@@ -46,7 +46,7 @@ export const HandleJoin = Game.System(
         [Player, { session: j.session, name: j.name, bot: j.bot }],
         [TeamOf, j.team],
         [Motion, { body: { x: spot.at[0], y: spot.at[1], z: spot.at[2], vx: 0, vy: 0, vz: 0, grounded: true, crouch: false }, yaw: spot.yaw, pitch: 0 }],
-        [Controls, { input: { ...IDLE_INPUT, yaw: spot.yaw }, previous: 0 }],
+        [Controls, { input: { ...IDLE_INPUT, yaw: spot.yaw }, previous: 0, pressed: 0, steps: [], starved: 0 }],
         [Life, { _tag: "Dead", respawn: 30, killer: null }],
         [Arsenal, freshArsenal(j.primary)],
         [Stats, NO_STATS],

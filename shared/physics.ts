@@ -51,7 +51,11 @@ let ready: Promise<void> | null = null
 /** Carica il WASM di Rapier una volta per processo. */
 export const initPhysics = () => (ready ??= RAPIER.init())
 
-export function createPhysicsWorld(): PhysicsWorld {
+/** Parametri del character controller (sovrascrivibili nei test). */
+export const KCC = { offset: 0.02, autostep: true, snap: 0.35, split: true }
+
+export function createPhysicsWorld(tuning: Partial<typeof KCC> = {}): PhysicsWorld {
+  const k = { ...KCC, ...tuning }
   const world = new RAPIER.World({ x: 0, y: 0, z: 0 })
   for (const b of BLOCKS) {
     const hx = (b.max[0] - b.min[0]) / 2
@@ -74,9 +78,9 @@ export function createPhysicsWorld(): PhysicsWorld {
   }
   const stand = world.createCollider(RAPIER.ColliderDesc.capsule(HALF_STAND, CAPSULE_RADIUS).setCollisionGroups(CHARACTER_GROUPS))
   const crouch = world.createCollider(RAPIER.ColliderDesc.capsule(HALF_CROUCH, CAPSULE_RADIUS).setCollisionGroups(CHARACTER_GROUPS))
-  const controller = world.createCharacterController(0.02)
-  controller.enableAutostep(0.5, 0.25, false)
-  controller.enableSnapToGround(0.35)
+  const controller = world.createCharacterController(k.offset)
+  if (k.autostep) controller.enableAutostep(0.5, 0.25, false)
+  if (k.snap > 0) controller.enableSnapToGround(k.snap)
   controller.setMaxSlopeClimbAngle((55 * Math.PI) / 180)
   controller.setMinSlopeSlideAngle((60 * Math.PI) / 180)
   controller.setSlideEnabled(true)
@@ -98,14 +102,31 @@ export function createPhysicsWorld(): PhysicsWorld {
       const half = crouching ? HALF_CROUCH : HALF_STAND
       const lift = half + CAPSULE_RADIUS
       collider.setTranslation({ x: feet.x, y: feet.y + lift, z: feet.z })
-      controller.computeColliderMovement(collider, { x: delta.x, y: delta.y, z: delta.z }, undefined, CHARACTER_GROUPS)
-      const m = controller.computedMovement()
+      if (!k.split) {
+        controller.computeColliderMovement(collider, { x: delta.x, y: delta.y, z: delta.z }, undefined, CHARACTER_GROUPS)
+        const m = controller.computedMovement()
+        return {
+          x: feet.x + m.x,
+          y: feet.y + m.y,
+          z: feet.z + m.z,
+          grounded: controller.computedGrounded(),
+          hitCeiling: delta.y > 0.001 && m.y < delta.y * 0.5
+        }
+      }
+      // Prima l'orizzontale (con gradini), poi la verticale: un corpo appoggiato
+      // non si incastra nel pavimento mentre cammina.
+      controller.computeColliderMovement(collider, { x: delta.x, y: 0, z: delta.z }, undefined, CHARACTER_GROUPS)
+      const h = controller.computedMovement()
+      const mid = { x: feet.x + h.x, y: feet.y + h.y, z: feet.z + h.z }
+      collider.setTranslation({ x: mid.x, y: mid.y + lift, z: mid.z })
+      controller.computeColliderMovement(collider, { x: 0, y: delta.y, z: 0 }, undefined, CHARACTER_GROUPS)
+      const v = controller.computedMovement()
       return {
-        x: feet.x + m.x,
-        y: feet.y + m.y,
-        z: feet.z + m.z,
+        x: mid.x + v.x,
+        y: mid.y + v.y,
+        z: mid.z + v.z,
         grounded: controller.computedGrounded(),
-        hitCeiling: delta.y > 0.001 && m.y < delta.y * 0.5
+        hitCeiling: delta.y > 0.001 && v.y < delta.y * 0.5
       }
     },
     canStand(feet) {

@@ -23,7 +23,11 @@ import { BotBrain } from "./bot.ts"
 import { navGraph } from "./nav.ts"
 
 /** Comandi in attesa per giocatore: oltre, il client corre troppo e si scartano i vecchi. */
-const MAX_QUEUE = 6
+const MAX_QUEUE = 20
+/** Comandi applicati al massimo in un tick (recupero dopo un ritardo di rete, non di più). */
+const STEPS_PER_TICK = 3
+/** Passi accumulabili durante un ritardo, da recuperare dopo. */
+const MAX_CREDIT = 12
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
 export interface Member {
@@ -35,6 +39,7 @@ export interface Member {
   queue: PlayerInput[]
   last: PlayerInput
   ping: number
+  credit: number
 }
 
 export interface RoomSettings {
@@ -92,7 +97,7 @@ export class Room {
       this.removeMember(bot.id)
     }
     const team = this.smallerTeam()
-    this.members.set(id, { id, name, team, bot: false, send, queue: [], last: IDLE_INPUT, ping: 0 })
+    this.members.set(id, { id, name, team, bot: false, send, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
     this.sim.join(id, name, team, false, primary)
     return true
   }
@@ -104,7 +109,7 @@ export class Room {
     const id = `bot-${++botCounter}`
     const primaries: PrimaryId[] = ["cramar", "cramar", "doplete", "cjampanili"]
     const primary = primaries[botCounter % primaries.length]
-    this.members.set(id, { id, name, team, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0 })
+    this.members.set(id, { id, name, team, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
     this.bots.set(id, new BotBrain(id, this.level, navGraph(this.physics), this.physics, botCounter))
     this.sim.join(id, name, team, true, primary)
   }
@@ -151,6 +156,9 @@ export class Room {
   queueInput(id: string, input: PlayerInput) {
     const m = this.members.get(id)
     if (!m || m.bot) return
+    // Fuori ordine o doppio (rete): si scarta.
+    const lastSeq = m.queue.length ? m.queue[m.queue.length - 1].seq : m.last.seq
+    if (input.seq <= lastSeq) return
     m.queue.push(input)
     if (m.queue.length > MAX_QUEUE) {
       // Si tengono le pressioni dei comandi scartati.
@@ -171,11 +179,19 @@ export class Room {
 
   /** Un tick: ingressi, bot, simulazione. */
   step() {
+    // Ogni comando è un passo: si consegnano quelli arrivati, fino a STEPS_PER_TICK
+    // (il resto resta in coda per il tick dopo). Niente comandi ripetuti: il server
+    // farebbe un passo che il client non ha mai fatto, e la camera scatterebbe.
     for (const m of this.members.values()) {
       if (m.bot) continue
-      const next = m.queue.shift()
-      if (next) m.last = next
-      this.sim.input(m.id, next ?? m.last)
+      // Credito di passi: in media uno per tick, così nessuno corre più veloce mandando più comandi.
+      m.credit = Math.min(MAX_CREDIT, m.credit + 1)
+      for (let i = 0; i < STEPS_PER_TICK && m.queue.length && m.credit >= 1; i++) {
+        m.credit--
+        const next = m.queue.shift()!
+        m.last = next
+        this.sim.input(m.id, next)
+      }
     }
     for (const [id, brain] of this.bots) this.sim.input(id, brain.think(this.world))
     const events = this.sim.step()

@@ -14,6 +14,8 @@ export class Predictor {
   /** Scarto visivo dopo una correzione, assorbito piano piano. */
   readonly smooth = { x: 0, y: 0, z: 0 }
   launched = false
+  /** Diagnostica: le correzioni recenti (metri), per il pannello F3. */
+  corrections: number[] = []
 
   constructor(private readonly physics: PhysicsWorld) {}
 
@@ -42,6 +44,8 @@ export class Predictor {
       const dy = this.body.y - body.y
       const dz = this.body.z - body.z
       const err = Math.hypot(dx, dy, dz)
+      this.corrections.push(err)
+      if (this.corrections.length > 60) this.corrections.shift()
       // Piccoli errori si smussano, i grandi (teletrasporto, rinascita) no.
       if (err < 2) {
         this.smooth.x += dx

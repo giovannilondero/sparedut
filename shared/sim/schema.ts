@@ -35,9 +35,19 @@ export interface MotionValue {
 export const Motion = Descriptor.Component<MotionValue>()("Sparedut/Motion")
 
 export interface ControlsValue {
+  /** L'ultimo comando applicato: sguardo, pulsanti tenuti, arma, numero confermato. */
   readonly input: PlayerInput
-  /** Pulsanti del tick precedente, per riconoscere le pressioni. */
+  /** Pulsanti alla fine del tick precedente, per riconoscere le pressioni. */
   readonly previous: number
+  /** Tutti i pulsanti comparsi nei comandi di questo tick (una pressione breve non si perde). */
+  readonly pressed: number
+  /**
+   * I comandi arrivati in questo tick, in ordine: ognuno è un passo di movimento,
+   * esattamente come li ha già applicati la predizione del client.
+   */
+  readonly steps: ReadonlyArray<PlayerInput>
+  /** Tick di fila senza comandi (rete in ritardo o scheda in pausa). */
+  readonly starved: number
 }
 export const Controls = Descriptor.Component<ControlsValue>()("Sparedut/Controls")
 

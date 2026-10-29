@@ -53,7 +53,13 @@ export const Respawn = Game.System(
       })
       const arsenal = m.data.arsenal.get()
       m.data.arsenal.set(freshArsenal(arsenal.nextPrimary))
-      m.data.controls.update((c) => ({ input: { ...IDLE_INPUT, seq: c.input.seq, view: c.input.view, yaw: spot.yaw, weapon: arsenal.nextPrimary }, previous: c.input.buttons }))
+      m.data.controls.update((c) => ({
+        input: { ...IDLE_INPUT, seq: c.input.seq, view: c.input.view, yaw: spot.yaw, weapon: arsenal.nextPrimary },
+        previous: c.input.buttons,
+        pressed: 0,
+        steps: [],
+        starved: 0
+      }))
       m.data.attackers.set([])
       events.out.emit({ t: "spawn", s: m.data.player.get().session })
     }

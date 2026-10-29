@@ -15,6 +15,9 @@ export interface NetStats {
   readonly snapEvery: number
   readonly snapJitter: number
   readonly players: number
+  /** Correzioni della predizione oltre 1 cm nelle ultime 60 istantanee, e la peggiore (m). */
+  readonly corrections: number
+  readonly worstCorrection: number
 }
 
 const WINDOW = 120
@@ -94,7 +97,7 @@ export class PerfMonitor {
       <span>CPU ${cpu.toFixed(1)} ms</span>
       <span>${this.calls} draw call · ${(this.triangles / 1000).toFixed(0)}k tri</span>
       <span>${canvas.width}×${canvas.height} @ ${this.renderer.getPixelRatio().toFixed(2)}x · ${extra.quality}</span>
-      ${n ? `<span>ping ${Math.round(n.ping)} ms · tick ${n.tick}</span><span>istantanee ${n.snapEvery.toFixed(0)}±${n.snapJitter.toFixed(0)} ms · ${n.players} giocatori</span>` : `<span>menu</span>`}
+      ${n ? `<span>ping ${Math.round(n.ping)} ms · tick ${n.tick}</span><span>istantanee ${n.snapEvery.toFixed(0)}±${n.snapJitter.toFixed(0)} ms · ${n.players} giocatori</span><span>correzioni ${n.corrections}/60 · max ${(n.worstCorrection * 100).toFixed(0)} cm</span>` : `<span>menu</span>`}
       <small>F3 per nascondere</small>`
   }
 }

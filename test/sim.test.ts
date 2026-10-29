@@ -57,6 +57,33 @@ describe("movimento", () => {
 })
 
 describe("simulazione", () => {
+  test("ogni comando è un passo: due in un tick, zero nel successivo, stesso risultato", () => {
+    const run = (deliver: (send: () => void, i: number) => void) => {
+      const sim = createSim({ mode: "bataie", minutes: 5, seed: 3, physics })
+      sim.join("a", "Toni", "benandanti", false, "cramar")
+      sim.start()
+      for (let i = 0; i < 5; i++) sim.step()
+      let seq = 1
+      const send = () => sim.input("a", { ...IDLE_INPUT, seq: seq++, mz: 1, yaw: Math.PI, view: 0 })
+      for (let i = 0; i < 60; i++) {
+        deliver(send, i)
+        sim.step()
+      }
+      // Gli ultimi comandi in ritardo arrivano dopo.
+      sim.step()
+      return sim.view().players[0].body
+    }
+    const steady = run((send) => send())
+    const bursty = run((send, i) => {
+      if (i % 2 === 0) {
+        send()
+        send()
+      }
+    })
+    expect(bursty.z).toBeCloseTo(steady.z, 3)
+    expect(bursty.x).toBeCloseTo(steady.x, 3)
+  })
+
   test("un benandant colpisce e abbatte un malandant", () => {
     const sim = createSim({ mode: "bataie", minutes: 5, seed: 7, physics })
     sim.join("a", "Toni", "benandanti", false, "cramar")
@@ -81,8 +108,9 @@ describe("simulazione", () => {
     let v = sim.view()
     const a = v.players.find((p) => p.session === "a")!
     const b = v.players.find((p) => p.session === "b")!
-    expect(a.body.z).toBeCloseTo(22, 0)
-    expect(b.body.z).toBeCloseTo(48, 0)
+    // Il percorso si ferma entro 0.8 m dal punto, poi il corpo frena: qualche decimetro di margine.
+    expect(Math.abs(a.body.z - 22)).toBeLessThan(1.5)
+    expect(Math.abs(b.body.z - 48)).toBeLessThan(1.5)
     const dx = b.body.x - a.body.x
     const dz = b.body.z - a.body.z
     const dy = b.body.y + 1.0 - (a.body.y + 1.6)

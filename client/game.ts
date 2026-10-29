@@ -200,7 +200,16 @@ export class Game {
     const gaps = a.slice(1).map((t, i) => t - a[i])
     const mean = gaps.length ? gaps.reduce((x, y) => x + y, 0) / gaps.length : 0
     const jitter = gaps.length ? Math.sqrt(gaps.reduce((x, y) => x + (y - mean) ** 2, 0) / gaps.length) : 0
-    return { ping: this.d.net.rtt, tick: this.snap?.tick ?? 0, snapEvery: mean, snapJitter: jitter, players: this.snap?.players.length ?? 0 }
+    const corr = this.predictor.corrections
+    return {
+      ping: this.d.net.rtt,
+      tick: this.snap?.tick ?? 0,
+      snapEvery: mean,
+      snapJitter: jitter,
+      players: this.snap?.players.length ?? 0,
+      corrections: corr.filter((c) => c > 0.01).length,
+      worstCorrection: corr.length ? Math.max(...corr) : 0
+    }
   }
 
   applySettings() {
@@ -259,7 +268,9 @@ export class Game {
     const now = performance.now() / 1000
     const target = s.tick - now * 60
     if (this.offset === null || Math.abs(target - this.offset) > 30) this.offset = target
-    else this.offset += target > this.offset ? (target - this.offset) * 0.2 : (target - this.offset) * 0.02
+    // L'orologio degli altri si sposta piano: un'istantanea in anticipo o in ritardo
+    // non deve accelerare o frenare tutti i giocatori disegnati.
+    else this.offset += (target - this.offset) * (target > this.offset ? 0.05 : 0.01)
     const players = new Map(s.players.map((p) => [p.id, p]))
     this.frames.push({ tick: s.tick, players })
     while (this.frames.length > 40) this.frames.shift()
