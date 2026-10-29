@@ -11,6 +11,10 @@ export interface Settings {
   invertY: boolean
   primary: PrimaryId
   quality: "bassa" | "media" | "alta"
+  /** Pannello prestazioni (F3). */
+  showInfo: boolean
+  /** Risoluzione dinamica: abbassa la risoluzione quando gli FPS calano. */
+  autoRes: boolean
   lastMode: ModeId
   lastBots: number
   lastLevel: BotLevel
@@ -27,6 +31,8 @@ const DEFAULTS: Settings = {
   invertY: false,
   primary: "cramar",
   quality: "media",
+  showInfo: false,
+  autoRes: true,
   lastMode: "bataie",
   lastBots: 4,
   lastLevel: "pari",

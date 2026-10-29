@@ -377,8 +377,10 @@ export function createFx(scene: THREE.Scene): Fx {
   })
   let lightCursor = 0
   function flashLight(at: P3, color: THREE.Color, peak: number, dist: number, life: number) {
-    let best = lights[lightCursor++ % lights.length]
-    for (const x of lights) if (x.t >= x.life) best = x
+    const usable = lights.filter((x) => x.l.visible)
+    if (!usable.length) return
+    let best = usable[lightCursor++ % usable.length]
+    for (const x of usable) if (x.t >= x.life) best = x
     best.l.position.set(at[0], at[1], at[2])
     best.l.color.copy(color)
     best.l.distance = dist
@@ -437,6 +439,12 @@ export function createFx(scene: THREE.Scene): Fx {
   }
 
   return {
+    setQuality(q) {
+      const n = q === "alta" ? 4 : q === "media" ? 2 : 0
+      lights.forEach((x, i) => {
+        x.l.visible = i < n
+      })
+    },
     tracer(from, to, weapon) {
       tracers.spawn(from, to, weapon)
     },

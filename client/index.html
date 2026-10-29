@@ -83,6 +83,8 @@
         <label class="field"><span>Volume <b id="s-master-v"></b></span><input type="range" id="s-master" min="0" max="1" step="0.05" /></label>
         <label class="field"><span>Musica <b id="s-music-v"></b></span><input type="range" id="s-music" min="0" max="1" step="0.05" /></label>
         <label class="field"><span>Qualità grafica</span><select id="s-quality"><option value="bassa">Bassa (portatile del nono)</option><option value="media">Media</option><option value="alta">Alta (ombre belle)</option></select></label>
+        <label class="check"><input type="checkbox" id="s-autores" /> Risoluzione dinamica (abbassa la risoluzione se gli FPS calano)</label>
+        <label class="check"><input type="checkbox" id="s-info" /> Mostra info prestazioni (FPS, ping…) · anche col tasto <kbd>F3</kbd></label>
         <label class="check"><input type="checkbox" id="s-invert" /> Inverti asse verticale</label>
         <div class="keys">
           <div><kbd>WASD</kbd> muoviti</div><div><kbd>Mouse</kbd> mira · <kbd>Sx</kbd> spara · <kbd>Dx</kbd> mira fine</div>
@@ -91,6 +93,7 @@
           <div><kbd>1-4</kbd> armi · <kbd>Q</kbd> ultima</div><div><kbd>G</kbd> bombe di sgnape</div>
           <div><kbd>Tab</kbd> classifica</div><div><kbd>Invio</kbd> chat · <kbd>V</kbd> frasi rapide</div>
           <div><kbd>B</kbd> armeria</div><div><kbd>Esc</kbd> menu partita</div>
+          <div><kbd>F3</kbd> info prestazioni</div>
         </div>
         <div class="row"><button data-go="home">Indaûr</button></div>
       </section>
@@ -159,7 +162,6 @@
       <div id="pause" class="hidden overlay"></div>
       <div id="endscreen" class="hidden overlay"></div>
       <div id="clickplay" class="hidden"><div>Fâs clic par zuiâ</div><small>Esc per il menu della partita</small></div>
-      <div id="netinfo"></div>
     </div>
 
     <div id="toast" class="hidden"></div>

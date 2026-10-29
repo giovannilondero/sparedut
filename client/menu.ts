@@ -103,6 +103,11 @@ export class Menu {
     }, 400)
   }
 
+  /** Allinea le caselle alle impostazioni cambiate da fuori (F3). */
+  syncSettings() {
+    $<HTMLInputElement>("s-info").checked = this.settings.showInfo
+  }
+
   show(on: boolean) {
     $("menu").classList.toggle("hidden", !on)
     if (on) this.go("home")
@@ -240,6 +245,14 @@ export class Menu {
       s.quality = q.value as Settings["quality"]
       this.handlers.settingsChanged()
     })
+    for (const [id, key] of [["s-autores", "autoRes"], ["s-info", "showInfo"]] as const) {
+      const box = $<HTMLInputElement>(id)
+      box.checked = s[key]
+      box.addEventListener("change", () => {
+        s[key] = box.checked
+        this.handlers.settingsChanged()
+      })
+    }
     const inv = $<HTMLInputElement>("s-invert")
     inv.checked = s.invertY
     inv.addEventListener("change", () => {

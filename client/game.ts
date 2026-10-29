@@ -85,7 +85,10 @@ export class Game {
   private shots: number[] = []
   private prevFire = false
   private prevBomb = false
-  private avatars = new Map<string, { avatar: Avatar; team: Team; stepAcc: number; last: { x: number; z: number } | null }>()
+  private avatars = new Map<string, { avatar: Avatar; blob: THREE.Mesh; team: Team; stepAcc: number; last: { x: number; z: number } | null }>()
+  /** Ombre vere dei giocatori solo in qualità alta; altrimenti un disco scuro ai piedi. */
+  private dynamicShadows = false
+  private snapArrivals: number[] = []
   private names = new Map<string, string>()
   private teams = new Map<string, Team>()
   private board: readonly BoardRow[] = []
@@ -105,6 +108,10 @@ export class Game {
   private renderTick = 0
   private time = 0
   private running = false
+  private readonly blobGeo = new THREE.CircleGeometry(0.42, 20).rotateX(-Math.PI / 2)
+  private readonly blobMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false })
+  private readonly deathCam = new THREE.Vector3()
+  private readonly deathLook = new THREE.Vector3()
 
   constructor(private readonly d: GameDeps) {
     this.predictor = new Predictor(d.physics)
@@ -163,7 +170,7 @@ export class Game {
   stop() {
     this.running = false
     for (const a of this.avatars.values()) {
-      this.d.scene.remove(a.avatar.object)
+      this.d.scene.remove(a.avatar.object, a.blob)
       a.avatar.dispose()
     }
     this.avatars.clear()
@@ -175,6 +182,25 @@ export class Game {
 
   get active() {
     return this.running
+  }
+
+  setQuality(q: "bassa" | "media" | "alta") {
+    this.dynamicShadows = q === "alta"
+    for (const a of this.avatars.values()) this.castShadows(a.avatar)
+  }
+
+  private castShadows(avatar: Avatar) {
+    avatar.object.traverse((o) => {
+      o.castShadow = this.dynamicShadows
+    })
+  }
+
+  netStats() {
+    const a = this.snapArrivals
+    const gaps = a.slice(1).map((t, i) => t - a[i])
+    const mean = gaps.length ? gaps.reduce((x, y) => x + y, 0) / gaps.length : 0
+    const jitter = gaps.length ? Math.sqrt(gaps.reduce((x, y) => x + (y - mean) ** 2, 0) / gaps.length) : 0
+    return { ping: this.d.net.rtt, tick: this.snap?.tick ?? 0, snapEvery: mean, snapJitter: jitter, players: this.snap?.players.length ?? 0 }
   }
 
   applySettings() {
@@ -219,7 +245,7 @@ export class Game {
     const ids = new Set(room.roster.map((r) => r.id))
     for (const [id, a] of this.avatars) {
       if (!ids.has(id)) {
-        this.d.scene.remove(a.avatar.object)
+        this.d.scene.remove(a.avatar.object, a.blob)
         a.avatar.dispose()
         this.avatars.delete(id)
       }
@@ -228,6 +254,8 @@ export class Game {
   }
 
   private onSnapshot(s: Snapshot) {
+    this.snapArrivals.push(performance.now())
+    if (this.snapArrivals.length > 31) this.snapArrivals.shift()
     const now = performance.now() / 1000
     const target = s.tick - now * 60
     if (this.offset === null || Math.abs(target - this.offset) > 30) this.offset = target
@@ -807,8 +835,11 @@ export class Game {
         if (!entry) {
           const team = this.teams.get(p.id) ?? "benandanti"
           const avatar = this.d.createAvatar(team, this.names.get(p.id) ?? "?")
-          this.d.scene.add(avatar.object)
-          entry = { avatar, team, stepAcc: 0, last: null }
+          this.castShadows(avatar)
+          const blob = new THREE.Mesh(this.blobGeo, this.blobMat)
+          blob.renderOrder = 1
+          this.d.scene.add(avatar.object, blob)
+          entry = { avatar, blob, team, stepAcc: 0, last: null }
           this.avatars.set(p.id, entry)
         }
         const q = this.interpolated(p.id) ?? p
@@ -830,6 +861,15 @@ export class Game {
           carrier: (q.f & FLAG_BIT.carrier) !== 0,
           sgnape: (q.f & FLAG_BIT.sgnape) !== 0
         })
+        entry.blob.visible = !this.dynamicShadows && (q.f & FLAG_BIT.alive) !== 0
+        if (entry.blob.visible) {
+          // Il disco sta sul terreno sotto i piedi: in aria si rimpicciolisce.
+          const ground = this.d.physics.raycast({ x: q.x, y: q.y + 0.3, z: q.z }, { x: 0, y: -1, z: 0 }, 12)
+          const gy = ground ? q.y + 0.3 - ground.dist : q.y
+          const h = Math.max(0, q.y - gy)
+          entry.blob.position.set(q.x, gy + 0.03, q.z)
+          entry.blob.scale.setScalar(Math.max(0.3, 1 - h * 0.12))
+        }
         if (entry.last && q.f & FLAG_BIT.grounded && q.f & FLAG_BIT.alive) {
           entry.stepAcc += Math.hypot(q.x - entry.last.x, q.z - entry.last.z)
           if (entry.stepAcc > 2.4) {
@@ -857,24 +897,25 @@ export class Game {
     viewmodel.setVisible(!!you?.alive && !scoped)
 
     const b = this.predictor.body
-    if (you?.alive && b) {
+    const drawn = this.predictor.render(this.acc / DT)
+    if (you?.alive && b && drawn) {
       this.eye += ((b.crouch ? EYE_CROUCH : EYE_STAND) - this.eye) * Math.min(1, dt * 14)
       const sm = this.predictor.smooth
       const shakeAmp = this.shake * 0.08
       this.shake *= Math.exp(-dt * 5)
       camera.position.set(
-        b.x + sm.x + (Math.random() - 0.5) * shakeAmp,
-        b.y + sm.y + this.eye + (Math.random() - 0.5) * shakeAmp,
-        b.z + sm.z + (Math.random() - 0.5) * shakeAmp
+        drawn.x + sm.x + (Math.random() - 0.5) * shakeAmp,
+        drawn.y + sm.y + this.eye + (Math.random() - 0.5) * shakeAmp,
+        drawn.z + sm.z + (Math.random() - 0.5) * shakeAmp
       )
       const roll = you.arsenal.sgnape > 0 ? Math.sin(t * 1.7) * 0.06 : 0
       camera.rotation.set(c.pitch + this.kickPitch, c.yaw, roll, "YXZ")
     } else if (you && b) {
       // Da morto: la camera sale e guarda chi ti ha fatto frico.
       const killer = you.killer ? this.interpolated(you.killer) : null
-      const target = new THREE.Vector3(killer?.x ?? b.x, (killer?.y ?? b.y) + 1.2, killer?.z ?? b.z - 1)
-      camera.position.lerp(new THREE.Vector3(b.x, b.y + 4.5, b.z), Math.min(1, dt * 2))
-      camera.lookAt(target)
+      this.deathLook.set(killer?.x ?? b.x, (killer?.y ?? b.y) + 1.2, killer?.z ?? b.z - 1)
+      camera.position.lerp(this.deathCam.set(b.x, b.y + 4.5, b.z), Math.min(1, dt * 2))
+      camera.lookAt(this.deathLook)
     }
     camera.updateMatrixWorld()
 
@@ -931,12 +972,12 @@ export class Game {
       this.hud.crosshair(Math.min(60, px * 1.6), you.alive && !scoped)
     }
     this.hud.clickToPlay(!this.controls.locked && this.overlay === "none" && !this.chatting && !this.boardOpen && s?.phase.tag !== "Over")
-    this.hud.netinfo(`ping ${Math.round(this.d.net.rtt)} ms · tick ${s?.tick ?? 0}`)
   }
 
   render() {
     const { renderer, scene, camera, viewmodel } = this.d
     renderer.autoClear = false
+    renderer.info.reset()
     renderer.clear()
     renderer.render(scene, camera)
     renderer.clearDepth()

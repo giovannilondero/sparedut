@@ -144,7 +144,7 @@ export function createDynamic(scene: THREE.Scene, envMap: THREE.Texture | null) 
     const geo = geos.get(p.kind) ?? pickupGeo(p.kind)
     geos.set(p.kind, geo)
     const mesh = new THREE.Mesh<THREE.BufferGeometry, THREE.Material>(geo, pickMat)
-    mesh.castShadow = true
+    mesh.castShadow = false
     mesh.position.set(p.at[0], p.at[1] + 1, p.at[2])
     const ring = new THREE.Mesh(ringGeo, glowMaterial(KIND_GLOW[p.kind], 0.55))
     ring.position.set(p.at[0], p.at[1] + 0.04, p.at[2])
@@ -232,7 +232,6 @@ export function createDynamic(scene: THREE.Scene, envMap: THREE.Texture | null) 
       pickups.forEach((p, i) => {
         const on = frame.pickups[i] ?? true
         p.mesh.material = on ? pickMat : ghostMat
-        p.mesh.castShadow = on
         p.mesh.position.y = p.y + Math.sin(t * 2 + p.phase) * 0.12
         p.mesh.rotation.y = t * 1.3 + p.phase
         p.ring.visible = on

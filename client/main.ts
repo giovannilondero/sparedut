@@ -10,19 +10,27 @@ import { createFx } from "./fx.ts"
 import { Game } from "./game.ts"
 import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
+import { PerfMonitor } from "./perf.ts"
 import { loadSettings, saveSettings } from "./settings.ts"
 import { createViewmodel } from "./viewmodel.ts"
 import { createWorld } from "./world.ts"
 
 const settings = loadSettings()
+let game: Game | null = null
 const canvas = document.getElementById("view") as HTMLCanvasElement
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: settings.quality !== "bassa", powerPreference: "high-performance" })
 renderer.outputColorSpace = THREE.SRGBColorSpace
 renderer.toneMapping = THREE.ACESFilmicToneMapping
 renderer.toneMappingExposure = 1.05
-renderer.shadowMap.enabled = settings.quality !== "bassa"
-renderer.shadowMap.type = settings.quality === "alta" ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap
-const pixelRatio = () => Math.min(devicePixelRatio, settings.quality === "alta" ? 2 : settings.quality === "media" ? 1.5 : 1)
+// Il conteggio di draw call e triangoli copre mondo e arma: lo azzera il frame.
+renderer.info.autoReset = false
+const perf = new PerfMonitor(renderer)
+
+/** Il pixel ratio massimo per qualità; la risoluzione dinamica scende fino a `minRatio`. */
+const maxRatio = () => Math.min(devicePixelRatio, settings.quality === "alta" ? 2 : settings.quality === "media" ? 1.5 : 1)
+const minRatio = () => Math.min(maxRatio(), settings.quality === "bassa" ? 0.6 : 0.75)
+const pixelRatio = () => (settings.autoRes ? Math.min(perf.scale, maxRatio()) : maxRatio())
+perf.scale = maxRatio()
 renderer.setPixelRatio(pixelRatio())
 
 const scene = new THREE.Scene()
@@ -47,11 +55,34 @@ audio.setVolumes(settings.master, settings.music)
 addEventListener("resize", resize)
 resize()
 
+let quality = settings.quality
+const applyQuality = () => {
+  quality = settings.quality
+  perf.scale = maxRatio()
+  world.setQuality(quality)
+  fx.setQuality(quality)
+  game?.setQuality(quality)
+  resize()
+}
+applyQuality()
+perf.show(settings.showInfo)
+window.addEventListener("keydown", (e: KeyboardEvent) => {
+  if (e.code !== "F3") return
+  e.preventDefault()
+  settings.showInfo = !settings.showInfo
+  perf.show(settings.showInfo)
+  menu.syncSettings()
+  saveSettings(settings)
+})
+
 const net = new Net()
 const persist = () => {
   saveSettings(settings)
   audio.setVolumes(settings.master, settings.music)
   game?.applySettings()
+  perf.show(settings.showInfo)
+  if (settings.quality !== quality) applyQuality()
+  else resize()
 }
 
 const menu = new Menu(settings, audio, {
@@ -69,7 +100,6 @@ const menu = new Menu(settings, audio, {
   settingsChanged: persist
 })
 
-let game: Game | null = null
 /** La partita veloce contro i bot parte subito, senza riscaldamento. */
 let autostart = false
 const physicsReady = initPhysics().then(() => {
@@ -89,6 +119,7 @@ const physicsReady = initPhysics().then(() => {
     saveSettings: () => saveSettings(settings),
     onLeave: backToMenu
   })
+  game.setQuality(quality)
 })
 
 function toast(text: string) {
@@ -174,6 +205,7 @@ const loop = (now: number) => {
   const dt = Math.min(0.1, (now - last) / 1000)
   last = now
   const t = now / 1000
+  const cpuStart = performance.now()
   if (game?.active) {
     game.frame(dt, t)
     game.render()
@@ -182,9 +214,13 @@ const loop = (now: number) => {
     camera.updateMatrixWorld()
     world.update(dt, t, { pickups: [], flags: null, hill: null, camera })
     fx.update(dt, camera)
+    renderer.info.reset()
     renderer.autoClear = true
     renderer.render(scene, camera)
   }
+  perf.sample(dt * 1000, performance.now() - cpuStart)
+  if (settings.autoRes && !document.hidden && perf.adapt(now, minRatio(), maxRatio())) resize()
+  perf.panel(now, { quality: `${quality}${settings.autoRes ? " · ris. dinamica" : ""}`, net: game?.active ? game.netStats() : null })
   requestAnimationFrame(loop)
 }
 requestAnimationFrame(loop)

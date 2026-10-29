@@ -20,46 +20,77 @@ export const fmtClock = (ticks: number) => {
 export class Hud {
   private announceTimer = 0
   private chatTimer = 0
+  /** Ultimo valore scritto per elemento e proprietà: il DOM si tocca solo se cambia. */
+  private written = new Map<string, string | boolean>()
+
+  private text(id: string, value: string) {
+    if (this.written.get(`${id}:t`) === value) return
+    this.written.set(`${id}:t`, value)
+    $(id).textContent = value
+  }
+
+  private html(id: string, value: string) {
+    if (this.written.get(`${id}:h`) === value) return
+    this.written.set(`${id}:h`, value)
+    $(id).innerHTML = value
+  }
+
+  private style(id: string, prop: string, value: string) {
+    if (this.written.get(`${id}:s:${prop}`) === value) return
+    this.written.set(`${id}:s:${prop}`, value)
+    $(id).style.setProperty(prop, value)
+  }
+
+  private toggleOn(el: Element, key: string, cls: string, on: boolean) {
+    if (this.written.get(`${key}:c:${cls}`) === on) return
+    this.written.set(`${key}:c:${cls}`, on)
+    el.classList.toggle(cls, on)
+  }
+
+  private toggle(id: string, cls: string, on: boolean) {
+    if (this.written.get(`${id}:c:${cls}`) === on) return
+    this.written.set(`${id}:c:${cls}`, on)
+    $(id).classList.toggle(cls, on)
+  }
 
   show(on: boolean) {
-    $("hud").classList.toggle("hidden", !on)
+    this.toggle("hud", "hidden", !on)
   }
 
   vitals(you: SnapSelf | null, slot: { owned: (id: WeaponId) => boolean }, localMag: number | null) {
     if (!you) return
     const hp = Math.max(0, you.hp)
-    $("hp").textContent = String(hp)
-    $("hp-bar").style.width = `${hp}%`
-    $("hp").parentElement!.classList.toggle("low", hp < 30 && you.alive)
-    $("armor").textContent = String(you.armor)
-    $("armor-bar").style.width = `${you.armor}%`
+    this.text("hp", String(hp))
+    this.style("hp-bar", "width", `${hp}%`)
+    this.toggleOn($("hp").parentElement!, "hp-low", "low", hp < 30 && you.alive)
+    this.text("armor", String(you.armor))
+    this.style("armor-bar", "width", `${you.armor}%`)
     const a = you.arsenal
     const def = WEAPONS[a.current]
-    $("weapon-name").textContent = def.name
+    this.text("weapon-name", def.name)
     const ammo = a.ammo[a.current]
-    $("mag").textContent = def.mode === "melee" ? "∞" : String(localMag ?? ammo.mag)
-    $("reserve").textContent = def.mode === "melee" ? "" : String(ammo.reserve)
-    $("reserve").previousElementSibling!.classList.toggle("hidden", def.mode === "melee")
-    $("bombs").textContent = `${SGNAPE_BOMB.name}: ${"🍶".repeat(a.bombs) || "—"}`
+    this.text("mag", def.mode === "melee" ? "∞" : String(localMag ?? ammo.mag))
+    this.text("reserve", def.mode === "melee" ? "" : String(ammo.reserve))
+    this.toggleOn($("reserve").previousElementSibling!, "slash", "hidden", def.mode === "melee")
+    this.text("bombs", `${SGNAPE_BOMB.name}: ${"🍶".repeat(a.bombs) || "—"}`)
     const slots: [string, WeaponId][] = [["1", a.primary], ["2", "mandi"], ["3", "lanciafrico"], ["4", "mescul"]]
-    $("slots").innerHTML = slots
+    this.html("slots", slots
       .map(([k, id]) => `<span class="${id === a.current ? "on" : slot.owned(id) ? "" : "off"}">${k} ${WEAPONS[id].name.split(" ")[0]}</span>`)
-      .join("")
+      .join(""))
     const buffs: string[] = []
     if (a.sgnape > 0) buffs.push(`🍶 Sgnape ${Math.ceil(a.sgnape / 60)}s`)
     if (you.shield > 0) buffs.push("✨ Protet")
-    $("buffs").textContent = buffs.join(" · ")
-    $("sgnape-fx").classList.toggle("on", a.sgnape > 0)
+    this.text("buffs", buffs.join(" · "))
+    this.toggle("sgnape-fx", "on", a.sgnape > 0)
   }
 
   crosshair(spreadPx: number, visible: boolean) {
-    const c = $("crosshair")
-    c.style.setProperty("--gap", `${4 + spreadPx}px`)
-    c.style.opacity = visible ? "1" : "0"
+    this.style("crosshair", "--gap", `${Math.round(4 + spreadPx)}px`)
+    this.style("crosshair", "opacity", visible ? "1" : "0")
   }
 
   scope(on: boolean) {
-    $("scope").classList.toggle("hidden", !on)
+    this.toggle("scope", "hidden", !on)
   }
 
   hitmarker(kind: "hit" | "head" | "kill") {
@@ -83,11 +114,11 @@ export class Hud {
   }
 
   top(snap: Snapshot, mode: ModeId, names: Map<string, string>) {
-    $("score-ben").textContent = String(snap.score.benandanti)
-    $("score-mal").textContent = String(snap.score.malandanti)
+    this.text("score-ben", String(snap.score.benandanti))
+    this.text("score-mal", String(snap.score.malandanti))
     const phase = snap.phase
-    $("clock").textContent = phase.tag === "Live" ? fmtClock(phase.ends - snap.tick) : phase.tag === "Warmup" ? "—:—" : "FIN"
-    $("mode-label").textContent = `${MODES[mode].name} · fin a ${MODES[mode].scoreLimit}`
+    this.text("clock", phase.tag === "Live" ? fmtClock(phase.ends - snap.tick) : phase.tag === "Warmup" ? "—:—" : "FIN")
+    this.text("mode-label", `${MODES[mode].name} · fin a ${MODES[mode].scoreLimit}`)
     let obj = ""
     if (mode === "frico") {
       obj = (["benandanti", "malandanti"] as const)
@@ -103,9 +134,8 @@ export class Hud {
       const label = h.contested ? "Contese!" : h.owner ? `Plaçute: ${TEAM_INFO[h.owner].name}` : "Plaçute libare"
       obj = `${label}<div class="hillbar"><i style="width:${((h.ticks % 60) / 60) * 100}%;background:${color}"></i></div>`
     }
-    $("objective").innerHTML = obj
-    $("banner").innerHTML =
-      phase.tag === "Warmup" ? "Riscjaldament · l'host al fâs partî la partide dal menu (<kbd>Esc</kbd>)" : ""
+    this.html("objective", obj)
+    this.html("banner", phase.tag === "Warmup" ? "Riscjaldament · l'host al fâs partî la partide dal menu (<kbd>Esc</kbd>)" : "")
   }
 
   killfeed(k: string | null, v: string, w: KillCause, head: boolean, names: Map<string, string>, teams: Map<string, Team>, me: string, seed: number) {
@@ -141,13 +171,12 @@ export class Hud {
   }
 
   death(you: SnapSelf | null, names: Map<string, string>, seed: number) {
-    const d = $("death")
     const dead = !!you && !you.alive
-    d.classList.toggle("hidden", !dead)
+    this.toggle("death", "hidden", !dead)
     if (!dead || !you) return
-    $("death-by").innerHTML = you.killer ? `Ti à fat fûr <b>${esc(names.get(you.killer) ?? "?")}</b>` : "Ti sês fat dal mâl di bessôl"
-    $("death-line").textContent = pick(DEATH_LINES, seed)
-    $("death-timer").textContent = you.respawn > 0 ? `Si torne in pîts tra ${Math.ceil(you.respawn / 60)}…` : "…"
+    this.html("death-by", you.killer ? `Ti à fat fûr <b>${esc(names.get(you.killer) ?? "?")}</b>` : "Ti sês fat dal mâl di bessôl")
+    this.text("death-line", pick(DEATH_LINES, seed))
+    this.text("death-timer", you.respawn > 0 ? `Si torne in pîts tra ${Math.ceil(you.respawn / 60)}…` : "…")
   }
 
   chat(name: string, team: Team | null, text: string) {
@@ -167,12 +196,9 @@ export class Hud {
     b.innerHTML = boardHtml(rows, me)
   }
 
-  netinfo(text: string) {
-    $("netinfo").textContent = text
-  }
 
   clickToPlay(on: boolean) {
-    $("clickplay").classList.toggle("hidden", !on)
+    this.toggle("clickplay", "hidden", !on)
   }
 }
 

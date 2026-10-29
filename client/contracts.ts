@@ -9,6 +9,13 @@ import type { WeaponId } from "../shared/weapons.ts"
 
 export type P3 = readonly [number, number, number]
 
+/**
+ * Qualità grafica. "alta": ombre dinamiche rifatte a ogni frame (anche dei giocatori).
+ * "media": ombre del paese calcolate una volta sola, i giocatori hanno un'ombra a disco.
+ * "bassa": niente ombre, meno luci, risoluzione piena al massimo 1x.
+ */
+export type Quality = "bassa" | "media" | "alta"
+
 // --- client/world.ts: export function createWorld(scene, renderer): WorldScene ---------
 export interface FlagVisual {
   readonly pos: P3
@@ -26,6 +33,8 @@ export interface WorldFrame {
 export interface WorldScene {
   /** Da chiamare ogni frame. `t` in secondi dall'avvio. */
   update(dt: number, t: number, frame: WorldFrame): void
+  /** Ombre e luci secondo la qualità; si può richiamare a partita in corso. */
+  setQuality(q: Quality): void
   /** Inquadratura per lo sfondo dei menu: la camera gira lenta attorno al Duomo. */
   menuCamera(t: number, camera: THREE.PerspectiveCamera): void
 }
@@ -102,6 +111,8 @@ export interface Fx {
   padBurst(at: P3): void
   pickupBurst(at: P3, kind: PickupKind): void
   update(dt: number, camera: THREE.Camera): void
+  /** Quante luci puntiformi usano i lampi (ognuna costa su ogni pixel del mondo). */
+  setQuality(q: Quality): void
 }
 
 // --- client/audio.ts: export function createAudio(): GameAudio ----------------------------

@@ -22,7 +22,7 @@ import {
   type Building,
   type Mat
 } from "../shared/map.ts"
-import type { WorldFrame, WorldScene } from "./contracts.ts"
+import type { WorldFrame, WorldScene, Quality } from "./contracts.ts"
 import { HORIZON, makeSky, makeTerrain, makeTown, nearGround } from "./world/backdrop.ts"
 import { createDynamic } from "./world/dynamic.ts"
 import { archPanel, archRing, Batch, boxAt, faceMatrix, Inst, quad, rng, spandrel, tri, vault, type V } from "./world/geo.ts"
@@ -1178,7 +1178,29 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
   const look = new THREE.Vector3()
   const PERIOD = 150
 
+  const setQuality = (q: Quality) => {
+    const shadows = q !== "bassa"
+    const changed = renderer.shadowMap.enabled !== shadows
+    renderer.shadowMap.enabled = shadows
+    renderer.shadowMap.type = q === "alta" ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap
+    // In "media" il paese non si muove: la mappa d'ombra si fa una volta e basta.
+    renderer.shadowMap.autoUpdate = q === "alta"
+    renderer.shadowMap.needsUpdate = true
+    const size = q === "alta" ? sm : 2048
+    if (sun.shadow.mapSize.x !== size) {
+      sun.shadow.mapSize.set(size, size)
+      sun.shadow.map?.dispose()
+      sun.shadow.map = null
+    }
+    altarLight.visible = naveLight.visible = q !== "bassa"
+    if (changed) scene.traverse((o) => {
+      const m = (o as THREE.Mesh).material
+      if (m) for (const x of Array.isArray(m) ? m : [m]) x.needsUpdate = true
+    })
+  }
+
   return {
+    setQuality,
     update(dt: number, t: number, frame: WorldFrame) {
       ;(sky.material as THREE.ShaderMaterial).uniforms.uTime.value = t
       for (const [i, h] of hay.entries()) {
