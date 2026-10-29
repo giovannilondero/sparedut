@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sparedût — anteprima audio</title>
+    <style>
+      body { font: 14px system-ui, sans-serif; background: #1d1b18; color: #eee; margin: 24px }
+      h1 { font-size: 18px }
+      #grid { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 }
+      button { background: #3a352e; color: #eee; border: 1px solid #5a5248; border-radius: 4px; padding: 6px 10px; cursor: pointer }
+      button:hover { background: #4b443b }
+      button.on { background: #6b8e3a }
+      label { margin-right: 16px }
+      #log { color: #aaa; white-space: pre; margin-top: 12px }
+    </style>
+  </head>
+  <body>
+    <h1>Sparedût — anteprima audio</h1>
+    <div>
+      <button id="music">Villotta: spenta</button>
+      <label><input id="spatial" type="checkbox" /> posizionale (gira attorno all'ascoltatore, 15 m)</label>
+      <label>master <input id="master" type="range" min="0" max="1" step="0.05" value="1" /></label>
+      <label>musica <input id="musicVol" type="range" min="0" max="1" step="0.05" value="0.6" /></label>
+    </div>
+    <div id="grid"></div>
+    <div id="log"></div>
+    <script type="module" src="./audio.ts"></script>
+  </body>
+</html>

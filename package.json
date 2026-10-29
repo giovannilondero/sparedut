@@ -1,0 +1,36 @@
+{
+  "name": "sparedut",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.21.0",
+    "@typeonce/ritmo": "^0.18.0",
+    "@typeonce/ritmo-browser": "^0.18.0",
+    "@typeonce/ritmo-math": "^0.18.0",
+    "howler": "^2.2.4",
+    "three": "^0.186.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@typeonce/oxlint-plugin-ritmo": "^0.18.0",
+    "@typeonce/ritmo-devtools": "^0.18.0",
+    "@types/bun": "^1.4.4",
+    "@types/howler": "^2.2.13",
+    "@types/three": "^0.186.0",
+    "concurrently": "^10.0.6",
+    "oxlint": "^1.90.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n server,client -c yellow,cyan \"bun --watch server/index.ts\" \"vite\"",
+    "build": "vite build",
+    "start": "bun server/index.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "lint": "oxlint && ritmo-devtools lint shared/lint.ts",
+    "test": "bun test",
+    "check": "pnpm typecheck && pnpm lint && pnpm test"
+  }
+}

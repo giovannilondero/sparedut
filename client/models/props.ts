@@ -1,0 +1,77 @@
+/**
+ * Oggetti di scena condivisi fra viewmodel ed effetti: la boce di sgnape con la miccia
+ * e la forma di frico. Geometrie in cache: ogni chiamata crea solo le mesh.
+ */
+import * as THREE from "three"
+import { canvasTexture, fricoTex, std } from "./kit.ts"
+
+const labelTex = () =>
+  canvasTexture("sgnape-label", 128, 64, (g, w, h) => {
+    g.fillStyle = "#f3ead2"
+    g.fillRect(0, 0, w, h)
+    g.strokeStyle = "#7a1f1f"
+    g.lineWidth = 3
+    g.strokeRect(4, 4, w - 8, h - 8)
+    g.fillStyle = "#7a1f1f"
+    g.font = "bold 22px Georgia, serif"
+    g.textAlign = "center"
+    g.textBaseline = "middle"
+    g.fillText("SGNAPE", w / 2, h / 2 - 6)
+    g.font = "11px Georgia, serif"
+    g.fillText("Glemone · 70°", w / 2, h / 2 + 16)
+  })
+
+let bottleGeo: { glass: THREE.BufferGeometry; liquid: THREE.BufferGeometry; label: THREE.BufferGeometry; cork: THREE.BufferGeometry; rag: THREE.BufferGeometry } | null = null
+
+const bottleMats = () => ({
+  glass: std("p-glass", { color: 0xcfeee6, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.5, depthWrite: false }),
+  liquid: std("p-liquid", { color: 0xbfe2ff, emissive: 0x10304a, roughness: 0.2 }),
+  label: std("p-label", { map: labelTex(), roughness: 0.9 }),
+  cork: std("p-cork", { color: 0xb08a5a, roughness: 1 }),
+  rag: std("p-rag", { color: 0xe8dcc0, roughness: 1, emissive: 0x401000 })
+})
+
+/** Bottiglia di grappa alta ~22 cm, base a y=0. */
+export function sgnapeBottle(): THREE.Group {
+  if (!bottleGeo) {
+    const prof = [
+      [0.001, 0],
+      [0.034, 0],
+      [0.037, 0.01],
+      [0.037, 0.11],
+      [0.028, 0.14],
+      [0.012, 0.16],
+      [0.012, 0.2],
+      [0.014, 0.205]
+    ].map(([r, y]) => new THREE.Vector2(r, y))
+    bottleGeo = {
+      glass: new THREE.LatheGeometry(prof, 12),
+      liquid: new THREE.CylinderGeometry(0.031, 0.031, 0.1, 10).translate(0, 0.058, 0),
+      label: new THREE.CylinderGeometry(0.038, 0.038, 0.055, 12, 1, true).translate(0, 0.065, 0),
+      cork: new THREE.CylinderGeometry(0.011, 0.01, 0.022, 8).translate(0, 0.212, 0),
+      rag: new THREE.BoxGeometry(0.012, 0.04, 0.006).translate(0, 0.24, 0)
+    }
+  }
+  const m = bottleMats()
+  const g = new THREE.Group()
+  g.add(new THREE.Mesh(bottleGeo.liquid, m.liquid))
+  g.add(new THREE.Mesh(bottleGeo.label, m.label))
+  g.add(new THREE.Mesh(bottleGeo.cork, m.cork))
+  g.add(new THREE.Mesh(bottleGeo.rag, m.rag))
+  const glass = new THREE.Mesh(bottleGeo.glass, m.glass)
+  glass.renderOrder = 1
+  g.add(glass)
+  return g
+}
+
+let fricoGeo: { disc: THREE.BufferGeometry; rim: THREE.BufferGeometry } | null = null
+
+/** Forma di frico, diametro ~32 cm, faccia verso ±y. */
+export function fricoDisc(): THREE.Group {
+  if (!fricoGeo) fricoGeo = { disc: new THREE.CylinderGeometry(0.16, 0.16, 0.035, 18), rim: new THREE.TorusGeometry(0.155, 0.018, 6, 18).rotateX(Math.PI / 2) }
+  const mat = std("p-frico", { color: 0xf0b850, map: fricoTex(), roughness: 0.7, emissive: 0x5a2400 })
+  const g = new THREE.Group()
+  g.add(new THREE.Mesh(fricoGeo.disc, mat))
+  g.add(new THREE.Mesh(fricoGeo.rim, mat))
+  return g
+}
