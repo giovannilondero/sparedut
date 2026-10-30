@@ -237,7 +237,8 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
   /** Il materiale del Batch per un `Mat` della mappa. */
   const surface = (m: Mat): K => (m === "invisibile" ? "pietra" : matKey(m))
   for (const b of BLOCKS) {
-    if (!isTerrain(b)) continue
+    // il terreno invisibile lo disegna lo scenario (rive irregolari, a Maran)
+    if (!isTerrain(b) || b.mat === "invisibile") continue
     const k = surface(b.mat)
     B.add(k, face(b.min, b.max, "top"), matColor(b.mat))
     if (gemona) {
@@ -258,12 +259,17 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     }
   }
   for (const w of WEDGES) {
-    const yb = Math.min(w.y0, w.y1)
+    // lo stesso solido del collider (base mezzo metro sotto il punto più basso): una rampa
+    // sospesa, come una scala, si vede anche da sotto e dalle teste
+    const yb = Math.min(w.y0, w.y1) - 0.5
     const top = surface(w.mat)
     const sideKey: K = top === "porfido" ? "pietra" : top === "erba" ? "terra" : top
     B.add(top, orient(quad([w.x0, w.y0, w.z0], [w.x0, w.y1, w.z1], [w.x1, w.y1, w.z1], [w.x1, w.y0, w.z0]), [0, 1, 0]), matColor(w.mat))
     B.add(sideKey, orient(quad([w.x0, yb, w.z0], [w.x0, yb, w.z1], [w.x0, w.y1, w.z1], [w.x0, w.y0, w.z0]), [-1, 0, 0]))
     B.add(sideKey, orient(quad([w.x1, yb, w.z0], [w.x1, yb, w.z1], [w.x1, w.y1, w.z1], [w.x1, w.y0, w.z0]), [1, 0, 0]))
+    B.add(sideKey, orient(quad([w.x0, yb, w.z0], [w.x1, yb, w.z0], [w.x1, w.y0, w.z0], [w.x0, w.y0, w.z0]), [0, 0, -1]))
+    B.add(sideKey, orient(quad([w.x0, yb, w.z1], [w.x1, yb, w.z1], [w.x1, w.y1, w.z1], [w.x0, w.y1, w.z1]), [0, 0, 1]))
+    B.add(sideKey, orient(quad([w.x0, yb, w.z0], [w.x1, yb, w.z0], [w.x1, yb, w.z1], [w.x0, yb, w.z1]), [0, -1, 0]))
   }
   // Le terrazze proseguono oltre i bordi, sotto il resto del paese.
   if (gemona) for (const g of nearGround()) {

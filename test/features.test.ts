@@ -164,7 +164,9 @@ describe("la puarte dal casot", () => {
     const sim = match(maran, [["a", "benandanti", "cramar"]])
     const p = me(sim, "a").body
     const outside: [number, number] = [CASOT.minX - 0.8, 27]
-    expect(walk(sim, "a", [[p.x, -90], [41.2, -90], [41.2, -51], [41.2, 13], [37, 27], outside], [], 5000)).toBe(true)
+    // la passerele tra lis cjanis, il troi tal bosc, il puintut e il troi fin te puarte
+    const route: [number, number][] = [[p.x, -90], [40.8, -90], [40.8, -51], [40.8, -26], [36, -24.8], [33.5, -19], [32, -14], [28, -7], [30, -1], [30, 2.5], [30, 15], [32.5, 19.2], [36, 24], [37, 27], outside]
+    expect(walk(sim, "a", route, [], 5000)).toBe(true)
 
     // Chiusa: non si passa.
     for (let i = 0; i < 90; i++) {

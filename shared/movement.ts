@@ -64,7 +64,9 @@ export function stepBody(body: Body, input: PlayerInput, physics: PhysicsWorld, 
   const wantsCrouch = pressed(input, "crouch")
   const crouch = wantsCrouch || (body.crouch && !physics.canStand(body))
   const aiming = pressed(input, "aim")
-  const speed = (crouch ? MOVE.crouch : aiming ? MOVE.aim : sprinting(input, crouch) ? MOVE.sprint : MOVE.walk) * speedScale
+  const wade = physics.map.wade
+  const wet = wade !== undefined && body.y < wade.level - 0.05
+  const speed = (crouch ? MOVE.crouch : aiming ? MOVE.aim : sprinting(input, crouch) ? MOVE.sprint : MOVE.walk) * speedScale * (wet ? wade.speed : 1)
 
   const f = forward(input.yaw)
   // destra = avanti ruotato di 90° in senso orario visto dall'alto

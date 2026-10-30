@@ -137,6 +137,8 @@ export interface MapDef {
   readonly track: readonly V3[]
   /** Sotto questa quota si è caduti fuori dal mondo. */
   readonly killY: number
+  /** Acqua bassa da guadare: con i piedi sotto `level` si va a `speed` della velocità. */
+  readonly wade?: { readonly level: number; readonly speed: number }
   /** Le torrette con la mitraie. */
   readonly turrets: readonly TurretSpot[]
   /** Le porte da sfondare (non stanno in `blocks`: la fisica le toglie quando cedono). */

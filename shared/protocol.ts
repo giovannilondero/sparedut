@@ -14,7 +14,7 @@ import type { StormValue } from "./sim/rules.ts"
 import type { CartView, PhaseView } from "./sim/view.ts"
 import { PRIMARIES, type PrimaryId, type ProjectileKind, type WeaponId } from "./weapons.ts"
 
-export const PROTOCOL_VERSION = 8
+export const PROTOCOL_VERSION = 9
 export const MAX_PLAYERS = 16
 export const SNAPSHOT_EVERY = 2 // tick: 30 istantanee al secondo
 

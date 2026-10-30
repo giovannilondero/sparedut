@@ -6,9 +6,11 @@
  * i bagns; prin plan cu lis grandis cameradis e i bagns; il tet plan si cjamine (e al à
  * une torete cu la mitraie). Une scjale dople e va sù dal pian tiere al prin plan e po
  * sul tet. Tal mieç l'arzin che al cor di nord a sud, cu lis passerelis di len che lu
- * leghin a lis barenis. Su la isule a est il casot di osservazion: la puarte e je sierade
- * e si à di sfondâle, dentri e je la discoteche dai fenicotars. A sud i casons dai
- * pescjadôrs. Dapardut la aghe e je basse: si va a vuat (al tache sul zenoli).
+ * leghin a lis barenis. A est il bosc, cun doi trois tra i arbui, e il puintut a schene di
+ * mus che al passe il canâl fin su la isule dal casot di osservazion: la puarte e je
+ * sierade e si à di sfondâle, dentri e je la discoteche dai fenicotars. A sud i casons
+ * dai pescjadôrs. Dapardut la aghe e je basse: si va a vuat, ma plan (passerelis, trois e
+ * puintut a son lis stradis sveltis).
  *
  * Assi: x viers est, y in alt, z viers sud. Metris.
  */
@@ -72,28 +74,211 @@ function wall(min: V3, max: V3, mat: Mat, holes: readonly Hole[] = []) {
 
 // --- Tiere e aghe ----------------------------------------------------------------------
 
-/** Lis tieris sutis: la tiere a nord, l'arzin, lis barenis, la isule dal casot, il borc dai casons. */
-export const LANDS: readonly { readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number; readonly mat: Mat }[] = [
-  { minX: BOUNDS.minX, maxX: BOUNDS.maxX, minZ: BOUNDS.minZ, maxZ: -48, mat: "erba" },
-  { minX: -6, maxX: 6, minZ: -48, maxZ: 62, mat: "terra" },
-  { minX: -58, maxX: -24, minZ: -32, maxZ: 18, mat: "erba" },
-  { minX: 26, maxX: 62, minZ: 10, maxZ: 46, mat: "erba" },
-  { minX: -40, maxX: -30, minZ: 34, maxZ: 44, mat: "erba" },
-  { minX: 22, maxX: 32, minZ: -34, maxZ: -24, mat: "erba" },
-  { minX: BOUNDS.minX, maxX: BOUNDS.maxX, minZ: 62, maxZ: BOUNDS.maxZ, mat: "erba" }
-]
-box([BOUNDS.minX, BOTTOM, BOUNDS.minZ], [BOUNDS.maxX, SEA, BOUNDS.maxZ], "terra", "terreno")
-for (const l of LANDS) box([l.minX, BOTTOM, l.minZ], [l.maxX, LAND, l.maxZ], l.mat, "terreno")
+export type P2 = readonly [number, number]
 
-/** Lis passerelis di len sore la aghe, a râs de tiere (i scjalins bas a fermin il character controller). */
+/** Une tiere sute: un poligon (x, z) cul ôr irregolâr, come lis barenis vêris. */
+export interface Land {
+  readonly name: string
+  readonly poly: readonly P2[]
+  readonly mat: Mat
+  /** Il colôr de cuvierte (il client le dissegne lisse; la fisiche le spartìs a strissis). */
+  readonly tint: string
+}
+
+/**
+ * Lis tieris sutis. La tiere a nord e chê a sud e cjapin dut il lât de mape; l'arzin
+ * al à i ôrs in comun cun lôr (cussì lis cuviertis no si sorepuedin).
+ */
+export const LANDS: readonly Land[] = [
+  {
+    name: "tiere a nord",
+    mat: "erba",
+    tint: "#ffffff",
+    poly: [[-70, -105], [70, -105], [70, -50], [60, -46], [50, -48.5], [40, -44.5], [30, -47], [20, -45], [11, -49], [6, -51], [-6, -51], [-12, -48], [-22, -45.5], [-32, -48], [-42, -44.5], [-52, -47.5], [-62, -45], [-70, -48]]
+  },
+  {
+    name: "arzin",
+    mat: "terra",
+    tint: "#ffffff",
+    poly: [[-6, -51], [-7.2, -38], [-5.6, -24], [-7.6, -8], [-6.2, 8], [-7.4, 24], [-5.8, 40], [-7, 54], [-6, 63], [6, 63], [7.2, 52], [5.6, 38], [6.8, 22], [7.4, 6], [5.8, -10], [7, -26], [6, -40], [6, -51]]
+  },
+  {
+    name: "tiere a sud",
+    mat: "erba",
+    tint: "#ffffff",
+    poly: [[-70, 105], [-70, 64], [-60, 61], [-48, 64], [-36, 60.5], [-24, 63.5], [-14, 60], [-6, 63], [6, 63], [14, 60.5], [24, 64], [36, 61.5], [48, 64.5], [60, 61], [70, 64], [70, 105]]
+  },
+  {
+    name: "barene a ovest",
+    mat: "erba",
+    tint: "#f0f4e0",
+    poly: [[-58, -14], [-56, -28], [-46, -33.5], [-34, -31], [-26, -24], [-27, -12], [-23, -4], [-24, 4], [-29, 14], [-40, 19.5], [-52, 16], [-60, 5]]
+  },
+  {
+    name: "bosc",
+    mat: "erba",
+    tint: "#c8d8b0",
+    poly: [[13, -22], [18, -30], [28, -33], [36, -28], [39, -18], [37, -8], [38, 0], [32, 4.5], [22, 3], [15, -2], [12, -10]]
+  },
+  {
+    name: "isule dal casot",
+    mat: "erba",
+    tint: "#f4f0d8",
+    poly: [[27, 16], [34, 12], [44, 13.5], [54, 11], [62, 16], [63.5, 28], [60, 40], [52, 47], [40, 46], [30, 42], [26, 30], [28, 22]]
+  },
+  {
+    name: "isulute",
+    mat: "erba",
+    tint: "#f0f4e0",
+    poly: [[-40, 36], [-37, 33.5], [-32, 34.5], [-30, 39], [-32.5, 43.5], [-37, 44.5], [-40.5, 41]]
+  }
+]
+
+/** Il pont è dentri dal poligon? (regule pari-dispari) */
+export function insidePoly(poly: readonly P2[], x: number, z: number): boolean {
+  let inside = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, zi] = poly[i]
+    const [xj, zj] = poly[j]
+    if (zi > z !== zj > z && x < xi + ((z - zi) * (xj - xi)) / (zj - zi)) inside = !inside
+  }
+  return inside
+}
+
+/** Distance di un pont dal segment `a`–`b` (sul plan). */
+function segDist(x: number, z: number, a: P2, b: P2): number {
+  const dx = b[0] - a[0]
+  const dz = b[1] - a[1]
+  const k = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz)))
+  const ex = x - (a[0] + dx * k)
+  const ez = z - (a[1] + dz * k)
+  return Math.sqrt(ex * ex + ez * ez)
+}
+
+/** Distance di un pont de spezade (vierte) o dal ôr dal poligon (sierât). */
+function lineDist(line: readonly P2[], x: number, z: number, closed: boolean): number {
+  let d = Infinity
+  const n = closed ? line.length : line.length - 1
+  for (let i = 0; i < n; i++) d = Math.min(d, segDist(x, z, line[i], line[(i + 1) % line.length]))
+  return d
+}
+
+/**
+ * Une tiere tai blocs che a colidin: strissis di mieç metri lunc z, ognidune taiade dulà
+ * che la linie di mieç e passe l'ôr. Lis strissis compagnis une daûr chê altre si unissin.
+ */
+const ROW = 0.5
+function landBlocks(poly: readonly P2[], top: number): Block[] {
+  const l = { poly }
+  const zs = l.poly.map((p) => p[1])
+  const out: Block[] = []
+  let open = new Map<string, { x0: number; x1: number; z0: number; z1: number }>()
+  const flush = (m: Map<string, { x0: number; x1: number; z0: number; z1: number }>) => {
+    for (const r of m.values()) out.push({ min: [r.x0, BOTTOM, r.z0], max: [r.x1, top, r.z1], mat: "invisibile", look: "terreno" })
+  }
+  for (let z0 = Math.floor(Math.min(...zs) / ROW) * ROW; z0 < Math.max(...zs); z0 += ROW) {
+    const zc = z0 + ROW / 2
+    const xs: number[] = []
+    for (let i = 0, j = l.poly.length - 1; i < l.poly.length; j = i++) {
+      const [xi, zi] = l.poly[i]
+      const [xj, zj] = l.poly[j]
+      if (zi > zc !== zj > zc) xs.push(xi + ((zc - zi) * (xj - xi)) / (zj - zi))
+    }
+    xs.sort((a, b) => a - b)
+    const next = new Map<string, { x0: number; x1: number; z0: number; z1: number }>()
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      const key = `${xs[k].toFixed(3)}|${xs[k + 1].toFixed(3)}`
+      const prev = open.get(key)
+      if (prev) {
+        prev.z1 = z0 + ROW
+        open.delete(key)
+        next.set(key, prev)
+      } else next.set(key, { x0: xs[k], x1: xs[k + 1], z0, z1: z0 + ROW })
+    }
+    flush(open)
+    open = next
+  }
+  flush(open)
+  return out
+}
+/**
+ * Il poligon slargjât di `d` in fûr (ogni vertiç al va su la bisetrice des normâls).
+ * Al vâl par vie dai ôrs dolçs des barenis; i cjantons une vore spiçâts a vegnin cimâts.
+ */
+export function grow(poly: readonly P2[], d: number): P2[] {
+  let area = 0
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]
+    const b = poly[(i + 1) % poly.length]
+    area += a[0] * b[1] - b[0] * a[1]
+  }
+  const sg = area > 0 ? 1 : -1
+  const normal = (a: P2, b: P2): P2 => {
+    const len = Math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2)
+    return [(sg * (b[1] - a[1])) / len, (sg * -(b[0] - a[0])) / len]
+  }
+  return poly.map((p, i) => {
+    const n0 = normal(poly[(i + poly.length - 1) % poly.length], p)
+    const n1 = normal(p, poly[(i + 1) % poly.length])
+    const k = d / Math.max(0.5, 1 + n0[0] * n1[0] + n0[1] * n1[1])
+    return [p[0] + (n0[0] + n1[0]) * k, p[1] + (n0[1] + n1[1]) * k]
+  })
+}
+
+/**
+ * La rive: un scjalin sot de aghe a mieze altece, largj `SHELF`. Un scjalin unic di 45 cm
+ * il character controller nol le passe simpri (a vuat si va plan); doi di 22 sì.
+ */
+export const SHELF = 0.7
+const SHELF_Y = (LAND + SEA) / 2
+box([BOUNDS.minX, BOTTOM, BOUNDS.minZ], [BOUNDS.maxX, SEA, BOUNDS.maxZ], "terra", "terreno")
+for (const l of LANDS) blocks.push(...landBlocks(l.poly, LAND), ...landBlocks(grow(l.poly, SHELF), SHELF_Y))
+
+/** Lis passerelis di len sore la aghe, a râs de tiere, cun cualchi zirade tra lis cjanis. */
 export const BOARDWALK_Y = LAND
 export const BOARDWALKS: readonly { readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number }[] = [
-  { minX: -24, maxX: -6, minZ: -6, maxZ: -3.6 },
-  { minX: 6, maxX: 26, minZ: 22, maxZ: 24.4 },
-  { minX: 40, maxX: 42.4, minZ: -48, maxZ: 10 },
-  { minX: -42, maxX: -39.6, minZ: -48, maxZ: -32 }
+  // arzin → barene a ovest
+  { minX: -16, maxX: -6.5, minZ: -6, maxZ: -3.6 },
+  { minX: -18.4, maxX: -16, minZ: -9.4, maxZ: -3.6 },
+  { minX: -26, maxX: -18.4, minZ: -9.4, maxZ: -7 },
+  // tiere a nord → barene a ovest
+  { minX: -42, maxX: -39.6, minZ: -46, maxZ: -31 },
+  // arzin → bosc
+  { minX: 5, maxX: 13, minZ: -13, maxZ: -10.6 },
+  // tiere a nord → bosc, tra lis cjanis
+  { minX: 39.6, maxX: 42, minZ: -46, maxZ: -23.6 },
+  { minX: 34.5, maxX: 39.6, minZ: -26, maxZ: -23.6 },
+  // arzin → isule dal casot, cu la zirade
+  { minX: 6, maxX: 16.4, minZ: 22, maxZ: 24.4 },
+  { minX: 14, maxX: 16.4, minZ: 18, maxZ: 22 },
+  { minX: 16.4, maxX: 28.5, minZ: 18, maxZ: 20.4 }
 ]
-for (const w of BOARDWALKS) box([w.minX, SEA, w.minZ], [w.maxX, BOARDWALK_Y, w.maxZ], "legno")
+// Lis breis dal paviment si dissegnin un fregul parsore: il bloc al è dome par cjaminâ.
+for (const w of BOARDWALKS) {
+  box([w.minX, SEA, w.minZ], [w.maxX, BOARDWALK_Y, w.maxZ], "invisibile")
+  box([w.minX - SHELF, SEA, w.minZ - SHELF], [w.maxX + SHELF, SHELF_Y, w.maxZ + SHELF], "invisibile")
+}
+
+/** Il puintut di len a schene di mus sul canâl fra il bosc e la isule dal casot (si passe ancje sot, a cuet). */
+export const PONT = { x0: 28.6, x1: 31.4, z0: 2, up: 5, down: 11, z1: 14, deck: 0.95, under: 0.75, rail: 1 } as const
+const wedges: Wedge[] = [
+  { x0: PONT.x0, x1: PONT.x1, z0: PONT.z0, z1: PONT.up, y0: LAND, y1: PONT.deck, mat: "legno" },
+  { x0: PONT.x0, x1: PONT.x1, z0: PONT.down, z1: PONT.z1, y0: PONT.deck, y1: LAND, mat: "legno" }
+]
+box([PONT.x0, PONT.under, PONT.up], [PONT.x1, PONT.deck, PONT.down], "legno")
+for (const [x0, x1] of [[PONT.x0 - 0.12, PONT.x0], [PONT.x1, PONT.x1 + 0.12]] as const) {
+  box([x0, SEA, PONT.z0], [x1, PONT.deck + PONT.rail, PONT.up], "invisibile")
+  box([x0, PONT.under, PONT.up], [x1, PONT.deck + PONT.rail, PONT.down], "invisibile")
+  box([x0, SEA, PONT.down], [x1, PONT.deck + PONT.rail, PONT.z1], "invisibile")
+}
+
+/** I trois di tiere batude: tal bosc (doi) e su la isule fin te puarte dal casot. */
+export const PATHS: readonly (readonly P2[])[] = [
+  [[12, -11.8], [17, -13], [22, -19], [28, -20.5], [32, -14], [28, -7], [30, -1], [30, 2.5]],
+  [[36, -24.8], [33.5, -19], [32, -14]],
+  [[30, 14], [32.5, 19.2], [36, 24], [39.6, 27]],
+  [[28, 19.2], [32.5, 19.2]]
+]
 
 // --- La foresterie --------------------------------------------------------------------
 
@@ -106,10 +291,10 @@ export const STAIRS = {
   z0: -76,
   z1: -66
 } as const
-const wedges: Wedge[] = [
+wedges.push(
   { x0: STAIRS.first.x0, x1: STAIRS.first.x1, z0: STAIRS.z0, z1: STAIRS.z1, y0: FORESTERIE.f1, y1: LAND, mat: "legno" },
   { x0: STAIRS.second.x0, x1: STAIRS.second.x1, z0: STAIRS.z0, z1: STAIRS.z1, y0: FORESTERIE.f1, y1: FORESTERIE.roof, mat: "legno" }
-]
+)
 {
   const { minX, maxX, minZ, maxZ, t, f1, roof } = FORESTERIE
   const s1 = f1 - FORESTERIE.slab
@@ -272,7 +457,7 @@ const navPoints: V3[] = [
   [-60, LAND, -95], [-35, LAND, -95], [-10, LAND, -95], [10, LAND, -95], [35, LAND, -95], [60, LAND, -95],
   [-60, LAND, -75], [-35, LAND, -75], [-24, LAND, -73], [24, LAND, -73], [35, LAND, -75], [60, LAND, -75],
   [-60, LAND, -55], [-35, LAND, -55], [-20, LAND, -58], [-9.5, LAND, -60], [0, LAND, -54], [14.5, LAND, -60], [24, LAND, -58], [35, LAND, -55], [60, LAND, -55],
-  [-40.8, LAND, -51], [41.2, LAND, -51],
+  [-40.8, LAND, -51], [40.8, LAND, -51],
   // Foresterie: pian tiere
   [-9.5, LAND, -66.5], [-9.5, LAND, -73], [-9.5, LAND, -79], [-17.6, LAND, -73], [-17.6, LAND, -79], [0, LAND, -78.2], [0, LAND, -69.2],
   [4, LAND, -78.3], [11, LAND, -78.3], [5, LAND, -69.2], [11, LAND, -68.2],
@@ -285,24 +470,76 @@ const navPoints: V3[] = [
   [14.5, F.roof, -65.2], [5, F.roof, -66], [-10, F.roof, -66], [-10, F.roof, -78], [5, F.roof, -78], [18.2, F.roof, -65.2], [18.2, F.roof, -75],
   // Arzin e passerelis
   [0, LAND, -46], [0, LAND, -30], [0, LAND, -14], [0, LAND, 0], [0, LAND, 14], [0, LAND, 30], [0, LAND, 46], [0, LAND, 60],
-  [4.5, LAND, -24], [-4.5, LAND, 8], [4.5, LAND, 23.2], [-4.5, LAND, -4.8],
-  [8, B, 23.2], [16, B, 23.2], [24, B, 23.2],
-  [-8, B, -4.8], [-16, B, -4.8], [-22, B, -4.8],
-  [41.2, B, -44], [41.2, B, -30], [41.2, B, -16], [41.2, B, -2], [41.2, B, 8],
+  [4.5, LAND, -24], [-4.5, LAND, 8], [4.5, LAND, 23.2], [-4.5, LAND, -4.8], [4.5, LAND, -11.8],
+  [10, B, 23.2], [15.2, B, 23.2], [15.2, B, 19.2], [22, B, 19.2], [28, LAND, 19.2],
+  [-10, B, -4.8], [-17.2, B, -4.8], [-17.2, B, -8.2], [-22, B, -8.2],
+  [40.8, B, -44], [40.8, B, -35], [40.8, B, -27.5],
   [-40.8, B, -45], [-40.8, B, -35],
   // Barene a ovest
-  [-28, LAND, -4.8], [-40.8, LAND, -29], [-35, LAND, -18], [-35, LAND, 5], [-50, LAND, 12], [-55, LAND, -20], [-46, LAND, -15], [-40, LAND, 15],
+  [-28, LAND, -8.2], [-40.8, LAND, -29], [-35, LAND, -18], [-35, LAND, 5], [-50, LAND, 12], [-55, LAND, -20], [-46, LAND, -15], [-40, LAND, 15],
+  // Bosc: i doi trois e il puintut
+  [9, B, -11.8], [13.5, LAND, -11.8], [17, LAND, -13], [22, LAND, -19], [28, LAND, -20.5], [32, LAND, -14], [28, LAND, -7], [30, LAND, -1], [30, LAND, 2.5],
+  [30, PONT.deck, 6], [30, PONT.deck, 10], [30, LAND, 15],
+  [38, B, -24.8], [36, LAND, -24.8], [33.5, LAND, -19],
   // Isule dal casot (fûr)
-  [30, LAND, 23.2], [34, LAND, 14], [41.2, LAND, 13], [34, LAND, 40], [37, LAND, 27], [46, LAND, 16], [46, LAND, 38], [57, LAND, 27], [57, LAND, 14], [57, LAND, 40],
-  // Isulis piçulis e aghe
-  [-35, LAND, 39], [27, LAND, -29],
-  [-15, SEA, -30], [-15, SEA, 30], [15, SEA, -20], [15, SEA, 0], [20, SEA, 45], [-20, SEA, 50], [-45, SEA, 40], [-60, SEA, 30],
-  [-62, SEA, -40], [55, SEA, -20], [62, SEA, 0], [50, SEA, 55], [-24, SEA, -40], [24, SEA, -42], [-48, SEA, 52],
+  [32.5, LAND, 19.2], [36, LAND, 24], [34, LAND, 14], [42, LAND, 16], [34, LAND, 40], [37, LAND, 27], [46, LAND, 16], [46, LAND, 38], [57, LAND, 27], [57, LAND, 14], [57, LAND, 40], [30, LAND, 32],
+  // Isulute e aghe
+  [-35, LAND, 39],
+  [-15, SEA, -30], [-15, SEA, 30], [10, SEA, -25], [15, SEA, 4], [20, SEA, 45], [-20, SEA, 50], [-45, SEA, 40], [-60, SEA, 30],
+  [-62, SEA, -40], [55, SEA, -20], [62, SEA, 0], [50, SEA, 55], [-24, SEA, -40], [24, SEA, -42], [-48, SEA, 52], [45, SEA, -10],
   // Borc dai casons a sud
   [-60, LAND, 70], [-45, LAND, 66], [-20, LAND, 68], [-4, LAND, 68], [0, LAND, 76], [16, LAND, 68], [36, LAND, 68], [60, LAND, 70],
   [-50, LAND, 85], [-30, LAND, 84], [-20, LAND, 96], [-4, LAND, 88], [10, LAND, 96], [20, LAND, 88], [36, LAND, 84], [55, LAND, 85],
   [60, LAND, 100], [-60, LAND, 100], [0, LAND, 98], [36, LAND, 100]
 ]
+
+// --- Arbui ---------------------------------------------------------------------------------
+
+/** Un arbul: il tronc al colît (si si ripare e no si passe), la frasche e je alte. */
+export interface Tree {
+  readonly x: number
+  readonly z: number
+  /** Grandece (1 = tronc di 3 m). */
+  readonly s: number
+}
+
+/** I arbui: chei metûts a man su lis tieris e il bosc fis ator dai trois. */
+export const TREES: readonly Tree[] = (() => {
+  const out: Tree[] = [
+    [-50, -90], [-28, -100], [26, -100], [52, -88], [-56, -60], [56, -62], [-45, 14], [-52, -24], [54, 36], [-62, 96], [62, 92], [30, 100]
+  ].map(([x, z], i) => ({ x, z, s: 0.95 + ((i * 37) % 10) / 20 }))
+  // caso deterministic, compagn su server e client
+  let seed = 4242
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+  const clear = (x: number, z: number) =>
+    navPoints.every((p) => (p[0] - x) ** 2 + (p[2] - z) ** 2 > 2.2 * 2.2) &&
+    pickups.every((p) => (p.at[0] - x) ** 2 + (p.at[2] - z) ** 2 > 2.5 * 2.5) &&
+    PATHS.every((p) => lineDist(p, x, z, false) > 2.4) &&
+    BOARDWALKS.every((w) => x < w.minX - 2 || x > w.maxX + 2 || z < w.minZ - 2 || z > w.maxZ + 2) &&
+    (x < CASOT.minX - 2.5 || x > CASOT.maxX + 2.5 || z < CASOT.minZ - 2.5 || z > CASOT.maxZ + 2.5) &&
+    (x < PONT.x0 - 3 || x > PONT.x1 + 3 || z < PONT.z0 - 3 || z > PONT.z1 + 3)
+  const grove = (land: Land, step: number, minX = -Infinity, maxX = Infinity) => {
+    const xs = land.poly.map((p) => p[0])
+    const zs = land.poly.map((p) => p[1])
+    for (let x = Math.min(...xs); x <= Math.max(...xs); x += step) {
+      for (let z = Math.min(...zs); z <= Math.max(...zs); z += step) {
+        const tx = x + (rnd() - 0.5) * step * 0.7
+        const tz = z + (rnd() - 0.5) * step * 0.7
+        const s = 0.85 + rnd() * 0.45
+        if (tx < minX || tx > maxX) continue
+        if (!insidePoly(land.poly, tx, tz) || lineDist(land.poly, tx, tz, true) < 1.4 || !clear(tx, tz)) continue
+        out.push({ x: tx, z: tz, s })
+      }
+    }
+  }
+  grove(LANDS.find((l) => l.name === "bosc")!, 3.1)
+  grove(LANDS.find((l) => l.name === "isule dal casot")!, 4.6, 0, CASOT.minX)
+  return out
+})()
+for (const t of TREES) {
+  const r = 0.2 * t.s
+  box([t.x - r, LAND, t.z - r], [t.x + r, LAND + 3 * t.s, t.z + r], "invisibile")
+}
 
 /** Il cjar: de foresterie jù pal arzin fin tal borc dai casons. */
 const track: V3[] = [
@@ -329,6 +566,7 @@ export const MARAN = defineMap({
   navPoints,
   track,
   killY: -10,
+  wade: { level: WATER, speed: 0.6 },
   turrets: [
     { at: [0, FORESTERIE.roof, -65.2], yaw: Math.PI },
     { at: [-18, LAND, 63.6], yaw: 0 }

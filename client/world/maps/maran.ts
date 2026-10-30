@@ -11,6 +11,7 @@
  */
 import * as THREE from "three"
 import {
+  BOARDWALK_Y,
   BOARDWALKS,
   CASON_TOP,
   CASONS,
@@ -20,14 +21,19 @@ import {
   LAND,
   LANDS,
   OPENINGS,
+  PATHS,
   PIGNATE,
+  PONT,
   SCJALIN,
   SEA,
+  SHELF,
   STAIRS,
-  WATER
+  TREES,
+  WATER,
+  type Land
 } from "../../../shared/maps/maran.ts"
 import { fbm, makeHeightfield, smooth } from "../backdrop.ts"
-import { boxAt, type V } from "../geo.ts"
+import { boxAt, quad, type V } from "../geo.ts"
 import type { Scenery, SceneryKit } from "../scenery.ts"
 
 const BPM = 124
@@ -280,44 +286,82 @@ export const scenery: Scenery = {
     // --- aghe e rivis -----------------------------------------------------------------------
     const { minX, maxX, minZ, maxZ } = map.bounds
     B.add("acqua", kit.face([minX, WATER - 0.01, minZ], [maxX, WATER, maxZ], "top"), C("#b8e0d8"))
-    // fanc tor des tieris: une strisse plui scure tal ôr
-    for (const l of LANDS) {
-      for (const [a, b] of [
-        [[l.minX - 0.6, SEA_EDGE, l.minZ - 0.6], [l.maxX + 0.6, SEA_EDGE + 0.02, l.minZ]],
-        [[l.minX - 0.6, SEA_EDGE, l.maxZ], [l.maxX + 0.6, SEA_EDGE + 0.02, l.maxZ + 0.6]],
-        [[l.minX - 0.6, SEA_EDGE, l.minZ], [l.minX, SEA_EDGE + 0.02, l.maxZ]],
-        [[l.maxX, SEA_EDGE, l.minZ], [l.maxX + 0.6, SEA_EDGE + 0.02, l.maxZ]]
-      ] as [V, V][]) B.add("terra", boxAt(a, b), C("#6a5a40"))
-    }
-
-    // --- cjanis tal ôr des barenis --------------------------------------------------------
-    const reedCol = [C("#d8dca0"), C("#e8d890"), C("#c0cc88")]
-    const reeds = (x0: number, x1: number, z0: number, z1: number, n: number) => {
-      for (let i = 0; i < n; i++) {
-        const x = x0 + R() * (x1 - x0)
-        const z = z0 + R() * (z1 - z0)
-        const h = 1.4 + R() * 1.3
-        const lx = (R() - 0.5) * 0.3
-        B.add("erba", cylBetween([x, WATER - 0.2, z], [x + lx, WATER + h, z + (R() - 0.5) * 0.3], 0.025, 0.008, 3), reedCol[i % 3])
-        if (i % 3 === 0) B.add("terra", sphere([x + lx, WATER + h - 0.1, z], 0.05, 3, 5), C("#5a4030"))
+    /** La normâl in fûr dal ôr `i` (il poligon al pues jessi zirât in ducj i doi sens). */
+    const outward = (l: Land) => {
+      let area = 0
+      for (let i = 0; i < l.poly.length; i++) {
+        const a = l.poly[i]
+        const b = l.poly[(i + 1) % l.poly.length]
+        area += a[0] * b[1] - b[0] * a[1]
+      }
+      return (i: number): [number, number, number] => {
+        const a = l.poly[i]
+        const b = l.poly[(i + 1) % l.poly.length]
+        const len = Math.hypot(b[0] - a[0], b[1] - a[1])
+        const sg = area > 0 ? 1 : -1
+        return [(sg * (b[1] - a[1])) / len, (sg * -(b[0] - a[0])) / len, len]
       }
     }
+    /** Un ôr al è sul confin de mape (là no si viôt e no si met nuie). */
+    const onBorder = (a: readonly [number, number], b: readonly [number, number]) =>
+      (Math.abs(a[0] - b[0]) < 1e-6 && (Math.abs(Math.abs(a[0]) - maxX) < 1e-6)) || (Math.abs(a[1] - b[1]) < 1e-6 && Math.abs(Math.abs(a[1]) - maxZ) < 1e-6)
+    /** Lis tieris sutis come lis à la fisiche: cuvierte lisse e la rive di fanc che e cale te aghe. */
     for (const l of LANDS) {
-      if (l.maxZ - l.minZ > 100) continue
-      const w = 1.4
-      reeds(l.minX - w, l.maxX + w, l.minZ - w, l.minZ, Math.round((l.maxX - l.minX) * 1.2))
-      reeds(l.minX - w, l.maxX + w, l.maxZ, l.maxZ + w, Math.round((l.maxX - l.minX) * 1.2))
-      reeds(l.minX - w, l.minX, l.minZ, l.maxZ, Math.round((l.maxZ - l.minZ) * 1.2))
-      reeds(l.maxX, l.maxX + w, l.minZ, l.maxZ, Math.round((l.maxZ - l.minZ) * 1.2))
+      const shape = new THREE.Shape(l.poly.map(([x, z]) => new THREE.Vector2(x, -z)))
+      B.add(l.mat === "terra" ? "terra" : "erba", new THREE.ShapeGeometry(shape).rotateX(-Math.PI / 2).translate(0, LAND, 0), C(l.tint))
+      const out = outward(l)
+      for (let i = 0; i < l.poly.length; i++) {
+        const a = l.poly[i]
+        const b = l.poly[(i + 1) % l.poly.length]
+        if (onBorder(a, b)) continue
+        const [nx, nz] = out(i)
+        const w = SHELF + 0.2
+        B.add("terra", kit.orient(quad([a[0], LAND, a[1]], [b[0], LAND, b[1]], [b[0] + nx * w, SEA, b[1] + nz * w], [a[0] + nx * w, SEA, a[1] + nz * w]), [nx, 1, nz]), C("#8a7a5a"))
+      }
     }
-    // cjanis tal ôr de tiere a nord e a sud (verso la aghe)
-    reeds(minX, -8, -48, -46.6, 90)
-    reeds(8, maxX, -48, -46.6, 90)
-    reeds(minX, -8, 62, 63.4, 90)
-    reeds(8, maxX, 62, 63.4, 90)
+    // i trois di tiere batude, un fregul parsore la cuvierte
+    for (const path of PATHS) {
+      for (let i = 0; i + 1 < path.length; i++) {
+        const [ax, az] = path[i]
+        const [bx, bz] = path[i + 1]
+        const len = Math.hypot(bx - ax, bz - az)
+        const px = (-(bz - az) / len) * 0.9
+        const pz = ((bx - ax) / len) * 0.9
+        B.add("terra", kit.orient(quad([ax - px, LAND + 0.04, az - pz], [ax + px, LAND + 0.04, az + pz], [bx + px, LAND + 0.04, bz + pz], [bx - px, LAND + 0.04, bz - pz]), [0, 1, 0]), C("#c8b890"))
+        B.add("terra", new THREE.CircleGeometry(0.9, 10).rotateX(-Math.PI / 2).translate(bx, LAND + 0.04, bz), C("#c8b890"))
+      }
+    }
+
+    // --- cjanis tal ôr des tieris, dulà che no si rive cu lis passerelis ---------------------
+    const reedCol = [C("#d8dca0"), C("#e8d890"), C("#c0cc88")]
+    const landing = (x: number, z: number) =>
+      BOARDWALKS.some((w) => x > w.minX - 1.5 && x < w.maxX + 1.5 && z > w.minZ - 1.5 && z < w.maxZ + 1.5) ||
+      (x > PONT.x0 - 2 && x < PONT.x1 + 2 && z > PONT.z0 - 2 && z < PONT.z1 + 2)
+    let reedN = 0
+    const reed = (x: number, z: number) => {
+      if (landing(x, z) || x < minX + 1 || x > maxX - 1 || z < minZ + 1 || z > maxZ - 1) return
+      const h = 1.4 + R() * 1.3
+      const lx = (R() - 0.5) * 0.3
+      B.add("erba", cylBetween([x, WATER - 0.3, z], [x + lx, WATER + h, z + (R() - 0.5) * 0.3], 0.025, 0.008, 3), reedCol[reedN % 3])
+      if (reedN++ % 3 === 0) B.add("terra", sphere([x + lx, WATER + h - 0.1, z], 0.05, 3, 5), C("#5a4030"))
+    }
+    for (const l of LANDS) {
+      const out = outward(l)
+      for (let i = 0; i < l.poly.length; i++) {
+        const a = l.poly[i]
+        const b = l.poly[(i + 1) % l.poly.length]
+        if (onBorder(a, b)) continue
+        const [nx, nz, len] = out(i)
+        for (let k = 0; k < len * 1.3; k++) {
+          const t = R()
+          const off = 0.4 + R() * 1.4
+          reed(a[0] + (b[0] - a[0]) * t + nx * off, a[1] + (b[1] - a[1]) * t + nz * off)
+        }
+      }
+    }
 
     // --- briculis e barcjis ---------------------------------------------------------------
-    for (const [x, z] of [[-15, -38], [15, -38], [-15, 0], [15, -10], [-15, 40], [15, 50], [-62, 10], [62, -8], [35, 56], [-40, 56]] as const) bricola(kit, x, z, R() * 3)
+    for (const [x, z] of [[-15, -38], [15, -38], [-15, 0], [10, -20], [-15, 40], [15, 50], [-62, 10], [62, -8], [35, 56], [-40, 56]] as const) bricola(kit, x, z, R() * 3)
     const hull = (x: number, z: number, yaw: number, col: string) => {
       const s = new THREE.Shape()
       s.moveTo(-0.7, 0)
@@ -328,9 +372,9 @@ export const scenery: Scenery = {
       g.rotateY(yaw).translate(x, 0, z)
       B.add("legno", g, C(col))
     }
-    hull(8, 96, 0.3, "#3a5a7a")
-    hull(-6, 100, -0.2, "#7a3a2a")
-    hull(-44, 46, 1.2, "#e8e0d0")
+    hull(18, 56, 0.3, "#3a5a7a")
+    hull(-20, 52, -0.2, "#7a3a2a")
+    hull(-44, 47, 1.2, "#e8e0d0")
 
     // --- passerelis: breis e pâi -----------------------------------------------------------
     for (const w of BOARDWALKS) {
@@ -348,10 +392,52 @@ export const scenery: Scenery = {
         const b: V = alongX ? [w.maxX, LAND + 1.0, a[2] + 0.04] : [a[0] + 0.04, LAND + 1.0, w.maxZ]
         B.add("legno", boxAt(a, b), C("#8a7050"))
       }
+      // lis breis (un fregul parsore la tiere dulà che si poin) e i trâfs disot
+      const y = BOARDWALK_Y + 0.03
       for (let a = 0; a < len; a += 0.35) {
-        const g = alongX ? boxAt([w.minX + a, LAND, w.minZ], [w.minX + a + 0.3, LAND + 0.02, w.maxZ]) : boxAt([w.minX, LAND, w.minZ + a], [w.maxX, LAND + 0.02, w.minZ + a + 0.3])
+        const g = alongX ? boxAt([w.minX + a, y - 0.06, w.minZ], [w.minX + a + 0.3, y, w.maxZ]) : boxAt([w.minX, y - 0.06, w.minZ + a], [w.maxX, y, w.minZ + a + 0.3])
         B.add("legno", g, C("#ffffff").offsetHSL(0, 0, (R() - 0.5) * 0.1))
       }
+      for (const side of [0.25, 0.75]) {
+        const g = alongX
+          ? boxAt([w.minX, y - 0.22, w.minZ + (w.maxZ - w.minZ) * side - 0.08], [w.maxX, y - 0.06, w.minZ + (w.maxZ - w.minZ) * side + 0.08])
+          : boxAt([w.minX + (w.maxX - w.minX) * side - 0.08, y - 0.22, w.minZ], [w.minX + (w.maxX - w.minX) * side + 0.08, y - 0.06, w.maxZ])
+        B.add("legno", g, C("#6a5440"))
+      }
+    }
+
+    // --- il puintut a schene di mus ------------------------------------------------------------
+    {
+      const P = PONT
+      const yAt = (z: number) => (z < P.up ? LAND + ((P.deck - LAND) * (z - P.z0)) / (P.up - P.z0) : z > P.down ? P.deck - ((P.deck - LAND) * (z - P.down)) / (P.z1 - P.down) : P.deck)
+      for (let z = P.z0 + 0.2; z < P.z1 - 0.1; z += 0.34) B.add("legno", boxAt([P.x0 - 0.05, yAt(z) - 0.02, z - 0.15], [P.x1 + 0.05, yAt(z) + 0.03, z + 0.15]), C("#ffffff").offsetHSL(0, 0, (R() - 0.5) * 0.12))
+      for (const x of [P.x0 - 0.06, P.x1 + 0.06]) {
+        for (let z = P.z0 + 0.3; z <= P.z1 - 0.2; z += 1.5) B.add("legno", cylBetween([x, z > P.up && z < P.down ? SEA : yAt(z) - 0.3, z], [x, yAt(z) + P.rail, z], 0.06, 0.06, 6), C("#6a5038"))
+        // il corimano: un toc par ogni tratt, che al seguìs la schene
+        for (const [a, b] of [[P.z0 + 0.3, P.up], [P.up, P.down], [P.down, P.z1 - 0.2]] as const) {
+          B.add("legno", cylBetween([x, yAt(a) + P.rail, a], [x, yAt(b) + P.rail, b], 0.05, 0.05, 6), C("#8a6a48"))
+          B.add("legno", cylBetween([x, yAt(a) + P.rail * 0.5, a], [x, yAt(b) + P.rail * 0.5, b], 0.035, 0.035, 5), C("#7a5e40"))
+        }
+      }
+      // i pâi tal ploc sot dal plan
+      for (const z of [P.up + 0.3, (P.up + P.down) / 2, P.down - 0.3]) {
+        for (const x of [P.x0 + 0.3, P.x1 - 0.3]) B.add("legno", cylBetween([x, -1.5, z], [x, P.under, z], 0.12, 0.12, 6), C("#5a4434"))
+      }
+    }
+
+    // --- arbui: i stes de fisiche (il tronc al colît), la frasche alte -------------------------
+    for (const t of TREES) {
+      const s = t.s
+      const h = 3 * s
+      const bend = (R() - 0.5) * 0.4
+      B.add("legno", cylBetween([t.x, LAND - 0.1, t.z], [t.x + bend, LAND + h, t.z + bend * 0.5], 0.2 * s, 0.12 * s, 7), C("#6a5444").offsetHSL(0, 0, (R() - 0.5) * 0.06))
+      const green = C("#5a7a48").offsetHSL((R() - 0.5) * 0.03, 0, (R() - 0.5) * 0.08)
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * Math.PI * 2 + R()
+        const r = (0.5 + R() * 0.7) * s
+        B.add("erba", sphere([t.x + bend + Math.cos(a) * r, LAND + h + (0.2 + R() * 1.1) * s, t.z + Math.sin(a) * r], (1 + R() * 0.5) * s, 0.75, 7), green)
+      }
+      B.add("erba", sphere([t.x + bend, LAND + h + 1.4 * s, t.z], 1.1 * s, 0.8, 7), green)
     }
 
     // --- casons ------------------------------------------------------------------------------
@@ -367,29 +453,46 @@ export const scenery: Scenery = {
       const [x0, y0, z0] = o.min
       const [x1, y1, z1] = o.max
       const col = C(o.door ? "#5a3a24" : "#4a6a4a")
+      // la cornîs e sta su lis musis dal mûr, no dentri te vierzidure (li e tremave cul intonac);
+      // il bancâl al sta un fregul parsore il mûr
       if (o.alongX) {
-        const za = z0 - out, zb = z1 + out
-        B.add("legno", boxAt([x0 - fr, y0, za], [x0, y1 + fr, zb]), col)
-        B.add("legno", boxAt([x1, y0, za], [x1 + fr, y1 + fr, zb]), col)
-        B.add("legno", boxAt([x0 - fr, y1, za], [x1 + fr, y1 + fr, zb]), col)
-        if (!o.door) B.add("pietraChiara", boxAt([x0 - fr, y0 - 0.06, za - 0.04], [x1 + fr, y0, zb + 0.04]), C("#e8e0d0"))
+        for (const [za, zb] of [[z0 - out, z0], [z1, z1 + out]] as const) {
+          B.add("legno", boxAt([x0 - fr, y0, za], [x0, y1 + fr, zb]), col)
+          B.add("legno", boxAt([x1, y0, za], [x1 + fr, y1 + fr, zb]), col)
+          B.add("legno", boxAt([x0, y1, za], [x1, y1 + fr, zb]), col)
+        }
+        if (!o.door) B.add("pietraChiara", boxAt([x0 - fr, y0 - 0.06, z0 - out - 0.04], [x1 + fr, y0 + 0.04, z1 + out + 0.04]), C("#e8e0d0"))
       } else {
-        const xa = x0 - out, xb = x1 + out
-        B.add("legno", boxAt([xa, y0, z0 - fr], [xb, y1 + fr, z0]), col)
-        B.add("legno", boxAt([xa, y0, z1], [xb, y1 + fr, z1 + fr]), col)
-        B.add("legno", boxAt([xa, y1, z0 - fr], [xb, y1 + fr, z1 + fr]), col)
-        if (!o.door) B.add("pietraChiara", boxAt([xa - 0.04, y0 - 0.06, z0 - fr], [xb + 0.04, y0, z1 + fr]), C("#e8e0d0"))
+        for (const [xa, xb] of [[x0 - out, x0], [x1, x1 + out]] as const) {
+          B.add("legno", boxAt([xa, y0, z0 - fr], [xb, y1 + fr, z0]), col)
+          B.add("legno", boxAt([xa, y0, z1], [xb, y1 + fr, z1 + fr]), col)
+          B.add("legno", boxAt([xa, y1, z0], [xb, y1 + fr, z1]), col)
+        }
+        if (!o.door) B.add("pietraChiara", boxAt([x0 - out - 0.04, y0 - 0.06, z0 - fr], [x1 + out + 0.04, y0 + 0.04, z1 + fr]), C("#e8e0d0"))
       }
     }
-    // zocul di piere e cornîs dal tet
-    B.add("pietra", boxAt([F.minX - 0.05, 0, F.maxZ - 0.05], [F.maxX + 0.05, 0.5, F.maxZ + 0.02]), C("#b8b0a0"))
-    B.add("pietraChiara", boxAt([F.minX - 0.1, F.roof - 0.2, F.minZ - 0.1], [F.maxX + 0.1, F.roof, F.maxZ + 0.1]), C("#ece6da"))
-    // pavimenti di dentri: cotto in salon, piastrelis in cusine e bagns, len di sore
-    B.add("porfido", boxAt([F.minX + 0.4, 0, F.minZ + 0.4], [2, 0.015, F.maxZ - 0.4]), C("#c88a5a"))
-    B.add("marmo", boxAt([2.4, 0, F.minZ + 0.4], [12.6, 0.015, F.maxZ - 0.4]), C("#d8dcd8"))
+    // zocul di piere su la façade, interot dulà che a son lis puartis
+    {
+      const doors = OPENINGS.filter((o) => o.door && o.alongX && o.min[2] >= F.maxZ - F.t - 0.01).map((o) => [o.min[0], o.max[0]] as const).sort((a, b) => a[0] - b[0])
+      let at = F.minX - 0.06
+      for (const [d0, d1] of [...doors, [F.maxX + 0.06, F.maxX + 0.06] as const]) {
+        if (d0 - at > 0.01) B.add("pietra", boxAt([at, 0, F.maxZ], [d0, 0.5, F.maxZ + 0.06]), C("#b8b0a0"))
+        at = d1
+      }
+    }
+    // la cornîs dal tet: dome ator dai mûrs, di fûr (sore il tet e taponave il bûs de scjale)
+    for (const [a, b] of [
+      [[F.minX - 0.1, F.roof - 0.2, F.minZ - 0.1], [F.maxX + 0.1, F.roof, F.minZ]],
+      [[F.minX - 0.1, F.roof - 0.2, F.maxZ], [F.maxX + 0.1, F.roof, F.maxZ + 0.1]],
+      [[F.minX - 0.1, F.roof - 0.2, F.minZ], [F.minX, F.roof, F.maxZ]],
+      [[F.maxX, F.roof - 0.2, F.minZ], [F.maxX + 0.1, F.roof, F.maxZ]]
+    ] as [V, V][]) B.add("pietraChiara", boxAt(a, b), C("#ece6da"))
+    // pavimenti di dentri: cotto in salon, piastrelis in cusine, bagns e te sale de scjale
+    B.add("porfido", boxAt([F.minX + F.t, 0, F.minZ + F.t], [2, 0.04, F.maxZ - F.t]), C("#c88a5a"))
+    B.add("marmo", boxAt([2.4, 0, F.minZ + F.t], [F.maxX - F.t, 0.04, F.maxZ - F.t]), C("#d8dcd8"))
     // insegne su la façade
     const plaque = sign(["Foresterie", "Riserve naturâl des Focis dal Stele"], 5, 1.1, "#f4ecd8", "#3a4a2a")
-    plaque.position.set(-1, 3.0, F.maxZ + 0.03)
+    plaque.position.set(-1, 3.0, F.maxZ + 0.06)
     root.add(plaque)
     // la bandiere dal Friûl sul tet
     B.add("ferro", cylBetween([-18, F.roof, -80], [-18, F.roof + 6, -80], 0.05), C("#c8c8c8"))
@@ -407,7 +510,7 @@ export const scenery: Scenery = {
     root.add(fire)
     B.add("luce", sphere([-18.9, 0.55, -68.25], 0.25, 0.6, 8), new THREE.Color(3, 1.2, 0.3))
     const map1 = sign(["Lagune di Maran", "Focis dal Stele · Val Cjanâl Gnûf"], 3, 1.6, "#e8dcc0", "#2a4a6a")
-    map1.position.set(-8, 2.2, F.minZ + 0.42)
+    map1.position.set(-8, 2.2, F.minZ + F.t + 0.04)
     root.add(map1)
     // cusine: plan di açâl, fornei, pignatis
     B.add("ferro", boxAt([3, 0.95, F.minZ + 0.4], [12.2, 1.0, -80.9]), C("#b8bcc0"))
@@ -453,12 +556,7 @@ export const scenery: Scenery = {
       B.add("luce", sphere([x, y + 0.15, z], 0.14, 0.6, 8), new THREE.Color(2.4, 2.1, 1.6))
     }
 
-    // --- tiere a nord: bancjis, rastrelîr, tamarîs ----------------------------------------
-    const tree = (x: number, z: number, s: number) => {
-      B.add("legno", cylBetween([x, LAND, z], [x + 0.2, LAND + 1.6 * s, z], 0.14 * s, 0.1 * s, 6), C("#5a4434"))
-      for (let k = 0; k < 5; k++) B.add("erba", sphere([x + (R() - 0.5) * 1.6 * s, LAND + (1.9 + R() * 0.8) * s, z + (R() - 0.5) * 1.6 * s], (0.8 + R() * 0.5) * s, 0.7, 7), C("#6a8a5a").offsetHSL(0, 0, (R() - 0.5) * 0.08))
-    }
-    for (const [x, z] of [[-50, -90], [-28, -100], [26, -100], [52, -88], [-56, -60], [56, -62], [-45, 20], [-55, -28], [58, 44], [-62, 96], [62, 92], [30, 100]] as const) tree(x, z, 0.9 + R() * 0.5)
+    // --- tiere a nord: bancjis e la tabele ----------------------------------------------------
     for (const [x, z] of [[-8, -58], [8, -58]] as const) {
       B.add("legno", boxAt([x - 1, LAND + 0.42, z - 0.25], [x + 1, LAND + 0.48, z + 0.25]), C("#8a6040"))
       for (const dx of [-0.8, 0.8]) B.add("ferro", boxAt([x + dx - 0.05, LAND, z - 0.2], [x + dx + 0.05, LAND + 0.42, z + 0.2]), C("#3a3a3a"))
@@ -478,7 +576,7 @@ export const scenery: Scenery = {
     casotSign.rotation.y = -Math.PI / 2
     root.add(casotSign)
     // paviment di breis e il scjalin
-    B.add("legno", boxAt([K.minX + K.t, LAND, K.minZ + K.t], [K.maxX - K.t, LAND + 0.012, K.maxZ - K.t]), C("#a07a50"))
+    B.add("legno", boxAt([K.minX + K.t, LAND, K.minZ + K.t], [K.maxX - K.t, LAND + 0.04, K.maxZ - K.t]), C("#a07a50"))
     B.add("legno", boxAt([SCJALIN.minX - 0.04, SCJALIN.top - 0.04, SCJALIN.minZ], [SCJALIN.minX + 0.06, SCJALIN.top + 0.01, SCJALIN.maxZ]), C("#6a4a2a"))
 
     // la pignate de bire, cul mescul e la sbrume
@@ -511,7 +609,7 @@ export const scenery: Scenery = {
 
     // il cjoc, cul cjâf sul scjalin
     const drunk = sleeper()
-    drunk.g.position.set(SCJALIN.minX - 1.85, LAND, 24.4)
+    drunk.g.position.set(SCJALIN.minX - 1.85, LAND + 0.04, 24.4)
     root.add(drunk.g)
 
     // il paviment de discoteche: piastrelis che a cambin colôr a timp
@@ -521,7 +619,7 @@ export const scenery: Scenery = {
       for (let j = 0; j < floor.m; j++) {
         const mat = new THREE.MeshBasicMaterial({ color: "#222", toneMapped: false })
         const tile = new THREE.Mesh(new THREE.PlaneGeometry(floor.s - 0.06, floor.s - 0.06).rotateX(-Math.PI / 2), mat)
-        tile.position.set(floor.x0 + (i + 0.5) * floor.s, LAND + 0.02, floor.z0 + (j + 0.5) * floor.s)
+        tile.position.set(floor.x0 + (i + 0.5) * floor.s, LAND + 0.08, floor.z0 + (j + 0.5) * floor.s)
         root.add(tile)
         tiles.push(mat)
       }
@@ -537,7 +635,7 @@ export const scenery: Scenery = {
     root.add(ball)
     // i spots di lûs su mûrs e sofit: ognidun al cor lunc il so cercli
     const spotMat = new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })
-    const inner = { x0: K.minX + K.t + 0.02, x1: K.maxX - K.t - 0.02, y0: LAND + 0.02, y1: K.top - 0.02, z0: K.minZ + K.t + 0.02, z1: K.maxZ - K.t - 0.02 }
+    const inner = { x0: K.minX + K.t + 0.02, x1: K.maxX - K.t - 0.02, y0: LAND + 0.1, y1: K.top - 0.02, z0: K.minZ + K.t + 0.02, z1: K.maxZ - K.t - 0.02 }
     const spots = Array.from({ length: 46 }, (_, i) => {
       const m = new THREE.Mesh(new THREE.CircleGeometry(0.06 + R() * 0.05, 8), spotMat.clone())
       ;(m.material as THREE.MeshBasicMaterial).color.copy(PALETTE[i % PALETTE.length]).lerp(new THREE.Color("#fff"), 0.5)
@@ -556,7 +654,7 @@ export const scenery: Scenery = {
     // i fenicotars che a balin
     const dancers = [[42.6, 25.6], [45.2, 25.2], [42.8, 28.6], [45.6, 28.8], [44, 30.6]].map(([x, z], i) => {
       const f = flamingo()
-      f.g.position.set(x, LAND + 0.02, z)
+      f.g.position.set(x, LAND + 0.08, z)
       f.g.rotation.y = R() * Math.PI * 2
       root.add(f.g)
       return { ...f, i, base: f.g.rotation.y }
@@ -602,7 +700,7 @@ export const scenery: Scenery = {
         }
         for (const d of dancers) {
           const ph = beat * Math.PI + d.i
-          d.g.position.y = LAND + 0.02 + Math.abs(Math.sin(ph)) * 0.08
+          d.g.position.y = LAND + 0.08 + Math.abs(Math.sin(ph)) * 0.08
           d.g.rotation.y = d.base + Math.sin(beat * 0.25 * Math.PI + d.i) * 0.9
           d.body.rotation.z = Math.sin(ph) * 0.12
           d.neck.rotation.z = Math.sin(ph + 0.6) * 0.35
@@ -643,8 +741,11 @@ export const scenery: Scenery = {
       return Math.max(lagoon, plain - 0.2) + alps
     }
     const terrain = makeHeightfield(height, map.bounds, 707)
-    const sea = new THREE.Mesh(new THREE.PlaneGeometry(2600, 2600).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: "#4a8088", roughness: 0.08, metalness: 0.25, transparent: true, opacity: 0.9 }))
-    sea.position.y = WATER - 0.02
+    // il mâr di fûr al à il bûs de mape: dentri e je za la aghe (dôs a 2 cm a tremavin)
+    const ring = new THREE.Shape([new THREE.Vector2(-1300, -1300), new THREE.Vector2(1300, -1300), new THREE.Vector2(1300, 1300), new THREE.Vector2(-1300, 1300)])
+    ring.holes.push(new THREE.Path([new THREE.Vector2(minX, -minZ), new THREE.Vector2(minX, -maxZ), new THREE.Vector2(maxX, -maxZ), new THREE.Vector2(maxX, -minZ)]))
+    const sea = new THREE.Mesh(new THREE.ShapeGeometry(ring).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: "#4a8088", roughness: 0.08, metalness: 0.25, transparent: true, opacity: 0.9 }))
+    sea.position.y = WATER
     sea.receiveShadow = true
     // Maran a nord-ovest: lis cjasis e la tor milenarie
     const town = new THREE.Group()
@@ -696,5 +797,3 @@ export const scenery: Scenery = {
   light: { sun: [-0.4, 0.55, 0.7], fog: 0.0012 }
 }
 
-/** Il pel dal fanc tal ôr des tieris, un fregul sot de aghe. */
-const SEA_EDGE = WATER - 0.2
