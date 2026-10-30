@@ -237,3 +237,14 @@ const loop = (now: number) => {
   requestAnimationFrame(loop)
 }
 requestAnimationFrame(loop)
+
+// Il primo frame è disegnato e il menu tradotto: via la schermata di caricamento.
+requestAnimationFrame(() =>
+  requestAnimationFrame(() => {
+    document.documentElement.classList.remove("booting")
+    const loader = document.getElementById("loader")!
+    loader.classList.add("done")
+    loader.addEventListener("transitionend", () => loader.remove(), { once: true })
+    setTimeout(() => loader.remove(), 1000)
+  })
+)
