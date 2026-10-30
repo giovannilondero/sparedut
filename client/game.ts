@@ -79,7 +79,8 @@ export class Game {
   private seq = 0
   private wanted: WeaponId = "cramar"
   private lastWeapon: WeaponId = "mandi"
-  private serverWeapon: WeaponId | null = null
+  /** Primo comando che porta l'arma scelta: finché il server non l'ha visto, il cambio è in viaggio. */
+  private wantedSeq = 0
   private shownWeapon: WeaponId | null = null
   private localCooldown = 0
   private localMag: number | null = null
@@ -162,7 +163,7 @@ export class Game {
     this.offset = null
     this.predictor.reset()
     this.wanted = this.d.settings.primary
-    this.serverWeapon = null
+    this.wantedSeq = 0
     this.shownWeapon = null
     this.applySettings()
     this.updateRoster(room)
@@ -301,14 +302,10 @@ export class Game {
         else this.predictor.reconcile(you.body, you.seq, true)
       }
       this.wasAlive = you.alive
+      // Il server ha già visto il mio ultimo cambio d'arma e ne impugna un'altra: l'ha
+      // cambiata lui (raccolta del lanciafrico, armeria, rinascita) o ha rifiutato il cambio. Lo seguo.
       const server = you.arsenal.current
-      if (server !== this.serverWeapon) {
-        // Il server ha cambiato arma da sé (raccolta, rinascita): la seguo.
-        if (this.serverWeapon !== null && server !== this.wanted && !owned(you.arsenal, this.wanted)) this.wanted = server
-        if (this.serverWeapon !== null && server === "lanciafrico" && prev?.you && !prev.you.arsenal.launcher) this.wanted = server
-        this.serverWeapon = server
-      }
-      if (!owned(you.arsenal, this.wanted)) this.wanted = you.arsenal.current
+      if (server !== this.wanted && you.seq >= this.wantedSeq) this.wanted = server
       this.shots = this.shots.filter((q) => q > you.seq)
       const mag = you.arsenal.ammo[you.arsenal.current].mag
       this.localMag = you.arsenal.current === this.wanted ? Math.max(0, mag - this.shots.length) : null
@@ -402,12 +399,13 @@ export class Game {
         }
         return
       case "boom": {
-        fx.explosion(e.p, e.k)
+        const down = this.d.physics.raycast({ x: e.p[0], y: e.p[1] + 0.3, z: e.p[2] }, { x: 0, y: -1, z: 0 }, 4)
+        fx.explosion(e.p, e.k, down ? e.p[1] + 0.3 - down.dist : null)
         audio.play("boom", { at: e.p })
         const b = this.predictor.body
         if (b) {
           const d = Math.hypot(e.p[0] - b.x, e.p[1] - b.y, e.p[2] - b.z)
-          this.shake = Math.min(1.2, this.shake + Math.max(0, 1 - d / 18))
+          this.shake = Math.min(1.6, this.shake + Math.max(0, 1.4 - d / 22))
         }
         return
       }
@@ -489,6 +487,7 @@ export class Game {
     if (!you || !owned(you.arsenal, id) || id === this.wanted) return
     this.lastWeapon = this.wanted
     this.wanted = id
+    this.wantedSeq = this.seq + 1
     this.localCooldown = 18
     this.localMag = null
     this.d.audio.play("switch", { volume: 0.6 })
@@ -578,7 +577,16 @@ export class Game {
       const el = $("loadout")
       const lo = t().loadout
       el.innerHTML = `<h2>${lo.title}</h2><p class="muted">${lo.note}</p><div class="weapons" id="loadout-list"></div><div class="row"><button id="lo-close" class="primary">${lo.resume}</button></div>`
-      this.d.menu.buildArmarie($("loadout-list"), (p) => this.d.net.send({ t: "primary", p }))
+      this.d.menu.buildArmarie($("loadout-list"), (p) => {
+        this.d.net.send({ t: "primary", p })
+        // Se avevo in mano la vecchia principale, impugno subito la nuova.
+        const you = this.you()
+        if (you?.alive && this.wanted === you.arsenal.primary && p !== this.wanted) {
+          this.lastWeapon = this.wanted
+          this.wanted = p
+          this.wantedSeq = this.seq + 1
+        }
+      })
       $("lo-close").onclick = () => {
         this.openOverlay("none")
         this.controls.lock()

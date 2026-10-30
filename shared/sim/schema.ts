@@ -46,6 +46,12 @@ export interface ControlsValue {
    * esattamente come li ha già applicati la predizione del client.
    */
   readonly steps: ReadonlyArray<PlayerInput>
+  /**
+   * L'arma chiesta in questo tick, solo se il comando l'ha cambiata rispetto al
+   * precedente. Il server cambia arma sui cambi, non sul valore: così una raccolta o
+   * un'armeria che cambiano arma da sé non vengono annullate dai comandi già in viaggio.
+   */
+  readonly switchTo: WeaponId | null
   /** Tick di fila senza comandi (rete in ritardo o scheda in pausa). */
   readonly starved: number
 }

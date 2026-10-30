@@ -58,6 +58,7 @@ export const Respawn = Game.System(
         previous: c.input.buttons,
         pressed: 0,
         steps: [],
+        switchTo: null,
         starved: 0
       }))
       m.data.attackers.set([])

@@ -46,7 +46,7 @@ export const HandleJoin = Game.System(
         [Player, { session: j.session, name: j.name, bot: j.bot }],
         [TeamOf, j.team],
         [Motion, { body: { x: spot.at[0], y: spot.at[1], z: spot.at[2], vx: 0, vy: 0, vz: 0, grounded: true, crouch: false }, yaw: spot.yaw, pitch: 0 }],
-        [Controls, { input: { ...IDLE_INPUT, yaw: spot.yaw }, previous: 0, pressed: 0, steps: [], starved: 0 }],
+        [Controls, { input: { ...IDLE_INPUT, yaw: spot.yaw }, previous: 0, pressed: 0, steps: [], switchTo: null, starved: 0 }],
         [Life, { _tag: "Dead", respawn: 30, killer: null }],
         [Arsenal, freshArsenal(j.primary)],
         [Stats, NO_STATS],
@@ -93,8 +93,19 @@ export const HandleTeamChanges = Game.System(
         if (life._tag === "Alive") m.data.life.transition({ from: "Alive", to: "Dead", data: { respawn: 60, killer: null } })
       }
       const primary = primaries.get(session)
-      // La nuova arma principale arriva alla prossima rinascita.
-      if (primary) m.data.arsenal.update((a) => ({ ...a, nextPrimary: primary }))
+      // La nuova arma principale arriva subito; se si aveva in mano la vecchia, si impugna la nuova.
+      // Le munizioni restano quelle di ogni arma: cambiare avanti e indietro non ricarica niente.
+      if (primary)
+        m.data.arsenal.update((a) =>
+          a.primary === primary
+            ? { ...a, nextPrimary: primary }
+            : {
+                ...a,
+                primary,
+                nextPrimary: primary,
+                ...(a.current === a.primary ? { current: primary, action: { _tag: "switch" as const, ticks: 20 } } : {})
+              }
+        )
     }
   }
 )

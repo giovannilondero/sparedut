@@ -28,12 +28,19 @@ export const ApplyInputs = Game.System(
       const steps = arrived.get(m.data.player.get().session) ?? []
       const last = steps.length ? steps[steps.length - 1] : old.input
       let pressed = 0
-      for (const s of steps) pressed |= s.buttons
+      let weapon = old.input.weapon
+      let switchTo: ControlsValue["switchTo"] = null
+      for (const s of steps) {
+        pressed |= s.buttons
+        if (s.weapon !== weapon) switchTo = s.weapon
+        weapon = s.weapon
+      }
       m.data.controls.set({
         input: last,
         previous: old.input.buttons,
         pressed: pressed | last.buttons,
         steps,
+        switchTo,
         starved: steps.length ? 0 : old.starved + 1
       })
     }

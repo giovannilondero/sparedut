@@ -126,4 +126,45 @@ describe("simulazione", () => {
     expect(events).toContain("kill")
     expect(v.score.benandanti).toBeGreaterThan(0)
   })
+
+  test("il lanciafrico raccolto resta in mano anche con i comandi già in viaggio", () => {
+    const sim = createSim({ mode: "bataie", minutes: 5, seed: 5, physics })
+    sim.join("a", "Toni", "benandanti", false, "cramar")
+    sim.start()
+    for (let i = 0; i < 30; i++) sim.step()
+    const route: [number, number][] = [[3, -36], [3, -2], [9, -2]]
+    let seq = 1
+    let picked = -1
+    for (let i = 0; i < 60 * 20 && picked < 0; i++) {
+      const p = sim.view().players[0]
+      while (route.length > 1 && Math.hypot(route[0][0] - p.body.x, route[0][1] - p.body.z) < 0.8) route.shift()
+      const [tx, tz] = route[0]
+      // Il client chiede sempre il mitra: è il comando che era già partito prima della raccolta.
+      sim.input("a", { ...IDLE_INPUT, seq: seq++, mz: 1, yaw: Math.atan2(-(tx - p.body.x), -(tz - p.body.z)), weapon: "cramar", view: sim.view().tick })
+      if (sim.step().some((e) => e.t === "pick" && e.k === "lanciafrico")) picked = i
+    }
+    expect(picked).toBeGreaterThanOrEqual(0)
+    for (let i = 0; i < 30; i++) {
+      sim.input("a", { ...IDLE_INPUT, seq: seq++, weapon: "cramar", view: sim.view().tick })
+      sim.step()
+    }
+    expect(sim.view().players[0].arsenal.current).toBe("lanciafrico")
+    // Un cambio vero, invece, passa.
+    sim.input("a", { ...IDLE_INPUT, seq: seq++, weapon: "mandi", view: sim.view().tick })
+    sim.step()
+    expect(sim.view().players[0].arsenal.current).toBe("mandi")
+  })
+
+  test("la nuova arma principale dall'armeria arriva subito", () => {
+    const sim = createSim({ mode: "bataie", minutes: 5, seed: 5, physics })
+    sim.join("a", "Toni", "benandanti", false, "cramar")
+    sim.start()
+    for (let i = 0; i < 30; i++) sim.step()
+    expect(sim.view().players[0].arsenal.current).toBe("cramar")
+    sim.primary("a", "doplete")
+    sim.step()
+    const a = sim.view().players[0].arsenal
+    expect(a.primary).toBe("doplete")
+    expect(a.current).toBe("doplete")
+  })
 })

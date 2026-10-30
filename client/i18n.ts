@@ -392,7 +392,7 @@ const fur: Strings = {
   },
   loadout: {
     title: "Armarie",
-    note: "La gnove arme principâl e rive cuant che tu tornis in pîts.",
+    note: "La gnove arme principâl e rive subite, cu lis sôs munizions.",
     resume: "Torne a zuiâ"
   },
   pause: {
@@ -648,7 +648,7 @@ const it: Strings = {
   },
   loadout: {
     title: "Armeria",
-    note: "La nuova arma principale arriva alla prossima rinascita.",
+    note: "La nuova arma principale arriva subito, con le sue munizioni.",
     resume: "Torna a giocare"
   },
   pause: {

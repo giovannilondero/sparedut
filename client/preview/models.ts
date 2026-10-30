@@ -141,7 +141,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "f") shoot()
   if (e.key === "r") vm.reload(WEAPONS[WEAPON_IDS[wIndex]].reloadTicks / 60)
   if (e.key === "g") vm.throwBomb()
-  if (e.key === "e") fx.explosion([0, 0.3, -3], Math.random() < 0.5 ? "frico" : "sgnape")
+  if (e.key === "e") fx.explosion([0, 0.3, -3], Math.random() < 0.5 ? "frico" : "sgnape", 0)
   if (e.key === "p") auto = !auto
 })
 
@@ -212,7 +212,7 @@ function frame() {
     fxTimer = 0
     fxStep++
     const x = ((fxStep * 3.7) % 10) - 5
-    if (fxStep % 3 === 0) fx.explosion([x, 0.3, 4], fxStep % 2 ? "frico" : "sgnape")
+    if (fxStep % 3 === 0) fx.explosion([x, 0.3, 4], fxStep % 2 ? "frico" : "sgnape", 0)
     if (fxStep % 3 === 1) fx.padBurst([x, 0.05, 4])
     if (fxStep % 3 === 2) fx.pickupBurst([x, 0.5, 4], kinds[fxStep % kinds.length])
     fx.hitPuff([-x, 1.5, -2], fxStep % 2 === 0)

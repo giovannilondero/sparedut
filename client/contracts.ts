@@ -104,7 +104,8 @@ export interface Fx {
   /** Colpo a segno: briciole di polenta (niente sangue). */
   hitPuff(at: P3, head: boolean): void
   muzzle(at: P3): void
-  explosion(at: P3, kind: "frico" | "sgnape"): void
+  /** Esplosione: palla di fuoco, schegge, onda d'urto. Con `ground` (y del pavimento sotto) lascia fuoco e bruciatura. */
+  explosion(at: P3, kind: "frico" | "sgnape", ground: number | null): void
   /** Proiettili in volo: forme di frico che girano, bottiglie di sgnape. Chiamare a ogni frame con la lista corrente. */
   projectiles(list: readonly (readonly ["frico" | "sgnape", number, number, number])[]): void
   /** Anelli/sbuffi di fieno quando qualcuno usa un cjar di fen. */

@@ -5,7 +5,7 @@
 import { Random } from "@typeonce/ritmo"
 import { rayPose, type Pose } from "../../hitbox.ts"
 import { eyeHeight, lookDir } from "../../movement.ts"
-import { FRICO_SHELL, SGNAPE_BOMB, WEAPONS, type WeaponId } from "../../weapons.ts"
+import { FRICO_SHELL, SGNAPE_BOMB, WEAPONS } from "../../weapons.ts"
 import type { Vec3 } from "../../vec.ts"
 import type { P3 } from "../events.ts"
 import { damageAt, owned } from "../rules.ts"
@@ -101,8 +101,8 @@ export const UseWeapons = Game.System(
       a = { ...a, sgnape: Math.max(0, a.sgnape - 1), bombCooldown: Math.max(0, a.bombCooldown - 1) }
 
       // Cambio arma.
-      const wanted: WeaponId = input.weapon
-      if (wanted !== a.current && owned(a, wanted)) {
+      const wanted = controls.switchTo
+      if (wanted && wanted !== a.current && owned(a, wanted)) {
         a = { ...a, current: wanted, action: { _tag: "switch", ticks: SWITCH_TICKS } }
       }
 

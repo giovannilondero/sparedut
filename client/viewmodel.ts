@@ -33,6 +33,8 @@ const SWITCH_DOWN = 0.16
 const SWITCH_UP = 0.22
 const SWING = 0.42
 const TOSS = 0.6
+/** Di quanto il mirino resta sotto la linea di mira quando si mira (m). */
+const AIM_DROP = 0.035
 const BOLT_CYCLE = 0.65
 const Y = new THREE.Vector3(0, 1, 0)
 const X = new THREE.Vector3(1, 0, 0)
@@ -433,7 +435,9 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
 
     // composizione finale: anca ↔ mira, più tutte le aggiunte
     const [hx, hy, hz] = h.hip
-    const aim = h.aim ?? [0, -s.model.sightH, hz - 0.1]
+    // Mirando l'arma sale al centro ma resta un filo sotto la linea di mira: la cima del
+    // mirino a ~3.5 cm sotto l'occhio, così il bersaglio al centro resta scoperto.
+    const aim = h.aim ?? [0, -s.model.sightH - AIM_DROP, hz - 0.04]
     rig.position.set(
       hx + (aim[0] - hx) * aimB + A.px,
       hy + (aim[1] - hy) * aimB + A.py - sw * 0.28,
