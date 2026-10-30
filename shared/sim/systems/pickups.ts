@@ -3,7 +3,7 @@
  */
 import type { PickupKind } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
-import { WEAPON_IDS, WEAPONS } from "../../weapons.ts"
+import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS } from "../../weapons.ts"
 import { MAX_ARMOR, MAX_HP, SGNAPE_TICKS } from "../rules.ts"
 import { Arsenal, Game, Life, Match, Motion, Out, Pickups, Player, Rules, type ArsenalValue } from "../schema.ts"
 
@@ -58,13 +58,13 @@ export const CollectPickups = Game.System(
             m.data.arsenal.set({ ...a, sgnape: SGNAPE_TICKS })
             break
           case "munizions": {
-            if (ammoFull(a) && a.bombs >= 2) {
+            if (ammoFull(a) && a.bombs >= SGNAPE_BOMB.perLife && a.mines >= RAIBL_MINE.perLife) {
               used = false
               break
             }
             const ammo = { ...a.ammo }
             for (const id of WEAPON_IDS) ammo[id] = { mag: ammo[id].mag, reserve: Math.max(ammo[id].reserve, WEAPONS[id].reserve) }
-            m.data.arsenal.set({ ...a, ammo, bombs: Math.max(a.bombs, 2) })
+            m.data.arsenal.set({ ...a, ammo, bombs: Math.max(a.bombs, SGNAPE_BOMB.perLife), mines: Math.max(a.mines, RAIBL_MINE.perLife) })
             break
           }
           case "lanciafrico":

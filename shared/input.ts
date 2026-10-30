@@ -11,7 +11,8 @@ export const BUTTON = {
   crouch: 8,
   sprint: 16,
   reload: 32,
-  bomb: 64
+  bomb: 64,
+  mine: 128
 } as const
 
 export type ButtonName = keyof typeof BUTTON

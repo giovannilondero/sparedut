@@ -166,6 +166,8 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 @keyframes pop { 0% { opacity: 0; transform: translateX(-50%) scale(1.6); } 10% { opacity: 1; transform: translateX(-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
 #banner { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); font-size: 14px; background: rgba(10, 8, 6, 0.7); padding: 6px 14px; border-radius: 8px; border: 1px solid var(--stone-line); }
 #banner:empty { display: none; }
+#banner .storm { color: #9fd0ff; animation: storm-pulse 0.8s ease-in-out infinite alternate; }
+@keyframes storm-pulse { from { opacity: 0.6; } to { opacity: 1; } }
 
 #vitals { position: absolute; left: 22px; bottom: 22px; display: flex; flex-direction: column; gap: 6px; }
 .vital { display: grid; grid-template-columns: 28px 52px 160px; align-items: center; gap: 6px; background: var(--stone); border: 1px solid var(--stone-line); padding: 6px 10px; border-radius: 10px; }

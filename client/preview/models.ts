@@ -203,6 +203,7 @@ function frame() {
     crouch: false,
     lookDx,
     lookDy: 0,
+    spin: Math.max(0, Math.sin(t * 0.5)),
     sgnape: Math.sin(t * 0.13) > 0.8
   })
 

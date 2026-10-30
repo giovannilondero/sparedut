@@ -6,7 +6,7 @@
 import * as THREE from "three"
 import type { Fx, P3 } from "./contracts.ts"
 import type { PickupKind } from "../shared/map.ts"
-import { FRICO_SHELL, SGNAPE_BOMB, type WeaponId } from "../shared/weapons.ts"
+import { FRICO_SHELL, RAIBL_MINE, SGNAPE_BOMB, type ProjectileKind, type WeaponId } from "../shared/weapons.ts"
 import { flashTex } from "./models/kit.ts"
 import { fricoDisc, sgnapeBottle } from "./models/props.ts"
 
@@ -257,6 +257,9 @@ const TRACER: Record<WeaponId, { color: THREE.Color; speed: number; len: number;
   cramar: { color: C(0xffa14a), speed: 420, len: 4.5, width: 0.022 },
   doplete: { color: C(0xfff0c0), speed: 330, len: 2.2, width: 0.014 },
   cjampanili: { color: C(0xd8f4ff), speed: 650, len: 12, width: 0.04 },
+  mulin: { color: C(0xffb85a), speed: 400, len: 3, width: 0.016 },
+  // il getto del miedi: lento, corto e largo, verde camomilla
+  miedi: { color: C(0x9effb0), speed: 38, len: 2.4, width: 0.07 },
   lanciafrico: null
 }
 
@@ -388,7 +391,22 @@ function scorchTex() {
   return t
 }
 
-const BLAST = { frico: FRICO_SHELL.radius, sgnape: SGNAPE_BOMB.radius } as const
+const BLAST = { frico: FRICO_SHELL.radius, sgnape: SGNAPE_BOMB.radius, mine: RAIBL_MINE.radius } as const satisfies Record<ProjectileKind, number>
+
+/** La mine di Raibl: un disco di ferro con la spoletta e una luce rossa che lampeggia. */
+function raiblMine(): { g: THREE.Group; light: THREE.MeshBasicMaterial } {
+  const g = new THREE.Group()
+  const iron = new THREE.MeshLambertMaterial({ color: 0x4a4a40 })
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.09, 14), iron)
+  body.position.y = 0.045
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.06, 10), new THREE.MeshLambertMaterial({ color: 0x8a6a3a }))
+  cap.position.y = 0.12
+  const light = new THREE.MeshBasicMaterial({ color: 0xff2a1a, toneMapped: false })
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), light)
+  led.position.set(0.12, 0.1, 0)
+  g.add(body, cap, led)
+  return { g, light }
+}
 /** Quanto resta acceso il fuoco a terra (s). */
 const FIRE_LIFE = 7
 /** Schegge che lasciano una scia di fumo. */
@@ -435,6 +453,7 @@ export function createFx(scene: THREE.Scene): Fx {
   // proiettili: si riusano, se ne creano solo quando la lista cresce oltre il visto
   const fricos: THREE.Group[] = []
   const bottles: THREE.Group[] = []
+  const mines: { g: THREE.Group; light: THREE.MeshBasicMaterial }[] = []
   let nFrico = 0
   let nBottle = 0
   let trailAcc = 0
@@ -606,8 +625,21 @@ export function createFx(scene: THREE.Scene): Fx {
     projectiles(list) {
       let nf = 0
       let nb = 0
+      let nm = 0
       for (const [kind, x, y, z] of list) {
-        if (kind === "frico") {
+        if (kind === "mine") {
+          let m = mines[nm]
+          if (!m) {
+            m = raiblMine()
+            scene.add(m.g)
+            mines.push(m)
+          }
+          m.g.visible = true
+          m.g.position.set(x, y, z)
+          // lampeggia: una volta al secondo, sfasate fra loro
+          m.light.color.setHex((time + nm * 0.37) % 1 < 0.15 ? 0xff3a20 : 0x3a0a06)
+          nm++
+        } else if (kind === "frico") {
           let m = fricos[nf]
           if (!m) {
             m = fricoDisc()
@@ -634,6 +666,7 @@ export function createFx(scene: THREE.Scene): Fx {
           nb++
         }
       }
+      for (let i = nm; i < mines.length; i++) mines[i].g.visible = false
       for (let i = nf; i < nFrico; i++) fricos[i].visible = false
       for (let i = nb; i < nBottle; i++) bottles[i].visible = false
       nFrico = nf

@@ -6,6 +6,7 @@ import { BUTTON, IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
 import type { Team, V3 } from "../shared/map.ts"
 import { eyeHeight } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
+import { allied, outsideStorm } from "../shared/sim/rules.ts"
 import type { PlayerView, WorldView } from "../shared/sim/view.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { nearestNode, route, type NavGraph } from "./nav.ts"
@@ -67,7 +68,7 @@ export class BotBrain {
     let enemy: PlayerView | null = null
     let enemyDist = Infinity
     for (const p of world.players) {
-      if (!p.alive || p.team === me.team) continue
+      if (!p.alive || p.session === me.session || allied(world.rules, me.team, p.team)) continue
       const d = Math.hypot(p.body.x - me.body.x, p.body.y - me.body.y, p.body.z - me.body.z)
       if (d > skill.sight || d >= enemyDist) continue
       const chest = { x: p.body.x, y: p.body.y + (p.body.crouch ? 0.8 : 1.2), z: p.body.z }
@@ -92,8 +93,24 @@ export class BotBrain {
     let mx = 0
     let mz = 0
 
+    // Il medico senza nemici a tiro va a curare il compagno più malconcio che vede.
+    let patient: PlayerView | null = null
+    if (a.primary === "miedi" && !(enemy && enemyDist < 25)) {
+      let worst = 75
+      for (const p of world.players) {
+        if (!p.alive || p.session === me.session || !allied(world.rules, me.team, p.team) || p.hp >= worst) continue
+        if (Math.hypot(p.body.x - me.body.x, p.body.z - me.body.z) > 30) continue
+        if (!this.physics.lineOfSight(eye, { x: p.body.x, y: p.body.y + 1.2, z: p.body.z })) continue
+        patient = p
+        worst = p.hp
+      }
+      if (patient) weapon = "miedi"
+    }
+    // Mine davanti ai piedi, ogni tanto, quando non c'è nessuno in giro.
+    if (!enemy && a.mines > 0 && this.level !== "zovin" && (this.tick + this.roam) % 900 === 0) buttons |= BUTTON.mine
+
     // Dove andare.
-    const goal = this.chooseGoal(world, me)
+    const goal: V3 = patient ? [patient.body.x, patient.body.y, patient.body.z] : this.chooseGoal(world, me)
     const goalMoved = !this.goal || Math.hypot(this.goal[0] - goal[0], this.goal[2] - goal[2]) > 6
     if (goalMoved || this.path.length === 0) {
       this.goal = goal
@@ -128,8 +145,11 @@ export class BotBrain {
       const tolerance = 0.05 + 0.5 / Math.max(4, enemyDist)
       const def = WEAPONS[weapon]
       const inRange = def.mode === "projectile" ? enemyDist > 5 : def.mode === "melee" ? enemyDist < def.range : enemyDist < def.range * 0.9
+      // Il Mulin si tiene in rotazione finché il nemico è in vista.
+      if (def.spinTicks > 0 && enemyDist < def.range) buttons |= BUTTON.fire
       if (yawErr < tolerance && inRange) {
-        if (def.mode === "auto") buttons |= Math.sin(this.tick * 0.05 + this.roam) < skill.burst * 2 - 1 ? BUTTON.fire : 0
+        if (def.spinTicks > 0 || def.mode === "beam") buttons |= BUTTON.fire
+        else if (def.mode === "auto") buttons |= Math.sin(this.tick * 0.05 + this.roam) < skill.burst * 2 - 1 ? BUTTON.fire : 0
         else {
           this.fireHeld = !this.fireHeld
           if (this.fireHeld) buttons |= BUTTON.fire
@@ -142,7 +162,7 @@ export class BotBrain {
         this.strafeTimer = 25 + ((this.tick * 13 + this.roam) % 50)
       }
       mx = this.strafe
-      const wantDist = weapon === "cjampanili" ? 30 : weapon === "doplete" || weapon === "mescul" ? 3 : 12
+      const wantDist = weapon === "cjampanili" ? 30 : weapon === "doplete" || weapon === "mescul" || weapon === "miedi" ? 3 : 12
       mz = enemyDist > wantDist + 4 ? 1 : enemyDist < wantDist - 4 ? -0.6 : 0
       // Chi ha un obiettivo corre e spara: il frico non si porta da solo.
       if (waypoint && this.pushesObjective(world, me)) {
@@ -157,13 +177,21 @@ export class BotBrain {
       // Muoversi in relazione al nemico: il percorso si riprende dopo.
       if (this.level !== "zovin" && (this.tick + this.roam) % 140 === 0) buttons |= BUTTON.jump
       if (a.bombs > 0 && enemyDist > 9 && enemyDist < 22 && this.level !== "zovin" && (this.tick + this.roam) % 420 === 0) buttons |= BUTTON.bomb
+    } else if (patient) {
+      // Mira al petto del compagno e lo cura col getto; da vicino si ferma.
+      const dx = patient.body.x - eye.x
+      const dz = patient.body.z - eye.z
+      const d = Math.hypot(dx, dz)
+      this.turn(Math.atan2(-dx, -dz), Math.atan2(patient.body.y + 1.1 - eye.y, d), 9)
+      if (d < WEAPONS.miedi.range - 1.5 && a.current === "miedi") buttons |= BUTTON.fire
+      mz = d > 4 ? 1 : 0
     } else {
       if (enemy) wantYaw = Math.atan2(-(enemy.body.x - me.body.x), -(enemy.body.z - me.body.z))
       this.turn(wantYaw, wantPitch, 7)
       if (waypoint) {
         mz = 1
         if (Math.abs(wrap(wantYaw - this.yaw)) > 1.2) mz = 0.2
-        if (!enemy && this.path.length > 2 && me.arsenal.current !== "cjampanili") buttons |= BUTTON.sprint
+        if (!enemy && this.path.length > 2 && me.arsenal.current !== "cjampanili" && me.arsenal.current !== "mulin") buttons |= BUTTON.sprint
       }
       // Ricarica a mani libere.
       const ammo = a.ammo[a.current]
@@ -204,6 +232,8 @@ export class BotBrain {
     }
     const { hill } = this.physics.map
     if (mode === "culine") return Math.hypot(me.body.x - hill.at[0], me.body.z - hill.at[2]) > hill.radius * 0.6
+    if (mode === "cjar" && world.cart) return Math.hypot(me.body.x - world.cart.at[0], me.body.z - world.cart.at[2]) > 2.5
+    if (mode === "tampieste" && world.storm) return outsideStorm(world.storm, me.body)
     return false
   }
 
@@ -232,8 +262,18 @@ export class BotBrain {
       return FLAG_BASES[enemyTeam]
     }
     if (mode === "culine") return HILL.at
+    // Il cjar: i Benandanti lo spingono, i Malandanti ci si piazzano davanti.
+    if (mode === "cjar" && world.cart) {
+      const [x, y, z] = world.cart.at
+      const ahead = team === "malandanti" ? 3 : -1.5
+      return [x - Math.sin(world.cart.yaw) * ahead + ((this.roam % 5) - 2) * 0.6, y, z - Math.cos(world.cart.yaw) * ahead]
+    }
+    // La tempesta: chi è fuori torna dentro, verso il centro.
+    if (mode === "tampieste" && world.storm && Math.hypot(me.body.x - world.storm.x, me.body.z - world.storm.z) > world.storm.radius * 0.8) {
+      return [world.storm.x, me.body.y, world.storm.z]
+    }
     // Bataie: verso il nemico più vicino, o in giro per la mappa.
-    const enemies = world.players.filter((p) => p.alive && p.team !== team)
+    const enemies = world.players.filter((p) => p.alive && p.session !== me.session && !allied(world.rules, team, p.team))
     if (enemies.length) {
       const pick = enemies[Math.abs(this.roam) % enemies.length]
       // Cambia preda ogni tanto.

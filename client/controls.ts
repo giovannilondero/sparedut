@@ -11,7 +11,8 @@ const KEYS: Record<string, ButtonName> = {
   KeyC: "crouch",
   ShiftLeft: "sprint",
   KeyR: "reload",
-  KeyG: "bomb"
+  KeyG: "bomb",
+  KeyF: "mine"
 }
 
 export interface ControlsHandlers {

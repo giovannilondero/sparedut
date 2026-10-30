@@ -10,10 +10,11 @@ import { MAP_IDS } from "./maps/index.ts"
 import type { Body } from "./movement.ts"
 import type { GameEvent } from "./sim/events.ts"
 import type { ArsenalValue, FlagState, HillValue } from "./sim/schema.ts"
-import type { PhaseView } from "./sim/view.ts"
-import { PRIMARIES, type PrimaryId, type WeaponId } from "./weapons.ts"
+import type { StormValue } from "./sim/rules.ts"
+import type { CartView, PhaseView } from "./sim/view.ts"
+import { PRIMARIES, type PrimaryId, type ProjectileKind, type WeaponId } from "./weapons.ts"
 
-export const PROTOCOL_VERSION = 6
+export const PROTOCOL_VERSION = 7
 export const MAX_PLAYERS = 16
 export const SNAPSHOT_EVERY = 2 // tick: 30 istantanee al secondo
 
@@ -117,7 +118,11 @@ export interface Snapshot {
   readonly hill: HillValue
   /** "1" disponibile, "0" in attesa, nell'ordine di `PICKUPS`. */
   readonly pickups: string
-  readonly proj: readonly (readonly [kind: "frico" | "sgnape", x: number, y: number, z: number])[]
+  readonly proj: readonly (readonly [kind: ProjectileKind, x: number, y: number, z: number])[]
+  /** Solo in Spingi il Cjar. */
+  readonly cart: CartView | null
+  /** Solo nella Tampieste in corso. */
+  readonly storm: StormValue | null
   readonly players: readonly SnapOther[]
   readonly you: SnapSelf | null
   readonly ev: readonly GameEvent[]

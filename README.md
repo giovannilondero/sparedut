@@ -27,7 +27,7 @@ All'avvio il server stampa gli indirizzi di rete locale: gli altri computer dell
 ## Partite
 
 - **Zuie cuintri i bot**: partita privata contro la CPU, subito.
-- **Cree une partide**: modalità, durata, bot per squadra e bravura (Zovin, Pari di famee, Plevan), fuoco amico.
+- **Cree une partide**: modalità, mappa, durata, bot per squadra e bravura (Zovin, Pari di famee, Plevan), fuoco amico.
   - *Rete locale*: compare nella lista "Partidis in rêt locâl" di chi è sulla stessa rete (stesso IP pubblico visto dal server; se il server gira in LAN, tutti gli IP privati contano come stessa rete), ed è raggiungibile anche col codice.
   - *Solo con codice*: non è in lista; si entra col codice di 4 lettere o col link `?p=CODICE`.
 - Chi crea è l'host: dal menu di partita (`Esc`) fa partire la partita, aggiunge o toglie bot, cambia la bravura.
@@ -40,6 +40,18 @@ All'avvio il server stampa gli indirizzi di rete locale: gli altri computer dell
 | **Bataie di Gnot** | deathmatch a squadre, a 40 |
 | **Cjape il Frico** | cattura la bandiera: la forma di frico sull'altare del Duomo e sotto la loggia del Comune, a 3 |
 | **Re de Plaçute** | re della collina attorno alla fontana di Via Bini, un punto al secondo, a 120 |
+| **Spinç il Cjar** | carrello: i Benandanti spingono il cjar lungo il percorso (avanza con un Benandante vicino e nessun Malandante, conteso si ferma, lasciato solo torna indietro); se arriva in fondo vincono, allo scadere vincono i Malandanti |
+| **La Tampieste** | tutti contro tutti, una vita sola: la tempesta stringe attorno al centro della mappa e fuori fa male; vince l'ultimo in piedi |
+
+### Mappe
+
+| | |
+|---|---|
+| **Glemone** | il Duomo, Via Bini coi portici e la piazza del Municipio |
+| **Fuart di Osôf** | il Forte di Osoppo sul colle: bastioni e gallerie |
+| **Trinceis dal Pal Piçul** | le trincee della Grande Guerra sulle Alpi Carniche |
+| **Vençon** | il borgo murato di Venzone col Duomo di Sant'Andrea |
+| **Cave dal Predil** | la miniera di Raibl: binari e carrelli |
 
 ### Armeria
 
@@ -48,28 +60,31 @@ All'avvio il server stampa gli indirizzi di rete locale: gli altri computer dell
 | Mitra dal Cramâr | automatica (principale) |
 | Dopiete di Pre Checo | doppietta, 9 pallini (principale) |
 | Il Cjampanili | fucile di precisione con cannocchiale (principale) |
+| Il Mulin | mitragliatrice a canne rotanti: prima deve girare, poi spara a raffica; pesante (principale) |
+| Cassele dal Miedi | il medico: getto a corto raggio che cura i compagni e scotta i nemici; chi la porta cura piano sé e i compagni vicini (principale) |
 | La Mandi | pistola, sempre con te |
 | Mescul de Polente | corpo a corpo, sempre con te |
 | Lanciafrico | arma potente da raccogliere in Via Bini: forme di frico che rimbalzano e scoppiano |
 | Bombe di Sgnape | granate (`G`), due per vita |
+| Mine di Raibl | mine (`F`), due per vita: si piantano a terra, si armano in un secondo e saltano quando passa un nemico |
 
 Raccolte: **frico** (+40 salute), **gubane** (+50 corazza), **sgnape** (corri più forte, la vista ondeggia), **munizions**.
 I **cjars di fen** (carri di fieno) lanciano sul ballatoio del campanile e sulla terrazza del Comune.
 
 ### Comandi
 
-`WASD` muoversi · mouse mirare · clic sinistro sparare · destro mirare · `Spazio` saltare · `Ctrl`/`C` accucciarsi · `Shift` correre ·
-`R` ricaricare · `1-4` armi · `Q` arma precedente · rotella cambia arma · `G` bomba di sgnape · `Tab` classifica ·
+`WASD` muoversi · mouse mirare · clic sinistro sparare · destro mirare · `Spazio` saltare · `Ctrl`/`C` accucciarsi · `Shift` correre (con l'arma abbassata: non si spara) ·
+`R` ricaricare · `1-4` armi · `Q` arma precedente · rotella cambia arma · `G` bomba di sgnape · `F` mina di Raibl · `Tab` classifica ·
 `Invio`/`T` chat · `V` frasi rapide (Mandi!, Orpo!, …) · `B` armeria · `Esc` menu di partita.
 
 ## Struttura
 
 Stack dalle linee guida (`giovannilondero/game-dev-guidelines`, 3D): **Ritmo** (ECS e simulazione) + **Three.js** + **Howler.js** + **Rapier 3D**.
 
-- `shared/map.ts`: la mappa come dati, unica fonte per collisioni, grafica, spawn, obiettivi e grafo dei bot
+- `shared/map.ts`, `shared/maps/`: le mappe come dati, unica fonte per collisioni, grafica, spawn, obiettivi, percorso del cjar e grafo dei bot
 - `shared/physics.ts`: il mondo statico in Rapier 3D e il character controller (server e client)
 - `shared/movement.ts`: il movimento in prima persona, funzione pura usata dal server e dalla predizione del client
-- `shared/sim/`: la simulazione Ritmo (60 tick/s): schema, sistemi (ingressi, partita, rinascita, movimento, armi con compensazione della latenza, proiettili, danni, raccolte, obiettivi), proiezioni per l'host
+- `shared/sim/`: la simulazione Ritmo (60 tick/s): schema, sistemi (ingressi, partita, rinascita, movimento, armi con compensazione della latenza, proiettili e mine, medico, tempesta, danni e cure, raccolte, obiettivi e cjar), proiezioni per l'host
 - `shared/weapons.ts`, `shared/folklore.ts`: armi, squadre, modalità, bot (solo dati, senza lingua)
 - `client/i18n.ts`: tutti i testi in friulano e italiano: menu, HUD, battute, consigli, vocabolario
 - `shared/protocol.ts`: messaggi client ↔ server, validati con zod

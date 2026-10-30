@@ -3,7 +3,7 @@
  */
 import { MODES, pick, TEAM_INFO, type ModeId } from "../shared/folklore.ts"
 import type { Team } from "../shared/map.ts"
-import type { BoardRow, RoomInfo, SnapSelf, Snapshot } from "../shared/protocol.ts"
+import { FLAG_BIT, type BoardRow, type RoomInfo, type SnapSelf, type Snapshot } from "../shared/protocol.ts"
 import type { KillCause } from "../shared/sim/events.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { WARMUP_TICKS } from "../shared/sim/rules.ts"
@@ -21,6 +21,8 @@ export const fmtClock = (ticks: number) => {
 
 export class Hud {
   private announceTimer = 0
+  /** Nella Tampieste in corso chi muore non rinasce: il pannello della morte lo dice. */
+  spectating = false
   private chatTimer = 0
   /** Ultimo valore scritto per elemento e proprietà: il DOM si tocca solo se cambia. */
   private written = new Map<string, string | boolean>()
@@ -74,7 +76,7 @@ export class Hud {
     this.text("mag", def.mode === "melee" ? "∞" : String(localMag ?? ammo.mag))
     this.text("reserve", def.mode === "melee" ? "" : String(ammo.reserve))
     this.toggleOn($("reserve").previousElementSibling!, "slash", "hidden", def.mode === "melee")
-    this.text("bombs", `${t().bomb}: ${"🍶".repeat(a.bombs) || "—"}`)
+    this.text("bombs", `${t().bomb}: ${"🍶".repeat(a.bombs) || "—"} · ${t().mine}: ${"💣".repeat(a.mines) || "—"}`)
     const slots: [string, WeaponId][] = [["1", a.primary], ["2", "mandi"], ["3", "lanciafrico"], ["4", "mescul"]]
     this.html("slots", slots
       .map(([k, id]) => `<span class="${id === a.current ? "on" : slot.owned(id) ? "" : "off"}">${k} ${t().weapons[id].short}</span>`)
@@ -115,15 +117,19 @@ export class Hud {
     }
   }
 
-  top(snap: Snapshot, mode: ModeId, names: Map<string, string>) {
+  /** `outside`: sono vivo e fuori dal cerchio della Tampieste. */
+  top(snap: Snapshot, mode: ModeId, names: Map<string, string>, outside = false) {
     const s = t()
-    this.text("name-ben", s.teams.benandanti.name)
-    this.text("name-mal", s.teams.malandanti.name)
-    this.text("score-ben", String(snap.score.benandanti))
-    this.text("score-mal", String(snap.score.malandanti))
+    const alone = mode === "tampieste"
+    const alive = snap.players.filter((p) => p.f & FLAG_BIT.alive).length
+    // Nella Tampieste non ci sono squadre: al posto dei punti, quanti sono in piedi.
+    this.text("name-ben", alone ? s.hud.alive(alive) : s.teams.benandanti.name)
+    this.text("name-mal", alone ? "" : s.teams.malandanti.name)
+    this.text("score-ben", alone ? "" : mode === "cjar" ? `${snap.score.benandanti}%` : String(snap.score.benandanti))
+    this.text("score-mal", alone ? "" : String(snap.score.malandanti))
     const phase = snap.phase
     this.text("clock", phase.tag === "Live" ? fmtClock(phase.ends - snap.tick) : phase.tag === "Warmup" ? fmtClock(WARMUP_TICKS - snap.tick) : s.hud.over)
-    this.text("mode-label", s.hud.modeLabel(s.modes[mode].name, MODES[mode].scoreLimit))
+    this.text("mode-label", alone ? `${s.modes[mode].name} · ${s.modes[mode].sub}` : s.hud.modeLabel(s.modes[mode].name, MODES[mode].scoreLimit))
     let obj = ""
     if (mode === "frico") {
       obj = (["benandanti", "malandanti"] as const)
@@ -138,9 +144,18 @@ export class Hud {
       const color = h.owner ? TEAM_INFO[h.owner].color : "#888"
       const label = h.contested ? s.hud.contested : h.owner ? s.hud.hillOwned(s.teams[h.owner].name) : s.hud.hillFree
       obj = `${label}<div class="hillbar"><i style="width:${((h.ticks % 60) / 60) * 100}%;background:${color}"></i></div>`
+    } else if (mode === "cjar" && snap.cart) {
+      const c = snap.cart
+      const pct = Math.floor(c.progress * 100)
+      const state = c.contested ? s.hud.cartStop : c.pushers > 0 ? s.hud.cartPush(c.pushers) : c.back ? s.hud.cartBack : s.hud.cartIdle
+      const color = c.contested ? "#ffb347" : TEAM_INFO.benandanti.color
+      obj = `${s.hud.cart(pct)} · ${state}<div class="hillbar"><i style="width:${pct}%;background:${color}"></i></div>`
     }
     this.html("objective", obj)
-    this.html("banner", phase.tag === "Warmup" ? s.hud.warmup(fmtClock(WARMUP_TICKS - snap.tick)) : "")
+    this.html(
+      "banner",
+      phase.tag === "Warmup" ? s.hud.warmup(fmtClock(WARMUP_TICKS - snap.tick)) : outside ? `<b class="storm">${s.hud.stormOutside}</b>` : ""
+    )
   }
 
   killfeed(k: string | null, v: string, w: KillCause, head: boolean, names: Map<string, string>, teams: Map<string, Team>, me: string, seed: number) {
@@ -149,10 +164,10 @@ export class Hud {
     const kill = t().hud.kill
     const victim = teamSpan(names.get(v) ?? "?", teams.get(v))
     if (!k) {
-      div.innerHTML = w === "fall" ? `${victim} <em>${kill.fall}</em>` : `${victim} <em>${kill.self}</em>`
+      div.innerHTML = `${victim} <em>${w === "fall" ? kill.fall : w === "tampieste" ? kill.storm : kill.self}</em>`
     } else {
-      const verb = w === "sgnape" ? pick(kill.sgnape, seed) : w === "fall" ? kill.pushed : pick(kill[w], seed)
-      const weapon = w === "sgnape" ? "🍶" : w === "fall" ? "" : t().weapons[w].name
+      const verb = w === "fall" || w === "tampieste" ? kill.pushed : pick(kill[w], seed)
+      const weapon = w === "sgnape" ? "🍶" : w === "mine" ? "💣" : w === "fall" || w === "tampieste" ? "" : t().weapons[w].name
       div.innerHTML = `${teamSpan(names.get(k) ?? "?", teams.get(k))} <em>${verb}</em> ${victim}${head ? ` <em>${kill.head}</em> 🎯` : ""} <span class="w">${weapon}</span>`
     }
     const feed = $("killfeed")
@@ -183,7 +198,7 @@ export class Hud {
     const s = t().hud
     this.html("death-by", you.killer ? s.deathBy(esc(names.get(you.killer) ?? "?")) : s.deathSelf)
     this.text("death-line", pick(s.deathLines, seed))
-    this.text("death-timer", you.respawn > 0 ? s.respawnIn(Math.ceil(you.respawn / 60)) : "…")
+    this.text("death-timer", this.spectating ? s.spectate : you.respawn > 0 ? s.respawnIn(Math.ceil(you.respawn / 60)) : "…")
   }
 
   chat(name: string, team: Team | null, text: string) {

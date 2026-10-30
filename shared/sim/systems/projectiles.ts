@@ -1,17 +1,20 @@
 /**
- * Forme di frico e bombe di sgnape: volano, rimbalzano, scoppiano.
+ * Forme di frico, bombe di sgnape e mine di Raibl: volano, rimbalzano, si piantano, scoppiano.
  */
 import { bodyCenter } from "../../hitbox.ts"
-import { FRICO_SHELL, SGNAPE_BOMB } from "../../weapons.ts"
+import { FRICO_SHELL, RAIBL_MINE, SGNAPE_BOMB, type ProjectileKind } from "../../weapons.ts"
 import type { Vec3 } from "../../vec.ts"
 import { DT } from "../../movement.ts"
+import type { KillCause } from "../events.ts"
+import { hostile } from "../rules.ts"
 import { Damage, Game, Life, Motion, Out, Physics, Player, Projectile, Rules, TeamOf, type ProjectileValue } from "../schema.ts"
 
-const GRAVITY = { frico: FRICO_SHELL.gravity, sgnape: 22 } as const
+const GRAVITY = { frico: FRICO_SHELL.gravity, sgnape: 22, mine: 22 } as const satisfies Record<ProjectileKind, number>
 const BLAST = {
-  frico: { radius: FRICO_SHELL.radius, damage: 110 },
-  sgnape: { radius: SGNAPE_BOMB.radius, damage: SGNAPE_BOMB.damage }
-} as const
+  frico: { radius: FRICO_SHELL.radius, damage: 110, cause: "lanciafrico" },
+  sgnape: { radius: SGNAPE_BOMB.radius, damage: SGNAPE_BOMB.damage, cause: "sgnape" },
+  mine: { radius: RAIBL_MINE.radius, damage: RAIBL_MINE.damage, cause: "mine" }
+} as const satisfies Record<ProjectileKind, { radius: number; damage: number; cause: KillCause }>
 
 export const FlyProjectiles = Game.System(
   "Sparedut/FlyProjectiles",
@@ -40,7 +43,7 @@ export const FlyProjectiles = Game.System(
       const blast = BLAST[p.kind]
       events.out.emit({ t: "boom", p: [at.x, at.y, at.z], k: p.kind })
       for (const target of living) {
-        if (target.session !== p.owner && target.team === p.team && !rules.friendlyFire) continue
+        if (target.session !== p.owner && !hostile(rules, p.team, target.team)) continue
         const dx = target.center.x - at.x
         const dy = target.center.y - at.y
         const dz = target.center.z - at.z
@@ -56,7 +59,7 @@ export const FlyProjectiles = Game.System(
           victim: target.session,
           attacker: p.owner,
           amount,
-          weapon: p.kind === "frico" ? "lanciafrico" : "sgnape",
+          weapon: blast.cause,
           head: false,
           push: { x: dx * inv * push, y: 4 + 6 * falloff, z: dz * inv * push }
         })
@@ -65,6 +68,23 @@ export const FlyProjectiles = Game.System(
 
     for (const m of queries.projectiles.each()) {
       const p = m.data.projectile.get()
+      // Una mine piantata non si muove: aspetta che si armi, poi chi le passa vicino.
+      if (p.kind === "mine" && p.vx === 0 && p.vy === 0 && p.vz === 0) {
+        const fuse = p.fuse - 1
+        const victim =
+          p.age >= RAIBL_MINE.armTicks &&
+          living.find((t) => {
+            if (t.session === p.owner || !hostile(rules, p.team, t.team)) return false
+            const dx = t.center.x - p.x
+            const dz = t.center.z - p.z
+            return dx * dx + dz * dz < RAIBL_MINE.trigger * RAIBL_MINE.trigger && Math.abs(t.center.y - p.y) < 2
+          })
+        if (victim || fuse <= 0) {
+          explode(p, { x: p.x, y: p.y + 0.15, z: p.z })
+          commands.despawn(m.entity)
+        } else m.data.projectile.set({ ...p, fuse, age: p.age + 1 })
+        continue
+      }
       let vx = p.vx
       let vy = p.vy - GRAVITY[p.kind] * DT
       let vz = p.vz
@@ -98,7 +118,21 @@ export const FlyProjectiles = Game.System(
         }
         if (!exploded && wall) {
           const at = { x: x + dir.x * Math.max(0, wall.dist - 0.1), y: y + dir.y * Math.max(0, wall.dist - 0.1), z: z + dir.z * Math.max(0, wall.dist - 0.1) }
-          if (bounces > 0) {
+          if (p.kind === "mine") {
+            // Sul pavimento si pianta; contro un muro scivola giù.
+            x = at.x
+            y = at.y
+            z = at.z
+            if (wall.normal.y > 0.6) {
+              vx = 0
+              vy = 0
+              vz = 0
+            } else {
+              vx = 0
+              vz = 0
+              vy = Math.min(vy, 0)
+            }
+          } else if (bounces > 0) {
             const n = wall.normal
             const dn = vx * n.x + vy * n.y + vz * n.z
             const damping = p.kind === "frico" ? 0.62 : 0.45

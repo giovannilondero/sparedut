@@ -26,6 +26,8 @@ const HOLD: Record<WeaponId, Hold> = {
   cramar: { hip: [0.14, -0.15, -0.36], rot: [0.02, 0.05, 0], aim: null, kickZ: 0.016, kickR: 0.045, flash: 0.16 },
   doplete: { hip: [0.14, -0.14, -0.34], rot: [0.02, 0.05, 0], aim: null, kickZ: 0.07, kickR: 0.26, flash: 0.26 },
   cjampanili: { hip: [0.14, -0.14, -0.34], rot: [0.02, 0.04, 0], aim: null, kickZ: 0.06, kickR: 0.18, flash: 0.22 },
+  mulin: { hip: [0.15, -0.2, -0.38], rot: [0.02, 0.05, 0], aim: [0.06, -0.2, -0.36], kickZ: 0.006, kickR: 0.012, flash: 0.14 },
+  miedi: { hip: [0.15, -0.17, -0.36], rot: [0.03, 0.06, 0], aim: [0.1, -0.16, -0.34], kickZ: 0, kickR: 0, flash: 0 },
   lanciafrico: { hip: [0.17, -0.21, -0.4], rot: [0.03, 0.06, 0], aim: null, kickZ: 0.08, kickR: 0.2, flash: 0.3 }
 }
 
@@ -84,7 +86,7 @@ function makeSlot(id: WeaponId): Slot {
   leftArm.visible = model.left !== null
   const rest: Slot["rest"] = []
   const parts = model.parts
-  for (const o of [parts.mag, parts.slide, parts.barrels, parts.bolt, parts.frico, parts.pouch, ...(parts.shells ?? [])])
+  for (const o of [parts.mag, parts.slide, parts.barrels, parts.bolt, parts.frico, parts.pouch, parts.spinner, ...(parts.shells ?? [])])
     if (o) rest.push({ o, p: o.position.clone(), r: o.rotation.clone(), v: o.visible })
   model.root.visible = false
   return { id, model, hold, leftArm, leftBase, rest }
@@ -138,6 +140,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
   let reloadT = -1
   let reloadDur = 1
   let fireT = 9
+  let spinA = 0
   let rec = 0
   let swingT = -1
   let boltT = -1
@@ -274,6 +277,29 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
         hand.copy(f.position).add(tmp.set(-0.03, -0.02, 0.03))
         return ramp(p, 0.1, 0.25) - ramp(p, 0.75, 0.88)
       }
+      case "mulin": {
+        // si abbassa la cassa e si cambia il nastro
+        const env = ramp(p, 0, 0.12) - ramp(p, 0.86, 1)
+        A.rz -= 0.25 * env
+        A.rx += 0.12 * env
+        A.py -= 0.03 * env
+        const m = P.mag!
+        const out = ramp(p, 0.15, 0.35) - ramp(p, 0.6, 0.8)
+        m.position.y -= 0.12 * out
+        m.position.x += 0.05 * out
+        hand.copy(m.position).add(tmp.set(0, 0.02, 0.02))
+        return ramp(p, 0.1, 0.2) - ramp(p, 0.8, 0.9)
+      }
+      case "miedi": {
+        // si riempie il serbatoio e si pompa
+        const env = ramp(p, 0, 0.12) - ramp(p, 0.88, 1)
+        A.rx += 0.3 * env
+        A.rz += 0.15 * env
+        const pump = P.pouch!
+        pump.position.y += 0.03 * Math.abs(Math.sin(ramp(p, 0.3, 0.85) * 4 * Math.PI))
+        hand.copy(pump.position).add(tmp.set(0, 0.02, 0.07))
+        return ramp(p, 0.2, 0.3) - ramp(p, 0.82, 0.9)
+      }
       default:
         return 0
     }
@@ -362,6 +388,13 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     if (s.id === "mandi") s.model.parts.slide!.position.z += 0.03 * Math.max(0, 1 - fireT / 0.07)
     if (s.id === "cramar") s.model.parts.bolt!.position.z += 0.04 * Math.max(0, 1 - fireT / 0.05)
     if (s.id === "lanciafrico" && !reloading) s.model.parts.frico!.visible = loaded
+    // le canne del Mulin girano con la rotazione; il miedi pompa mentre spruzza
+    if (s.id === "mulin") {
+      spinA += f.spin * dt * 38
+      s.model.parts.spinner!.rotation.z = spinA
+      A.px += f.spin * Math.sin(t * 70) * 0.0015
+    }
+    if (s.id === "miedi" && fireT < 0.12) s.model.parts.pouch!.position.y += 0.012 * Math.sin(fireT * 50)
 
     // fendente col mescul: carica a destra, spazza a sinistra
     if (swingT >= 0) {

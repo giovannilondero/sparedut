@@ -270,11 +270,16 @@ const navPoints: V3[] = [
 ]
 
 /**
- * Il cjar di fen da spingere: dal sagrato giù per Vie Bini (girando attorno alla
- * fontana della plaçute) fino in Piazza del Municipio.
+ * Il cjar di fen da spingere: dal sagrato (girando attorno al riparo di pietra) giù
+ * per Vie Bini (girando attorno alla fontana della plaçute) fino in Piazza del Municipio.
  */
 const track: V3[] = [
   [0, G_DUOMO, -50],
+  [0, G_DUOMO, -42],
+  // attorno al riparo di pietra in mezzo al sagrato
+  [4.2, G_DUOMO, -39.5],
+  [4.2, G_DUOMO, -35],
+  [0, G_DUOMO, -31],
   [0, G_DUOMO, -28],
   [0, G_MID, -20],
   [0, G_MID, -6],

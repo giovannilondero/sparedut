@@ -187,6 +187,8 @@ const GRIP: Record<WeaponId, { p: [number, number, number]; r: [number, number, 
   cramar: { p: [0.13, -0.1, -0.3], r: [0, 0, 0] },
   doplete: { p: [0.13, -0.1, -0.3], r: [0, 0, 0] },
   cjampanili: { p: [0.13, -0.1, -0.28], r: [0, 0, 0] },
+  mulin: { p: [0.15, -0.16, -0.26], r: [0, 0, 0] },
+  miedi: { p: [0.14, -0.12, -0.28], r: [0, 0, 0] },
   lanciafrico: { p: [0.16, -0.13, -0.24], r: [0, 0, 0] }
 }
 

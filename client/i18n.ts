@@ -31,6 +31,7 @@ export interface Strings {
   readonly levels: Record<BotLevel, { readonly name: string; readonly sub: string }>
   readonly weapons: Record<WeaponId, { readonly name: string; readonly short: string; readonly blurb: string }>
   readonly bomb: string
+  readonly mine: string
   readonly quality: Record<"bassa" | "media" | "alta", string>
   readonly errors: Record<ErrorCode, string>
   readonly menu: {
@@ -69,8 +70,8 @@ export interface Strings {
     readonly respawnIn: Fn<[number]>
     readonly shield: string
     readonly board: readonly string[]
-    readonly kill: Record<WeaponId, readonly string[]> & {
-      readonly sgnape: readonly string[]
+    readonly kill: Record<WeaponId | "sgnape" | "mine", readonly string[]> & {
+      readonly storm: string
       readonly head: string
       readonly fall: string
       readonly self: string
@@ -78,6 +79,17 @@ export interface Strings {
     }
     readonly deathLines: readonly string[]
     readonly streaks: Record<number, string>
+    /** Spingi il Cjar: la strada fatta. */
+    readonly cart: Fn<[number]>
+    readonly cartPush: Fn<[number]>
+    readonly cartStop: string
+    readonly cartBack: string
+    readonly cartIdle: string
+    /** La Tampieste: quanti sono ancora in piedi. */
+    readonly alive: Fn<[number]>
+    readonly stormOutside: string
+    readonly spectate: string
+    readonly healed: Fn<[string, number]>
   }
   readonly game: {
     readonly sgnape: string
@@ -87,6 +99,10 @@ export interface Strings {
     readonly hillTaken: Fn
     readonly start: string
     readonly startSub: string
+    readonly cart: { readonly push: string; readonly stop: string; readonly back: string; readonly arrived: string }
+    readonly cartSub: Fn<[boolean]>
+    readonly stormStart: string
+    readonly stormStartSub: string
     /** Traduzione delle frasi sveltis, se la lenghe no je il furlan. */
     readonly quickGloss: readonly string[] | null
   }
@@ -110,6 +126,9 @@ export interface Strings {
     readonly lose: string
     readonly drawSub: string
     readonly winSub: Fn<[string, string]>
+    /** La Tampieste: vince una persona. */
+    readonly lastStanding: Fn
+    readonly lastStandingSub: string
     readonly mvp: Record<Team, string>
     readonly killer: string
     readonly streak: string
@@ -135,6 +154,7 @@ const KEYS_FUR = [
   ["R", "torne a cjamâ"],
   ["1-4", "armis · <kbd>Q</kbd> chê di prime"],
   ["G", "bombis di sgnape"],
+  ["F", "mine di Raibl"],
   ["Tab", "classifiche"],
   ["Invio", "chat · <kbd>V</kbd> frasis sveltis"],
   ["B", "armarie"],
@@ -151,6 +171,7 @@ const KEYS_IT = [
   ["R", "ricarica"],
   ["1-4", "armi · <kbd>Q</kbd> quella di prima"],
   ["G", "bombe di sgnape"],
+  ["F", "mina di Raibl"],
   ["Tab", "classifica"],
   ["Invio", "chat · <kbd>V</kbd> frasi rapide"],
   ["B", "armeria"],
@@ -200,6 +221,8 @@ const WEAPON_NAMES = {
   cramar: { name: "Mitra dal Cramâr", short: "Mitra" },
   doplete: { name: "Dopiete di Pre Checo", short: "Dopiete" },
   cjampanili: { name: "Il Cjampanili", short: "Cjampanili" },
+  mulin: { name: "Il Mulin", short: "Mulin" },
+  miedi: { name: "Cassele dal Miedi", short: "Miedi" },
   lanciafrico: { name: "Lanciafrico", short: "Lanciafrico" }
 } as const
 
@@ -271,6 +294,16 @@ const fur: Strings = {
       name: "Re de Plaçute",
       sub: "Re de culine",
       rules: "Ten la plaçute di Vie Bini ator de fontane. Un pont al secont par cui che le ten di bessôl."
+    },
+    cjar: {
+      name: "Spinç il Cjar",
+      sub: "Sburte il cjar",
+      rules: "I Benandants a sburtin il cjar fin insom de strade: al va indenant se un Benandant i sta dongje e nissun Malandant. I Malandants lu fermin fin che al finìs il timp. Lassât di bessôl, al torne indaûr."
+    },
+    tampieste: {
+      name: "La Tampieste",
+      sub: "Ducj cuintri ducj",
+      rules: "Nissune scuadre, une vite sole. La tampieste e strenç: fûr dal cercli la grampe e fâs mâl. L'ultin in pîts al vinç."
     }
   },
   maps: {
@@ -291,12 +324,18 @@ const fur: Strings = {
     cramar: { ...WEAPON_NAMES.cramar, blurb: "I cramârs a vendevin spezie in Austrie. Chest al vent plomp." },
     doplete: { ...WEAPON_NAMES.doplete, blurb: "La dopiete dal plevan. E benedìs a curte distance." },
     cjampanili: { ...WEAPON_NAMES.cjampanili, blurb: "Fusil di precision. Alt, dret e tornât a fâ piere su piere." },
+    mulin: { ...WEAPON_NAMES.mulin, blurb: "Al masane plomp come il mulin la blave. Prime al à di cjapâ zîr, e al pese tant che un sac di farine." },
+    miedi: {
+      ...WEAPON_NAMES.miedi,
+      blurb: "Un sbrufadôr di sgnape e cjamomile: al tache i compagns e al bruse i nemîs. Cui che lu puarte al è il miedi: ator di lui si guarìs."
+    },
     lanciafrico: {
       ...WEAPON_NAMES.lanciafrico,
       blurb: "Al tire formis di frico bulintis che a sbalcin e a sclopin. Arme potente: si cjape sù in Vie Bini."
     }
   },
   bomb: "Bombis di Sgnape",
+  mine: "Minis di Raibl",
   quality: { bassa: "basse", media: "medie", alta: "alte" },
   errors: {
     invalid: "Messaç no valit.",
@@ -353,7 +392,11 @@ const fur: Strings = {
       doplete: ["al à benedît", "al à mandât a messe", "al à spedît in canoniche"],
       cjampanili: ["al à sunât lis cjampanis a", "al à cjalât di lontan", "al à dit l'Ave Marie a"],
       lanciafrico: ["al à fat frico di", "al à frizût", "al à servît cul pan"],
+      mulin: ["al à masanât", "al à fat farine di", "al à metût sot la muele"],
+      miedi: ["al à dât la medisine sbaliade a", "al à curât par simpri", "al à prescrit il ripôs eterni a"],
       sgnape: ["al à fat bevi masse sgnape a", "al à cjocât", "al à fat il brindis cun"],
+      mine: ["al à fat saltâ par aria", "al à spedît in galarie", "al à fat cjatâ il plomp di Raibl a"],
+      storm: "al è restât te tampieste",
       head: "tal cjâf",
       fall: "al è lât a mont",
       self: "si è fat frico di bessôl",
@@ -379,7 +422,16 @@ const fur: Strings = {
       7: "CJAMPANIS A FESTE!",
       10: "PATRIARCJE DI AQUILEE!",
       15: "LEGJENDE DI GLEMONE!"
-    }
+    },
+    cart: (pct) => `🛒 Cjar: ${pct}%`,
+    cartPush: (n) => `al va indenant (${n} ch'a sburtin)`,
+    cartStop: "Contindût!",
+    cartBack: "al torne indaûr…",
+    cartIdle: "fer",
+    alive: (n) => `🌩️ In pîts: ${n}`,
+    stormOutside: "Fûr de tampieste! Torne dentri dal cercli",
+    spectate: "Une vite sole: tu cjalis fin a la fin de partide.",
+    healed: (who, n) => `+${n} a ${who}`
   },
   game: {
     sgnape: "Salût!",
@@ -396,6 +448,10 @@ const fur: Strings = {
     hillTaken: (team) => `${team} in plaçute!`,
     start: "Al tache la bataie!",
     startSub: "Lis cjampanis dal Dom a sunin",
+    cart: { push: "Il cjar al va indenant!", stop: "Il cjar al è fer: contindût!", back: "Il cjar al torne indaûr!", arrived: "Il cjar al è rivât!" },
+    cartSub: (ben) => (ben ? "Sburtilu fin insom" : "Fermilu prime che al rivi"),
+    stormStart: "E rive la tampieste!",
+    stormStartSub: "Ducj cuintri ducj · une vite sole",
     quickGloss: null
   },
   loadout: {
@@ -422,6 +478,8 @@ const fur: Strings = {
     lose: "Pierdût…",
     drawSub: "Nissun al à vinçût: si fâs un altri zîr",
     winSub: (team, motto) => `A vincin i ${team} · ${motto}`,
+    lastStanding: (name) => `Al vinç ${name}`,
+    lastStandingSub: "L'ultin in pîts te tampieste",
     mvp: { benandanti: "Benandant dal An", malandanti: "Malandant dal An" },
     killer: "Sclopetari",
     streak: "Cjampanis a feste",
@@ -451,7 +509,14 @@ const fur: Strings = {
     "Tast Q: tu tornis a l'arme di prime. Tast G: bombis di sgnape. Tast V: frasis sveltis.",
     "Cjape il Frico: se ti àn robât il frico, cope cui che lu puarte e tocjilu par puartâlu a cjase.",
     "I bot Plevan no falin mai. Come il plevan cuant che al conte lis ufiertis.",
-    "Esc ti puarte indaûr in ducj i menùs."
+    "Esc ti puarte indaûr in ducj i menùs.",
+    "Cul Shift si cor, ma l'arme e reste bassade: par sparâ tu âs di molâ la corse.",
+    "Il Mulin al à di cjapâ zîr prime di sparâ: ten fracât e po al plûf plomp.",
+    "Il miedi al cure i compagns cul sbrufadôr e, dome stant dongje, ancje un pôc di bessôl.",
+    "Tast F: mine di Raibl. Si plante tal teren e e salte cuant che un nemì i passe dongje.",
+    "Cave dal Predil, o Raibl: une des minieris di plomp e zinc plui grandis de Europe, sierade tal 1991.",
+    "Il Fuart di Osôf nol è mai stât cjapât: Napoleon lu à volût, i austriacs lu àn sedeât tal 1848.",
+    "Vençon e je stade tornade a fâ piere su piere dopo dal taramot, come il Dom di Glemone."
   ]
 }
 
@@ -523,6 +588,16 @@ const it: Strings = {
       name: "Re de Plaçute",
       sub: "Re della collina",
       rules: "Tieni la piazzetta di Via Bini attorno alla fontana. Un punto al secondo per chi la controlla da solo."
+    },
+    cjar: {
+      name: "Spinç il Cjar",
+      sub: "Spingi il carro",
+      rules: "I Benandanti spingono il carro fino in fondo alla strada: avanza se un Benandante gli sta vicino e nessun Malandante. I Malandanti lo fermano finché scade il tempo. Lasciato solo, torna indietro."
+    },
+    tampieste: {
+      name: "La Tampieste",
+      sub: "Tutti contro tutti",
+      rules: "Niente squadre, una vita sola. La tempesta si stringe: fuori dal cerchio la grandine fa male. L'ultimo in piedi vince."
     }
   },
   maps: {
@@ -543,12 +618,18 @@ const it: Strings = {
     cramar: { ...WEAPON_NAMES.cramar, blurb: "I cramârs vendevano spezie in Austria. Questo vende piombo." },
     doplete: { ...WEAPON_NAMES.doplete, blurb: "La doppietta del parroco. Benedice a corto raggio." },
     cjampanili: { ...WEAPON_NAMES.cjampanili, blurb: "Fucile di precisione. Alto, dritto e rifatto pietra su pietra." },
+    mulin: { ...WEAPON_NAMES.mulin, blurb: "Macina piombo come il mulino il granturco. Prima deve prendere giri, e pesa come un sacco di farina." },
+    miedi: {
+      ...WEAPON_NAMES.miedi,
+      blurb: "Uno spruzzatore di grappa e camomilla: rimette in sesto i compagni e brucia i nemici. Chi lo porta è il medico: intorno a lui si guarisce."
+    },
     lanciafrico: {
       ...WEAPON_NAMES.lanciafrico,
       blurb: "Spara forme di frico bollenti che rimbalzano e scoppiano. Arma potente: si raccoglie in Via Bini."
     }
   },
   bomb: "Bombe di Sgnape",
+  mine: "Mine di Raibl",
   quality: { bassa: "bassa", media: "media", alta: "alta" },
   errors: {
     invalid: "Messaggio non valido.",
@@ -605,7 +686,11 @@ const it: Strings = {
       doplete: ["ha benedetto", "ha mandato a messa", "ha spedito in canonica"],
       cjampanili: ["ha suonato le campane a", "ha guardato da lontano", "ha recitato l'Ave Maria a"],
       lanciafrico: ["ha fatto frico di", "ha fritto", "ha servito col pane"],
+      mulin: ["ha macinato", "ha fatto farina di", "ha messo sotto la macina"],
+      miedi: ["ha dato la medicina sbagliata a", "ha curato per sempre", "ha prescritto il riposo eterno a"],
       sgnape: ["ha fatto bere troppa grappa a", "ha ubriacato", "ha brindato con"],
+      mine: ["ha fatto saltare in aria", "ha spedito in galleria", "ha fatto trovare il piombo di Raibl a"],
+      storm: "è rimasto nella tempesta",
       head: "in testa",
       fall: "è caduto di sotto",
       self: "si è fatto frico da solo",
@@ -631,7 +716,16 @@ const it: Strings = {
       7: "CAMPANE A FESTA!",
       10: "PATRIARCA DI AQUILEIA!",
       15: "LEGGENDA DI GEMONA!"
-    }
+    },
+    cart: (pct) => `🛒 Carro: ${pct}%`,
+    cartPush: (n) => `avanza (${n} a spingere)`,
+    cartStop: "Conteso!",
+    cartBack: "torna indietro…",
+    cartIdle: "fermo",
+    alive: (n) => `🌩️ In piedi: ${n}`,
+    stormOutside: "Fuori dalla tempesta! Torna dentro il cerchio",
+    spectate: "Una vita sola: guardi fino alla fine della partita.",
+    healed: (who, n) => `+${n} a ${who}`
   },
   game: {
     sgnape: "Salute!",
@@ -648,6 +742,10 @@ const it: Strings = {
     hillTaken: (team) => `${team} in piazzetta!`,
     start: "Inizia la battaglia!",
     startSub: "Suonano le campane del Duomo",
+    cart: { push: "Il carro avanza!", stop: "Il carro è fermo: conteso!", back: "Il carro torna indietro!", arrived: "Il carro è arrivato!" },
+    cartSub: (ben) => (ben ? "Spingilo fino in fondo" : "Fermalo prima che arrivi"),
+    stormStart: "Arriva la tempesta!",
+    stormStartSub: "Tutti contro tutti · una vita sola",
     quickGloss: [
       "Ciao!",
       "Come va?",
@@ -685,6 +783,8 @@ const it: Strings = {
     lose: "Sconfitta…",
     drawSub: "Nessuno ha vinto: si fa un altro giro",
     winSub: (team, motto) => `Vincono i ${team} · ${motto}`,
+    lastStanding: (name) => `Vince ${name}`,
+    lastStandingSub: "L'ultimo in piedi nella tempesta",
     mvp: { benandanti: "Benandante dell'anno", malandanti: "Malandante dell'anno" },
     killer: "Pistolero",
     streak: "Campane a festa",
@@ -714,7 +814,14 @@ const it: Strings = {
     "Tasto Q: torni all'arma di prima. Tasto G: bombe di sgnape. Tasto V: frasi rapide.",
     "Cjape il Frico: se ti hanno rubato il frico, abbatti chi lo porta e toccalo per riportarlo a casa.",
     "I bot Plevan non sbagliano mai. Come il pievano quando conta le offerte.",
-    "Esc ti riporta indietro in tutti i menu."
+    "Esc ti riporta indietro in tutti i menu.",
+    "Con Shift si corre, ma l'arma resta abbassata: per sparare devi smettere di correre.",
+    "Il Mulin deve prendere giri prima di sparare: tieni premuto e poi piove piombo.",
+    "Il medico cura i compagni con lo spruzzatore e, solo stando vicino, anche un po' da sé.",
+    "Tasto F: mina di Raibl. Si pianta nel terreno e salta quando un nemico le passa vicino.",
+    "Cave del Predil, o Raibl: una delle più grandi miniere di piombo e zinco d'Europa, chiusa nel 1991.",
+    "Il Forte di Osoppo non è mai stato preso: lo volle Napoleone, gli austriaci lo assediarono nel 1848.",
+    "Venzone è stata ricostruita pietra su pietra dopo il terremoto, come il Duomo di Gemona."
   ]
 }
 

@@ -110,7 +110,7 @@ export class Room {
     const used = new Set([...this.members.values()].map((m) => m.name))
     const name = BOT_NAMES[team].find((n) => !used.has(n)) ?? `${BOT_NAMES[team][0]} ${++botCounter}`
     const id = `bot-${++botCounter}`
-    const primaries: PrimaryId[] = ["cramar", "cramar", "doplete", "cjampanili"]
+    const primaries: PrimaryId[] = ["cramar", "cramar", "doplete", "cjampanili", "mulin", "miedi", "cramar"]
     const primary = primaries[botCounter % primaries.length]
     this.members.set(id, { id, name, team, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
     this.bots.set(id, new BotBrain(id, this.level, navGraph(this.physics), this.physics, botCounter))
@@ -247,6 +247,8 @@ export class Room {
       score: w.score,
       flags: w.flags,
       hill: w.hill,
+      cart: w.cart,
+      storm: w.storm,
       pickups: w.pickups.map((p) => (p ? "1" : "0")).join(""),
       proj: w.projectiles.map((p) => [p.kind, r2(p.x), r2(p.y), r2(p.z)] as const),
       players: others,
@@ -285,7 +287,7 @@ export class Room {
       deaths: p.stats.deaths,
       assists: p.stats.assists,
       caps: p.stats.caps,
-      score: p.stats.score,
+      score: Math.round(p.stats.score),
       best: p.stats.best,
       headshots: p.stats.headshots,
       damage: Math.round(p.stats.damage),

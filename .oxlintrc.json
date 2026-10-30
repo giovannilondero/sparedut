@@ -8,7 +8,7 @@
   },
   "overrides": [
     {
-      "files": ["shared/sim/**", "shared/movement.ts", "shared/hitbox.ts", "shared/input.ts", "shared/map.ts", "shared/weapons.ts", "shared/folklore.ts", "shared/vec.ts"],
+      "files": ["shared/sim/**", "shared/movement.ts", "shared/hitbox.ts", "shared/input.ts", "shared/map.ts", "shared/maps/**", "shared/weapons.ts", "shared/folklore.ts", "shared/vec.ts"],
       "rules": {
         "ritmo/use-clock-for-time": "error",
         "ritmo/use-random-for-randomness": "error",

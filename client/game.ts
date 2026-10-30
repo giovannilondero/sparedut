@@ -5,13 +5,13 @@
 import * as THREE from "three"
 import { BOT_LEVEL_IDS, QUICK_CHAT, TEAM_INFO, type BotLevel } from "../shared/folklore.ts"
 import { rayPose } from "../shared/hitbox.ts"
-import { BUTTON, type PlayerInput } from "../shared/input.ts"
+import { BUTTON, IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
 import type { MapId, PickupKind, Team } from "../shared/map.ts"
-import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE } from "../shared/movement.ts"
+import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, sprinting } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
-import type { GameEvent } from "../shared/sim/events.ts"
-import { owned } from "../shared/sim/rules.ts"
+import type { GameEvent, Winner } from "../shared/sim/events.ts"
+import { outsideStorm, owned, RAISE_TICKS } from "../shared/sim/rules.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, Viewmodel, WorldScene } from "./contracts.ts"
 import { Controls } from "./controls.ts"
@@ -28,7 +28,9 @@ const SHOT_SOUND: Partial<Record<WeaponId, SoundName>> = {
   mandi: "shot_mandi",
   cramar: "shot_cramar",
   doplete: "shot_doplete",
-  cjampanili: "shot_cjampanili"
+  cjampanili: "shot_cjampanili",
+  mulin: "shot_mulin",
+  miedi: "beam_miedi"
 }
 const PICK_SOUND = {
   frico: "pickup_frico",
@@ -91,6 +93,11 @@ export class Game {
   private shots: number[] = []
   private prevFire = false
   private prevBomb = false
+  private prevMine = false
+  /** Rotazione predetta del Mulin (tick), come la conta il server. */
+  private localSpin = 0
+  /** Ultima volta (s) che ho suonato la cura, per non farne una raffica. */
+  private healSoundAt = 0
   private avatars = new Map<string, { avatar: Avatar; blob: THREE.Mesh; team: Team; stepAcc: number; last: { x: number; z: number } | null }>()
   /** Ombre vere dei giocatori solo in qualità alta; altrimenti un disco scuro ai piedi. */
   private dynamicShadows = false
@@ -359,8 +366,10 @@ export class Game {
         if (e.s === me) return
         const muzzle: P3 = e.o
         for (const end of e.e) fx.tracer(muzzle, end, e.w)
-        fx.muzzle(muzzle)
-        this.avatars.get(e.s)?.avatar.flash()
+        if (WEAPONS[e.w].mode !== "beam") {
+          fx.muzzle(muzzle)
+          this.avatars.get(e.s)?.avatar.flash()
+        }
         const snd = SHOT_SOUND[e.w]
         if (snd) audio.play(snd, { at: muzzle })
         return
@@ -375,6 +384,12 @@ export class Game {
         return
       }
       case "launch": {
+        if (e.k === "mine") {
+          const at = this.posOf(e.s)
+          if (e.s === me) audio.play("mine_plant")
+          else if (at) audio.play("mine_plant", { at, volume: 0.6 })
+          return
+        }
         if (e.s === me) return
         const at = this.posOf(e.s)
         if (at) audio.play(e.k === "frico" ? "launch_frico" : "throw", { at })
@@ -478,12 +493,28 @@ export class Game {
       case "match":
         if (e.a === "start") {
           audio.play("bells")
-          this.hud.announce(t().game.start, t().game.startSub)
-        } else {
-          const myTeam = this.teams.get(me)
-          audio.play(e.winner === myTeam ? "victory" : "defeat")
+          const mode = this.room?.mode
+          if (mode === "tampieste") this.hud.announce(t().game.stormStart, t().game.stormStartSub)
+          else if (mode === "cjar") this.hud.announce(t().game.start, t().game.cartSub(this.teams.get(me) === "benandanti"))
+          else this.hud.announce(t().game.start, t().game.startSub)
+        } else audio.play(e.winner && this.won(e.winner) ? "victory" : "defeat")
+        return
+      case "cart": {
+        const g = t().game
+        const ben = this.teams.get(me) === "benandanti"
+        this.hud.announce(g.cart[e.a], g.cartSub(ben))
+        const good = e.a === "push" || e.a === "arrived" ? ben : !ben
+        audio.play(e.a === "arrived" ? (good ? "flag_captured" : "flag_taken") : good ? "flag_returned" : "flag_taken", { volume: 0.7 })
+        return
+      }
+      case "heal": {
+        const now = performance.now() / 1000
+        if ((e.v === me || e.s === me) && now - this.healSoundAt > 0.45) {
+          this.healSoundAt = now
+          audio.play("heal")
         }
         return
+      }
     }
   }
 
@@ -686,16 +717,24 @@ export class Game {
     }
   }
 
+  /** Ho vinto io (la mia squadra, o io da solo nella Tampieste)? */
+  private won(winner: Winner) {
+    return typeof winner === "object" ? winner.player === this.me : winner === this.teams.get(this.me)
+  }
+
   private renderEnd() {
     const s = this.snap
     if (!s || s.phase.tag !== "Over") return
     const el = $("endscreen")
     el.classList.remove("hidden")
     const winner = s.phase.winner
-    const myTeam = this.teams.get(this.me)
     const en = t().end
-    const title = winner === "pari" ? en.draw : winner === myTeam ? en.win : en.lose
-    const sub = winner === "pari" ? en.drawSub : en.winSub(t().teams[winner].name, t().teams[winner].motto)
+    const title = winner === "pari" ? en.draw : this.won(winner) ? en.win : en.lose
+    const sub =
+      winner === "pari" ? en.drawSub
+      : typeof winner === "object" ? `${en.lastStanding(esc(winner.name))} · ${en.lastStandingSub}`
+      : en.winSub(t().teams[winner].name, t().teams[winner].motto)
+    const color = winner === "pari" ? "var(--gold)" : typeof winner === "object" ? (this.won(winner) ? "var(--gold)" : "#9fd0ff") : TEAM_INFO[winner].color
     const rows = [...this.board]
     const best = <K extends keyof BoardRow>(k: K) => rows.slice().sort((a, b) => (b[k] as number) - (a[k] as number))[0]
     const award = (title: string, row: BoardRow | undefined, value: string) =>
@@ -705,8 +744,8 @@ export class Game {
     const streak = best("best")
     const head = best("headshots")
     el.innerHTML = `
-      <h1 class="end-title" style="color:${winner === "pari" ? "var(--gold)" : TEAM_INFO[winner].color}">${title}</h1>
-      <p style="text-align:center;font-family:var(--serif);font-style:italic">${sub} · ${s.score.benandanti} – ${s.score.malandanti}</p>
+      <h1 class="end-title" style="color:${color}">${title}</h1>
+      <p style="text-align:center;font-family:var(--serif);font-style:italic">${sub}${this.room?.mode === "tampieste" ? "" : ` · ${s.score.benandanti} – ${s.score.malandanti}`}</p>
       <div class="awards">
         ${award(en.mvp[mvp?.team ?? "benandanti"], mvp, en.points(mvp?.score ?? 0))}
         ${award(en.killer, killer, en.kills(killer?.kills ?? 0))}
@@ -769,7 +808,7 @@ export class Game {
       }
     }
 
-    // Spari predetti: effetti subito, il danno lo decide il server.
+    // Spari predetti: effetti subito, il danno lo decide il server (con le stesse regole).
     if (this.localCooldown > 0) this.localCooldown--
     const def = WEAPONS[this.wanted]
     const fire = (buttons & BUTTON.fire) !== 0
@@ -777,8 +816,16 @@ export class Game {
     this.prevFire = fire
     const action = you.arsenal.action._tag
     const busy = action === "reload" || (action === "switch" && you.arsenal.current === this.wanted)
+    // Di corsa l'arma è abbassata: come sul server, e poi ci vuole un attimo per rialzarla.
+    const running = sprinting(input, after?.crouch ?? false)
+    if (running) this.localCooldown = Math.max(this.localCooldown, RAISE_TICKS)
+    if (def.spinTicks > 0) {
+      const turning = fire && !running && !busy
+      if (turning && this.localSpin === 0) this.d.audio.play("spin_mulin")
+      this.localSpin = turning ? Math.min(def.spinTicks, this.localSpin + 1) : Math.max(0, this.localSpin - 2)
+    } else this.localSpin = 0
     const mag = this.localMag ?? you.arsenal.ammo[this.wanted].mag
-    const trigger = def.mode === "auto" ? fire : pressedFire
+    const trigger = (def.mode === "auto" || def.mode === "beam" ? fire : pressedFire) && this.localSpin >= def.spinTicks
     if (trigger && this.localCooldown === 0 && !busy && you.arsenal.current === this.wanted) {
       if (def.mode !== "melee" && mag <= 0) {
         if (pressedFire) this.d.audio.play("dry")
@@ -798,6 +845,9 @@ export class Game {
       this.d.viewmodel.throwBomb()
       this.d.audio.play("throw")
     }
+    const mine = (buttons & BUTTON.mine) !== 0
+    if (mine && !this.prevMine && you.arsenal.mines > 0) this.d.viewmodel.throwBomb()
+    this.prevMine = mine
   }
 
   private localShot(id: WeaponId, input: PlayerInput) {
@@ -812,6 +862,25 @@ export class Game {
     }
     if (def.mode === "projectile") {
       audio.play("launch_frico")
+      return
+    }
+    if (def.mode === "beam") {
+      // il getto: dalla lancia fino al primo corpo o muro entro la portata
+      audio.play("beam_miedi")
+      const b = this.predictor.body
+      if (!b) return
+      const eye = { x: b.x, y: b.y + this.eye, z: b.z }
+      const dir = lookDir(input.yaw, input.pitch)
+      const wall = physics.raycast(eye, dir, def.range)
+      let reach = wall ? wall.dist : def.range
+      for (const [pid] of this.avatars) {
+        const p = this.interpolated(pid)
+        if (!p || !(p.f & FLAG_BIT.alive)) continue
+        const hit = rayPose(eye, dir, { x: p.x, y: p.y, z: p.z, crouch: (p.f & FLAG_BIT.crouch) !== 0 })
+        if (hit && hit.dist < reach) reach = hit.dist
+      }
+      const muzzle = viewmodel.muzzleWorld(new THREE.Vector3())
+      fx.tracer([muzzle.x, muzzle.y, muzzle.z], [eye.x + dir.x * reach, eye.y + dir.y * reach, eye.z + dir.z * reach], id)
       return
     }
     audio.play(SHOT_SOUND[id] ?? "shot_mandi")
@@ -995,11 +1064,12 @@ export class Game {
         speed: b ? Math.hypot(b.vx, b.vz) : 0,
         grounded: b?.grounded ?? true,
         aiming,
-        sprinting: c.isHeld("sprint") && c.move().mz > 0,
+        sprinting: sprinting({ ...IDLE_INPUT, mz: c.move().mz, buttons: c.buttons() }, b?.crouch ?? false),
         crouch: b?.crouch ?? false,
         lookDx,
         lookDy,
-        sgnape: you.arsenal.sgnape > 0
+        sgnape: you.arsenal.sgnape > 0,
+        spin: def.spinTicks > 0 ? this.localSpin / def.spinTicks : 0
       })
     }
 
@@ -1018,10 +1088,14 @@ export class Game {
         pickups: [...s.pickups].map((ch) => ch === "1"),
         flags: mode === "frico" ? { benandanti: flagPos("benandanti"), malandanti: flagPos("malandanti") } : null,
         hill: mode === "culine" ? { owner: s.hill.owner, contested: s.hill.contested } : null,
+        cart: s.cart ? { at: s.cart.at, yaw: s.cart.yaw, contested: s.cart.contested, pushers: s.cart.pushers } : null,
+        storm: s.storm,
         camera
       })
       fx.projectiles(s.proj)
-      this.hud.top(s, this.room?.mode ?? "bataie", this.names)
+      const outside = !!s.storm && !!you?.alive && !!b && outsideStorm(s.storm, b)
+      this.hud.spectating = mode === "tampieste" && s.phase.tag === "Live"
+      this.hud.top(s, mode ?? "bataie", this.names, outside)
       this.hud.death(you, this.names, Math.floor(this.seed / 7))
       if (s.phase.tag === "Over" && Math.floor(t) !== Math.floor(t - dt)) this.renderEnd()
     }

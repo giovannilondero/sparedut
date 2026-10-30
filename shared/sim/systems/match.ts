@@ -1,10 +1,12 @@
 /**
  * Il flusso della partita: riscaldamento → in corso → finita → di nuovo in corso.
+ * Ogni modalità decide quando finisce e chi vince.
  */
 import { TEAMS } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
-import { NO_STATS, OVER_TICKS, WARMUP_TICKS } from "../rules.ts"
-import { Attackers, Flags, Game, Hill, Life, Match, Out, Pickups, Player, Rules, Score, StartMatch, Stats, Tick } from "../schema.ts"
+import type { Winner } from "../events.ts"
+import { NO_STATS, OVER_TICKS, START_GRACE_TICKS, WARMUP_TICKS } from "../rules.ts"
+import { Attackers, Cart, Flags, Game, Hill, Life, Match, Out, Pickups, Player, Rules, Score, StartMatch, Stats, Tick } from "../schema.ts"
 
 export const AdvanceTick = Game.System(
   "Sparedut/AdvanceTick",
@@ -33,6 +35,7 @@ export const MatchFlow = Game.System(
       score: Game.System.writeResource(Score),
       flags: Game.System.writeResource(Flags),
       hill: Game.System.writeResource(Hill),
+      cart: Game.System.writeResource(Cart),
       pickups: Game.System.writeResource(Pickups)
     },
     events: { start: Game.System.readEvent(StartMatch), out: Game.System.writeEvent(Out) },
@@ -49,6 +52,7 @@ export const MatchFlow = Game.System(
       resources.score.set({ benandanti: 0, malandanti: 0 })
       resources.flags.set({ benandanti: { _tag: "base" }, malandanti: { _tag: "base" } })
       resources.hill.set({ owner: null, contested: false, ticks: 0 })
+      resources.cart.set({ d: 0, pushers: 0, contested: false, idle: 0 })
       resources.pickups.set(MAPS[rules.map].pickups.map(() => ({ _tag: "up" })))
       for (const m of queries.players.each()) {
         m.data.stats.set(NO_STATS)
@@ -61,16 +65,48 @@ export const MatchFlow = Game.System(
       events.out.emit({ t: "match", a: "start", winner: null })
     }
 
+    /** Il vincitore se la partita è finita in questo tick, altrimenti null. */
+    const verdict = (ends: number): Winner | null => {
+      const timeUp = tick >= ends
+      const score = resources.score.get()
+      switch (rules.mode) {
+        case "tampieste": {
+          // L'ultimo in piedi; servono almeno due partecipanti, se no si continua.
+          const all = queries.players.each()
+          const alive = all.filter((m) => m.data.life.get()._tag === "Alive")
+          const last = (): Winner => {
+            let best: { player: string; name: string; hp: number } | null = null
+            for (const m of alive) {
+              const life = m.data.life.get()
+              const hp = life._tag === "Alive" ? life.hp + life.armor : 0
+              if (!best || hp > best.hp) best = { player: m.data.player.get().session, name: m.data.player.get().name, hp }
+            }
+            return best ? { player: best.player, name: best.name } : "pari"
+          }
+          if (tick - (ends - rules.timeLimitTicks) <= START_GRACE_TICKS) return null
+          if (all.length >= 2 && alive.length <= 1) return last()
+          return timeUp ? last() : null
+        }
+        case "cjar":
+          // I Benandanti vincono arrivando in fondo; allo scadere hanno tenuto i Malandanti.
+          if (score.benandanti >= rules.scoreLimit) return "benandanti"
+          return timeUp ? "malandanti" : null
+        default: {
+          const reached = TEAMS.find((t) => score[t] >= rules.scoreLimit)
+          if (!reached && !timeUp) return null
+          return score.benandanti === score.malandanti ? "pari" : score.benandanti > score.malandanti ? "benandanti" : "malandanti"
+        }
+      }
+    }
+
     switch (match._tag) {
       case "Warmup":
         // Senza questo, se l'host non preme "parti" i punti non contano mai.
         if (startRequested || tick >= WARMUP_TICKS) begin()
         return
       case "Live": {
-        const score = resources.score.get()
-        const reached = TEAMS.find((t) => score[t] >= rules.scoreLimit)
-        if (reached || tick >= match.ends) {
-          const winner = score.benandanti === score.malandanti ? "pari" : score.benandanti > score.malandanti ? "benandanti" : "malandanti"
+        const winner = verdict(match.ends)
+        if (winner) {
           nextMachines.match.set({ _tag: "Over", winner, restarts: tick + OVER_TICKS })
           events.out.emit({ t: "match", a: "end", winner })
         } else if (startRequested) begin()

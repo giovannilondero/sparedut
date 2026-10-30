@@ -40,6 +40,7 @@ export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: H
       Score: { benandanti: 0, malandanti: 0 },
       Flags: { benandanti: { _tag: "base" }, malandanti: { _tag: "base" } },
       Hill: { owner: null, contested: false, ticks: 0 },
+      Cart: { d: 0, pushers: 0, contested: false, idle: 0 },
       Pickups: options.physics.map.pickups.map(() => ({ _tag: "up" })),
       History: [],
       Rng: Random.seed(options.seed)

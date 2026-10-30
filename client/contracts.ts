@@ -5,7 +5,7 @@
  */
 import type * as THREE from "three"
 import type { PickupKind, Team } from "../shared/map.ts"
-import type { WeaponId } from "../shared/weapons.ts"
+import type { ProjectileKind, WeaponId } from "../shared/weapons.ts"
 
 export type P3 = readonly [number, number, number]
 
@@ -28,6 +28,10 @@ export interface WorldFrame {
   readonly flags: Readonly<Record<Team, FlagVisual>> | null
   /** Solo in modalità "culine". */
   readonly hill: { readonly owner: Team | null; readonly contested: boolean } | null
+  /** Solo in modalità "cjar": il carro sul binario. */
+  readonly cart: { readonly at: P3; readonly yaw: number; readonly contested: boolean; readonly pushers: number } | null
+  /** Solo nella Tampieste in corso: il cerchio sicuro. */
+  readonly storm: { readonly x: number; readonly z: number; readonly radius: number } | null
   readonly camera: THREE.PerspectiveCamera
 }
 export interface WorldScene {
@@ -84,6 +88,8 @@ export interface ViewmodelFrame {
   readonly lookDx: number
   readonly lookDy: number
   readonly sgnape: boolean
+  /** Rotazione del Mulin, da 0 a 1. */
+  readonly spin: number
 }
 export interface Viewmodel {
   readonly scene: THREE.Scene
@@ -107,9 +113,9 @@ export interface Fx {
   hitPuff(at: P3, head: boolean): void
   muzzle(at: P3): void
   /** Esplosione: palla di fuoco, schegge, onda d'urto. Con `ground` (y del pavimento sotto) lascia fuoco e bruciatura. */
-  explosion(at: P3, kind: "frico" | "sgnape", ground: number | null): void
-  /** Proiettili in volo: forme di frico che girano, bottiglie di sgnape. Chiamare a ogni frame con la lista corrente. */
-  projectiles(list: readonly (readonly ["frico" | "sgnape", number, number, number])[]): void
+  explosion(at: P3, kind: ProjectileKind, ground: number | null): void
+  /** Proiettili in volo e mine piantate: forme di frico che girano, bottiglie di sgnape, mine che lampeggiano. Chiamare a ogni frame con la lista corrente. */
+  projectiles(list: readonly (readonly [ProjectileKind, number, number, number])[]): void
   /** Anelli/sbuffi di fieno quando qualcuno usa un cjar di fen. */
   padBurst(at: P3): void
   pickupBurst(at: P3, kind: PickupKind): void
@@ -124,6 +130,11 @@ export type SoundName =
   | "shot_cramar"
   | "shot_doplete"
   | "shot_cjampanili"
+  | "shot_mulin"
+  | "spin_mulin"
+  | "beam_miedi"
+  | "mine_plant"
+  | "heal"
   | "launch_frico"
   | "throw"
   | "boom"

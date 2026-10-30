@@ -12,8 +12,8 @@ import type { MapId, Team } from "../map.ts"
 import type { Body } from "../movement.ts"
 import type { PhysicsWorld } from "../physics.ts"
 import type { ModeId } from "../folklore.ts"
-import type { PrimaryId, WeaponId } from "../weapons.ts"
-import type { GameEvent } from "./events.ts"
+import type { PrimaryId, ProjectileKind, WeaponId } from "../weapons.ts"
+import type { GameEvent, KillCause } from "./events.ts"
 
 export const Root = Schema.defineRoot("Sparedut")
 
@@ -96,6 +96,11 @@ export interface ArsenalValue {
   readonly action: WeaponAction
   readonly bombs: number
   readonly bombCooldown: number
+  /** Mine di Raibl ancora da piantare. */
+  readonly mines: number
+  readonly mineCooldown: number
+  /** Tick di rotazione accumulati dal Mulin (0 per le altre armi). */
+  readonly spin: number
   /** Tick rimasti di sgnape in corpo (corri più forte). */
   readonly sgnape: number
 }
@@ -118,7 +123,7 @@ export const Stats = Descriptor.Component<StatsValue>()("Sparedut/Stats")
 export const Attackers = Descriptor.Component<ReadonlyArray<{ readonly session: string; readonly tick: number }>>()("Sparedut/Attackers")
 
 export interface ProjectileValue {
-  readonly kind: "frico" | "sgnape"
+  readonly kind: ProjectileKind
   readonly x: number
   readonly y: number
   readonly z: number
@@ -159,6 +164,17 @@ export interface HillValue {
 }
 export const Hill = Descriptor.Resource<HillValue>()("Sparedut/Hill")
 
+/** Il cjar da spingere (Spingi il Cjar): metri percorsi lungo `map.track`. */
+export interface CartValue {
+  readonly d: number
+  /** Benandanti vivi attaccati al cjar (0 se conteso). */
+  readonly pushers: number
+  readonly contested: boolean
+  /** Tick senza nessuno che spinge: dopo un po' il cjar torna indietro. */
+  readonly idle: number
+}
+export const Cart = Descriptor.Resource<CartValue>()("Sparedut/Cart")
+
 export type PickupState = { readonly _tag: "up" } | { readonly _tag: "down"; readonly ticks: number }
 /** Uno per ogni punto di `PICKUPS`, nello stesso ordine. */
 export const Pickups = Descriptor.Resource<ReadonlyArray<PickupState>>()("Sparedut/Pickups")
@@ -190,12 +206,15 @@ export interface DamageValue {
   readonly victim: string
   readonly attacker: string | null
   readonly amount: number
-  readonly weapon: WeaponId | "sgnape" | "fall"
+  readonly weapon: KillCause
   readonly head: boolean
   /** Spinta (esplosioni). */
   readonly push: { readonly x: number; readonly y: number; readonly z: number } | null
 }
 export const Damage = Descriptor.Event<DamageValue>()("Sparedut/Damage")
+
+/** Cura (la Cassele dal Miedi e il medico vicino): la applica `ApplyDamage`, padrona della salute. */
+export const Heal = Descriptor.Event<{ readonly target: string; readonly healer: string; readonly amount: number }>()("Sparedut/Heal")
 
 /** Verso l'host e i client. */
 export const Out = Descriptor.Event<GameEvent>()("Sparedut/Out")
@@ -210,8 +229,8 @@ export const Game = Schema.bind(
   Schema.fragment({
     components: { Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers, Projectile },
     requires: [Schema.requires(Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers)],
-    resources: { Rules, Tick, Score, Flags, Hill, Pickups, History, Rng },
-    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, Damage, Out }
+    resources: { Rules, Tick, Score, Flags, Hill, Cart, Pickups, History, Rng },
+    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, Damage, Heal, Out }
   }),
   Root
 )
@@ -220,5 +239,9 @@ export const Game = Schema.bind(
 export const Match = Game.StateMachine("Sparedut/Match", {
   Warmup: {},
   Live: z.object({ ends: z.number().int() }),
-  Over: z.object({ winner: z.enum(["benandanti", "malandanti", "pari"]), restarts: z.number().int() })
+  /** Il vincitore: una squadra, nessuno, o (La Tampieste) l'ultimo in piedi. */
+  Over: z.object({
+    winner: z.union([z.enum(["benandanti", "malandanti", "pari"]), z.object({ player: z.string(), name: z.string() })]),
+    restarts: z.number().int()
+  })
 })

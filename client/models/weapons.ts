@@ -20,6 +20,8 @@ export interface WeaponModel {
     readonly bolt?: THREE.Object3D
     readonly frico?: THREE.Object3D
     readonly pouch?: THREE.Object3D
+    /** Il fascio di canne del Mulin, che gira attorno a z. */
+    readonly spinner?: THREE.Object3D
   }
   /** Dove sta la mano sinistra (spazio arma), null per le armi a una mano. */
   readonly left: THREE.Vector3 | null
@@ -89,7 +91,7 @@ function pistolGrip(root: THREE.Object3D, mat: THREE.Material, rake: number) {
   return g
 }
 
-// --- le sei armi ----------------------------------------------------------------------
+// --- le armi ---------------------------------------------------------------------------
 function mescul(): WeaponModel {
   const root = new THREE.Group()
   Z(root, 0.016, 0.014, 0.95, M.beech(), 0, 0, -0.32, 10)
@@ -286,7 +288,83 @@ function lanciafrico(): WeaponModel {
   return { root, muzzle, parts: { frico }, left: new THREE.Vector3(0, 0.0, -0.2), sightH: 0.165 }
 }
 
-const BUILDERS: Record<WeaponId, () => WeaponModel> = { mescul, mandi, cramar, doplete, cjampanili, lanciafrico }
+/** Il Mulin: sei canne attorno a un asse, dietro la mola di pietra del mulino e la manovella. */
+function mulin(): WeaponModel {
+  const root = new THREE.Group()
+  const y = 0.07
+  // la mola: un disco di pietra con le scanalature, il cuore che fa girare tutto
+  put(root, C(0.085, 0.085, 0.06, 20), M.plainStone(), 0, y, 0.05, Math.PI / 2)
+  for (let i = 0; i < 8; i++) put(root, B(0.004, 0.08, 0.062), M.stone(), 0, y, 0.05, 0, 0, (i / 8) * Math.PI)
+  put(root, T(0.086, 0.006, Math.PI * 2, 24), M.darkSteel(), 0, y, 0.02)
+  put(root, T(0.086, 0.006, Math.PI * 2, 24), M.darkSteel(), 0, y, 0.08)
+  // il fascio di canne
+  const spinner = group(root, 0, y, -0.1)
+  Z(spinner, 0.022, 0.022, 0.06, M.darkSteel(), 0, 0, 0.1, 10)
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2
+    Z(spinner, 0.011, 0.011, 0.55, M.steel(), Math.cos(a) * 0.034, Math.sin(a) * 0.034, -0.17, 8)
+  }
+  for (const z of [0.03, -0.2, -0.42]) put(spinner, C(0.05, 0.05, 0.014, 14), M.brass(), 0, 0, z, Math.PI / 2)
+  Z(spinner, 0.008, 0.008, 0.6, M.darkSteel(), 0, 0, -0.17, 6)
+  // cassa di legno sotto, con il nastro di munizioni
+  put(root, B(0.07, 0.06, 0.2), M.wood(), 0, y - 0.075, 0.0)
+  const mag = group(root, 0.06, y - 0.07, 0.0)
+  put(mag, B(0.05, 0.08, 0.12), M.darkWood(), 0, 0, 0)
+  for (let i = 0; i < 5; i++) put(mag, C(0.006, 0.006, 0.03, 6), M.brass(), -0.03, 0.03 - i * 0.012, -0.02, 0, 0, Math.PI / 2)
+  // manovella del mulino sul fianco e impugnature
+  put(root, B(0.06, 0.008, 0.008), M.darkSteel(), 0.09, y, 0.05)
+  put(root, C(0.008, 0.008, 0.04, 8), M.beech(), 0.12, y - 0.02, 0.05)
+  pistolGrip(root, M.wood(), 0.15)
+  guard(root, 0.02, -0.03)
+  put(root, C(0.016, 0.014, 0.1, 10), M.beech(), 0, y - 0.09, -0.26)
+  put(root, B(0.1, 0.012, 0.012), M.darkSteel(), 0, y + 0.1, 0.05)
+  put(root, B(0.004, 0.02, 0.004), M.brass(), 0, y + 0.115, -0.05)
+  const muzzle = marker(root, 0, y, -0.45)
+  return { root, muzzle, parts: { spinner, mag }, left: new THREE.Vector3(0, y - 0.13, -0.26), sightH: 0.18 }
+}
+
+/**
+ * La Cassele dal Miedi: la pompe dal solfato delle vigne diventata infermeria. Un
+ * serbatoio di rame con la croce, la pompa a mano e la lancia con l'ugello.
+ */
+function miedi(): WeaponModel {
+  const root = new THREE.Group()
+  const y = 0.06
+  // serbatoio
+  put(root, C(0.06, 0.06, 0.2, 18), M.copper(), 0, y + 0.02, 0.06, Math.PI / 2)
+  for (const z of [-0.04, 0.16]) put(root, new THREE.SphereGeometry(0.06, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.copper(), 0, y + 0.02, z, z < 0 ? -Math.PI / 2 : Math.PI / 2)
+  put(root, T(0.061, 0.004, Math.PI * 2, 20), M.darkCopper(), 0, y + 0.02, 0.02)
+  put(root, T(0.061, 0.004, Math.PI * 2, 20), M.darkCopper(), 0, y + 0.02, 0.12)
+  // croce rossa sul fianco, dipinta su un riquadro bianco
+  for (const s of [1, -1]) {
+    put(root, B(0.002, 0.05, 0.05), M.plainStone(), s * 0.061, y + 0.02, 0.07)
+    put(root, B(0.003, 0.036, 0.01), M.shell(), s * 0.062, y + 0.02, 0.07)
+    put(root, B(0.003, 0.01, 0.036), M.shell(), s * 0.062, y + 0.02, 0.07)
+  }
+  // la pompa: cilindro in alto con il manico che va su e giù
+  const pouch = group(root, 0, y + 0.09, 0.06)
+  Z(pouch, 0.004, 0.004, 0.12, M.darkSteel(), 0, 0.02, 0, 6)
+  put(pouch, B(0.06, 0.01, 0.01), M.beech(), 0, 0.02, 0.07)
+  put(root, C(0.014, 0.014, 0.05, 10), M.brass(), 0, y + 0.08, 0.06)
+  // la lancia con l'ugello e un mazzetto di camomilla legato
+  Z(root, 0.007, 0.007, 0.36, M.brass(), 0, y - 0.01, -0.22, 8)
+  Z(root, 0.012, 0.006, 0.04, M.darkCopper(), 0, y - 0.01, -0.42, 10)
+  put(root, T(0.012, 0.004, Math.PI * 2, 10), M.rope(), 0, y - 0.01, -0.3)
+  for (let i = 0; i < 4; i++) {
+    const a = i * 1.6
+    put(root, new THREE.SphereGeometry(0.008, 6, 4), M.polenta(), Math.cos(a) * 0.016, y + 0.008 + Math.sin(a) * 0.006, -0.3)
+    put(root, C(0.011, 0.011, 0.002, 8), M.plainStone(), Math.cos(a) * 0.016, y + 0.008 + Math.sin(a) * 0.006, -0.302, Math.PI / 2)
+  }
+  // impugnatura e cinghia di cuoio
+  pistolGrip(root, M.wood(), 0.2)
+  guard(root, 0.02, -0.03)
+  put(root, B(0.02, 0.03, 0.06), M.leather(), 0, y - 0.035, 0.06)
+  put(root, T(0.064, 0.004, Math.PI, 16), M.leather(), 0, y + 0.02, 0.17, 0, 0, Math.PI / 2)
+  const muzzle = marker(root, 0, y - 0.01, -0.44)
+  return { root, muzzle, parts: { pouch }, left: new THREE.Vector3(0, y - 0.03, -0.18), sightH: 0.12 }
+}
+
+const BUILDERS: Record<WeaponId, () => WeaponModel> = { mescul, mandi, cramar, doplete, cjampanili, mulin, miedi, lanciafrico }
 
 export const buildWeapon = (id: WeaponId): WeaponModel => BUILDERS[id]()
 

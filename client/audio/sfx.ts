@@ -58,6 +58,46 @@ const shotCjampanili: Recipe = r => {
   return done(b)
 }
 
+const shotMulin: Recipe = r => {
+  // corto e secco: a 20 colpi al secondo diventa il ronzio del mulino
+  const b = gunshot(r, { crack: 2000, body: 140, bodyD: 0.022, tail: 0.03, tailLp: 1300, drv: 3, len: 0.18 })
+  voice(b, { dur: 0.03, wave: "sqr", f: exp(420, 160, 0.01), amp: 0.2, d: 0.01, lp: 1600 })
+  return done(b, 0.8)
+}
+
+const spinMulin: Recipe = r => {
+  // le canne che prendono giri: un fischio meccanico che sale, col cric degli ingranaggi
+  const b = buffer(0.85)
+  voice(b, { dur: 0.8, wave: "saw", f: t => 90 + 520 * (t / 0.8) ** 1.4, amp: t => 0.35 * Math.min(1, t / 0.15), lp: 2400 })
+  for (let i = 0; i < 14; i++) click(b, (i / 14) ** 0.7 * 0.75, 0.25, 2600, r)
+  return done(b, 0.6)
+}
+
+const beamMiedi: Recipe = r => {
+  // lo sbrufadôr: uno spruzzo soffice con un filo di bolle
+  const b = buffer(0.22)
+  voice(b, { dur: 0.2, wave: "noise", bp: exp(2600, 1800, 0.08), q: 1.2, amp: 0.7, a: 0.01, d: 0.06, rnd: r })
+  voice(b, { at: 0.02, dur: 0.06, wave: "sin", f: t => 700 + t * 4000, amp: 0.15, d: 0.02 })
+  return done(b, 0.5)
+}
+
+const minePlant: Recipe = r => {
+  // la mine che si pianta nel terreno e il bip di quando si arma
+  const b = buffer(1.2)
+  voice(b, { dur: 0.15, wave: "sin", f: exp(140, 60, 0.03), amp: 1, d: 0.04 })
+  voice(b, { dur: 0.1, wave: "noise", lp: 900, amp: 0.6, d: 0.03, rnd: r })
+  click(b, 0.05, 0.5, 1800, r)
+  for (const at of [0.9, 1.05]) voice(b, { at, dur: 0.07, wave: "sqr", f: 1760, amp: 0.25, a: 0.002, d: 0.03, lp: 3000 })
+  return done(b, 0.7)
+}
+
+const heal: Recipe = r => {
+  const b = buffer(0.5)
+  for (const [n, at] of [[880, 0], [1320, 0.07]] as const) mode(b, at, n, 0.35, 0.15)
+  voice(b, { dur: 0.3, wave: "noise", hp: 5000, amp: 0.08, d: 0.08, rnd: r })
+  return done(b, 0.45)
+}
+
 const launchFrico: Recipe = r => {
   const b = buffer(1)
   // "thoonk": tubo che risuona e colpo sordo
@@ -465,6 +505,11 @@ export const SFX: Record<SoundName, readonly [Recipe, number]> = {
   shot_cramar: [shotCramar, 4],
   shot_doplete: [shotDoplete, 2],
   shot_cjampanili: [shotCjampanili, 1],
+  shot_mulin: [shotMulin, 3],
+  spin_mulin: [spinMulin, 1],
+  beam_miedi: [beamMiedi, 2],
+  mine_plant: [minePlant, 1],
+  heal: [heal, 1],
   launch_frico: [launchFrico, 1],
   throw: [throwSnd, 1],
   boom: [boom, 2],
