@@ -99,7 +99,7 @@ export class Game {
   private boardOpen = false
   private chatting = false
   private quickOpen = false
-  private overlay: "none" | "pause" | "loadout" = "none"
+  private overlay: "none" | "pause" | "loadout" | "settings" = "none"
   /** Da dove si è aperta l'armeria: Esc ci torna. */
   private loadoutFrom: "none" | "pause" = "none"
   /** Quando il browser ha tolto il blocco del mouse: lo stesso Esc non deve anche chiudere la pausa. */
@@ -178,6 +178,7 @@ export class Game {
 
   stop() {
     this.running = false
+    this.openOverlay("none")
     for (const a of this.avatars.values()) {
       this.d.scene.remove(a.avatar.object, a.blob)
       a.avatar.dispose()
@@ -538,6 +539,7 @@ export class Game {
   private escape() {
     if (this.quickOpen) this.toggleQuick(false)
     else if (this.overlay === "loadout") this.openOverlay(this.loadoutFrom)
+    else if (this.overlay === "settings") this.openOverlay("pause")
     else if (this.overlay === "pause" && performance.now() - this.unlockedAt > 300) this.openOverlay("none")
   }
 
@@ -568,9 +570,23 @@ export class Game {
     if (!this.controls.locked) this.controls.lock()
   }
 
-  private openOverlay(which: "none" | "pause" | "loadout") {
+  /** Il modulo delle impostazioni torna nel menu principale. */
+  private restoreSettings() {
+    const form = $("settings-form")
+    if (form.parentElement?.id !== "settings-home") $("settings-home").append(form)
+  }
+
+  private openOverlay(which: "none" | "pause" | "loadout" | "settings") {
     if (which === "loadout" && this.overlay !== "loadout") this.loadoutFrom = this.overlay === "pause" ? "pause" : "none"
     this.overlay = which
+    $("settings-ingame").classList.toggle("hidden", which !== "settings")
+    if (which === "settings") {
+      // Lo stesso modulo del menu principale: stessi controlli, salvati e applicati subito.
+      const el = $("settings-ingame")
+      el.innerHTML = `<h2>${t().static.settings}</h2><div id="settings-slot"></div><div class="row"><button id="st-back">${t().static.back}</button></div>`
+      $("settings-slot").append($("settings-form"))
+      $("st-back").onclick = () => this.openOverlay("pause")
+    } else this.restoreSettings()
     $("pause").classList.toggle("hidden", which !== "pause")
     $("loadout").classList.toggle("hidden", which !== "loadout")
     if (which === "pause") this.renderPause()
@@ -628,9 +644,9 @@ export class Game {
         <button id="p-resume" class="primary">${s.loadout.resume}</button>
         <button id="p-team">${p.switchTeam(s.teams[other].name)}</button>
         <button id="p-loadout">${s.loadout.title}</button>
+        <button id="p-settings">${s.static.settings}</button>
         <button id="p-leave">${p.leave}</button>
-      </div>
-      <label class="field" style="margin-top:10px"><span>${p.sens}</span><input type="range" id="p-sens" min="0.2" max="3" step="0.05" value="${this.d.settings.sensitivity}" /></label>`
+      </div>`
     $("p-resume").onclick = () => {
       this.openOverlay("none")
       this.controls.lock()
@@ -645,11 +661,7 @@ export class Game {
       void navigator.clipboard?.writeText(link)
       $("p-copy").textContent = p.copied
     }
-    $<HTMLInputElement>("p-sens").oninput = (e) => {
-      this.d.settings.sensitivity = Number((e.target as HTMLInputElement).value)
-      this.d.saveSettings()
-      this.applySettings()
-    }
+    $("p-settings").onclick = () => this.openOverlay("settings")
     if (host) {
       $("p-start").onclick = () => {
         this.d.net.send({ t: "start" })

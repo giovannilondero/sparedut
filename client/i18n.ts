@@ -102,7 +102,6 @@ export interface Strings {
     readonly level: string
     readonly switchTeam: Fn
     readonly leave: string
-    readonly sens: string
   }
   readonly end: {
     readonly draw: string
@@ -406,8 +405,7 @@ const fur: Strings = {
     hostOnly: "L'host (👑) al fâs partî la partide.",
     level: "Bravure",
     switchTeam: (team) => `Passe cui ${team}`,
-    leave: "Va fûr · Mandi!",
-    sens: "Sensibilitât dal mouse"
+    leave: "Va fûr · Mandi!"
   },
   end: {
     draw: "Pari e patte!",
@@ -662,8 +660,7 @@ const it: Strings = {
     hostOnly: "L'host (👑) fa partire la partita.",
     level: "Bravura",
     switchTeam: (team) => `Passa con i ${team}`,
-    leave: "Esci · Mandi!",
-    sens: "Sensibilità del mouse"
+    leave: "Esci · Mandi!"
   },
   end: {
     draw: "Pareggio!",
