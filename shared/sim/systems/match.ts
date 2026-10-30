@@ -1,7 +1,8 @@
 /**
  * Il flusso della partita: riscaldamento → in corso → finita → di nuovo in corso.
  */
-import { PICKUPS, TEAMS } from "../../map.ts"
+import { TEAMS } from "../../map.ts"
+import { MAPS } from "../../maps/index.ts"
 import { NO_STATS, OVER_TICKS, WARMUP_TICKS } from "../rules.ts"
 import { Attackers, Flags, Game, Hill, Life, Match, Out, Pickups, Player, Rules, Score, StartMatch, Stats, Tick } from "../schema.ts"
 
@@ -48,7 +49,7 @@ export const MatchFlow = Game.System(
       resources.score.set({ benandanti: 0, malandanti: 0 })
       resources.flags.set({ benandanti: { _tag: "base" }, malandanti: { _tag: "base" } })
       resources.hill.set({ owner: null, contested: false, ticks: 0 })
-      resources.pickups.set(PICKUPS.map(() => ({ _tag: "up" })))
+      resources.pickups.set(MAPS[rules.map].pickups.map(() => ({ _tag: "up" })))
       for (const m of queries.players.each()) {
         m.data.stats.set(NO_STATS)
         m.data.attackers.set([])

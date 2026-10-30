@@ -7,7 +7,7 @@
  * Lis frasis sveltis de chat a van ai altris zuiadôrs come test, e a restin par furlan.
  */
 import type { BotLevel, ModeId } from "../shared/folklore.ts"
-import type { Team } from "../shared/map.ts"
+import type { MapId, Team } from "../shared/map.ts"
 import type { ErrorCode } from "../shared/protocol.ts"
 import type { WeaponId } from "../shared/weapons.ts"
 
@@ -21,12 +21,13 @@ type StaticKey =
   | "lanTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "visLabel" | "visLan" | "visCode"
   | "ff" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
   | "qHigh" | "autoRes" | "showInfo" | "invert" | "keys" | "vocabTitle" | "connecting" | "chatPh" | "deathTitle" | "deathHint"
-  | "clickplay" | "language"
+  | "clickplay" | "language" | "mapLabel"
 
 export interface Strings {
   readonly static: Record<StaticKey, string>
   readonly teams: Record<Team, { readonly name: string; readonly motto: string }>
   readonly modes: Record<ModeId, { readonly name: string; readonly sub: string; readonly rules: string }>
+  readonly maps: Record<MapId, { readonly name: string; readonly sub: string }>
   readonly levels: Record<BotLevel, { readonly name: string; readonly sub: string }>
   readonly weapons: Record<WeaponId, { readonly name: string; readonly short: string; readonly blurb: string }>
   readonly bomb: string
@@ -248,7 +249,8 @@ const fur: Strings = {
     deathTitle: "Ti àn fat frico!",
     deathHint: "Frache <kbd>B</kbd> par cambiâ l'arme principâl",
     clickplay: "<div>Fâs clic par zuiâ</div><small>Esc pal menù de partide</small>",
-    language: "Lenghe"
+    language: "Lenghe",
+    mapLabel: "Mape"
   },
   teams: {
     benandanti: { name: "Benandants", motto: "Pal racolt e pe glesie!" },
@@ -270,6 +272,13 @@ const fur: Strings = {
       sub: "Re de culine",
       rules: "Ten la plaçute di Vie Bini ator de fontane. Un pont al secont par cui che le ten di bessôl."
     }
+  },
+  maps: {
+    glemone: { name: "Glemone", sub: "Il Dom, Vie Bini e la place dal Comun" },
+    osoppo: { name: "Fuart di Osôf", sub: "La fortece sul cuel, bastions e galariis" },
+    trincee: { name: "Trinceis dal Pal Piçul", sub: "La Grande Vuere tes Alps Cjargnelis" },
+    venzone: { name: "Vençon", sub: "Il borc dentri lis muris e il Dom di Sant Andree" },
+    predil: { name: "Cave dal Predil", sub: "La miniere di Raibl, binaris e carei" }
   },
   levels: {
     zovin: { name: "Zovin", sub: "Facil: apene tornât di Udin" },
@@ -492,7 +501,8 @@ const it: Strings = {
     deathTitle: "Ti hanno fatto frico!",
     deathHint: "Premi <kbd>B</kbd> per cambiare arma principale",
     clickplay: "<div>Clicca per giocare</div><small>Esc per il menu della partita</small>",
-    language: "Lingua"
+    language: "Lingua",
+    mapLabel: "Mappa"
   },
   teams: {
     benandanti: { name: "Benandanti", motto: "Per il raccolto e per la chiesa!" },
@@ -514,6 +524,13 @@ const it: Strings = {
       sub: "Re della collina",
       rules: "Tieni la piazzetta di Via Bini attorno alla fontana. Un punto al secondo per chi la controlla da solo."
     }
+  },
+  maps: {
+    glemone: { name: "Glemone", sub: "Il Duomo, Via Bini e la piazza del Municipio" },
+    osoppo: { name: "Fuart di Osôf", sub: "Il Forte di Osoppo sul colle: bastioni e gallerie" },
+    trincee: { name: "Trinceis dal Pal Piçul", sub: "La Grande Guerra sulle Alpi Carniche" },
+    venzone: { name: "Vençon", sub: "Il borgo murato di Venzone e il Duomo di Sant'Andrea" },
+    predil: { name: "Cave dal Predil", sub: "La miniera di Raibl: binari e carrelli" }
   },
   levels: {
     zovin: { name: "Zovin", sub: "Facile: appena tornato da Udine" },

@@ -4,7 +4,8 @@
 import { Random } from "@typeonce/ritmo"
 import { IDLE_INPUT } from "../../input.ts"
 import { chooseSpawn, freshArsenal, MAX_HP, SHIELD_TICKS } from "../rules.ts"
-import { Arsenal, Attackers, Controls, Game, Life, Match, Motion, Out, Player, Rng, TeamOf } from "../schema.ts"
+import { MAPS } from "../../maps/index.ts"
+import { Arsenal, Attackers, Controls, Game, Life, Match, Motion, Out, Player, Rng, Rules, TeamOf } from "../schema.ts"
 
 export const Respawn = Game.System(
   "Sparedut/Respawn",
@@ -22,7 +23,7 @@ export const Respawn = Game.System(
         }
       })
     },
-    resources: { rng: Game.System.writeResource(Rng) },
+    resources: { rules: Game.System.readResource(Rules), rng: Game.System.writeResource(Rng) },
     events: { out: Game.System.writeEvent(Out) },
     machines: { match: Game.System.machine(Match) }
   },
@@ -44,7 +45,7 @@ export const Respawn = Game.System(
       const enemies = all
         .filter((o) => o.data.team.get() !== team && o.data.life.get()._tag === "Alive")
         .map((o) => o.data.motion.get().body)
-      const spot = chooseSpawn(team, enemies, rng.next() * 1000)
+      const spot = chooseSpawn(MAPS[resources.rules.get().map].spawns[team], enemies, rng.next() * 1000)
       m.data.life.transition({ from: "Dead", to: "Alive", data: { hp: MAX_HP, armor: 0, shield: SHIELD_TICKS } })
       m.data.motion.set({
         body: { x: spot.at[0], y: spot.at[1], z: spot.at[2], vx: 0, vy: 0, vz: 0, grounded: true, crouch: false },

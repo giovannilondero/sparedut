@@ -6,7 +6,7 @@ import type { ModeId } from "../shared/folklore.ts"
 for (const mode of ["bataie", "frico", "culine"] as ModeId[]) {
   test(`i bot giocano una partita: ${mode}`, async () => {
     await initPhysics()
-    const room = new Room("TEST", "nessuno", "Test", "lan", { mode, minutes: 10, visibility: "code", level: "pari", ff: false })
+    const room = new Room("TEST", "nessuno", "Test", "lan", { mode, map: "glemone", minutes: 10, visibility: "code", level: "pari", ff: false })
     room.fillBots(6)
     room.start()
     const kinds = new Map<string, number>()

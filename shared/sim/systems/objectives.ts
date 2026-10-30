@@ -1,7 +1,8 @@
 /**
  * Obiettivi: Cjape il Frico (bandiera) e Re de Plaçute (collina).
  */
-import { FLAG_BASES, HILL, TEAMS, type Team } from "../../map.ts"
+import { TEAMS, type Team } from "../../map.ts"
+import { MAPS } from "../../maps/index.ts"
 import { FLAG_RETURN_TICKS, otherTeam } from "../rules.ts"
 import { Flags, Game, Hill, Life, Match, Motion, Out, Player, Rules, Score, Stats, TeamOf, type FlagState } from "../schema.ts"
 
@@ -35,6 +36,7 @@ export const PlayObjectives = Game.System(
     const phase = machines.match.get()._tag
     if (phase === "Over") return
     const live = phase === "Live"
+    const { flagBases: FLAG_BASES, hill: HILL } = MAPS[rules.map]
     const players = queries.players.each().map((m) => ({
       m,
       session: m.data.player.get().session,

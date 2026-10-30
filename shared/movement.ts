@@ -5,7 +5,6 @@
 import { Ops } from "@typeonce/ritmo"
 import type { PlayerInput } from "./input.ts"
 import { pressed } from "./input.ts"
-import { JUMP_PADS, KILL_Y } from "./map.ts"
 import type { PhysicsWorld } from "./physics.ts"
 
 export const TICK_RATE = 60
@@ -55,6 +54,9 @@ export const lookDir = (yaw: number, pitch: number) => {
 
 export const eyeHeight = (body: Body) => (body.crouch ? EYE_CROUCH : EYE_STAND)
 
+/** Si corre: Shift, avanti, né accucciati né mirando. Chi corre tiene l'arma abbassata e non spara. */
+export const sprinting = (input: PlayerInput, crouch: boolean) => pressed(input, "sprint") && !crouch && !pressed(input, "aim") && input.mz > 0
+
 /**
  * Un tick di movimento. `speedScale` porta il peso dell'arma e la sgnape.
  */
@@ -62,8 +64,7 @@ export function stepBody(body: Body, input: PlayerInput, physics: PhysicsWorld, 
   const wantsCrouch = pressed(input, "crouch")
   const crouch = wantsCrouch || (body.crouch && !physics.canStand(body))
   const aiming = pressed(input, "aim")
-  const sprinting = pressed(input, "sprint") && !crouch && !aiming && input.mz > 0
-  const speed = (crouch ? MOVE.crouch : aiming ? MOVE.aim : sprinting ? MOVE.sprint : MOVE.walk) * speedScale
+  const speed = (crouch ? MOVE.crouch : aiming ? MOVE.aim : sprinting(input, crouch) ? MOVE.sprint : MOVE.walk) * speedScale
 
   const f = forward(input.yaw)
   // destra = avanti ruotato di 90° in senso orario visto dall'alto
@@ -91,7 +92,7 @@ export function stepBody(body: Body, input: PlayerInput, physics: PhysicsWorld, 
   vy = Math.max(-MOVE.maxFall, vy - MOVE.gravity * DT)
 
   let launchedBy: string | null = null
-  for (const pad of JUMP_PADS) {
+  for (const pad of physics.map.jumpPads) {
     const dx = body.x - pad.at[0]
     const dz = body.z - pad.at[2]
     if (dx * dx + dz * dz < pad.radius * pad.radius && Math.abs(body.y - pad.at[1]) < 0.6 && body.vy <= 0.5) {
@@ -115,6 +116,6 @@ export function stepBody(body: Body, input: PlayerInput, physics: PhysicsWorld, 
   return {
     body: { x: moved.x, y: moved.y, z: moved.z, vx, vy, vz, grounded, crouch },
     launchedBy,
-    fellOut: moved.y < KILL_Y
+    fellOut: moved.y < physics.map.killY
   }
 }

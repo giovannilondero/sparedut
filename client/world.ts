@@ -1,51 +1,21 @@
 /**
- * Il mondo visibile: Gemona attorno al Duomo, costruita dagli stessi dati delle
- * collisioni (`shared/map.ts`). Tutto ciò che si tocca coincide coi BLOCKS e i WEDGES;
- * sopra ci sono solo decori sottili: finestre, archi, tetti, statue, insegne.
+ * Il mondo visibile di una mappa, costruito dagli stessi dati delle collisioni
+ * (`shared/maps/`). Tutto ciò che si tocca coincide coi blocchi e le rampe; sopra ci
+ * sono solo decori sottili: finestre, archi, tetti, statue, insegne.
+ * Gemona (Duomo, campanile, Comune) è disegnata qui; le altre mappe aggiungono i loro
+ * monumenti con uno scenario (`client/world/maps/`).
  * Geometria statica fusa per materiale, ripetizioni istanziate, texture su canvas.
  */
 import * as THREE from "three"
-import {
-  BLOCKS,
-  BOUNDS,
-  BUILDINGS,
-  buildingBlocks,
-  CAMPANILE,
-  COMUNE,
-  DUOMO,
-  G_DUOMO,
-  G_LOW,
-  G_MID,
-  JUMP_PADS,
-  WEDGES,
-  type Block,
-  type Building,
-  type Mat
-} from "../shared/map.ts"
+import { buildingBlocks, type Block, type Building, type MapDef, type Mat } from "../shared/map.ts"
+import { CAMPANILE, COMUNE, DUOMO, G_DUOMO, G_LOW, G_MID } from "../shared/maps/glemone.ts"
 import type { WorldFrame, WorldScene, Quality } from "./contracts.ts"
 import { HORIZON, makeSky, makeTerrain, makeTown, nearGround } from "./world/backdrop.ts"
 import { createDynamic } from "./world/dynamic.ts"
+import { SCENERY } from "./world/maps/index.ts"
+import type { K, SceneryKit, SceneryLive } from "./world/scenery.ts"
 import { archPanel, archRing, Batch, boxAt, faceMatrix, Inst, quad, rng, spandrel, tri, vault, type V } from "./world/geo.ts"
 import { atlasDisc, atlasQuad, makeAtlas, makeTextures, setAnisotropy, type Region } from "./world/tex.ts"
-
-type K =
-  | "pietra"
-  | "pietraChiara"
-  | "intonaco"
-  | "porfido"
-  | "legno"
-  | "cassa"
-  | "fen"
-  | "coppi"
-  | "erba"
-  | "marmo"
-  | "ferro"
-  | "pavimento"
-  | "stoffa"
-  | "vetro"
-  | "luce"
-  | "acqua"
-  | "atlas"
 
 const SCALES: Record<K, number> = {
   pietra: 3,
@@ -64,6 +34,9 @@ const SCALES: Record<K, number> = {
   vetro: 1,
   luce: 1,
   acqua: 3,
+  terra: 3,
+  roccia: 4,
+  sacs: 1.2,
   atlas: 1
 }
 
@@ -129,45 +102,58 @@ function cylBetween(a: V, b: V, r0: number, r1 = r0, seg = 8): THREE.BufferGeome
 
 const sphere = (c: V, r: number, sy = 1, seg = 10) => new THREE.SphereGeometry(r, seg, Math.max(6, seg - 2)).scale(1, sy, 1).translate(...c)
 
-/** Quota del terreno (terrazze e rampe) in un punto. */
-function groundAt(x: number, z: number): number {
-  for (const w of WEDGES) {
-    if (x >= w.x0 && x <= w.x1 && z >= w.z0 && z <= w.z1) return w.y0 + ((w.y1 - w.y0) * (z - w.z0)) / (w.z1 - w.z0)
+/** Il terreno di una mappa: blocchi `terreno` e rampe. */
+function groundOf(map: MapDef) {
+  const terrain = map.blocks.filter((b) => b.look === "terreno")
+  return (x: number, z: number): number => {
+    for (const w of map.wedges) {
+      if (x >= w.x0 && x <= w.x1 && z >= w.z0 && z <= w.z1) return w.y0 + ((w.y1 - w.y0) * (z - w.z0)) / (w.z1 - w.z0)
+    }
+    let y = -Infinity
+    for (const b of terrain) if (x >= b.min[0] && x <= b.max[0] && z >= b.min[2] && z <= b.max[2]) y = Math.max(y, b.max[1])
+    return y === -Infinity ? 0 : y
   }
-  return z < -28 ? G_DUOMO : z < 10 ? G_MID : G_LOW
 }
 
 type Rect = { minX: number; maxX: number; minZ: number; maxZ: number }
-const SOLIDS: Rect[] = [
-  ...BUILDINGS.map((b) => ({ minX: b.min[0], maxX: b.max[0], minZ: b.min[2], maxZ: b.max[2] })),
-  DUOMO,
-  COMUNE,
-  CAMPANILE
-]
 /** Un punto appena fuori da una facciata è libero (né dentro un altro edificio né fuori dal mondo)? */
-function open(x: number, z: number): boolean {
-  if (x < BOUNDS.minX || x > BOUNDS.maxX || z < BOUNDS.minZ || z > BOUNDS.maxZ) return false
-  return !SOLIDS.some((r) => x > r.minX && x < r.maxX && z > r.minZ && z < r.maxZ)
+function openOf(map: MapDef) {
+  const solids: Rect[] = map.buildings.map((b) => ({ minX: b.min[0], maxX: b.max[0], minZ: b.min[2], maxZ: b.max[2] }))
+  if (map.id === "glemone") solids.push(DUOMO, COMUNE, CAMPANILE)
+  const { minX, maxX, minZ, maxZ } = map.bounds
+  return (x: number, z: number): boolean => {
+    if (x < minX || x > maxX || z < minZ || z > maxZ) return false
+    return !solids.some((r) => x > r.minX && x < r.maxX && z > r.minZ && z < r.maxZ)
+  }
 }
 
 // --- il mondo -------------------------------------------------------------------------------
 
-export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): WorldScene {
+export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, map: MapDef): WorldScene {
   setAnisotropy(renderer.capabilities.getMaxAnisotropy())
   const tex = makeTextures()
   const atlas = makeAtlas()
   const R = rng(2024)
+  const gemona = map.id === "glemone"
+  const scenery = map.id === "glemone" ? null : SCENERY[map.id]
+  const groundAt = groundOf(map)
+  const open = openOf(map)
+  const { blocks: BLOCKS, wedges: WEDGES, buildings: BUILDINGS, jumpPads: JUMP_PADS, bounds: BOUNDS } = map
+  /** Tutto ciò che appartiene alla mappa: si toglie in blocco col cambio mappa. */
+  const root = new THREE.Group()
+  root.name = `mappa-${map.id}`
+  scene.add(root)
 
   // Luce di fine pomeriggio: sole basso da sud-ovest, cielo caldo, foschia.
-  const sunDir = new THREE.Vector3(-0.62, 0.4, 0.68).normalize()
-  scene.fog = new THREE.FogExp2(HORIZON.getHex(), 0.0011)
+  const sunDir = new THREE.Vector3(...(scenery?.light?.sun ?? [-0.62, 0.4, 0.68])).normalize()
+  scene.fog = new THREE.FogExp2(HORIZON.getHex(), scenery?.light?.fog ?? 0.0011)
   scene.background = HORIZON.clone()
   const sky = makeSky(sunDir)
-  scene.add(sky)
+  root.add(sky)
   const hemi = new THREE.HemisphereLight("#cfe0f5", "#9a7a55", 1.25)
-  scene.add(hemi)
+  root.add(hemi)
   const sun = new THREE.DirectionalLight("#ffd3a0", 3.1)
-  const focus = new THREE.Vector3(0, 10, -2)
+  const focus = new THREE.Vector3((BOUNDS.minX + BOUNDS.maxX) / 2, 10, (BOUNDS.minZ + BOUNDS.maxZ) / 2)
   sun.position.copy(focus).addScaledVector(sunDir, 260)
   sun.target.position.copy(focus)
   sun.castShadow = true
@@ -193,7 +179,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
     s.far = -box.min.z + 10
     s.updateProjectionMatrix()
   }
-  scene.add(sun, sun.target)
+  root.add(sun, sun.target)
 
   // Mappa d'ambiente dal cielo, per metalli, vetri, acqua e marmo.
   const pmrem = new THREE.PMREMGenerator(renderer)
@@ -221,6 +207,9 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
     vetro: new THREE.MeshStandardMaterial({ color: "#26303c", vertexColors: true, roughness: 0.12, metalness: 0.5, envMap, envMapIntensity: 1.2 }),
     luce: new THREE.MeshBasicMaterial({ vertexColors: true }),
     acqua: new THREE.MeshStandardMaterial({ color: "#3c7380", vertexColors: true, roughness: 0.06, metalness: 0.2, envMap, transparent: true, opacity: 0.88 }),
+    terra: lam(tex.terra, { bumpMap: tex.terra, bumpScale: 1.2 }),
+    roccia: lam(tex.roccia, { bumpMap: tex.roccia, bumpScale: 1.6 }),
+    sacs: lam(tex.sacs, { bumpMap: tex.sacs, bumpScale: 1.4 }),
     atlas: lam(atlas.texture, { alphaTest: 0.5, side: THREE.DoubleSide })
   }
   const B = new Batch<K>(SCALES, ["atlas"])
@@ -244,22 +233,40 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
   const matColor = (m: Mat) => C(PLASTER[m] ?? "#ffffff")
 
   // --- 1. terreno e rampe -------------------------------------------------------------------
-  const isTerrain = (b: Block) => b.look === "terreno" && b.mat === "porfido"
+  const isTerrain = (b: Block) => b.look === "terreno"
+  /** Il materiale del Batch per un `Mat` della mappa. */
+  const surface = (m: Mat): K => (m === "invisibile" ? "pietra" : matKey(m))
   for (const b of BLOCKS) {
     if (!isTerrain(b)) continue
-    B.add("porfido", face(b.min, b.max, "top"))
-    // il gradino verso sud è un muro di sostegno in pietra, con una copertina chiara
-    B.add("pietra", face(b.min, b.max, "south"), C("#d8d0c4"))
-    B.add("pietraChiara", boxAt([b.min[0], b.max[1] - 0.25, b.max[2]], [b.max[0], b.max[1], b.max[2] + 0.06]))
+    const k = surface(b.mat)
+    B.add(k, face(b.min, b.max, "top"), matColor(b.mat))
+    if (gemona) {
+      // il gradino verso sud è un muro di sostegno in pietra, con una copertina chiara
+      B.add("pietra", face(b.min, b.max, "south"), C("#d8d0c4"))
+      B.add("pietraChiara", boxAt([b.min[0], b.max[1] - 0.25, b.max[2]], [b.max[0], b.max[1], b.max[2] + 0.06]))
+      continue
+    }
+    // Fianchi dei gradoni: si vedono solo dove il terreno accanto è più basso.
+    const sideKey: K = k === "porfido" ? "pietra" : k === "erba" ? "terra" : k
+    for (const side of ["east", "west", "south", "north"] as const) {
+      const [x0, , z0] = b.min
+      const [x1, y1, z1] = b.max
+      const probe = side === "east" ? [x1 + 0.3, (z0 + z1) / 2] : side === "west" ? [x0 - 0.3, (z0 + z1) / 2] : side === "south" ? [(x0 + x1) / 2, z1 + 0.3] : [(x0 + x1) / 2, z0 - 0.3]
+      const inside = probe[0] > BOUNDS.minX && probe[0] < BOUNDS.maxX && probe[1] > BOUNDS.minZ && probe[1] < BOUNDS.maxZ
+      if (inside && groundAt(probe[0], probe[1]) >= y1 - 0.05) continue
+      B.add(sideKey, face(b.min, b.max, side), C("#d8d0c4"))
+    }
   }
   for (const w of WEDGES) {
     const yb = Math.min(w.y0, w.y1)
-    B.add("porfido", orient(quad([w.x0, w.y0, w.z0], [w.x0, w.y1, w.z1], [w.x1, w.y1, w.z1], [w.x1, w.y0, w.z0]), [0, 1, 0]))
-    B.add("pietra", orient(quad([w.x0, yb, w.z0], [w.x0, yb, w.z1], [w.x0, w.y1, w.z1], [w.x0, w.y0, w.z0]), [-1, 0, 0]))
-    B.add("pietra", orient(quad([w.x1, yb, w.z0], [w.x1, yb, w.z1], [w.x1, w.y1, w.z1], [w.x1, w.y0, w.z0]), [1, 0, 0]))
+    const top = surface(w.mat)
+    const sideKey: K = top === "porfido" ? "pietra" : top === "erba" ? "terra" : top
+    B.add(top, orient(quad([w.x0, w.y0, w.z0], [w.x0, w.y1, w.z1], [w.x1, w.y1, w.z1], [w.x1, w.y0, w.z0]), [0, 1, 0]), matColor(w.mat))
+    B.add(sideKey, orient(quad([w.x0, yb, w.z0], [w.x0, yb, w.z1], [w.x0, w.y1, w.z1], [w.x0, w.y0, w.z0]), [-1, 0, 0]))
+    B.add(sideKey, orient(quad([w.x1, yb, w.z0], [w.x1, yb, w.z1], [w.x1, w.y1, w.z1], [w.x1, w.y0, w.z0]), [1, 0, 0]))
   }
   // Le terrazze proseguono oltre i bordi, sotto il resto del paese.
-  for (const g of nearGround()) {
+  if (gemona) for (const g of nearGround()) {
     B.add("erba", face(g.min, g.max, "top"), C("#c8c4a0"))
     for (const s of ["south", "north"] as const) B.add("pietra", face(g.min, g.max, s), C("#b8b0a4"))
   }
@@ -463,9 +470,9 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
   }
 
   // --- 3. blocchi generici ---------------------------------------------------------------
-  const camp = (b: Block) => b.min[0] === CAMPANILE.minX && b.max[0] === CAMPANILE.maxX && b.min[2] === CAMPANILE.minZ && b.max[1] === CAMPANILE.floor + CAMPANILE.height
-  const comuneUpper = (b: Block) => b.min[0] === COMUNE.minX && b.max[0] === COMUNE.maxX && b.min[1] === COMUNE.floor + COMUNE.loggiaHeight
-  const inDuomo = (b: Block) => b.min[0] >= DUOMO.minX && b.max[0] <= DUOMO.maxX && b.min[2] >= DUOMO.minZ && b.max[2] <= DUOMO.maxZ
+  const camp = (b: Block) => gemona && b.min[0] === CAMPANILE.minX && b.max[0] === CAMPANILE.maxX && b.min[2] === CAMPANILE.minZ && b.max[1] === CAMPANILE.floor + CAMPANILE.height
+  const comuneUpper = (b: Block) => gemona && b.min[0] === COMUNE.minX && b.max[0] === COMUNE.maxX && b.min[1] === COMUNE.floor + COMUNE.loggiaHeight
+  const inDuomo = (b: Block) => gemona && b.min[0] >= DUOMO.minX && b.max[0] <= DUOMO.maxX && b.min[2] >= DUOMO.minZ && b.max[2] <= DUOMO.maxZ
   for (const b of BLOCKS) {
     if (b.mat === "invisibile" || isTerrain(b) || buildingKeys.has(key(b)) || camp(b)) continue
     const k = matKey(b.mat)
@@ -516,6 +523,11 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
     B.add(k, boxAt(b.min, b.max), k === "pietra" && inDuomo(b) ? C("#e6e0d6") : col)
   }
 
+  // --- 4-6. solo a Gemona: Duomo, campanile, Comune --------------------------------------------
+  const altarLight = new THREE.PointLight("#ffb46a", 70, 22, 1.3)
+  const naveLight = new THREE.PointLight("#ffc888", 45, 20, 1.3)
+  const clockHands: THREE.Mesh[] = []
+  if (gemona) {
   // --- 4. Duomo di Santa Maria Assunta -----------------------------------------------------
   {
     const { minX, maxX, minZ, maxZ, floor: f, height: h } = DUOMO
@@ -702,11 +714,9 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
       }
     }
   }
-  const altarLight = new THREE.PointLight("#ffb46a", 70, 22, 1.3)
   altarLight.position.set(0, DUOMO.floor + 4, -94)
-  const naveLight = new THREE.PointLight("#ffc888", 45, 20, 1.3)
   naveLight.position.set(0, DUOMO.floor + 8.5, -80)
-  scene.add(altarLight, naveLight)
+  root.add(altarLight, naveLight)
 
   // --- 5. Campanile ---------------------------------------------------------------------
   {
@@ -766,7 +776,6 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
   }
 
   // --- 6. Palazzo Comunale e loggia ---------------------------------------------------------
-  const clockHands: THREE.Mesh[] = []
   {
     const { minX, maxX, minZ, floor: f, loggiaDepth, loggiaHeight: lh, roof: rf } = COMUNE
     const colsX = [-15.5, -9.5, -3.5, 2.5, 8.5, 14.5]
@@ -828,7 +837,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
       const hand = new THREE.Mesh(g, MATS.ferro)
       hand.position.set(0, cy, tz - 0.09)
       hand.rotation.y = Math.PI
-      scene.add(hand)
+      root.add(hand)
       clockHands.push(hand)
     }
   }
@@ -838,6 +847,8 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
       const n = h.geometry.getAttribute("position").count
       h.geometry.setAttribute("color", new THREE.BufferAttribute(new Float32Array(n * 3).fill(0.08), 3))
     }
+  }
+
   }
 
   // --- 7. portici di Via Bini: archi, costoloni, volte, insegne -----------------------------
@@ -993,12 +1004,13 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
       h.rotation.y = rotY
       h.castShadow = true
       h.receiveShadow = true
-      scene.add(h)
+      root.add(h)
       hay.push(h)
     }
   }
 
-  // --- 9. stendardi, festoni, insegne, lanterne ----------------------------------------------
+  // --- 9. stendardi, festoni, insegne, lanterne (Gemona) ----------------------------------------
+  if (gemona) {
   const banner = (reg: Region, n: V, p: V, h: number) => {
     const m = faceMatrix(n, [p[0] + n[0] * 0.05, p[1], p[2] + n[2] * 0.05])
     B.add("atlas", atlasQuad(reg, h).applyMatrix4(m))
@@ -1066,9 +1078,15 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
   lantern([1, 0, 0], [-28, G_DUOMO + 3.5, -38])
   lantern([-1, 0, 0], [30, G_DUOMO + 3.5, -46])
 
+  }
+
+  // --- 9b. lo scenario delle altre mappe ------------------------------------------------------
+  const kit: SceneryKit = { map, B, I, root, MATS, tex, atlas, R, C, groundAt, face, orient, cylBetween, sphere, roof, win, door }
+  const live: SceneryLive = scenery?.build(kit) ?? {}
+
   // --- 10. costruzione -------------------------------------------------------------------
   const statics = B.build(MATS, { cast: (k) => k !== "luce" && k !== "acqua" && k !== "atlas" && k !== "vetro" && k !== "erba" })
-  for (const m of statics) scene.add(m)
+  for (const m of statics) root.add(m)
 
   // Geometrie delle istanze.
   const glassGeo = new THREE.PlaneGeometry(1, 1)
@@ -1127,7 +1145,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
   const doorMat = new THREE.MeshLambertMaterial({ map: tex.legno })
   const vaseMat = new THREE.MeshLambertMaterial({ vertexColors: true })
   const glassMat = new THREE.MeshStandardMaterial({ color: "#2a3440", roughness: 0.1, metalness: 0.5, envMap, envMapIntensity: 1.3 })
-  scene.add(
+  root.add(
     I.vetro.build(glassGeo, glassMat),
     I.cornice.build(frameGeo, new THREE.MeshLambertMaterial({ map: tex.pietraChiara, vertexColors: true }), true),
     I.scuri.build(shutterGeo, shutterMat, true),
@@ -1139,14 +1157,16 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
   )
 
   // Sfondo.
-  scene.add(makeTerrain(), makeTown(tex))
+  if (scenery) root.add(...scenery.backdrop(kit))
+  else root.add(makeTerrain(), makeTown(tex))
 
   // Parti dinamiche.
-  const dyn = createDynamic(scene, envMap)
+  const dyn = createDynamic(root, envMap, map)
 
   // --- camera del menu: un giro lento fra Duomo, campanile e Via Bini --------------------------
+  const v3 = (p: V) => new THREE.Vector3(...p)
   const camPath = new THREE.CatmullRomCurve3(
-    [
+    scenery ? scenery.menu.path.map(v3) : [
       new THREE.Vector3(0, 21, -22),
       new THREE.Vector3(-15, 15, -40),
       new THREE.Vector3(-4, 12, -50),
@@ -1161,7 +1181,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
     "centripetal"
   )
   const lookPath = new THREE.CatmullRomCurve3(
-    [
+    scenery ? scenery.menu.look.map(v3) : [
       new THREE.Vector3(0, 17, -66),
       new THREE.Vector3(3, 14, -62),
       new THREE.Vector3(5, 13, -62),
@@ -1193,7 +1213,8 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
       sun.shadow.map = null
     }
     altarLight.visible = naveLight.visible = q !== "bassa"
-    if (changed) scene.traverse((o) => {
+    live.setQuality?.(q)
+    if (changed) root.traverse((o) => {
       const m = (o as THREE.Mesh).material
       if (m) for (const x of Array.isArray(m) ? m : [m]) x.needsUpdate = true
     })
@@ -1212,9 +1233,23 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
       const d = new Date()
       const min = d.getMinutes() + d.getSeconds() / 60
       const hr = (d.getHours() % 12) + min / 60
-      clockHands[0].rotation.z = -(hr / 12) * Math.PI * 2
-      clockHands[1].rotation.z = -(min / 60) * Math.PI * 2
+      if (clockHands.length) {
+        clockHands[0].rotation.z = -(hr / 12) * Math.PI * 2
+        clockHands[1].rotation.z = -(min / 60) * Math.PI * 2
+      }
+      live.update?.(t)
       dyn.update(dt, t, frame)
+    },
+    dispose() {
+      scene.remove(root)
+      root.traverse((o) => {
+        const mesh = o as THREE.Mesh
+        mesh.geometry?.dispose()
+        const m = mesh.material
+        if (m) for (const x of Array.isArray(m) ? m : [m]) x.dispose()
+      })
+      sun.shadow.map?.dispose()
+      envMap.dispose()
     },
     menuCamera(t: number, camera: THREE.PerspectiveCamera) {
       const s = (t / PERIOD) % 1

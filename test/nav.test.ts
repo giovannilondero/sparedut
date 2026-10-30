@@ -1,23 +1,33 @@
 import { expect, test } from "bun:test"
 import { createPhysicsWorld, initPhysics } from "../shared/physics.ts"
 import { navGraph, route } from "../server/nav.ts"
-import { NAV_POINTS } from "../shared/map.ts"
+import { MAP_IDS, MAPS } from "../shared/maps/index.ts"
 
-test("il grafo dei bot collega Duomo e piazza in entrambi i sensi", async () => {
+for (const id of MAP_IDS) {
+  test(`il grafo dei bot collega ogni punto di ${id} in entrambi i sensi`, async () => {
+    await initPhysics()
+    const map = MAPS[id]
+    const g = navGraph(createPhysicsWorld(map))
+    const points = map.navPoints
+    const isolated = g.edges.map((e, i) => (e.length === 0 ? i : -1)).filter((i) => i >= 0)
+    if (isolated.length) console.log(id, "isolati", isolated.map((i) => points[i]))
+    // Ogni nodo deve raggiungere ogni altro: basta che tutti vadano e tornino dal primo.
+    const unreachable: string[] = []
+    for (let i = 1; i < points.length; i++) {
+      if (route(g, 0, i).length === 0) unreachable.push(`${points[0]}→${points[i]}`)
+      if (route(g, i, 0).length === 0) unreachable.push(`${points[i]}→${points[0]}`)
+    }
+    if (unreachable.length) console.log(id, unreachable)
+    expect(unreachable).toEqual([])
+  }, 60000)
+}
+
+test("a Gemona il grafo porta dal Duomo in piazza", async () => {
   await initPhysics()
-  const g = navGraph(createPhysicsWorld())
-  const isolated = g.edges.map((e, i) => (e.length === 0 ? i : -1)).filter((i) => i >= 0)
-  if (isolated.length) console.log("isolati", isolated.map((i) => NAV_POINTS[i]))
-  const duomo = NAV_POINTS.findIndex((p) => p[2] === -90)
-  const piazza = NAV_POINTS.findIndex((p) => p[2] === 83 && p[0] === 0)
-  // Ogni nodo deve raggiungere ogni altro.
-  const unreachable: string[] = []
-  for (let i = 0; i < NAV_POINTS.length; i++) {
-    if (i !== duomo && route(g, duomo, i).length === 0) unreachable.push(`duomo→${NAV_POINTS[i]}`)
-    if (i !== duomo && route(g, i, duomo).length === 0) unreachable.push(`${NAV_POINTS[i]}→duomo`)
-  }
-  if (unreachable.length) console.log(unreachable)
+  const map = MAPS.glemone
+  const g = navGraph(createPhysicsWorld(map))
+  const duomo = map.navPoints.findIndex((p) => p[2] === -90)
+  const piazza = map.navPoints.findIndex((p) => p[2] === 83 && p[0] === 0)
   expect(route(g, duomo, piazza).length).toBeGreaterThan(2)
   expect(route(g, piazza, duomo).length).toBeGreaterThan(2)
-  expect(unreachable).toEqual([])
 }, 30000)

@@ -3,7 +3,8 @@
  */
 import { BOT_NAMES, QUICK_CHAT, type BotLevel, type ModeId } from "../shared/folklore.ts"
 import { IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
-import { TEAMS, type Team } from "../shared/map.ts"
+import { TEAMS, type MapId, type Team } from "../shared/map.ts"
+import { MAPS } from "../shared/maps/index.ts"
 import { createPhysicsWorld, type PhysicsWorld } from "../shared/physics.ts"
 import {
   FLAG_BIT,
@@ -44,6 +45,7 @@ export interface Member {
 
 export interface RoomSettings {
   readonly mode: ModeId
+  readonly map: MapId
   readonly minutes: number
   readonly visibility: Visibility
   readonly level: BotLevel
@@ -53,7 +55,7 @@ export interface RoomSettings {
 let botCounter = 0
 
 export class Room {
-  readonly physics: PhysicsWorld = createPhysicsWorld()
+  readonly physics: PhysicsWorld
   readonly sim: Sim
   readonly members = new Map<string, Member>()
   private bots = new Map<string, BotBrain>()
@@ -69,6 +71,7 @@ export class Room {
     readonly settings: RoomSettings
   ) {
     this.level = settings.level
+    this.physics = createPhysicsWorld(MAPS[settings.map])
     this.sim = createSim({ mode: settings.mode, minutes: settings.minutes, friendlyFire: settings.ff, seed: Math.floor(Math.random() * 2 ** 31), physics: this.physics })
     this.world = this.sim.view()
   }
@@ -299,6 +302,7 @@ export class Room {
       code: this.code,
       host: this.hostName,
       mode: this.settings.mode,
+      map: this.settings.map,
       visibility: this.settings.visibility,
       players: this.humans.length,
       bots: this.bots.size,

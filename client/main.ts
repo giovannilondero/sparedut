@@ -2,7 +2,9 @@
  * Avvio del client: renderer, mondo, audio, menu, connessione, partita.
  */
 import * as THREE from "three"
-import { createPhysicsWorld, initPhysics } from "../shared/physics.ts"
+import type { MapId } from "../shared/map.ts"
+import { MAPS } from "../shared/maps/index.ts"
+import { createPhysicsWorld, initPhysics, type PhysicsWorld } from "../shared/physics.ts"
 import { PROTOCOL_VERSION, type ServerMessage } from "../shared/protocol.ts"
 import { createAudio } from "./audio.ts"
 import { createAvatar } from "./avatars.ts"
@@ -14,6 +16,7 @@ import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
 import { PerfMonitor } from "./perf.ts"
 import { loadSettings, saveSettings } from "./settings.ts"
+import type { WorldScene } from "./contracts.ts"
 import { createViewmodel } from "./viewmodel.ts"
 import { createWorld } from "./world.ts"
 
@@ -48,7 +51,25 @@ const resize = () => {
   viewmodel.camera.updateProjectionMatrix()
 }
 
-const world = createWorld(scene, renderer)
+/** Il mondo visibile della mappa corrente: lo sfondo del menu è l'ultima mappa scelta. */
+let worldMap: MapId = settings.lastMap
+let world: WorldScene = createWorld(scene, renderer, MAPS[worldMap])
+/** Una fisica per mappa, costruita la prima volta che serve (il WASM deve essere pronto). */
+const physicsOf = new Map<MapId, PhysicsWorld>()
+const loadMap = (id: MapId) => {
+  if (id !== worldMap) {
+    world.dispose()
+    world = createWorld(scene, renderer, MAPS[id])
+    world.setQuality(quality)
+    worldMap = id
+  }
+  let physics = physicsOf.get(id)
+  if (!physics) {
+    physics = createPhysicsWorld(MAPS[id])
+    physicsOf.set(id, physics)
+  }
+  return { world, physics }
+}
 const fx = createFx(scene)
 const viewmodel = createViewmodel(camera)
 viewmodel.setVisible(false)
@@ -94,6 +115,9 @@ const menu = new Menu(settings, audio, {
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
     net.send({ t: "create", ...o, primary: settings.primary })
   },
+  mapChanged: (id) => {
+    if (!game?.active) loadMap(id)
+  },
   join: (code) => {
     if (!ensureOnline()) return
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
@@ -113,11 +137,10 @@ const physicsReady = initPhysics().then(() => {
     renderer,
     scene,
     camera,
-    world,
+    loadMap,
     audio,
     fx,
     viewmodel,
-    physics: createPhysicsWorld(),
     net,
     settings,
     menu,

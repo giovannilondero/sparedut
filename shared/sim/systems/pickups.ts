@@ -1,10 +1,11 @@
 /**
  * Raccolte: frico (salute), gubane (corazza), sgnape (velocità), munizions, lanciafrico.
  */
-import { PICKUPS, type PickupKind } from "../../map.ts"
+import type { PickupKind } from "../../map.ts"
+import { MAPS } from "../../maps/index.ts"
 import { WEAPON_IDS, WEAPONS } from "../../weapons.ts"
 import { MAX_ARMOR, MAX_HP, SGNAPE_TICKS } from "../rules.ts"
-import { Arsenal, Game, Life, Match, Motion, Out, Pickups, Player, type ArsenalValue } from "../schema.ts"
+import { Arsenal, Game, Life, Match, Motion, Out, Pickups, Player, Rules, type ArsenalValue } from "../schema.ts"
 
 export const RESPAWN_OF = {
   frico: 20 * 60,
@@ -24,7 +25,7 @@ export const CollectPickups = Game.System(
         selection: { player: Game.Query.read(Player), motion: Game.Query.read(Motion), life: Game.Query.write(Life), arsenal: Game.Query.write(Arsenal) }
       })
     },
-    resources: { pickups: Game.System.writeResource(Pickups) },
+    resources: { rules: Game.System.readResource(Rules), pickups: Game.System.writeResource(Pickups) },
     events: { out: Game.System.writeEvent(Out) },
     machines: { match: Game.System.machine(Match) }
   },
@@ -33,7 +34,7 @@ export const CollectPickups = Game.System(
     const states = resources.pickups.get()
     const next = states.map((s) => (s._tag === "down" ? (s.ticks <= 1 ? { _tag: "up" as const } : { _tag: "down" as const, ticks: s.ticks - 1 }) : s))
     const players = queries.players.each()
-    PICKUPS.forEach((spot, i) => {
+    MAPS[resources.rules.get().map].pickups.forEach((spot, i) => {
       if (next[i]._tag !== "up") return
       for (const m of players) {
         const life = m.data.life.get()

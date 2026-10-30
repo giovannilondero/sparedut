@@ -6,7 +6,7 @@ import * as THREE from "three"
 import { BOT_LEVEL_IDS, QUICK_CHAT, TEAM_INFO, type BotLevel } from "../shared/folklore.ts"
 import { rayPose } from "../shared/hitbox.ts"
 import { BUTTON, type PlayerInput } from "../shared/input.ts"
-import { FLAG_BASES, PICKUPS, type Team } from "../shared/map.ts"
+import type { MapId, PickupKind, Team } from "../shared/map.ts"
 import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
@@ -36,17 +36,17 @@ const PICK_SOUND = {
   sgnape: "pickup_sgnape",
   munizions: "pickup_munizions",
   lanciafrico: "pickup_lanciafrico"
-} as const satisfies Record<(typeof PICKUPS)[number]["kind"], SoundName>
+} as const satisfies Record<PickupKind, SoundName>
 
 export interface GameDeps {
   readonly renderer: THREE.WebGLRenderer
   readonly scene: THREE.Scene
   readonly camera: THREE.PerspectiveCamera
-  readonly world: WorldScene
+  /** Il mondo visibile e la fisica di una mappa (il mondo si ricostruisce solo se cambia). */
+  readonly loadMap: (id: MapId) => { readonly world: WorldScene; readonly physics: PhysicsWorld }
   readonly audio: GameAudio
   readonly fx: Fx
   readonly viewmodel: Viewmodel
-  readonly physics: PhysicsWorld
   readonly net: Net
   readonly settings: Settings
   readonly menu: Menu
@@ -72,6 +72,8 @@ export class Game {
   private hud = new Hud()
   private controls: Controls
   private predictor: Predictor
+  private world: WorldScene
+  private physics: PhysicsWorld
   private room: RoomInfo | null = null
   private me = ""
   private snap: Snapshot | null = null
@@ -122,7 +124,10 @@ export class Game {
   private readonly deathLook = new THREE.Vector3()
 
   constructor(private readonly d: GameDeps) {
-    this.predictor = new Predictor(d.physics)
+    const stage = d.loadMap(d.settings.lastMap)
+    this.world = stage.world
+    this.physics = stage.physics
+    this.predictor = new Predictor(stage.physics)
     this.controls = new Controls(d.renderer.domElement, {
       onSlot: (slot) => this.selectSlot(slot),
       onLastWeapon: () => this.selectWeapon(this.lastWeapon),
@@ -163,7 +168,10 @@ export class Game {
     this.snap = null
     this.frames = []
     this.offset = null
-    this.predictor.reset()
+    const stage = this.d.loadMap(room.map)
+    this.world = stage.world
+    this.physics = stage.physics
+    this.predictor = new Predictor(stage.physics)
     this.wanted = this.d.settings.primary
     this.wantedSeq = 0
     this.shownWeapon = null
@@ -402,7 +410,7 @@ export class Game {
         }
         return
       case "boom": {
-        const down = this.d.physics.raycast({ x: e.p[0], y: e.p[1] + 0.3, z: e.p[2] }, { x: 0, y: -1, z: 0 }, 4)
+        const down = this.physics.raycast({ x: e.p[0], y: e.p[1] + 0.3, z: e.p[2] }, { x: 0, y: -1, z: 0 }, 4)
         fx.explosion(e.p, e.k, down ? e.p[1] + 0.3 - down.dist : null)
         audio.play("boom", { at: e.p })
         const b = this.predictor.body
@@ -793,7 +801,8 @@ export class Game {
   }
 
   private localShot(id: WeaponId, input: PlayerInput) {
-    const { audio, fx, viewmodel, physics } = this.d
+    const { audio, fx, viewmodel } = this.d
+    const physics = this.physics
     const def = WEAPONS[id]
     viewmodel.fire()
     this.kickPitch += def.kick
@@ -865,7 +874,8 @@ export class Game {
   frame(dt: number, t: number) {
     if (!this.running) return
     this.time = t
-    const { camera, audio, viewmodel, world, fx, settings } = this.d
+    const { camera, audio, viewmodel, fx, settings } = this.d
+    const world = this.world
     const now = performance.now() / 1000
     if (this.offset !== null) this.renderTick = now * 60 + this.offset - INTERP_TICKS
 
@@ -917,7 +927,7 @@ export class Game {
         entry.blob.visible = !this.dynamicShadows && (q.f & FLAG_BIT.alive) !== 0
         if (entry.blob.visible) {
           // Il disco sta sul terreno sotto i piedi: in aria si rimpicciolisce.
-          const ground = this.d.physics.raycast({ x: q.x, y: q.y + 0.3, z: q.z }, { x: 0, y: -1, z: 0 }, 12)
+          const ground = this.physics.raycast({ x: q.x, y: q.y + 0.3, z: q.z }, { x: 0, y: -1, z: 0 }, 12)
           const gy = ground ? q.y + 0.3 - ground.dist : q.y
           const h = Math.max(0, q.y - gy)
           entry.blob.position.set(q.x, gy + 0.03, q.z)
@@ -996,12 +1006,13 @@ export class Game {
     // Mondo, effetti, audio.
     if (s) {
       const mode = this.room?.mode
+      const bases = this.physics.map.flagBases
       const flagPos = (team: Team): { pos: P3; state: "base" | "carried" | "dropped" } => {
         const f = s.flags[team]
-        if (f._tag === "base") return { pos: FLAG_BASES[team], state: "base" }
+        if (f._tag === "base") return { pos: bases[team], state: "base" }
         if (f._tag === "dropped") return { pos: [f.x, f.y, f.z], state: "dropped" }
         const carrier = f.by === this.me && b ? { x: b.x, y: b.y, z: b.z } : this.interpolated(f.by)
-        return { pos: carrier ? [carrier.x, carrier.y + 2.1, carrier.z] : FLAG_BASES[team], state: "carried" }
+        return { pos: carrier ? [carrier.x, carrier.y + 2.1, carrier.z] : bases[team], state: "carried" }
       }
       world.update(dt, t, {
         pickups: [...s.pickups].map((ch) => ch === "1"),

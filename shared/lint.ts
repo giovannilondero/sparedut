@@ -11,8 +11,9 @@ const HostReadsOut = Game.System("Sparedut/HostReadsOut", { events: { out: Game.
 export const lintTarget = async () => {
   // La fisica è un servizio dell'host: si carica qui dentro.
   const { createPhysicsWorld, initPhysics } = await import("./physics.ts")
+  const { GLEMONE } = await import("./maps/glemone.ts")
   await initPhysics()
-  const runtime = makeRuntime({ mode: "bataie", minutes: 10, seed: 1, physics: createPhysicsWorld() }, { hostClock: HostClock.test() })
+  const runtime = makeRuntime({ mode: "bataie", minutes: 10, seed: 1, physics: createPhysicsWorld(GLEMONE) }, { hostClock: HostClock.test() })
   return {
     runtime,
     schedules: { simulate },

@@ -3,7 +3,7 @@
  */
 import type { BotLevel } from "../shared/folklore.ts"
 import { BUTTON, IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
-import { FLAG_BASES, HILL, PICKUPS, type Team, type V3 } from "../shared/map.ts"
+import type { Team, V3 } from "../shared/map.ts"
 import { eyeHeight } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
 import type { PlayerView, WorldView } from "../shared/sim/view.ts"
@@ -202,7 +202,8 @@ export class BotBrain {
       const theirs = world.flags[enemyTeam]
       return (theirs._tag === "carried" && theirs.by === me.session) || this.role === "attacca"
     }
-    if (mode === "culine") return Math.hypot(me.body.x - HILL.at[0], me.body.z - HILL.at[2]) > HILL.radius * 0.6
+    const { hill } = this.physics.map
+    if (mode === "culine") return Math.hypot(me.body.x - hill.at[0], me.body.z - hill.at[2]) > hill.radius * 0.6
     return false
   }
 
@@ -210,6 +211,7 @@ export class BotBrain {
     const team: Team = me.team
     const enemyTeam: Team = team === "benandanti" ? "malandanti" : "benandanti"
     const mode = world.rules.mode
+    const { flagBases: FLAG_BASES, hill: HILL, pickups: PICKUPS } = this.physics.map
     // Poca salute: un frico vicino.
     if (me.hp < 45) {
       const frico = PICKUPS.map((p, i) => ({ p, i })).filter(({ p, i }) => p.kind === "frico" && world.pickups[i])

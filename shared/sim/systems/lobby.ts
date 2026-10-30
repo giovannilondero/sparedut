@@ -2,7 +2,7 @@
  * Entrate, uscite, cambi di squadra e di arma principale.
  */
 import { IDLE_INPUT } from "../../input.ts"
-import { SPAWNS } from "../../map.ts"
+import { MAPS } from "../../maps/index.ts"
 import { freshArsenal, NO_STATS } from "../rules.ts"
 import {
   Arsenal,
@@ -16,6 +16,7 @@ import {
   Life,
   Motion,
   Player,
+  Rules,
   Stats,
   TeamOf
 } from "../schema.ts"
@@ -33,15 +34,17 @@ export const HandleJoin = Game.System(
   "Sparedut/HandleJoin",
   {
     queries: { members: Members },
+    resources: { rules: Game.System.readResource(Rules) },
     events: { join: Game.System.readEvent(Join) },
     commands: Game.System.commands(Game.System.spawns(Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers))
   },
-  ({ queries, events, commands }) => {
+  ({ queries, resources, events, commands }) => {
+    const spawns = MAPS[resources.rules.get().map].spawns
     const present = new Set(queries.members.each().map((m) => m.data.player.get().session))
     for (const j of events.join.all()) {
       if (present.has(j.session)) continue
       present.add(j.session)
-      const spot = SPAWNS[j.team][0]
+      const spot = spawns[j.team][0]
       const draft = Game.Command.spawn(
         [Player, { session: j.session, name: j.name, bot: j.bot }],
         [TeamOf, j.team],

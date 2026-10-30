@@ -8,7 +8,7 @@
 import { Descriptor, Random, Schema } from "@typeonce/ritmo"
 import { z } from "zod"
 import type { PlayerInput } from "../input.ts"
-import type { Team } from "../map.ts"
+import type { MapId, Team } from "../map.ts"
 import type { Body } from "../movement.ts"
 import type { PhysicsWorld } from "../physics.ts"
 import type { ModeId } from "../folklore.ts"
@@ -137,6 +137,7 @@ export const Projectile = Descriptor.Component<ProjectileValue>()("Sparedut/Proj
 
 export interface RulesValue {
   readonly mode: ModeId
+  readonly map: MapId
   readonly scoreLimit: number
   readonly timeLimitTicks: number
   readonly friendlyFire: boolean

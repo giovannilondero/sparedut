@@ -16,7 +16,7 @@ export type P3 = readonly [number, number, number]
  */
 export type Quality = "bassa" | "media" | "alta"
 
-// --- client/world.ts: export function createWorld(scene, renderer): WorldScene ---------
+// --- client/world.ts: export function createWorld(scene, renderer, map): WorldScene ----
 export interface FlagVisual {
   readonly pos: P3
   readonly state: "base" | "carried" | "dropped"
@@ -35,8 +35,10 @@ export interface WorldScene {
   update(dt: number, t: number, frame: WorldFrame): void
   /** Ombre e luci secondo la qualità; si può richiamare a partita in corso. */
   setQuality(q: Quality): void
-  /** Inquadratura per lo sfondo dei menu: la camera gira lenta attorno al Duomo. */
+  /** Inquadratura per lo sfondo dei menu: la camera gira lenta attorno alla mappa. */
   menuCamera(t: number, camera: THREE.PerspectiveCamera): void
+  /** Toglie la mappa dalla scena e libera geometrie, materiali e texture. */
+  dispose(): void
 }
 
 // --- client/avatars.ts: export function createAvatar(team, name): Avatar ------------------

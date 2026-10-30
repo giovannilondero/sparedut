@@ -3,7 +3,7 @@
  */
 import * as THREE from "three"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
-import { HILL, PICKUPS, TEAMS, type PickupKind, type Team } from "../../shared/map.ts"
+import { TEAMS, type MapDef, type PickupKind, type Team } from "../../shared/map.ts"
 import type { WorldFrame } from "../contracts.ts"
 
 export const TEAM_COLOR: Record<Team, THREE.Color> = {
@@ -133,7 +133,8 @@ function glowMaterial(color: THREE.Color | string, opacity = 0.6): THREE.MeshBas
   return new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
 }
 
-export function createDynamic(scene: THREE.Scene, envMap: THREE.Texture | null) {
+export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | null, map: MapDef) {
+  const { pickups: PICKUPS, hill: HILL } = map
   // --- raccoglibili ---
   const pickMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.1, envMap, emissive: "#3a2410", emissiveIntensity: 0.6 })
   const ghostMat = new THREE.MeshBasicMaterial({ color: "#fff4dc", transparent: true, opacity: 0.16, depthWrite: false })

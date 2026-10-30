@@ -3,7 +3,7 @@
  * si arriva davvero camminando (lo verifica la fisica, rampe e salti compresi).
  */
 import { IDLE_INPUT } from "../shared/input.ts"
-import { NAV_POINTS, type V3 } from "../shared/map.ts"
+import type { MapId, V3 } from "../shared/map.ts"
 import { stepBody, type Body } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
 
@@ -30,12 +30,14 @@ function walkable(physics: PhysicsWorld, a: V3, b: V3): boolean {
   return false
 }
 
-let cached: NavGraph | null = null
+/** Un grafo per mappa: la fisica è statica, si calcola una volta per processo. */
+const cached = new Map<MapId, NavGraph>()
 
 export function navGraph(physics: PhysicsWorld): NavGraph {
-  if (cached) return cached
+  const hit = cached.get(physics.map.id)
+  if (hit) return hit
   const started = performance.now()
-  const points = NAV_POINTS
+  const points = physics.map.navPoints
   const edges: number[][] = points.map(() => [])
   for (let i = 0; i < points.length; i++) {
     for (let j = 0; j < points.length; j++) {
@@ -46,10 +48,11 @@ export function navGraph(physics: PhysicsWorld): NavGraph {
       if (walkable(physics, a, b)) edges[i].push(j)
     }
   }
-  cached = { points, edges }
+  const graph = { points, edges }
+  cached.set(physics.map.id, graph)
   const count = edges.reduce((n, e) => n + e.length, 0)
-  console.log(`🧭 Grafo dei bot: ${points.length} punti, ${count} archi (${Math.round(performance.now() - started)} ms)`)
-  return cached
+  console.log(`🧭 Grafo dei bot (${physics.map.id}): ${points.length} punti, ${count} archi (${Math.round(performance.now() - started)} ms)`)
+  return graph
 }
 
 export function nearestNode(graph: NavGraph, p: { x: number; y: number; z: number }): number {

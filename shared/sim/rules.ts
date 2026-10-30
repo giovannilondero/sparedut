@@ -1,7 +1,7 @@
 /**
  * Regole pure della simulazione: equipaggiamento, rinascita, danni.
  */
-import { SPAWNS, type Spawn, type Team } from "../map.ts"
+import type { Spawn, Team } from "../map.ts"
 import { SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type WeaponId } from "../weapons.ts"
 import type { Ammo, ArsenalValue, StatsValue } from "./schema.ts"
 
@@ -46,8 +46,7 @@ export const owned = (a: ArsenalValue, id: WeaponId) =>
   id === "mescul" || id === "mandi" || id === a.primary || (id === "lanciafrico" && a.launcher)
 
 /** Il punto di rinascita più lontano dai nemici vivi, con un po' di caso. */
-export function chooseSpawn(team: Team, enemies: ReadonlyArray<{ x: number; z: number }>, roll: number): Spawn {
-  const spots = SPAWNS[team]
+export function chooseSpawn(spots: readonly Spawn[], enemies: ReadonlyArray<{ x: number; z: number }>, roll: number): Spawn {
   let best = spots[0]
   let bestScore = -1
   spots.forEach((s, i) => {

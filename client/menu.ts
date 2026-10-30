@@ -2,6 +2,8 @@
  * Il menu principale: nome, lingua, partite, armeria, impostazioni, vocabolario.
  */
 import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "../shared/folklore.ts"
+import type { MapId } from "../shared/map.ts"
+import { MAP_IDS } from "../shared/maps/index.ts"
 import type { RoomSummary, Visibility } from "../shared/protocol.ts"
 import { PRIMARIES, WEAPON_IDS, WEAPONS, type PrimaryId } from "../shared/weapons.ts"
 import type { GameAudio } from "./contracts.ts"
@@ -13,6 +15,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 
 export interface CreateOptions {
   readonly mode: ModeId
+  readonly map: MapId
   readonly minutes: number
   readonly visibility: Visibility
   readonly bots: number
@@ -23,6 +26,8 @@ export interface CreateOptions {
 export interface MenuHandlers {
   readonly create: (o: CreateOptions, quick?: boolean) => void
   readonly join: (code: string) => void
+  /** La mappa scelta nel menu: diventa lo sfondo. */
+  readonly mapChanged: (id: MapId) => void
   readonly settingsChanged: () => void
 }
 
@@ -33,12 +38,14 @@ const MINUTES = [5, 10, 15, 20]
 export class Menu {
   private screen: ScreenName = "home"
   private mode: ModeId
+  private map: MapId
   private level: BotLevel
   private roomList: readonly RoomSummary[] = []
   private tipIndex = Math.floor(Math.random() * 100)
 
   constructor(private readonly settings: Settings, private readonly audio: GameAudio, private readonly handlers: MenuHandlers) {
     this.mode = settings.lastMode
+    this.map = settings.lastMap
     this.level = settings.lastLevel
     for (const el of document.querySelectorAll<HTMLElement>("[data-go]")) {
       el.addEventListener("click", () => {
@@ -139,7 +146,7 @@ export class Menu {
 
   private quick() {
     if (this.needName()) return
-    this.handlers.create({ mode: this.settings.lastMode, minutes: 10, visibility: "code", bots: this.settings.lastBots || 4, level: this.settings.lastLevel, ff: false }, true)
+    this.handlers.create({ mode: this.settings.lastMode, map: this.settings.lastMap, minutes: 10, visibility: "code", bots: this.settings.lastBots || 4, level: this.settings.lastLevel, ff: false }, true)
   }
 
   private joinCode() {
@@ -157,7 +164,7 @@ export class Menu {
     ul.innerHTML = list
       .map(
         (r) =>
-          `<li><button data-code="${r.code}"><span><b>${esc(r.host)}</b> · ${t().modes[r.mode].name}</span><span>${r.players}👤 ${r.bots}🤖 · ${r.code}</span></button></li>`
+          `<li><button data-code="${r.code}"><span><b>${esc(r.host)}</b> · ${t().modes[r.mode].name} · ${t().maps[r.map].name}</span><span>${r.players}👤 ${r.bots}🤖 · ${r.code}</span></button></li>`
       )
       .join("")
     for (const b of ul.querySelectorAll<HTMLButtonElement>("button")) b.addEventListener("click", () => !this.needName() && this.handlers.join(b.dataset.code!))
@@ -174,6 +181,16 @@ export class Menu {
       this.audio.play("ui_click")
       this.renderCreate()
     })
+    $("map-cards").addEventListener("click", (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-map]")
+      if (!b) return
+      this.map = b.dataset.map as MapId
+      this.audio.play("ui_click")
+      this.settings.lastMap = this.map
+      this.handlers.settingsChanged()
+      this.handlers.mapChanged(this.map)
+      this.renderCreate()
+    })
     $("c-level").addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-level]")
       if (!b) return
@@ -184,13 +201,14 @@ export class Menu {
     $("c-go").addEventListener("click", () => {
       const o: CreateOptions = {
         mode: this.mode,
+        map: this.map,
         minutes: Number($<HTMLSelectElement>("c-minutes").value),
         visibility: $<HTMLSelectElement>("c-vis").value as Visibility,
         bots: Number($<HTMLSelectElement>("c-bots").value),
         level: this.level,
         ff: $<HTMLInputElement>("c-ff").checked
       }
-      Object.assign(this.settings, { lastMode: o.mode, lastBots: o.bots, lastLevel: o.level, lastMinutes: o.minutes })
+      Object.assign(this.settings, { lastMode: o.mode, lastMap: o.map, lastBots: o.bots, lastLevel: o.level, lastMinutes: o.minutes })
       this.handlers.settingsChanged()
       this.handlers.create(o)
     })
@@ -201,6 +219,10 @@ export class Menu {
     $("mode-cards").innerHTML = MODE_IDS.map(
       (id) =>
         `<button class="card${id === this.mode ? " selected" : ""}" data-mode="${id}" aria-pressed="${id === this.mode}"><b>${s.modes[id].name}</b><small>${s.modes[id].sub}</small><small>${s.modes[id].rules}</small></button>`
+    ).join("")
+    $("map-cards").innerHTML = MAP_IDS.map(
+      (id) =>
+        `<button class="card${id === this.map ? " selected" : ""}" data-map="${id}" aria-pressed="${id === this.map}"><b>${s.maps[id].name}</b><small>${s.maps[id].sub}</small></button>`
     ).join("")
     $("c-level").innerHTML = BOT_LEVEL_IDS.map(
       (l) =>

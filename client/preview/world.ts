@@ -1,6 +1,7 @@
-// Anteprima del mondo: camera del menu (o fissa con ?cam=x,y,z,lx,ly,lz), modalità con ?mode=frico|culine.
+// Anteprima del mondo: mappa con ?map=osoppo, camera del menu (o fissa con ?cam=x,y,z,lx,ly,lz), modalità con ?mode=frico|culine.
 import * as THREE from "three"
-import { FLAG_BASES, PICKUPS } from "../../shared/map.ts"
+import type { MapId } from "../../shared/map.ts"
+import { MAP_IDS, MAPS } from "../../shared/maps/index.ts"
 import type { WorldFrame } from "../contracts.ts"
 import { createWorld } from "../world.ts"
 
@@ -18,7 +19,10 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, Number(q.get("pr") ?? 1.5)))
 const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera(75, 1, 0.05, 2500)
 const t0 = performance.now()
-const world = createWorld(scene, renderer)
+const mapId = MAP_IDS.find((id) => id === q.get("map")) ?? ("glemone" satisfies MapId)
+const map = MAPS[mapId]
+const { flagBases: FLAG_BASES, pickups: PICKUPS } = map
+const world = createWorld(scene, renderer, map)
 const buildMs = performance.now() - t0
 
 const resize = () => {
