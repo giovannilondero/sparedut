@@ -13,14 +13,15 @@ const KEYS: Record<string, ButtonName> = {
   ShiftLeft: "sprint",
   KeyR: "reload",
   KeyG: "bomb",
-  KeyF: "mine"
+  KeyF: "mine",
+  KeyE: "use"
 }
 
 /**
  * I tasti del pad (indici della mappatura "standard") come i tasti della tastiera:
  * passano dagli stessi percorsi, così ogni azione funziona uguale.
- * ✕ salta, ◯ accucciati, ▢ ricarica, L1 bomba, R1 mina, R3 mescul, croce armi,
- * Share classifica, touchpad armeria. L2/R2 (mira/spara), △ (arma dopo),
+ * ✕ salta, ◯ accucciati, ▢ ricarica, L1 bomba, R1 mina, R3 mescul, croce armi
+ * (giù: monta o smonta la torretta), Share classifica, touchpad armeria. L2/R2 (mira/spara), △ (arma dopo),
  * L3 (corsa) e Options (pausa) li gestisce `poll`.
  */
 const PAD_KEYS: Readonly<Record<number, string>> = {
@@ -32,7 +33,7 @@ const PAD_KEYS: Readonly<Record<number, string>> = {
   8: "Tab",
   11: "Digit4",
   12: "Digit1",
-  13: "KeyQ",
+  13: "KeyE",
   14: "Digit2",
   15: "Digit3",
   17: "KeyB"

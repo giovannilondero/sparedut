@@ -36,10 +36,14 @@ resize()
 const cam = q.get("cam")?.split(",").map(Number)
 const mode = q.get("mode")
 /** Il cjar che va avanti e indietro sul binario, la tempesta che si stringe. */
-const extras = (t: number): Pick<WorldFrame, "cart" | "storm"> => {
+const extras = (t: number): Pick<WorldFrame, "cart" | "storm" | "turrets" | "doors"> => {
   const len = trackLength(map.track)
   const p = trackPoint(map.track, ((Math.sin(t * 0.05) + 1) / 2) * len)
+  // le torrette girano e scaldano, le porte si rompono e tornano
+  const heat = (Math.sin(t * 0.4) + 1) / 2
   return {
+    turrets: map.turrets.map((s, i) => ({ yaw: s.yaw + Math.sin(t * 0.7 + i) * 0.8, pitch: Math.sin(t * 0.5) * 0.15, heat, jammed: heat > 0.95, manned: true, mine: false })),
+    doors: map.doors.map(() => Math.max(0, Math.cos(t * 0.2))),
     cart: mode === "cjar" ? { at: p.at, yaw: p.yaw, contested: Math.floor(t / 5) % 3 === 2, pushers: 1 } : null,
     storm: mode === "tampieste" ? { x: map.hill.at[0], z: map.hill.at[2], radius: 10 + ((Math.cos(t * 0.1) + 1) / 2) * 80 } : null
   }

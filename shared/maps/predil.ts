@@ -224,5 +224,10 @@ export const PREDIL = defineMap({
   pickups,
   navPoints,
   track,
-  killY: -10
+  killY: -10,
+  turrets: [
+    { at: [14, P_UP, -52], yaw: Math.PI },
+    { at: [12, P_LOW, 70], yaw: 0 }
+  ],
+  doors: []
 })

@@ -61,7 +61,8 @@ export class Hud {
     this.toggle("hud", "hidden", !on)
   }
 
-  vitals(you: SnapSelf | null, slot: { owned: (id: WeaponId) => boolean }, localMag: number | null) {
+  /** `turret`: sono alla torretta, l'arma in mano è la mitraie (colpi infiniti). */
+  vitals(you: SnapSelf | null, slot: { owned: (id: WeaponId) => boolean }, localMag: number | null, turret = false) {
     if (!you) return
     const hp = Math.max(0, you.hp)
     this.text("hp", String(hp))
@@ -71,11 +72,12 @@ export class Hud {
     this.style("armor-bar", "width", `${you.armor}%`)
     const a = you.arsenal
     const def = WEAPONS[a.current]
-    this.text("weapon-name", t().weapons[a.current].name)
+    const endless = def.mode === "melee" || turret
+    this.text("weapon-name", t().weapons[turret ? "mitraie" : a.current].name)
     const ammo = a.ammo[a.current]
-    this.text("mag", def.mode === "melee" ? "∞" : String(localMag ?? ammo.mag))
-    this.text("reserve", def.mode === "melee" ? "" : String(ammo.reserve))
-    this.toggleOn($("reserve").previousElementSibling!, "slash", "hidden", def.mode === "melee")
+    this.text("mag", endless ? "∞" : String(localMag ?? ammo.mag))
+    this.text("reserve", endless ? "" : String(ammo.reserve))
+    this.toggleOn($("reserve").previousElementSibling!, "slash", "hidden", endless)
     this.text("bombs", `${t().bomb}: ${"🍶".repeat(a.bombs) || "—"} · ${t().mine}: ${"💣".repeat(a.mines) || "—"}`)
     const slots: [string, WeaponId][] = [["1", a.primary], ["2", "mandi"], ["3", "lanciafrico"], ["4", "mescul"]]
     this.html("slots", slots
@@ -86,6 +88,34 @@ export class Hud {
     if (you.shield > 0) buffs.push(t().hud.shield)
     this.text("buffs", buffs.join(" · "))
     this.toggle("sgnape-fx", "on", a.sgnape > 0)
+  }
+
+  /** Alla torretta: il calore della mitraie. Vicino a una libera: il tasto per usarla. */
+  turret(gun: { readonly heat: number; readonly jammed: boolean } | null, prompt: boolean) {
+    this.toggle("turret-hud", "hidden", !gun)
+    this.toggle("turret-prompt", "hidden", !prompt && !gun)
+    this.html("turret-prompt", gun ? t().hud.turretLeave : t().hud.turretUse)
+    if (!gun) return
+    this.style("turret-heat", "width", `${Math.round(gun.heat * 100)}%`)
+    this.toggle("turret-hud", "jammed", gun.jammed)
+    this.toggle("turret-hud", "warm", gun.heat > 0.7)
+    this.text("turret-label", gun.jammed ? t().hud.turretHot : t().hud.turretHeat)
+  }
+
+  /** Piume negli occhi (la gjaline): la vista si copre per `seconds` e poi si libera piano. */
+  feathers(seconds: number) {
+    const el = $("plumis")
+    el.innerHTML = Array.from({ length: 34 }, (_, i) => {
+      const x = (i * 37) % 100
+      const y = (i * 53) % 100
+      const r = (i * 71) % 360
+      const s = 2.2 + ((i * 13) % 10) / 3
+      return `<i style="left:${x}%;top:${y}%;--r:${r}deg;font-size:${s}em;animation-delay:${((i % 7) * 0.05).toFixed(2)}s">🪶</i>`
+    }).join("")
+    el.style.setProperty("--blind", `${seconds.toFixed(2)}s`)
+    el.classList.remove("on")
+    void el.offsetWidth
+    el.classList.add("on")
   }
 
   crosshair(spreadPx: number, visible: boolean) {

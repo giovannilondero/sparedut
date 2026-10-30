@@ -28,7 +28,10 @@ const HOLD: Record<WeaponId, Hold> = {
   cjampanili: { hip: [0.14, -0.14, -0.34], rot: [0.02, 0.04, 0], aim: null, kickZ: 0.06, kickR: 0.18, flash: 0.22 },
   mulin: { hip: [0.15, -0.2, -0.38], rot: [0.02, 0.05, 0], aim: [0.06, -0.2, -0.36], kickZ: 0.006, kickR: 0.012, flash: 0.14 },
   miedi: { hip: [0.15, -0.17, -0.36], rot: [0.03, 0.06, 0], aim: [0.1, -0.16, -0.34], kickZ: 0, kickR: 0, flash: 0 },
-  lanciafrico: { hip: [0.17, -0.21, -0.4], rot: [0.03, 0.06, 0], aim: null, kickZ: 0.08, kickR: 0.2, flash: 0.3 }
+  gjalinis: { hip: [0.16, -0.19, -0.36], rot: [0.03, 0.07, 0], aim: [0.09, -0.19, -0.36], kickZ: 0.07, kickR: 0.16, flash: 0.22 },
+  lanciafrico: { hip: [0.17, -0.21, -0.4], rot: [0.03, 0.06, 0], aim: null, kickZ: 0.08, kickR: 0.2, flash: 0.3 },
+  // alla torretta: l'arma sta davanti, centrata, tenuta con due mani
+  mitraie: { hip: [0.09, -0.25, -0.34], rot: [0, 0, 0], aim: null, kickZ: 0.008, kickR: 0.01, flash: 0.18 }
 }
 
 const SWITCH_DOWN = 0.16
@@ -388,6 +391,8 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     if (s.id === "mandi") s.model.parts.slide!.position.z += 0.03 * Math.max(0, 1 - fireT / 0.07)
     if (s.id === "cramar") s.model.parts.bolt!.position.z += 0.04 * Math.max(0, 1 - fireT / 0.05)
     if (s.id === "lanciafrico" && !reloading) s.model.parts.frico!.visible = loaded
+    // la prossima gallina torna in bocca al cannone un attimo dopo il colpo
+    if (s.id === "gjalinis") s.model.parts.frico!.visible = fireT > 0.45
     // le canne del Mulin girano con la rotazione; il miedi pompa mentre spruzza
     if (s.id === "mulin") {
       spinA += f.spin * dt * 38

@@ -245,5 +245,10 @@ export const OSOPPO = defineMap({
   pickups,
   navPoints,
   track,
-  killY: -10
+  killY: -10,
+  turrets: [
+    { at: [-12, O_TOP, -30], yaw: Math.PI },
+    { at: [7, O_TOP, 25], yaw: 0 }
+  ],
+  doors: []
 })

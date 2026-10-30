@@ -248,7 +248,7 @@ const loop = (now: number) => {
   } else {
     world.menuCamera(time, camera)
     camera.updateMatrixWorld()
-    world.update(dt, time, { pickups: [], flags: null, hill: null, cart: null, storm: null, camera })
+    world.update(dt, time, { pickups: [], flags: null, hill: null, cart: null, storm: null, turrets: [], doors: [], camera })
     fx.update(dt, camera)
     renderer.info.reset()
     renderer.autoClear = true

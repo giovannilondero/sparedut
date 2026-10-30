@@ -5,8 +5,8 @@
 import { TEAMS } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
 import type { Winner } from "../events.ts"
-import { NO_STATS, OVER_TICKS, START_GRACE_TICKS, WARMUP_TICKS } from "../rules.ts"
-import { Attackers, Cart, Flags, Game, Hill, Life, Match, Out, Pickups, Player, Rules, Score, StartMatch, Stats, Tick } from "../schema.ts"
+import { freshDoors, freshTurrets, NO_STATS, OVER_TICKS, START_GRACE_TICKS, WARMUP_TICKS } from "../rules.ts"
+import { Attackers, Cart, Doors, Flags, Game, Hill, Life, Match, Out, Pickups, Player, Rules, Score, StartMatch, Stats, Tick, Turrets } from "../schema.ts"
 
 export const AdvanceTick = Game.System(
   "Sparedut/AdvanceTick",
@@ -36,7 +36,9 @@ export const MatchFlow = Game.System(
       flags: Game.System.writeResource(Flags),
       hill: Game.System.writeResource(Hill),
       cart: Game.System.writeResource(Cart),
-      pickups: Game.System.writeResource(Pickups)
+      pickups: Game.System.writeResource(Pickups),
+      turrets: Game.System.writeResource(Turrets),
+      doors: Game.System.writeResource(Doors)
     },
     events: { start: Game.System.readEvent(StartMatch), out: Game.System.writeEvent(Out) },
     machines: { match: Game.System.machine(Match) },
@@ -54,6 +56,8 @@ export const MatchFlow = Game.System(
       resources.hill.set({ owner: null, contested: false, ticks: 0 })
       resources.cart.set({ d: 0, pushers: 0, contested: false, idle: 0 })
       resources.pickups.set(MAPS[rules.map].pickups.map(() => ({ _tag: "up" })))
+      resources.turrets.set(freshTurrets(MAPS[rules.map]))
+      resources.doors.set(freshDoors(MAPS[rules.map]))
       for (const m of queries.players.each()) {
         m.data.stats.set(NO_STATS)
         m.data.attackers.set([])

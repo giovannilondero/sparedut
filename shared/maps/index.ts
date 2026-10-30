@@ -3,6 +3,7 @@
  */
 import type { MapDef, MapId } from "../map.ts"
 import { GLEMONE } from "./glemone.ts"
+import { MARAN } from "./maran.ts"
 import { OSOPPO } from "./osoppo.ts"
 import { PREDIL } from "./predil.ts"
 import { TRINCEE } from "./trincee.ts"
@@ -13,7 +14,8 @@ export const MAPS = {
   osoppo: OSOPPO,
   trincee: TRINCEE,
   venzone: VENZONE,
-  predil: PREDIL
+  predil: PREDIL,
+  maran: MARAN
 } as const satisfies Record<MapId, MapDef>
 
 export const MAP_IDS = Object.keys(MAPS) as MapId[]

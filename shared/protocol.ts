@@ -9,12 +9,12 @@ import type { MapId, Team } from "./map.ts"
 import { MAP_IDS } from "./maps/index.ts"
 import type { Body } from "./movement.ts"
 import type { GameEvent } from "./sim/events.ts"
-import type { ArsenalValue, FlagState, HillValue } from "./sim/schema.ts"
+import type { ArsenalValue, FlagState, HillValue, TurretState } from "./sim/schema.ts"
 import type { StormValue } from "./sim/rules.ts"
 import type { CartView, PhaseView } from "./sim/view.ts"
 import { PRIMARIES, type PrimaryId, type ProjectileKind, type WeaponId } from "./weapons.ts"
 
-export const PROTOCOL_VERSION = 7
+export const PROTOCOL_VERSION = 8
 export const MAX_PLAYERS = 16
 export const SNAPSHOT_EVERY = 2 // tick: 30 istantanee al secondo
 
@@ -123,6 +123,10 @@ export interface Snapshot {
   readonly cart: CartView | null
   /** Solo nella Tampieste in corso. */
   readonly storm: StormValue | null
+  /** Le torrette della mappa, nell'ordine di `map.turrets`. */
+  readonly turrets: ReadonlyArray<TurretState>
+  /** Salute delle porte da sfondare, nell'ordine di `map.doors` (0 = sfondata). */
+  readonly doors: readonly number[]
   readonly players: readonly SnapOther[]
   readonly you: SnapSelf | null
   readonly ev: readonly GameEvent[]

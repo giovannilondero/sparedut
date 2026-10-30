@@ -6,6 +6,7 @@
 import * as THREE from "three"
 import type { WeaponId } from "../../shared/weapons.ts"
 import { Baker, burlapTex, copperTex, engravedTex, fricoTex, put, std, towerTex, woodTex } from "./kit.ts"
+import { gjaline } from "./props.ts"
 
 export interface WeaponModel {
   readonly root: THREE.Group
@@ -364,7 +365,76 @@ function miedi(): WeaponModel {
   return { root, muzzle, parts: { pouch }, left: new THREE.Vector3(0, y - 0.03, -0.18), sightH: 0.12 }
 }
 
-const BUILDERS: Record<WeaponId, () => WeaponModel> = { mescul, mandi, cramar, doplete, cjampanili, mulin, miedi, lanciafrico }
+/**
+ * Il Cjanon des Gjalinis: un tubo d'ottone legato sull'avambraccio con le cinghie,
+ * la camera di caricamento col coperchio e, in bocca, la prossima gallina che guarda fuori.
+ */
+function gjalinis(): WeaponModel {
+  const root = new THREE.Group()
+  const y = 0.075
+  // il tubo: dall'avambraccio (z+) fino alla bocca svasata
+  Z(root, 0.062, 0.062, 0.62, M.brass(), 0, y, -0.05, 22)
+  Z(root, 0.064, 0.078, 0.07, M.brass(), 0, y, -0.39, 22)
+  put(root, T(0.078, 0.008, Math.PI * 2, 24), M.darkCopper(), 0, y, -0.425)
+  for (const z of [-0.28, -0.12, 0.04]) put(root, T(0.063, 0.005, Math.PI * 2, 22), M.darkCopper(), 0, y, z)
+  // camera di caricamento col coperchio a cerniera e la manopola della pressione
+  put(root, C(0.034, 0.034, 0.04, 14), M.copper(), 0, y + 0.07, -0.12)
+  put(root, C(0.037, 0.037, 0.01, 14), M.darkCopper(), 0, y + 0.092, -0.12)
+  put(root, C(0.008, 0.008, 0.02, 8), M.black(), 0.02, y + 0.1, -0.12)
+  put(root, C(0.022, 0.022, 0.008, 14), M.plainStone(), -0.065, y + 0.02, -0.06, 0, 0, Math.PI / 2)
+  put(root, B(0.002, 0.016, 0.002), M.shell(), -0.07, y + 0.025, -0.06, 0, 0, -0.6)
+  // cinghie di cuoio attorno al braccio e la manopola sotto, per la mano
+  for (const z of [0.12, 0.24]) put(root, T(0.068, 0.012, Math.PI * 2, 18), M.leather(), 0, y, z)
+  put(root, B(0.02, 0.07, 0.03), M.darkSteel(), 0, y - 0.07, -0.02)
+  put(root, C(0.014, 0.014, 0.08, 10), M.wood(), 0, y - 0.11, -0.02)
+  guard(root, 0.0, -0.05)
+  // una piuma rimasta incastrata, per ricordo
+  put(root, B(0.004, 0.05, 0.016), M.plainStone(), 0.05, y + 0.06, -0.38, 0.3, 0, -0.5)
+  // la gallina pronta in bocca, che guarda avanti
+  const frico = group(root, 0, y + 0.01, -0.36)
+  const { g: hen, wings } = gjaline()
+  // nel tubo le ali stanno chiuse
+  for (const w of wings) w.visible = false
+  hen.scale.setScalar(0.42)
+  hen.rotation.y = Math.PI
+  frico.add(hen)
+  const muzzle = marker(root, 0, y, -0.45)
+  return { root, muzzle, parts: { frico }, left: null, sightH: 0.17 }
+}
+
+/**
+ * La mitraie della torretta in prima persona: camicia d'acqua forata, castello e le due
+ * impugnature a vanga col grilletto a pollice. L'origine è l'impugnatura destra.
+ */
+function mitraie(): WeaponModel {
+  const root = new THREE.Group()
+  const x = -0.09
+  const y = 0.05
+  put(root, B(0.11, 0.1, 0.24), M.darkSteel(), x, y, -0.08)
+  Z(root, 0.055, 0.055, 0.55, M.steel(), x, y + 0.01, -0.47, 20)
+  for (let i = 0; i < 6; i++) for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2
+    put(root, new THREE.SphereGeometry(0.007, 5, 4), M.black(), x + Math.cos(a) * 0.054, y + 0.01 + Math.sin(a) * 0.054, -0.28 - i * 0.07)
+  }
+  Z(root, 0.02, 0.026, 0.1, M.darkSteel(), x, y + 0.01, -0.79, 12)
+  put(root, T(0.056, 0.006, Math.PI * 2, 20), M.brass(), x, y + 0.01, -0.21)
+  // impugnature a vanga e piastra del grilletto
+  for (const gx of [0, -0.18]) {
+    put(root, C(0.016, 0.016, 0.1, 10), M.wood(), gx, 0, 0.06)
+    put(root, B(0.02, 0.012, 0.06), M.darkSteel(), gx, 0.05, 0.03)
+    put(root, B(0.02, 0.012, 0.06), M.darkSteel(), gx, -0.05, 0.03)
+  }
+  put(root, B(0.16, 0.012, 0.012), M.darkSteel(), x, 0.05, 0.06)
+  put(root, B(0.04, 0.03, 0.01), M.brass(), x, 0.02, 0.07)
+  // nastro di munizioni che pende a destra e mirino a tacca
+  for (let i = 0; i < 6; i++) put(root, C(0.006, 0.006, 0.045, 6), M.brass(), x + 0.07, y - 0.02 - i * 0.018, -0.1, 0, 0, Math.PI / 2)
+  put(root, B(0.004, 0.03, 0.004), M.darkSteel(), x, y + 0.075, -0.7)
+  put(root, B(0.03, 0.02, 0.004), M.darkSteel(), x, y + 0.065, -0.02)
+  const muzzle = marker(root, x, y + 0.01, -0.85)
+  return { root, muzzle, parts: {}, left: new THREE.Vector3(-0.18, 0, 0.06), sightH: 0.14 }
+}
+
+const BUILDERS: Record<WeaponId, () => WeaponModel> = { mescul, mandi, cramar, doplete, cjampanili, mulin, miedi, gjalinis, lanciafrico, mitraie }
 
 export const buildWeapon = (id: WeaponId): WeaponModel => BUILDERS[id]()
 

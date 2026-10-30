@@ -110,7 +110,7 @@ export class Room {
     const used = new Set([...this.members.values()].map((m) => m.name))
     const name = BOT_NAMES[team].find((n) => !used.has(n)) ?? `${BOT_NAMES[team][0]} ${++botCounter}`
     const id = `bot-${++botCounter}`
-    const primaries: PrimaryId[] = ["cramar", "cramar", "doplete", "cjampanili", "mulin", "miedi", "cramar"]
+    const primaries: PrimaryId[] = ["cramar", "cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis", "cramar"]
     const primary = primaries[botCounter % primaries.length]
     this.members.set(id, { id, name, team, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
     this.bots.set(id, new BotBrain(id, this.level, navGraph(this.physics), this.physics, botCounter))
@@ -237,7 +237,7 @@ export class Room {
         (p.buttons & 2 ? FLAG_BIT.aiming : 0) |
         (carriers.has(p.session) ? FLAG_BIT.carrier : 0) |
         (p.arsenal.sgnape > 0 ? FLAG_BIT.sgnape : 0),
-      w: p.arsenal.current,
+      w: w.turrets.some((t) => t.gunner === p.session) ? "mitraie" : p.arsenal.current,
       hp: Math.ceil(p.hp)
     }))
     const base: Omit<Snapshot, "you"> = {
@@ -249,6 +249,8 @@ export class Room {
       hill: w.hill,
       cart: w.cart,
       storm: w.storm,
+      turrets: w.turrets.map((t) => ({ ...t, heat: r2(t.heat) })),
+      doors: w.doors.map((d) => Math.ceil(d)),
       pickups: w.pickups.map((p) => (p ? "1" : "0")).join(""),
       proj: w.projectiles.map((p) => [p.kind, r2(p.x), r2(p.y), r2(p.z)] as const),
       players: others,

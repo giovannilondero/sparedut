@@ -90,6 +90,11 @@ export interface Strings {
     readonly stormOutside: string
     readonly spectate: string
     readonly healed: Fn<[string, number]>
+    /** Le torrette: il tasto per montare, per smontare, il calore. */
+    readonly turretUse: string
+    readonly turretLeave: string
+    readonly turretHeat: string
+    readonly turretHot: string
   }
   readonly game: {
     readonly sgnape: string
@@ -105,6 +110,11 @@ export interface Strings {
     readonly stormStartSub: string
     /** Traduzione delle frasi sveltis, se la lenghe no je il furlan. */
     readonly quickGloss: readonly string[] | null
+    /** La porta di una mappa sfondata: chi l'ha sfondata. */
+    readonly doorBroken: Fn<[string]>
+    readonly doorSub: string
+    /** Le piume della gjaline negli occhi. */
+    readonly plumis: string
   }
   readonly loadout: { readonly title: string; readonly note: string; readonly resume: string }
   readonly pause: {
@@ -225,7 +235,9 @@ const WEAPON_NAMES = {
   cjampanili: { name: "Il Cjampanili", short: "Cjampanili" },
   mulin: { name: "Il Mulin", short: "Mulin" },
   miedi: { name: "Cassele dal Miedi", short: "Miedi" },
-  lanciafrico: { name: "Lanciafrico", short: "Lanciafrico" }
+  gjalinis: { name: "Cjanon des Gjalinis", short: "Gjalinis" },
+  lanciafrico: { name: "Lanciafrico", short: "Lanciafrico" },
+  mitraie: { name: "Mitraie de Postazion", short: "Mitraie" }
 } as const
 
 const fur: Strings = {
@@ -313,7 +325,8 @@ const fur: Strings = {
     osoppo: { name: "Fuart di Osôf", sub: "La fortece sul cuel, bastions e galariis" },
     trincee: { name: "Trinceis dal Pal Piçul", sub: "La Grande Vuere tes Alps Cjargnelis" },
     venzone: { name: "Vençon", sub: "Il borc dentri lis muris e il Dom di Sant Andree" },
-    predil: { name: "Cave dal Predil", sub: "La miniere di Raibl, binaris e carei" }
+    predil: { name: "Cave dal Predil", sub: "La miniere di Raibl, binaris e carei" },
+    maran: { name: "Lagune di Maran", sub: "La riserve, la foresterie e il casot dai fenicotars" }
   },
   levels: {
     zovin: { name: "Zovin", sub: "Facil: apene tornât di Udin" },
@@ -331,9 +344,17 @@ const fur: Strings = {
       ...WEAPON_NAMES.miedi,
       blurb: "Un sbrufadôr di sgnape e cjamomile: al tache i compagns e al bruse i nemîs. Cui che lu puarte al è il miedi: ator di lui si guarìs."
     },
+    gjalinis: {
+      ...WEAPON_NAMES.gjalinis,
+      blurb: "Un tubo di oton leât sul braç che al spare gjalinis. Lis gjalinis a svolin, a cirin il nemì di bessolis e i sclopin intor intune nule di plumis: par un pôc nol viôt plui nuie."
+    },
     lanciafrico: {
       ...WEAPON_NAMES.lanciafrico,
       blurb: "Al tire formis di frico bulintis che a sbalcin e a sclopin. Arme potente: si cjape sù in Vie Bini."
+    },
+    mitraie: {
+      ...WEAPON_NAMES.mitraie,
+      blurb: "No si puarte: e je su lis toretis. Colps infinits e svelts, ma se no tu molis il grilet si scjalde e si ferme."
     }
   },
   bomb: "Bombis di Sgnape",
@@ -398,6 +419,8 @@ const fur: Strings = {
       miedi: ["al à dât la medisine sbaliade a", "al à curât par simpri", "al à prescrit il ripôs eterni a"],
       sgnape: ["al à fat bevi masse sgnape a", "al à cjocât", "al à fat il brindis cun"],
       mine: ["al à fat saltâ par aria", "al à spedît in galarie", "al à fat cjatâ il plomp di Raibl a"],
+      gjalinis: ["al à fat spenâ", "al à metût tal pulinâr", "al à fat cocodè cun"],
+      mitraie: ["al à cusît a machine", "al à tignût a bade di lontan", "al à fat la puntade a"],
       storm: "al è restât te tampieste",
       head: "tal cjâf",
       fall: "al è lât a mont",
@@ -433,7 +456,11 @@ const fur: Strings = {
     alive: (n) => `🌩️ In pîts: ${n}`,
     stormOutside: "Fûr de tampieste! Torne dentri dal cercli",
     spectate: "Une vite sole: tu cjalis fin a la fin de partide.",
-    healed: (who, n) => `+${n} a ${who}`
+    healed: (who, n) => `+${n} a ${who}`,
+    turretUse: "<kbd>E</kbd> Mitraie",
+    turretLeave: "<kbd>E</kbd> / <kbd>Spazi</kbd> lasse la mitraie",
+    turretHeat: "Calôr",
+    turretHot: "SCJALDADE!"
   },
   game: {
     sgnape: "Salût!",
@@ -454,7 +481,10 @@ const fur: Strings = {
     cartSub: (ben) => (ben ? "Sburtilu fin insom" : "Fermilu prime che al rivi"),
     stormStart: "E rive la tampieste!",
     stormStartSub: "Ducj cuintri ducj · une vite sole",
-    quickGloss: null
+    quickGloss: null,
+    doorBroken: (who) => `${who} al à sfondât la puarte dal casot!`,
+    doorSub: "Dentri e je fieste: i fenicotars a balin",
+    plumis: "Plumis tai vôi!"
   },
   loadout: {
     title: "Armarie",
@@ -518,7 +548,11 @@ const fur: Strings = {
     "Tast F: mine di Raibl. Si plante tal teren e e salte cuant che un nemì i passe dongje.",
     "Cave dal Predil, o Raibl: une des minieris di plomp e zinc plui grandis de Europe, sierade tal 1991.",
     "Il Fuart di Osôf nol è mai stât cjapât: Napoleon lu à volût, i austriacs lu àn sedeât tal 1848.",
-    "Vençon e je stade tornade a fâ piere su piere dopo dal taramot, come il Dom di Glemone."
+    "Vençon e je stade tornade a fâ piere su piere dopo dal taramot, come il Dom di Glemone.",
+    "Tast E dongje di une torete: tu montis su la mitraie. No sta tignî fracât masse: si scjalde e si ferme.",
+    "Il Cjanon des Gjalinis: no sta mirâ masse preciš, la gjaline e cjate il nemì di bessole.",
+    "Lagune di Maran: tal casot di osservazion e je une fieste. Par jentrâ, une pedade te puarte (o une gjaline).",
+    "Te riserve des Focis dal Stele i fenicotars a son di cjase dut l'an. Chei dal casot a balin dome la sabide."
   ]
 }
 
@@ -607,7 +641,8 @@ const it: Strings = {
     osoppo: { name: "Fuart di Osôf", sub: "Il Forte di Osoppo sul colle: bastioni e gallerie" },
     trincee: { name: "Trinceis dal Pal Piçul", sub: "La Grande Guerra sulle Alpi Carniche" },
     venzone: { name: "Vençon", sub: "Il borgo murato di Venzone e il Duomo di Sant'Andrea" },
-    predil: { name: "Cave dal Predil", sub: "La miniera di Raibl: binari e carrelli" }
+    predil: { name: "Cave dal Predil", sub: "La miniera di Raibl: binari e carrelli" },
+    maran: { name: "Laguna di Marano", sub: "La riserva, la foresteria e il capanno dei fenicotteri" }
   },
   levels: {
     zovin: { name: "Zovin", sub: "Facile: appena tornato da Udine" },
@@ -625,9 +660,17 @@ const it: Strings = {
       ...WEAPON_NAMES.miedi,
       blurb: "Uno spruzzatore di grappa e camomilla: rimette in sesto i compagni e brucia i nemici. Chi lo porta è il medico: intorno a lui si guarisce."
     },
+    gjalinis: {
+      ...WEAPON_NAMES.gjalinis,
+      blurb: "Un tubo d'ottone legato al braccio che spara galline. Le galline volano, cercano il nemico da sole e gli scoppiano addosso in una nuvola di piume: per un po' non vede più niente."
+    },
     lanciafrico: {
       ...WEAPON_NAMES.lanciafrico,
       blurb: "Spara forme di frico bollenti che rimbalzano e scoppiano. Arma potente: si raccoglie in Via Bini."
+    },
+    mitraie: {
+      ...WEAPON_NAMES.mitraie,
+      blurb: "Non si porta: sta sulle torrette. Colpi infiniti e veloci, ma se non molli il grilletto si scalda e si ferma."
     }
   },
   bomb: "Bombe di Sgnape",
@@ -692,6 +735,8 @@ const it: Strings = {
       miedi: ["ha dato la medicina sbagliata a", "ha curato per sempre", "ha prescritto il riposo eterno a"],
       sgnape: ["ha fatto bere troppa grappa a", "ha ubriacato", "ha brindato con"],
       mine: ["ha fatto saltare in aria", "ha spedito in galleria", "ha fatto trovare il piombo di Raibl a"],
+      gjalinis: ["ha spennato", "ha messo nel pollaio", "ha fatto coccodè con"],
+      mitraie: ["ha cucito a macchina", "ha tenuto a bada da lontano", "ha fatto l'orlo a"],
       storm: "è rimasto nella tempesta",
       head: "in testa",
       fall: "è caduto di sotto",
@@ -727,7 +772,11 @@ const it: Strings = {
     alive: (n) => `🌩️ In piedi: ${n}`,
     stormOutside: "Fuori dalla tempesta! Torna dentro il cerchio",
     spectate: "Una vita sola: guardi fino alla fine della partita.",
-    healed: (who, n) => `+${n} a ${who}`
+    healed: (who, n) => `+${n} a ${who}`,
+    turretUse: "<kbd>E</kbd> Mitragliatrice",
+    turretLeave: "<kbd>E</kbd> / <kbd>Spazio</kbd> lascia la mitragliatrice",
+    turretHeat: "Calore",
+    turretHot: "SURRISCALDATA!"
   },
   game: {
     sgnape: "Salute!",
@@ -759,7 +808,10 @@ const it: Strings = {
       "Salute e frico!",
       "Va bene, va bene...",
       "Guarda il campanile!"
-    ]
+    ],
+    doorBroken: (who) => `${who} ha sfondato la porta del capanno!`,
+    doorSub: "Dentro c'è festa: i fenicotteri ballano",
+    plumis: "Piume negli occhi!"
   },
   loadout: {
     title: "Armeria",
@@ -823,7 +875,11 @@ const it: Strings = {
     "Tasto F: mina di Raibl. Si pianta nel terreno e salta quando un nemico le passa vicino.",
     "Cave del Predil, o Raibl: una delle più grandi miniere di piombo e zinco d'Europa, chiusa nel 1991.",
     "Il Forte di Osoppo non è mai stato preso: lo volle Napoleone, gli austriaci lo assediarono nel 1848.",
-    "Venzone è stata ricostruita pietra su pietra dopo il terremoto, come il Duomo di Gemona."
+    "Venzone è stata ricostruita pietra su pietra dopo il terremoto, come il Duomo di Gemona.",
+    "Tasto E vicino a una torretta: monti sulla mitragliatrice. Non tenere premuto troppo: si scalda e si ferma.",
+    "Il Cannone delle Galline: non serve mirare troppo preciso, la gallina trova il nemico da sola.",
+    "Laguna di Marano: nel capanno di osservazione c'è una festa. Per entrare, un calcio alla porta (o una gallina).",
+    "Nella riserva delle Foci dello Stella i fenicotteri ci sono tutto l'anno. Quelli del capanno ballano solo il sabato."
   ]
 }
 

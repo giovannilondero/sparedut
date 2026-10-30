@@ -4,7 +4,7 @@
  */
 import type { MapDef, Spawn, Team } from "../map.ts"
 import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type WeaponId } from "../weapons.ts"
-import type { Ammo, ArsenalValue, RulesValue, StatsValue } from "./schema.ts"
+import type { Ammo, ArsenalValue, RulesValue, StatsValue, TurretState } from "./schema.ts"
 
 export const MAX_HP = 100
 export const MAX_ARMOR = 100
@@ -108,9 +108,19 @@ export function freshArsenal(primary: PrimaryId): ArsenalValue {
 
 export const NO_STATS: StatsValue = { kills: 0, deaths: 0, assists: 0, caps: 0, score: 0, damage: 0, headshots: 0, streak: 0, best: 0 }
 
-/** Le armi che il giocatore può impugnare adesso. */
+/** Le armi che il giocatore può impugnare adesso (la mitraie non si impugna: si usa la torretta). */
 export const owned = (a: ArsenalValue, id: WeaponId) =>
   id === "mescul" || id === "mandi" || id === a.primary || (id === "lanciafrico" && a.launcher)
+
+/** Torrette fredde e libere, porte intere: come stanno a inizio partita. */
+export const freshTurrets = (map: MapDef): TurretState[] => map.turrets.map(() => ({ gunner: null, heat: 0, jammed: false, cooldown: 0 }))
+export const freshDoors = (map: MapDef): number[] => map.doors.map((d) => d.hp)
+
+/** Le porte da sfondare prendono di più a pedate (il mescul) che a pallini. */
+export const DOOR_MELEE_SCALE = 1.6
+
+/** La torretta che usa `session`, se ne usa una. */
+export const turretOf = (turrets: ReadonlyArray<TurretState>, session: string): number => turrets.findIndex((t) => t.gunner === session)
 
 /** Il punto di rinascita più lontano dai nemici vivi, con un po' di caso. */
 export function chooseSpawn(spots: readonly Spawn[], enemies: ReadonlyArray<{ x: number; z: number }>, roll: number): Spawn {

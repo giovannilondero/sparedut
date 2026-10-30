@@ -245,7 +245,8 @@ export class Menu {
     const max = { damage: 110, rate: 10, range: 400, mag: 30 }
     const render = () => {
       const s = t()
-      target.innerHTML = WEAPON_IDS.map((id) => {
+      // La mitraie non si porta: sta sulle torrette.
+      target.innerHTML = WEAPON_IDS.filter((id) => id !== "mitraie").map((id) => {
         const w = WEAPONS[id]
         const text = s.weapons[id]
         const primary = (PRIMARIES as readonly string[]).includes(id)

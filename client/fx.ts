@@ -6,9 +6,9 @@
 import * as THREE from "three"
 import type { Fx, P3 } from "./contracts.ts"
 import type { PickupKind } from "../shared/map.ts"
-import { FRICO_SHELL, RAIBL_MINE, SGNAPE_BOMB, type ProjectileKind, type WeaponId } from "../shared/weapons.ts"
+import { FRICO_SHELL, GJALINE, RAIBL_MINE, SGNAPE_BOMB, type ProjectileKind, type WeaponId } from "../shared/weapons.ts"
 import { flashTex } from "./models/kit.ts"
-import { fricoDisc, sgnapeBottle } from "./models/props.ts"
+import { fricoDisc, gjaline, sgnapeBottle } from "./models/props.ts"
 
 const C = (hex: number) => new THREE.Color(hex)
 const rnd = (a: number, b: number) => a + Math.random() * (b - a)
@@ -260,7 +260,10 @@ const TRACER: Record<WeaponId, { color: THREE.Color; speed: number; len: number;
   mulin: { color: C(0xffb85a), speed: 400, len: 3, width: 0.016 },
   // il getto del miedi: lento, corto e largo, verde camomilla
   miedi: { color: C(0x9effb0), speed: 38, len: 2.4, width: 0.07 },
-  lanciafrico: null
+  gjalinis: null,
+  lanciafrico: null,
+  // la mitraie delle torrette: scie lunghe e calde, una ogni quattro tick
+  mitraie: { color: C(0xffc070), speed: 520, len: 5, width: 0.026 }
 }
 
 class Tracers {
@@ -350,6 +353,8 @@ const K = {
   crisp: C(0xc07a28), crispDark: C(0x7a4416),
   flame: C(0x6ab8ff), flameEnd: C(0x2a40d0), flameHot: C(0xd8f4ff), violet: C(0x9a6aff),
   glass: C(0xcfeee6),
+  feather: C(0xfffaf0), featherEnd: C(0xe8e0d0), featherDust: C(0xf4efe6),
+  wood: C(0x8a5a34), woodDark: C(0x5a3a20),
   hay: C(0xe8cf6a), hayDark: C(0xc8a640), hayDust: C(0xd8c890),
   steam: C(0xf0e8d8), steamEnd: C(0xd0c8b8),
   ember: C(0xffb040), emberEnd: C(0xff4010),
@@ -391,7 +396,7 @@ function scorchTex() {
   return t
 }
 
-const BLAST = { frico: FRICO_SHELL.radius, sgnape: SGNAPE_BOMB.radius, mine: RAIBL_MINE.radius } as const satisfies Record<ProjectileKind, number>
+const BLAST = { frico: FRICO_SHELL.radius, sgnape: SGNAPE_BOMB.radius, mine: RAIBL_MINE.radius, gjaline: GJALINE.radius } as const satisfies Record<ProjectileKind, number>
 
 /** La mine di Raibl: un disco di ferro con la spoletta e una luce rossa che lampeggia. */
 function raiblMine(): { g: THREE.Group; light: THREE.MeshBasicMaterial } {
@@ -454,6 +459,7 @@ export function createFx(scene: THREE.Scene): Fx {
   const fricos: THREE.Group[] = []
   const bottles: THREE.Group[] = []
   const mines: { g: THREE.Group; light: THREE.MeshBasicMaterial }[] = []
+  const hens: { g: THREE.Group; wings: THREE.Object3D[]; last: THREE.Vector3 }[] = []
   let nFrico = 0
   let nBottle = 0
   let trailAcc = 0
@@ -560,6 +566,20 @@ export function createFx(scene: THREE.Scene): Fx {
     explosion(at, kind, ground) {
       const [x, y, z] = at3(at)
       const R = BLAST[kind]
+      if (kind === "gjaline") {
+        // niente fuoco: un pof bianco e una nevicata di piume che scendono piano
+        flashLight(at, K.white, 30, R * 4, 0.25)
+        add.spawn(x, y, z, 0, 0, 0, 0.2, R * 0.4, R * 1.2, K.white, K.featherEnd, 0.8)
+        burst(smoke, n(22), at, R * 2.2, 1, [0.8, 1.5], [R * 0.25, R * 0.45, R * 0.6, R * 0.9], K.featherDust, K.featherEnd, 0.85, -0.3, 3, 0, 0.3 * R)
+        const floor = ground ?? y - 3
+        for (let i = 0; i < n(70); i++) {
+          const a = Math.random() * 6.283
+          const v = rnd(1.5, 6)
+          const len = rnd(0.07, 0.16)
+          debris.spawn(x, y, z, Math.cos(a) * v, rnd(1, 5), Math.sin(a) * v, rnd(2.5, 4.5), len * 0.45, 0.006, len, Math.random() < 0.15 ? K.crisp : K.feather, 1.1, 2.2, floor)
+        }
+        return
+      }
       const blue = kind === "sgnape"
       // a terra se il pavimento è vicino; in aria niente fuoco né bruciatura
       const onGround = ground !== null && y - ground < 2.5
@@ -626,6 +646,7 @@ export function createFx(scene: THREE.Scene): Fx {
       let nf = 0
       let nb = 0
       let nm = 0
+      let nh = 0
       for (const [kind, x, y, z] of list) {
         if (kind === "mine") {
           let m = mines[nm]
@@ -639,6 +660,26 @@ export function createFx(scene: THREE.Scene): Fx {
           // lampeggia: una volta al secondo, sfasate fra loro
           m.light.color.setHex((time + nm * 0.37) % 1 < 0.15 ? 0xff3a20 : 0x3a0a06)
           nm++
+        } else if (kind === "gjaline") {
+          let h = hens[nh]
+          if (!h) {
+            const made = gjaline()
+            h = { g: made.g, wings: made.wings, last: new THREE.Vector3(x, y, z) }
+            scene.add(h.g)
+            hens.push(h)
+          }
+          h.g.visible = true
+          // guarda dove va: dalla posizione precedente alla nuova
+          const dx = x - h.last.x
+          const dz = z - h.last.z
+          if (dx * dx + dz * dz > 1e-4) h.g.rotation.y = Math.atan2(dx, dz)
+          h.g.rotation.x = Math.max(-0.6, Math.min(0.6, -(y - h.last.y) * 3))
+          h.last.set(x, y, z)
+          h.g.position.set(x, y, z)
+          const flap = Math.sin(time * 38 + nh) * 0.9
+          h.wings[0].rotation.z = flap
+          h.wings[1].rotation.z = -flap
+          nh++
         } else if (kind === "frico") {
           let m = fricos[nf]
           if (!m) {
@@ -667,10 +708,21 @@ export function createFx(scene: THREE.Scene): Fx {
         }
       }
       for (let i = nm; i < mines.length; i++) mines[i].g.visible = false
+      for (let i = nh; i < hens.length; i++) hens[i].g.visible = false
       for (let i = nf; i < nFrico; i++) fricos[i].visible = false
       for (let i = nb; i < nBottle; i++) bottles[i].visible = false
       nFrico = nf
       nBottle = nb
+    },
+    splinters(at, big) {
+      const [x, y, z] = at3(at)
+      for (let i = 0; i < n(big ? 40 : 10); i++) {
+        const a = Math.random() * 6.283
+        const v = rnd(1.5, big ? 7 : 4)
+        const len = rnd(0.1, big ? 0.5 : 0.25)
+        debris.spawn(x, y + rnd(-0.8, 0.8), z, Math.cos(a) * v, rnd(1, 4), Math.sin(a) * v, rnd(1.2, 2.5), len * 0.25, len * 0.08, len, Math.random() < 0.4 ? K.woodDark : K.wood, 9.8, 0.4, y - 1.1)
+      }
+      burst(smoke, n(big ? 14 : 4), at, 2, 0.5, [0.6, 1.2], [0.2, 0.4, 0.6, 1.1], K.dust, K.dustEnd, 0.6, 0, 3)
     },
     padBurst(at) {
       const [x, y, z] = at3(at)

@@ -24,12 +24,15 @@ import {
   Stats,
   TeamOf,
   Tick,
+  Turrets,
+  Doors,
   type ArsenalValue,
   type FlagState,
   type HillValue,
   type ProjectileValue,
   type RulesValue,
-  type StatsValue
+  type StatsValue,
+  type TurretState
 } from "./schema.ts"
 import type { Team } from "../map.ts"
 import type { Body } from "../movement.ts"
@@ -83,6 +86,10 @@ export interface WorldView {
   /** Solo nella Tampieste in corso: il cerchio sicuro. */
   readonly storm: StormValue | null
   readonly pickups: readonly boolean[]
+  /** Una per `map.turrets`. */
+  readonly turrets: ReadonlyArray<TurretState>
+  /** Salute di ogni porta da sfondare (0 = sfondata). */
+  readonly doors: readonly number[]
   readonly projectiles: readonly ProjectileValue[]
   readonly players: readonly PlayerView[]
 }
@@ -111,7 +118,9 @@ export const ViewWorld = Game.Inspector(
       flags: Game.System.readResource(Flags),
       hill: Game.System.readResource(Hill),
       cart: Game.System.readResource(Cart),
-      pickups: Game.System.readResource(Pickups)
+      pickups: Game.System.readResource(Pickups),
+      turrets: Game.System.readResource(Turrets),
+      doors: Game.System.readResource(Doors)
     },
     machines: { match: Game.System.machine(Match) }
   },
@@ -148,6 +157,8 @@ export const ViewWorld = Game.Inspector(
       cart,
       storm,
       pickups: resources.pickups.get().map((p) => p._tag === "up"),
+      turrets: resources.turrets.get(),
+      doors: resources.doors.get(),
       projectiles: queries.projectiles.each().map((m) => m.data.projectile.get()),
       players: queries.players.each().map((m) => {
         const life = m.data.life.get()

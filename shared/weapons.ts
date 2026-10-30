@@ -4,7 +4,7 @@
  * stanno in `client/i18n.ts`).
  */
 
-export type WeaponId = "mescul" | "mandi" | "cramar" | "doplete" | "cjampanili" | "mulin" | "miedi" | "lanciafrico"
+export type WeaponId = "mescul" | "mandi" | "cramar" | "doplete" | "cjampanili" | "mulin" | "miedi" | "gjalinis" | "lanciafrico" | "mitraie"
 
 /**
  * "beam": getto a corto raggio, automatico. Sui compagni cura (`damage` è la cura per
@@ -40,6 +40,8 @@ export interface WeaponDef {
   readonly slot: 1 | 2 | 3 | 4
   /** Tick di rotazione prima del primo colpo (il Mulin); 0 = spara subito. */
   readonly spinTicks: number
+  /** Cosa lancia un'arma "projectile"; null per le altre. */
+  readonly shell: ShellKind | null
 }
 
 export const WEAPONS = {
@@ -60,7 +62,8 @@ export const WEAPONS = {
     kick: 0.02,
     moveScale: 1.12,
     slot: 4,
-    spinTicks: 0
+    spinTicks: 0,
+    shell: null
   },
   mandi: {
     id: "mandi",
@@ -79,7 +82,8 @@ export const WEAPONS = {
     kick: 0.025,
     moveScale: 1.05,
     slot: 2,
-    spinTicks: 0
+    spinTicks: 0,
+    shell: null
   },
   cramar: {
     id: "cramar",
@@ -98,7 +102,8 @@ export const WEAPONS = {
     kick: 0.012,
     moveScale: 1,
     slot: 1,
-    spinTicks: 0
+    spinTicks: 0,
+    shell: null
   },
   doplete: {
     id: "doplete",
@@ -117,7 +122,8 @@ export const WEAPONS = {
     kick: 0.07,
     moveScale: 1.02,
     slot: 1,
-    spinTicks: 0
+    spinTicks: 0,
+    shell: null
   },
   cjampanili: {
     id: "cjampanili",
@@ -136,7 +142,8 @@ export const WEAPONS = {
     kick: 0.06,
     moveScale: 0.9,
     slot: 1,
-    spinTicks: 0
+    spinTicks: 0,
+    shell: null
   },
   mulin: {
     id: "mulin",
@@ -155,7 +162,8 @@ export const WEAPONS = {
     kick: 0.006,
     moveScale: 0.78,
     slot: 1,
-    spinTicks: 45
+    spinTicks: 45,
+    shell: null
   },
   miedi: {
     id: "miedi",
@@ -174,7 +182,8 @@ export const WEAPONS = {
     kick: 0,
     moveScale: 1.06,
     slot: 1,
-    spinTicks: 0
+    spinTicks: 0,
+    shell: null
   },
   lanciafrico: {
     id: "lanciafrico",
@@ -193,15 +202,61 @@ export const WEAPONS = {
     kick: 0.09,
     moveScale: 0.92,
     slot: 3,
-    spinTicks: 0
+    spinTicks: 0,
+    shell: "frico"
+  },
+  /** Il cjanon des gjalinis: un tubo di ottone legato al braccio che spara galline. */
+  gjalinis: {
+    id: "gjalinis",
+    mode: "projectile",
+    damage: 70,
+    headMultiplier: 1,
+    pellets: 1,
+    spread: { still: 0, moving: 0, aimed: 0 },
+    cooldownTicks: 34,
+    reloadTicks: 120,
+    magazine: 3,
+    reserve: 15,
+    range: 0,
+    falloff: 1,
+    aimFov: 68,
+    kick: 0.06,
+    moveScale: 0.96,
+    slot: 1,
+    spinTicks: 0,
+    shell: "gjaline"
+  },
+  /**
+   * La mitraie de postazion: non si porta, si usa stando dietro a una torretta
+   * (`TURRET`). Colpi infiniti, ma scalda.
+   */
+  mitraie: {
+    id: "mitraie",
+    mode: "auto",
+    damage: 13,
+    headMultiplier: 1.8,
+    pellets: 1,
+    spread: { still: 0.004, moving: 0.004, aimed: 0.002 },
+    cooldownTicks: 4,
+    reloadTicks: 0,
+    magazine: 0,
+    reserve: 0,
+    range: 220,
+    falloff: 0.7,
+    aimFov: 50,
+    kick: 0.004,
+    moveScale: 1,
+    slot: 1,
+    spinTicks: 0,
+    shell: null
   }
 } as const satisfies Record<WeaponId, WeaponDef>
 
 export const WEAPON_IDS = Object.keys(WEAPONS) as WeaponId[]
 
 /** L'arma principale si sceglie prima di rinascere. */
-export type PrimaryId = "cramar" | "doplete" | "cjampanili" | "mulin" | "miedi"
-export const PRIMARIES = ["cramar", "doplete", "cjampanili", "mulin", "miedi"] as const satisfies readonly PrimaryId[]
+export type PrimaryId = "cramar" | "doplete" | "cjampanili" | "mulin" | "miedi" | "gjalinis"
+export const PRIMARIES = ["cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis"] as const satisfies readonly PrimaryId[]
 
 /** La Cassele dal Miedi sui nemici: danno per colpo (la cura sui compagni è `damage`). */
 export const BEAM_DAMAGE = 5
@@ -243,8 +298,11 @@ export const RAIBL_MINE = {
   cooldownTicks: 30
 } as const
 
-/** Ciò che vola o sta piantato: forme di frico, bombe di sgnape, mine. */
-export type ProjectileKind = "frico" | "sgnape" | "mine"
+/** Ciò che vola o sta piantato: forme di frico, bombe di sgnape, mine, galline. */
+export type ProjectileKind = "frico" | "sgnape" | "mine" | "gjaline"
+
+/** Ciò che si spara con un'arma (le bombe e le mine si lanciano coi loro tasti). */
+export type ShellKind = Extract<ProjectileKind, "frico" | "gjaline">
 
 export const FRICO_SHELL = {
   speed: 30,
@@ -253,3 +311,48 @@ export const FRICO_SHELL = {
   fuseTicks: 180,
   bounces: 1
 } as const
+
+/**
+ * La gjaline: vola sbattendo le ali (poca gravità), punta piano verso il nemico più
+ * vicino davanti a sé e gli scoppia addosso in una nuvola di piume che acceca.
+ */
+export const GJALINE = {
+  speed: 21,
+  lift: 2.5,
+  gravity: 5,
+  fuseTicks: 150,
+  /** Vede i nemici entro questa distanza e questo cono (coseno del mezzo angolo). */
+  sight: 30,
+  cone: 0.5,
+  /** Quanto gira verso il bersaglio per tick (rad). */
+  turn: 0.045,
+  radius: 3.2,
+  /** Tick di vista coperta dalle piume per chi è preso nello scoppio. */
+  blindTicks: 100
+} as const
+
+/** Le torrette con la mitraie: si montano col tasto "usa", e scaldano. */
+export const TURRET = {
+  /** Da quanto lontano (m, in orizzontale dal posto) si monta. */
+  reach: 1.6,
+  /** Il posto di chi spara è dietro l'arma, a questa distanza. */
+  seat: 1.0,
+  /** Quanto gira a destra e a sinistra dalla sua direzione (rad), e su e giù. */
+  arc: 1.35,
+  pitchUp: 0.55,
+  pitchDown: 0.45,
+  /**
+   * Calore (0..1) per colpo, al netto del raffreddamento fra un colpo e l'altro:
+   * circa 3 secondi di fuoco continuo prima di surriscaldarsi.
+   */
+  heatPerShot: 0.038,
+  /** Raffreddamento per tick (sempre), e quando è surriscaldata (ferma finché torna a 0). */
+  cool: 0.004,
+  jamCool: 0.005
+} as const
+
+/** Come esce dalla canna ogni cosa che si spara. */
+export const SHELLS = {
+  frico: { speed: FRICO_SHELL.speed, lift: 1.5, fuseTicks: FRICO_SHELL.fuseTicks, bounces: FRICO_SHELL.bounces },
+  gjaline: { speed: GJALINE.speed, lift: GJALINE.lift, fuseTicks: GJALINE.fuseTicks, bounces: 0 }
+} as const satisfies Record<ShellKind, { readonly speed: number; readonly lift: number; readonly fuseTicks: number; readonly bounces: number }>

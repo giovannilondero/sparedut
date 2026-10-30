@@ -274,5 +274,10 @@ export const TRINCEE = defineMap({
   pickups,
   navPoints,
   track,
-  killY: -10
+  killY: -10,
+  turrets: [
+    { at: [-1, T_FLOOR, 87], yaw: 0 },
+    { at: [-1, T_FLOOR, -87], yaw: Math.PI }
+  ],
+  doors: []
 })

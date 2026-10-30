@@ -12,7 +12,9 @@ export const BUTTON = {
   sprint: 16,
   reload: 32,
   bomb: 64,
-  mine: 128
+  mine: 128,
+  /** Monta o smonta una torretta. */
+  use: 256
 } as const
 
 export type ButtonName = keyof typeof BUTTON
@@ -38,7 +40,7 @@ export const PlayerInputSchema = z.object({
   mz: z.number().min(-1).max(1),
   yaw: z.number().finite(),
   pitch: z.number().min(-1.56).max(1.56),
-  buttons: z.number().int().min(0).max(255),
+  buttons: z.number().int().min(0).max(511),
   weapon: z.enum(WEAPON_IDS as [WeaponId, ...WeaponId[]]),
   view: z.number().int().nonnegative()
 })

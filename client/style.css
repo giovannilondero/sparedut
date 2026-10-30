@@ -208,6 +208,19 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 #sgnape-fx { position: absolute; inset: 0; opacity: 0; transition: opacity 0.6s; background: radial-gradient(circle, transparent 50%, rgba(120, 170, 255, 0.28) 100%); }
 #sgnape-fx.on { opacity: 1; animation: wobble 3s ease-in-out infinite; }
 @keyframes wobble { 50% { filter: hue-rotate(25deg); } }
+#plumis { position: absolute; inset: 0; pointer-events: none; opacity: 0; overflow: hidden; }
+#plumis.on { animation: plumis var(--blind, 1.5s) ease-in forwards; }
+#plumis::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle, rgba(255, 252, 244, 0.86) 30%, rgba(250, 244, 230, 0.96) 100%); }
+#plumis i { position: absolute; font-style: normal; transform: translate(-50%, -50%) rotate(var(--r)); filter: grayscale(1) brightness(1.6); opacity: 0.85; }
+#plumis.on i { animation: plumi-fall var(--blind, 1.5s) ease-in forwards; }
+@keyframes plumis { 0%, 55% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes plumi-fall { 0% { transform: translate(-50%, -50%) rotate(var(--r)); } 100% { transform: translate(-50%, 140%) rotate(calc(var(--r) + 120deg)); } }
+#turret-prompt { position: absolute; top: 60%; left: 50%; transform: translateX(-50%); font-family: var(--serif); color: var(--ink); background: var(--stone); border: 1px solid var(--stone-line); padding: 4px 12px; border-radius: 8px; font-size: 15px; }
+#turret-hud { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); width: 260px; text-align: center; font-family: var(--serif); color: var(--ink); background: var(--stone); border: 1px solid var(--stone-line); padding: 6px 12px; border-radius: 10px; }
+#turret-hud .bar { height: 8px; margin-top: 4px; background: rgba(0, 0, 0, 0.35); border-radius: 4px; overflow: hidden; }
+#turret-hud .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #f0c060, #ff6a20); transition: width 0.1s linear; }
+#turret-hud.warm .bar i { background: linear-gradient(90deg, #ff8a30, #ff2a10); }
+#turret-hud.jammed { color: #ff7a4a; animation: wobble 0.6s ease-in-out infinite; }
 #damage-flash { position: absolute; inset: 0; opacity: 0; background: radial-gradient(circle, transparent 45%, rgba(200, 40, 30, 0.55) 100%); }
 #damage-flash.on { animation: dmg 0.45s ease-out; }
 @keyframes dmg { 0% { opacity: 1; } 100% { opacity: 0; } }

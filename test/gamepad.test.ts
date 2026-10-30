@@ -107,7 +107,7 @@ test("Options, Share, croce e △ passano dagli stessi percorsi dei tasti", () =
     set(i, false)
     c.poll(1 / 60)
   }
-  expect(calls).toEqual(["pause", "Tab:down", "Tab:up", "Digit1:down", "slot1", "Digit1:up", "Digit2:down", "slot2", "Digit2:up", "KeyQ:down", "last", "KeyQ:up", "wheel1"])
+  expect(calls).toEqual(["pause", "Tab:down", "Tab:up", "Digit1:down", "slot1", "Digit1:up", "Digit2:down", "slot2", "Digit2:up", "KeyE:down", "KeyE:up", "wheel1"])
 })
 
 test("col menu aperto lo sguardo e i passi si fermano, Options va ancora", () => {

@@ -175,6 +175,22 @@ export interface CartValue {
 }
 export const Cart = Descriptor.Resource<CartValue>()("Sparedut/Cart")
 
+/** Una torretta (una per `map.turrets`, stesso ordine). */
+export interface TurretState {
+  /** Chi la usa (sessione): sta fermo al posto dietro l'arma finché non smonta o muore. */
+  readonly gunner: string | null
+  /** Calore da 0 a 1. */
+  readonly heat: number
+  /** Surriscaldata: non spara finché il calore non torna a 0. */
+  readonly jammed: boolean
+  /** Tick al prossimo colpo. */
+  readonly cooldown: number
+}
+export const Turrets = Descriptor.Resource<ReadonlyArray<TurretState>>()("Sparedut/Turrets")
+
+/** Salute delle porte da sfondare (una per `map.doors`): 0 vuol dire sfondata. */
+export const Doors = Descriptor.Resource<ReadonlyArray<number>>()("Sparedut/Doors")
+
 export type PickupState = { readonly _tag: "up" } | { readonly _tag: "down"; readonly ticks: number }
 /** Uno per ogni punto di `PICKUPS`, nello stesso ordine. */
 export const Pickups = Descriptor.Resource<ReadonlyArray<PickupState>>()("Sparedut/Pickups")
@@ -216,6 +232,9 @@ export const Damage = Descriptor.Event<DamageValue>()("Sparedut/Damage")
 /** Cura (la Cassele dal Miedi e il medico vicino): la applica `ApplyDamage`, padrona della salute. */
 export const Heal = Descriptor.Event<{ readonly target: string; readonly healer: string; readonly amount: number }>()("Sparedut/Heal")
 
+/** Un colpo a una porta (spari, mescul, esplosioni): la applica `BreakDoors`. */
+export const DoorHit = Descriptor.Event<{ readonly door: number; readonly amount: number; readonly by: string }>()("Sparedut/DoorHit")
+
 /** Verso l'host e i client. */
 export const Out = Descriptor.Event<GameEvent>()("Sparedut/Out")
 
@@ -229,8 +248,8 @@ export const Game = Schema.bind(
   Schema.fragment({
     components: { Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers, Projectile },
     requires: [Schema.requires(Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers)],
-    resources: { Rules, Tick, Score, Flags, Hill, Cart, Pickups, History, Rng },
-    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, Damage, Heal, Out }
+    resources: { Rules, Tick, Score, Flags, Hill, Cart, Pickups, Turrets, Doors, History, Rng },
+    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, Damage, Heal, DoorHit, Out }
   }),
   Root
 )

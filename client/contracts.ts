@@ -32,7 +32,20 @@ export interface WorldFrame {
   readonly cart: { readonly at: P3; readonly yaw: number; readonly contested: boolean; readonly pushers: number } | null
   /** Solo nella Tampieste in corso: il cerchio sicuro. */
   readonly storm: { readonly x: number; readonly z: number; readonly radius: number } | null
+  /** Una per torretta della mappa: dove guarda l'arma, quanto è calda, se qualcuno la usa. */
+  readonly turrets: readonly TurretVisual[]
+  /** Salute di ogni porta da sfondare, da 0 (sfondata) a 1 (intera). */
+  readonly doors: readonly number[]
   readonly camera: THREE.PerspectiveCamera
+}
+export interface TurretVisual {
+  readonly yaw: number
+  readonly pitch: number
+  readonly heat: number
+  readonly jammed: boolean
+  readonly manned: boolean
+  /** Chi la usa sono io: l'arma la disegna il viewmodel. */
+  readonly mine: boolean
 }
 export interface WorldScene {
   /** Da chiamare ogni frame. `t` in secondi dall'avvio. */
@@ -116,6 +129,8 @@ export interface Fx {
   explosion(at: P3, kind: ProjectileKind, ground: number | null): void
   /** Proiettili in volo e mine piantate: forme di frico che girano, bottiglie di sgnape, mine che lampeggiano. Chiamare a ogni frame con la lista corrente. */
   projectiles(list: readonly (readonly [ProjectileKind, number, number, number])[]): void
+  /** Schegge di legno: una porta colpita, o (`big`) sfondata. */
+  splinters(at: P3, big: boolean): void
   /** Anelli/sbuffi di fieno quando qualcuno usa un cjar di fen. */
   padBurst(at: P3): void
   pickupBurst(at: P3, kind: PickupKind): void
@@ -133,6 +148,13 @@ export type SoundName =
   | "shot_mulin"
   | "spin_mulin"
   | "beam_miedi"
+  | "launch_gjaline"
+  | "boom_gjaline"
+  | "shot_mitraie"
+  | "turret_on"
+  | "turret_hot"
+  | "door_hit"
+  | "door_break"
   | "mine_plant"
   | "heal"
   | "launch_frico"
@@ -178,4 +200,9 @@ export interface GameAudio {
   /** Musica del menu (villotta) accesa o spenta. */
   menuMusic(on: boolean): void
   setVolumes(master: number, music: number): void
+  /**
+   * La musica da discoteca di una mappa (il casot di Maran): suona in loop nel punto `at`,
+   * attutita se la porta è chiusa. `null` la spegne.
+   */
+  disco(at: P3 | null, open: boolean): void
 }

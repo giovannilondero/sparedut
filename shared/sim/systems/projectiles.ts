@@ -1,20 +1,25 @@
 /**
- * Forme di frico, bombe di sgnape e mine di Raibl: volano, rimbalzano, si piantano, scoppiano.
+ * Forme di frico, bombe di sgnape, mine di Raibl e galline: volano, rimbalzano, si
+ * piantano, puntano il nemico, scoppiano. Le esplosioni scheggiano le porte vicine.
  */
 import { bodyCenter } from "../../hitbox.ts"
-import { FRICO_SHELL, RAIBL_MINE, SGNAPE_BOMB, type ProjectileKind } from "../../weapons.ts"
+import { MAPS } from "../../maps/index.ts"
+import { FRICO_SHELL, GJALINE, RAIBL_MINE, SGNAPE_BOMB, WEAPONS, type ProjectileKind } from "../../weapons.ts"
 import type { Vec3 } from "../../vec.ts"
 import { DT } from "../../movement.ts"
 import type { KillCause } from "../events.ts"
 import { hostile } from "../rules.ts"
-import { Damage, Game, Life, Motion, Out, Physics, Player, Projectile, Rules, TeamOf, type ProjectileValue } from "../schema.ts"
+import { Damage, DoorHit, Game, Life, Motion, Out, Physics, Player, Projectile, Rules, TeamOf, type ProjectileValue } from "../schema.ts"
 
-const GRAVITY = { frico: FRICO_SHELL.gravity, sgnape: 22, mine: 22 } as const satisfies Record<ProjectileKind, number>
+const GRAVITY = { frico: FRICO_SHELL.gravity, sgnape: 22, mine: 22, gjaline: GJALINE.gravity } as const satisfies Record<ProjectileKind, number>
 const BLAST = {
   frico: { radius: FRICO_SHELL.radius, damage: 110, cause: "lanciafrico" },
   sgnape: { radius: SGNAPE_BOMB.radius, damage: SGNAPE_BOMB.damage, cause: "sgnape" },
-  mine: { radius: RAIBL_MINE.radius, damage: RAIBL_MINE.damage, cause: "mine" }
+  mine: { radius: RAIBL_MINE.radius, damage: RAIBL_MINE.damage, cause: "mine" },
+  gjaline: { radius: GJALINE.radius, damage: WEAPONS.gjalinis.damage, cause: "gjalinis" }
 } as const satisfies Record<ProjectileKind, { radius: number; damage: number; cause: KillCause }>
+/** Scoppiano addosso a chi toccano in volo. */
+const CONTACT: ReadonlySet<ProjectileKind> = new Set(["frico", "gjaline"])
 
 export const FlyProjectiles = Game.System(
   "Sparedut/FlyProjectiles",
@@ -27,12 +32,13 @@ export const FlyProjectiles = Game.System(
     },
     resources: { rules: Game.System.readResource(Rules) },
     services: { physics: Game.System.service(Physics) },
-    events: { out: Game.System.writeEvent(Out), damage: Game.System.writeEvent(Damage) },
+    events: { out: Game.System.writeEvent(Out), damage: Game.System.writeEvent(Damage), doorHit: Game.System.writeEvent(DoorHit) },
     commands: Game.System.commands(Game.System.despawns(Projectile))
   },
   ({ queries, resources, services, events, commands }) => {
     const physics = services.physics
     const rules = resources.rules.get()
+    const doors = MAPS[rules.map].doors
     const living = queries.players.each().filter((m) => m.data.life.get()._tag === "Alive").map((m) => ({
       session: m.data.player.get().session,
       team: m.data.team.get(),
@@ -63,7 +69,17 @@ export const FlyProjectiles = Game.System(
           head: false,
           push: { x: dx * inv * push, y: 4 + 6 * falloff, z: dz * inv * push }
         })
+        // Le piume della gjaline: chi è preso non vede niente per un po'.
+        if (p.kind === "gjaline") events.out.emit({ t: "plumis", v: target.session, n: Math.round(GJALINE.blindTicks * (0.5 + 0.5 * falloff)) })
       }
+      // Le porte vicine: si misura dal punto della porta più vicino allo scoppio.
+      doors.forEach((door, i) => {
+        const cx = Math.max(door.min[0], Math.min(door.max[0], at.x))
+        const cy = Math.max(door.min[1], Math.min(door.max[1], at.y))
+        const cz = Math.max(door.min[2], Math.min(door.max[2], at.z))
+        const d = Math.sqrt((cx - at.x) ** 2 + (cy - at.y) ** 2 + (cz - at.z) ** 2)
+        if (d < blast.radius) events.doorHit.emit({ door: i, amount: blast.damage * (0.25 + 0.75 * (1 - d / blast.radius)), by: p.owner })
+      })
     }
 
     for (const m of queries.projectiles.each()) {
@@ -88,6 +104,34 @@ export const FlyProjectiles = Game.System(
       let vx = p.vx
       let vy = p.vy - GRAVITY[p.kind] * DT
       let vz = p.vz
+      if (p.kind === "gjaline") {
+        // La gjaline punta il nemico più vicino che ha davanti, girando piano.
+        const sp = Math.sqrt(vx ** 2 + vy ** 2 + vz ** 2)
+        if (sp > 1e-6) {
+          let best: { x: number; y: number; z: number } | null = null
+          let bestD: number = GJALINE.sight
+          for (const t of living) {
+            if (t.session === p.owner || !hostile(rules, p.team, t.team)) continue
+            const dx = t.center.x - p.x
+            const dy = t.center.y - p.y
+            const dz = t.center.z - p.z
+            const d = Math.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
+            if (d < 0.01 || d > bestD || (dx * vx + dy * vy + dz * vz) / (d * sp) < GJALINE.cone) continue
+            best = { x: dx / d, y: dy / d, z: dz / d }
+            bestD = d
+          }
+          if (best) {
+            const k = GJALINE.turn
+            const nx = vx / sp + (best.x - vx / sp) * k
+            const ny = vy / sp + (best.y - vy / sp) * k
+            const nz = vz / sp + (best.z - vz / sp) * k
+            const n = Math.sqrt(nx ** 2 + ny ** 2 + nz ** 2)
+            vx = (nx / n) * sp
+            vy = (ny / n) * sp
+            vz = (nz / n) * sp
+          }
+        }
+      }
       const speed = Math.sqrt(vx * vx + vy * vy + vz * vz)
       const step = speed * DT
       let x = p.x
@@ -98,8 +142,8 @@ export const FlyProjectiles = Game.System(
       if (step > 1e-6) {
         const dir = { x: vx / speed, y: vy / speed, z: vz / speed }
         const wall = physics.raycast({ x, y, z }, dir, step + 0.12)
-        // Contro un giocatore: il frico scoppia addosso.
-        if (p.kind === "frico") {
+        // Contro un giocatore: frico e gjaline scoppiano addosso.
+        if (CONTACT.has(p.kind)) {
           for (const t of living) {
             if (t.session === p.owner && p.age < 12) continue
             const cx = t.center.x - x

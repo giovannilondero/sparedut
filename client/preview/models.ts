@@ -1,7 +1,8 @@
 /**
  * Anteprima di avatar, viewmodel ed effetti. A sinistra il mondo in terza persona,
  * a destra la prima persona con l'arma che cicla. Tasti: 1-6 arma, F spara,
- * R ricarica, G bomba, E esplosione, P pausa del ciclo automatico.
+ * R ricarica, G bomba, E esplosione, P pausa del ciclo automatico. Con ?w=gjalinis
+ * resta ferma su un'arma.
  */
 import * as THREE from "three"
 import { createAvatar } from "../avatars.ts"
@@ -106,13 +107,14 @@ function poseOf(a: Actor, t: number): AvatarPose {
 }
 
 // ciclo automatico dell'arma in prima persona
-let auto = true
+const fixed = WEAPON_IDS.indexOf(new URLSearchParams(location.search).get("w") as WeaponId)
+let auto = fixed < 0
 const force = { aim: null as boolean | null, walk: null as boolean | null }
-let wIndex = 0
+let wIndex = Math.max(0, fixed)
 let wTimer = 0
 let fireAcc = 0
 let lastLook = 0
-vm.setWeapon(WEAPON_IDS[0])
+vm.setWeapon(WEAPON_IDS[wIndex])
 const muzzle = new THREE.Vector3()
 const target = new THREE.Vector3()
 
@@ -123,7 +125,7 @@ function shoot() {
   vm.muzzleWorld(muzzle)
   const m: [number, number, number] = [muzzle.x, muzzle.y, muzzle.z]
   fx.muzzle(m)
-  if (id === "lanciafrico") return
+  if (WEAPONS[id].mode === "projectile") return
   for (let i = 0; i < WEAPONS[id].pellets; i++) {
     target.set((Math.random() - 0.5) * 3, 1 + Math.random() * 2.2, -8.7)
     const end: [number, number, number] = [target.x, target.y, target.z]

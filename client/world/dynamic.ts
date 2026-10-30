@@ -1,6 +1,7 @@
 /**
  * Le parti che si muovono: raccoglibili, frico-bandiera, cerchio della culine,
- * il cjar sul suo binario (Spingi il Cjar), il muro della tempesta (La Tampieste).
+ * il cjar sul suo binario (Spingi il Cjar), il muro della tempesta (La Tampieste),
+ * le torrette con la mitraie che girano e scaldano, le porte da sfondare.
  */
 import * as THREE from "three"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
@@ -134,8 +135,113 @@ function glowMaterial(color: THREE.Color | string, opacity = 0.6): THREE.MeshBas
   return new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
 }
 
+/** La mitraie su treppiede con lo scudo: `yaw` gira lo scudo e l'arma, `pitch` solo l'arma. */
+function turretModel(envMap: THREE.Texture | null) {
+  const steel = new THREE.MeshStandardMaterial({ color: "#4a4e52", metalness: 0.5, roughness: 0.45, envMap })
+  const dark = new THREE.MeshStandardMaterial({ color: "#2a2c2e", metalness: 0.4, roughness: 0.55, envMap })
+  const olive = new THREE.MeshStandardMaterial({ color: "#5a6040", metalness: 0.3, roughness: 0.7 })
+  const wood = new THREE.MeshLambertMaterial({ color: "#7a5030" })
+  const brass = new THREE.MeshStandardMaterial({ color: "#c9a043", metalness: 0.6, roughness: 0.35 })
+  const hot = new THREE.MeshStandardMaterial({ color: "#5a5e62", metalness: 0.5, roughness: 0.4, emissive: new THREE.Color(0, 0, 0), envMap })
+  const root = new THREE.Group()
+  const mesh = (g: THREE.BufferGeometry, m: THREE.Material, parent: THREE.Object3D, x = 0, y = 0, z = 0) => {
+    const o = new THREE.Mesh(g, m)
+    o.position.set(x, y, z)
+    o.castShadow = true
+    parent.add(o)
+    return o
+  }
+  // treppiede: tre gambe dal perno a terra
+  const PIV = 1.2
+  for (const a of [Math.PI, Math.PI / 3, -Math.PI / 3]) {
+    const foot = new THREE.Vector3(Math.sin(a) * 0.75, 0, Math.cos(a) * 0.75)
+    const top = new THREE.Vector3(0, PIV - 0.1, 0)
+    const leg = mesh(new THREE.CylinderGeometry(0.03, 0.04, foot.distanceTo(top), 6), dark, root)
+    leg.position.copy(foot).add(top).multiplyScalar(0.5)
+    leg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), top.clone().sub(foot).normalize())
+  }
+  mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.2, 10), dark, root, 0, PIV - 0.1, 0)
+  const yawG = new THREE.Group()
+  yawG.position.y = PIV
+  root.add(yawG)
+  // lo scudo, curvo, con la feritoia per mirare
+  const shield = new THREE.CylinderGeometry(1.6, 1.6, 0.66, 18, 1, true, -0.28, 0.56).rotateY(Math.PI).translate(0, 0, 1.6)
+  const sh = mesh(shield, olive, yawG, 0, -0.12, -0.42)
+  ;(sh.material as THREE.Material).side = THREE.DoubleSide
+  mesh(new THREE.BoxGeometry(0.06, 0.4, 0.06), dark, yawG, 0, -0.1, -0.3)
+  const pitchG = new THREE.Group()
+  yawG.add(pitchG)
+  // l'arma: camicia d'acqua (che arrossa col calore), castello, impugnature a vanga
+  const jacket = mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.75, 16).rotateX(Math.PI / 2), hot, pitchG, 0, 0.06, -0.55)
+  mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.18, 10).rotateX(Math.PI / 2), dark, pitchG, 0, 0.06, -1.0)
+  mesh(new THREE.BoxGeometry(0.16, 0.15, 0.4), steel, pitchG, 0, 0.05, -0.02)
+  mesh(new THREE.BoxGeometry(0.12, 0.02, 0.2), steel, pitchG, 0, 0.13, 0.05)
+  for (const gx of [-0.09, 0.09]) {
+    mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.12, 8), wood, pitchG, gx, 0.04, 0.3)
+    mesh(new THREE.BoxGeometry(0.02, 0.02, 0.12), dark, pitchG, gx, 0.1, 0.24)
+    mesh(new THREE.BoxGeometry(0.02, 0.02, 0.12), dark, pitchG, gx, -0.02, 0.24)
+  }
+  // cassetta delle munizioni e nastro
+  mesh(new THREE.BoxGeometry(0.14, 0.18, 0.28), olive, pitchG, 0.2, -0.05, 0)
+  for (let i = 0; i < 5; i++) mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.06, 6).rotateZ(Math.PI / 2), brass, pitchG, 0.11, 0.06 - i * 0.02, -0.02)
+  // vapore quando è surriscaldata: sbuffi che salgono dalla camicia
+  const steamMat = new THREE.MeshBasicMaterial({ color: "#e8eef0", transparent: true, opacity: 0.35, depthWrite: false })
+  const steam = Array.from({ length: 5 }, (_, i) => {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), steamMat)
+    m.position.set(0, 0.12, -0.3 - i * 0.12)
+    m.visible = false
+    pitchG.add(m)
+    return m
+  })
+  return { root, yawG, pitchG, hot, jacket, steam, gun: pitchG }
+}
+
+/** Una porta di assi (le dimensioni del suo blocco), con le traverse. */
+function doorModel(min: readonly number[], max: readonly number[]) {
+  const g = new THREE.Group()
+  const w = max[0] - min[0]
+  const h = max[1] - min[1]
+  const d = max[2] - min[2]
+  const alongZ = d > w
+  const plank = new THREE.MeshLambertMaterial({ color: "#7a5434" })
+  const batten = new THREE.MeshLambertMaterial({ color: "#4a3220" })
+  const iron = new THREE.MeshLambertMaterial({ color: "#2a2622" })
+  const span = alongZ ? d : w
+  const n = Math.max(3, Math.round(span / 0.2))
+  for (let i = 0; i < n; i++) {
+    const a = -span / 2 + (span * (i + 0.5)) / n
+    const m = new THREE.Mesh(new THREE.BoxGeometry(alongZ ? w : span / n - 0.01, h - (i % 2) * 0.03, alongZ ? span / n - 0.01 : d), plank)
+    m.position.set(alongZ ? 0 : a, -(i % 2) * 0.015, alongZ ? a : 0)
+    m.castShadow = true
+    g.add(m)
+  }
+  for (const y of [-h * 0.32, h * 0.32]) {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(alongZ ? w + 0.06 : span, 0.12, alongZ ? span : d + 0.06), batten)
+    b.position.y = y
+    g.add(b)
+  }
+  const k = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), iron)
+  k.position.set(alongZ ? -w / 2 - 0.03 : span * 0.35, 0, alongZ ? span * 0.35 : -d / 2 - 0.03)
+  g.add(k)
+  g.position.set((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2)
+  return g
+}
+
 export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | null, map: MapDef) {
   const { pickups: PICKUPS, hill: HILL, track: TRACK } = map
+  // --- torrette e porte ---
+  const turrets = map.turrets.map((spot) => {
+    const t = turretModel(envMap)
+    t.root.position.set(spot.at[0], spot.at[1], spot.at[2])
+    scene.add(t.root)
+    return { ...t, spot, yaw: spot.yaw, pitch: 0 }
+  })
+  const doors = map.doors.map((d) => {
+    const g = doorModel(d.min, d.max)
+    scene.add(g)
+    return { g, rest: g.position.clone() }
+  })
+  const hotColor = new THREE.Color()
   // --- raccoglibili ---
   const pickMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.1, envMap, emissive: "#3a2410", emissiveIntensity: 0.6 })
   const ghostMat = new THREE.MeshBasicMaterial({ color: "#fff4dc", transparent: true, opacity: 0.16, depthWrite: false })
@@ -364,6 +470,39 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
 
   return {
     update(dt: number, t: number, frame: WorldFrame) {
+      turrets.forEach((tu, i) => {
+        const v = frame.turrets[i]
+        const yaw = v?.manned ? v.yaw : tu.spot.yaw
+        const pitch = v?.manned ? v.pitch : -0.05
+        // l'arma insegue lo sguardo di chi la usa, a riposo torna dritta
+        let dy = yaw - tu.yaw
+        dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI
+        const k = Math.min(1, dt * (v?.manned ? 25 : 3))
+        tu.yaw += dy * k
+        tu.pitch += (pitch - tu.pitch) * k
+        tu.yawG.rotation.y = tu.yaw
+        tu.pitchG.rotation.x = tu.pitch
+        tu.gun.visible = !v?.mine
+        const heat = v?.heat ?? 0
+        hotColor.setRGB(1.6 * heat * heat, 0.35 * heat * heat * heat, 0)
+        if (v?.jammed) hotColor.multiplyScalar(0.8 + 0.4 * Math.sin(t * 9))
+        tu.hot.emissive.copy(hotColor)
+        tu.steam.forEach((m, j) => {
+          m.visible = !!v?.jammed
+          if (!m.visible) return
+          const ph = (t * 0.8 + j * 0.2) % 1
+          m.position.y = 0.12 + ph * 0.7
+          m.scale.setScalar(0.6 + ph * 1.4)
+        })
+      })
+      doors.forEach((d, i) => {
+        const hp = frame.doors[i] ?? 1
+        d.g.visible = hp > 0
+        // più è presa, più le assi sono storte
+        const hurt = 1 - hp
+        d.g.rotation.set(hurt * 0.05, hurt * 0.12, hurt * 0.04)
+        d.g.position.set(d.rest.x, d.rest.y - hurt * 0.04, d.rest.z)
+      })
       const c = frame.cart
       cart.visible = trail.m.visible = !!c
       if (c) {

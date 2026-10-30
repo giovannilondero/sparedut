@@ -6,13 +6,14 @@
  * Assi: x verso est, y in alto, z verso sud. Metri.
  */
 import { Ops } from "@typeonce/ritmo"
+import { TURRET } from "./weapons.ts"
 
 export type V3 = readonly [number, number, number]
 
 export type Team = "benandanti" | "malandanti"
 export const TEAMS = ["benandanti", "malandanti"] as const satisfies readonly Team[]
 
-export type MapId = "glemone" | "osoppo" | "trincee" | "venzone" | "predil"
+export type MapId = "glemone" | "osoppo" | "trincee" | "venzone" | "predil" | "maran"
 
 export type Mat =
   | "pietra" // pietra grigia del Duomo
@@ -86,6 +87,20 @@ export interface PickupSpot {
   readonly at: V3
 }
 
+/** Una torretta con la mitraie: `at` è il piede dell'arma, `yaw` dove guarda a riposo. */
+export interface TurretSpot {
+  readonly at: V3
+  readonly yaw: number
+}
+
+/** Una porta che si sfonda: collide finché ha salute, poi non c'è più. */
+export interface DoorDef {
+  readonly name: string
+  readonly min: V3
+  readonly max: V3
+  readonly hp: number
+}
+
 export interface Spawn {
   readonly at: V3
   readonly yaw: number
@@ -122,6 +137,10 @@ export interface MapDef {
   readonly track: readonly V3[]
   /** Sotto questa quota si è caduti fuori dal mondo. */
   readonly killY: number
+  /** Le torrette con la mitraie. */
+  readonly turrets: readonly TurretSpot[]
+  /** Le porte da sfondare (non stanno in `blocks`: la fisica le toglie quando cedono). */
+  readonly doors: readonly DoorDef[]
 }
 
 /** Scompone un edificio (anche con portici) nei blocchi che collidono. */
@@ -182,6 +201,18 @@ export function defineMap(input: MapInput): MapDef {
     { min: [minX, top, minZ], max: [maxX, top + 1, maxZ], mat: "invisibile" }
   ]
   return { ...rest, blocks: [...blocks, ...edge, ...input.buildings.flatMap(buildingBlocks)] }
+}
+
+/** Dove sta chi usa una torretta: dietro l'arma, sullo stesso piano. */
+export function turretSeat(t: TurretSpot): V3 {
+  return [t.at[0] + Ops.sin(t.yaw) * TURRET.seat, t.at[1], t.at[2] + Ops.cos(t.yaw) * TURRET.seat]
+}
+
+/** Lo sguardo di chi usa la torretta, dentro l'arco in cui l'arma gira. */
+export function turretAim(t: TurretSpot, yaw: number, pitch: number): { readonly yaw: number; readonly pitch: number } {
+  let d = yaw - t.yaw
+  d -= Math.round(d / (2 * Math.PI)) * 2 * Math.PI
+  return { yaw: t.yaw + Math.max(-TURRET.arc, Math.min(TURRET.arc, d)), pitch: Math.max(-TURRET.pitchDown, Math.min(TURRET.pitchUp, pitch)) }
 }
 
 const dist3 = (a: V3, b: V3) => Math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2 + (b[2] - a[2]) ** 2)

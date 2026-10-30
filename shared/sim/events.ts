@@ -29,4 +29,10 @@ export type GameEvent =
   | { readonly t: "streak"; readonly s: string; readonly n: number }
   | { readonly t: "cart"; readonly a: "push" | "stop" | "back" | "arrived" }
   | { readonly t: "heal"; readonly s: string; readonly v: string; readonly n: number }
+  /** Una torretta: montata, smontata, surriscaldata, di nuovo fredda. */
+  | { readonly t: "turret"; readonly i: number; readonly s: string | null; readonly a: "on" | "off" | "hot" | "cool" }
+  /** Una porta presa (scheggia) o sfondata. */
+  | { readonly t: "door"; readonly i: number; readonly s: string; readonly a: "hit" | "broken" }
+  /** Le piume di una gjaline scoppiata addosso: non si vede niente per un po'. */
+  | { readonly t: "plumis"; readonly v: string; readonly n: number }
   | { readonly t: "match"; readonly a: "start" | "end"; readonly winner: Winner | null }

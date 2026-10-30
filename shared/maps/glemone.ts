@@ -305,5 +305,10 @@ export const GLEMONE = defineMap({
   pickups,
   navPoints,
   track,
-  killY: -10
+  killY: -10,
+  turrets: [
+    { at: [-23, G_DUOMO, -39], yaw: Math.PI },
+    { at: [23, G_LOW, 56], yaw: 0 }
+  ],
+  doors: []
 })

@@ -75,3 +75,51 @@ export function fricoDisc(): THREE.Group {
   g.add(new THREE.Mesh(fricoGeo.rim, mat))
   return g
 }
+
+let henGeo: { body: THREE.BufferGeometry; head: THREE.BufferGeometry; beak: THREE.BufferGeometry; comb: THREE.BufferGeometry; wattle: THREE.BufferGeometry; tail: THREE.BufferGeometry; wing: THREE.BufferGeometry; eye: THREE.BufferGeometry; leg: THREE.BufferGeometry } | null = null
+
+/**
+ * La gjaline: gallina bianca lunga ~40 cm che guarda verso +z, coi piedi a y≈-0.15.
+ * Le ali (`wings`, sinistra e destra) girano attorno all'asse z per sbattere.
+ */
+export function gjaline(): { g: THREE.Group; wings: THREE.Object3D[] } {
+  if (!henGeo) {
+    henGeo = {
+      body: new THREE.SphereGeometry(1, 14, 10).scale(0.13, 0.12, 0.18),
+      head: new THREE.SphereGeometry(0.065, 10, 8).translate(0, 0.15, 0.15),
+      beak: new THREE.ConeGeometry(0.022, 0.06, 6).rotateX(Math.PI / 2).translate(0, 0.14, 0.235),
+      comb: new THREE.BoxGeometry(0.018, 0.05, 0.08).translate(0, 0.225, 0.15),
+      wattle: new THREE.SphereGeometry(0.02, 6, 5).scale(1, 1.6, 1).translate(0, 0.095, 0.2),
+      tail: new THREE.ConeGeometry(0.07, 0.16, 6).rotateX(-0.9).translate(0, 0.08, -0.19),
+      wing: new THREE.SphereGeometry(1, 10, 6).scale(0.16, 0.025, 0.11).translate(0.15, 0, 0),
+      eye: new THREE.SphereGeometry(0.012, 6, 4),
+      leg: new THREE.CylinderGeometry(0.01, 0.01, 0.1, 5).translate(0, -0.15, 0)
+    }
+  }
+  const white = std("p-hen", { color: 0xfaf6ee, roughness: 0.95 })
+  const red = std("p-hen-red", { color: 0xd8281e, roughness: 0.6 })
+  const yellow = std("p-hen-beak", { color: 0xf0b030, roughness: 0.5 })
+  const black = std("p-hen-eye", { color: 0x101010, roughness: 0.3 })
+  const g = new THREE.Group()
+  const G = henGeo
+  g.add(new THREE.Mesh(G.body, white), new THREE.Mesh(G.head, white), new THREE.Mesh(G.tail, white))
+  g.add(new THREE.Mesh(G.beak, yellow), new THREE.Mesh(G.comb, red), new THREE.Mesh(G.wattle, red))
+  for (const sx of [-1, 1]) {
+    const eye = new THREE.Mesh(G.eye, black)
+    eye.position.set(sx * 0.052, 0.165, 0.185)
+    const leg = new THREE.Mesh(G.leg, yellow)
+    leg.position.set(sx * 0.05, 0, -0.02)
+    g.add(eye, leg)
+  }
+  const wings = [-1, 1].map((sx) => {
+    const pivot = new THREE.Group()
+    pivot.position.set(sx * 0.08, 0.04, 0)
+    const w = new THREE.Mesh(G.wing, white)
+    w.scale.x = sx
+    pivot.add(w)
+    g.add(pivot)
+    return pivot
+  })
+  g.traverse((o) => (o.castShadow = true))
+  return { g, wings }
+}

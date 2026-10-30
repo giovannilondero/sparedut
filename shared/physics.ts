@@ -34,6 +34,8 @@ export interface MoveResult {
 export interface RayHit {
   readonly dist: number
   readonly normal: Vec3
+  /** L'indice della porta colpita (in `map.doors`), o null per un muro. */
+  readonly door: number | null
 }
 
 /** Ciò che la simulazione chiede alla fisica. */
@@ -47,6 +49,11 @@ export interface PhysicsWorld {
   /** Primo muro lungo il raggio (dir normalizzata), entro `maxDist`. */
   readonly raycast: (origin: Vec3, dir: Vec3, maxDist: number) => RayHit | null
   readonly lineOfSight: (a: Vec3, b: Vec3) => boolean
+  /**
+   * Porte in piedi (true) o sfondate, nell'ordine di `map.doors`. Idempotente: la
+   * simulazione lo chiama a ogni tick con lo stato salvato, il client a ogni istantanea.
+   */
+  readonly setDoors: (standing: readonly boolean[]) => void
 }
 
 let ready: Promise<void> | null = null
@@ -78,6 +85,17 @@ export function createPhysicsWorld(map: MapDef, tuning: Partial<typeof KCC> = {}
     const desc = RAPIER.ColliderDesc.convexHull(points)
     if (desc) world.createCollider(desc.setCollisionGroups(WORLD_GROUPS))
   }
+  const doorColliders = map.doors.map((d) => {
+    const hx = (d.max[0] - d.min[0]) / 2
+    const hy = (d.max[1] - d.min[1]) / 2
+    const hz = (d.max[2] - d.min[2]) / 2
+    return world.createCollider(
+      RAPIER.ColliderDesc.cuboid(hx, hy, hz)
+        .setTranslation(d.min[0] + hx, d.min[1] + hy, d.min[2] + hz)
+        .setCollisionGroups(WORLD_GROUPS)
+    )
+  })
+  const doorOf = new Map(doorColliders.map((c, i) => [c.handle, i]))
   const stand = world.createCollider(RAPIER.ColliderDesc.capsule(HALF_STAND, CAPSULE_RADIUS).setCollisionGroups(CHARACTER_GROUPS))
   const crouch = world.createCollider(RAPIER.ColliderDesc.capsule(HALF_CROUCH, CAPSULE_RADIUS).setCollisionGroups(CHARACTER_GROUPS))
   const controller = world.createCharacterController(k.offset)
@@ -95,7 +113,7 @@ export function createPhysicsWorld(map: MapDef, tuning: Partial<typeof KCC> = {}
     ray.dir = { x: dir.x, y: dir.y, z: dir.z }
     const hit = world.castRayAndGetNormal(ray, maxDist, true, undefined, RAY_GROUPS)
     if (!hit) return null
-    return { dist: hit.timeOfImpact, normal: { x: hit.normal.x, y: hit.normal.y, z: hit.normal.z } }
+    return { dist: hit.timeOfImpact, normal: { x: hit.normal.x, y: hit.normal.y, z: hit.normal.z }, door: doorOf.get(hit.collider.handle) ?? null }
   }
 
   return {
@@ -149,6 +167,18 @@ export function createPhysicsWorld(map: MapDef, tuning: Partial<typeof KCC> = {}
       const d = Math.sqrt(dx * dx + dy * dy + dz * dz)
       if (d < 1e-6) return true
       return raycast(a, { x: dx / d, y: dy / d, z: dz / d }, d) === null
+    },
+    setDoors(standing) {
+      let changed = false
+      doorColliders.forEach((c, i) => {
+        const on = standing[i] ?? true
+        if (c.isEnabled() !== on) {
+          c.setEnabled(on)
+          changed = true
+        }
+      })
+      // Le interrogazioni (raggi, character controller) vedono il cambio dopo un passo.
+      if (changed) world.step()
     }
   }
 }
