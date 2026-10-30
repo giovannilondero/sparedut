@@ -9,7 +9,7 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
-    allowedHosts: ["railway-courtesy-birth-have.trycloudflare.com", ...(publicHost ? [publicHost] : [])],
+    allowedHosts: ["fruits-twist-lived-holdem.trycloudflare.com", ...(publicHost ? [publicHost] : [])],
     proxy: { "/ws": { target: "ws://localhost:3007", ws: true } }
   }
 })
