@@ -259,6 +259,56 @@ for (const w of BOARDWALKS) {
   box([w.minX - SHELF, SEA, w.minZ - SHELF], [w.maxX + SHELF, SHELF_Y, w.maxZ + SHELF], "invisibile")
 }
 
+/** Un corimano di passerele: dal pont `a` al pont `b` (sul ôr), a l'altece dal paviment `y`. */
+export interface Rail {
+  readonly a: P2
+  readonly b: P2
+  readonly y: number
+}
+
+/**
+ * I corimans des passerelis: dome dulà che di fûr e je aghe (no sui cjâfs che a poin su la
+ * tiere, no tes ziradis dulà che une passerele e continue te altre). A colidin.
+ */
+export const RAILS: readonly Rail[] = (() => {
+  const onFoot = (x: number, z: number) =>
+    LANDS.some((l) => insidePoly(l.poly, x, z)) || BOARDWALKS.some((w) => x > w.minX && x < w.maxX && z > w.minZ && z < w.maxZ)
+  const out: Rail[] = []
+  const STEP = 0.25
+  for (const w of BOARDWALKS) {
+    const edges: [P2, P2, P2][] = [
+      [[w.minX, w.minZ], [w.maxX, w.minZ], [0, -1]],
+      [[w.minX, w.maxZ], [w.maxX, w.maxZ], [0, 1]],
+      [[w.minX, w.minZ], [w.minX, w.maxZ], [-1, 0]],
+      [[w.maxX, w.minZ], [w.maxX, w.maxZ], [1, 0]]
+    ]
+    for (const [a, b, n] of edges) {
+      const len = Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1])
+      const dx = (b[0] - a[0]) / len
+      const dz = (b[1] - a[1]) / len
+      let start = -1
+      const close = (end: number) => {
+        if (start >= 0 && end - start > 0.6) out.push({ a: [a[0] + dx * start, a[1] + dz * start], b: [a[0] + dx * end, a[1] + dz * end], y: BOARDWALK_Y })
+        start = -1
+      }
+      for (let t = 0; t < len - 1e-6; t += STEP) {
+        const m = t + STEP / 2
+        const wet = !onFoot(a[0] + dx * m + n[0] * 0.3, a[1] + dz * m + n[1] * 0.3)
+        if (wet && start < 0) start = t
+        if (!wet) close(t)
+      }
+      close(len)
+    }
+  }
+  return out
+})()
+/** Il corimano al sta sul ôr, alt un metri; il so collider al è grues 12 cm. */
+export const RAIL_H = 1
+for (const r of RAILS) {
+  const n = 0.06
+  box([Math.min(r.a[0], r.b[0]) - (r.a[0] === r.b[0] ? n : 0), SEA, Math.min(r.a[1], r.b[1]) - (r.a[1] === r.b[1] ? n : 0)], [Math.max(r.a[0], r.b[0]) + (r.a[0] === r.b[0] ? n : 0), r.y + RAIL_H, Math.max(r.a[1], r.b[1]) + (r.a[1] === r.b[1] ? n : 0)], "invisibile")
+}
+
 /** Il puintut di len a schene di mus sul canâl fra il bosc e la isule dal casot (si passe ancje sot, a cuet). */
 export const PONT = { x0: 28.6, x1: 31.4, z0: 2, up: 5, down: 11, z1: 14, deck: 0.95, under: 0.75, rail: 1 } as const
 const wedges: Wedge[] = [
@@ -540,6 +590,10 @@ for (const t of TREES) {
   const r = 0.2 * t.s
   box([t.x - r, LAND, t.z - r], [t.x + r, LAND + 3 * t.s, t.z + r], "invisibile")
 }
+
+/** Lis briculis dai canâi: trê pâi leâts in alt; a colidin (si va ator). */
+export const BRICOLE: readonly P2[] = [[-15, -38], [15, -38], [-15, 0], [10, -20], [-15, 40], [15, 50], [-62, 10], [62, -8], [35, 56], [-40, 56]]
+for (const [x, z] of BRICOLE) box([x - 0.45, SEA, z - 0.45], [x + 0.45, WATER + 3.2, z + 0.45], "invisibile")
 
 // --- Ferâi (la mape e je di gnot) ------------------------------------------------------------
 

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { MODE_IDS } from "../shared/folklore.ts"
 import { IDLE_INPUT } from "../shared/input.ts"
-import { BOARDWALK_Y, LAND, LANTERNS, MARAN, PONT, SEA, TREES } from "../shared/maps/maran.ts"
+import { BOARDWALK_Y, LAND, LANTERNS, MARAN, PONT, RAILS, SEA, TREES } from "../shared/maps/maran.ts"
 import { stepBody, type Body } from "../shared/movement.ts"
 import { createPhysicsWorld, initPhysics } from "../shared/physics.ts"
 import { playBots } from "./play.ts"
@@ -99,4 +99,18 @@ test("i ferâi a son solits e no taponin i trois", async () => {
     expect(hit).not.toBeNull()
     expect(Math.min(...MARAN.navPoints.map((p) => Math.hypot(p[0] - l.x, p[2] - l.z)))).toBeGreaterThan(1.2)
   }
+})
+
+test("dai corimans no si passe: passerele e puintut", async () => {
+  await initPhysics()
+  const physics = createPhysicsWorld(MARAN)
+  expect(RAILS.length).toBeGreaterThan(8)
+  // de passerele de barene (z fra -6 e -3.6) viers sud: il corimano al ferme
+  const side = walkFor(physics, [-10, BOARDWALK_Y, -4.8], Math.PI, 90)
+  expect(side.body.z).toBeLessThan(-3.6)
+  expect(side.body.y).toBeGreaterThan(-0.05)
+  // dal puintut viers est
+  const deck = walkFor(physics, [30, PONT.deck, 8], -Math.PI / 2, 90)
+  expect(deck.body.x).toBeLessThan(PONT.x1)
+  expect(deck.body.y).toBeGreaterThan(PONT.deck - 0.1)
 })

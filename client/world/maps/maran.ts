@@ -10,9 +10,11 @@
  * fonts.
  */
 import * as THREE from "three"
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import {
   BOARDWALK_Y,
   BOARDWALKS,
+  BRICOLE,
   CASON_TOP,
   CASONS,
   CASOT,
@@ -25,6 +27,8 @@ import {
   PATHS,
   PIGNATE,
   PONT,
+  RAIL_H,
+  RAILS,
   SCJALIN,
   SEA,
   SHELF,
@@ -339,12 +343,26 @@ export const scenery: Scenery = {
       BOARDWALKS.some((w) => x > w.minX - 1.5 && x < w.maxX + 1.5 && z > w.minZ - 1.5 && z < w.maxZ + 1.5) ||
       (x > PONT.x0 - 2 && x < PONT.x1 + 2 && z > PONT.z0 - 2 && z < PONT.z1 + 2)
     let reedN = 0
+    // Lis cjanis a stan dulà che si jes de aghe e no colidin: a pocjis spanis de cjamare un stec
+    // al taponave mieç schermi par un moment (i "lamps neris"). A van in une mesh a part che
+    // e sparìs dongje dal voli.
+    const reedParts: THREE.BufferGeometry[] = []
+    const reedAdd = (g: THREE.BufferGeometry, col: THREE.Color) => {
+      const ng = g.index ? g.toNonIndexed() : g.clone()
+      g.dispose()
+      for (const name of Object.keys(ng.attributes)) if (name !== "position" && name !== "normal") ng.deleteAttribute(name)
+      const n = ng.getAttribute("position").count
+      const c = new Float32Array(n * 3)
+      for (let i = 0; i < n; i++) c.set([col.r, col.g, col.b], i * 3)
+      ng.setAttribute("color", new THREE.BufferAttribute(c, 3))
+      reedParts.push(ng)
+    }
     const reed = (x: number, z: number) => {
       if (landing(x, z) || x < minX + 1 || x > maxX - 1 || z < minZ + 1 || z > maxZ - 1) return
       const h = 1.4 + R() * 1.3
       const lx = (R() - 0.5) * 0.3
-      B.add("erba", cylBetween([x, WATER - 0.3, z], [x + lx, WATER + h, z + (R() - 0.5) * 0.3], 0.025, 0.008, 3), reedCol[reedN % 3])
-      if (reedN++ % 3 === 0) B.add("terra", sphere([x + lx, WATER + h - 0.1, z], 0.05, 3, 5), C("#5a4030"))
+      reedAdd(cylBetween([x, WATER - 0.3, z], [x + lx, WATER + h, z + (R() - 0.5) * 0.3], 0.025, 0.008, 3), reedCol[reedN % 3])
+      if (reedN++ % 3 === 0) reedAdd(sphere([x + lx, WATER + h - 0.1, z], 0.05, 3, 5), C("#5a4030"))
     }
     for (const l of LANDS) {
       const out = outward(l)
@@ -361,8 +379,21 @@ export const scenery: Scenery = {
       }
     }
 
+    {
+      const mat = new THREE.MeshLambertMaterial({ vertexColors: true })
+      mat.onBeforeCompile = (sh) => {
+        sh.fragmentShader = sh.fragmentShader.replace("#include <clipping_planes_fragment>", "#include <clipping_planes_fragment>\n\tif (length(vViewPosition) < 0.9) discard;")
+      }
+      const reeds = new THREE.Mesh(mergeGeometries(reedParts, false), mat)
+      for (const g of reedParts) g.dispose()
+      reeds.castShadow = true
+      reeds.receiveShadow = true
+      reeds.matrixAutoUpdate = false
+      root.add(reeds)
+    }
+
     // --- briculis e barcjis ---------------------------------------------------------------
-    for (const [x, z] of [[-15, -38], [15, -38], [-15, 0], [10, -20], [-15, 40], [15, 50], [-62, 10], [62, -8], [35, 56], [-40, 56]] as const) bricola(kit, x, z, R() * 3)
+    for (const [x, z] of BRICOLE) bricola(kit, x, z, R() * 3)
     const hull = (x: number, z: number, yaw: number, col: string) => {
       const s = new THREE.Shape()
       s.moveTo(-0.7, 0)
@@ -378,21 +409,35 @@ export const scenery: Scenery = {
     hull(-44, 47, 1.2, "#e8e0d0")
 
     // --- passerelis: breis e pâi -----------------------------------------------------------
+    /** Une trâf di len fra doi ponts (ancje inclinade). */
+    const beam = (a: V, b: V, w: number, h: number, col: THREE.Color) => {
+      const dx = b[0] - a[0]
+      const dy = b[1] - a[1]
+      const dz = b[2] - a[2]
+      const g = new THREE.BoxGeometry(Math.hypot(dx, dy, dz), h, w)
+      g.rotateZ(Math.atan2(dy, Math.hypot(dx, dz))).rotateY(Math.atan2(-dz, dx))
+      B.add("legno", g.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), col)
+    }
+    /** Un corimano lunc une linie di ponts al nivel dal paviment: pâi, trâf in alt e une a mieç. */
+    const railing = (pts: readonly V[]) => {
+      const post = C("#5a4430")
+      for (const [x, y, z] of pts) B.add("legno", boxAt([x - 0.05, y - 0.08, z - 0.05], [x + 0.05, y + RAIL_H + 0.04, z + 0.05]), post)
+      for (let i = 0; i + 1 < pts.length; i++) {
+        const [a, b] = [pts[i], pts[i + 1]]
+        beam([a[0], a[1] + RAIL_H, a[2]], [b[0], b[1] + RAIL_H, b[2]], 0.11, 0.07, C("#8a6a48"))
+        beam([a[0], a[1] + RAIL_H * 0.5, a[2]], [b[0], b[1] + RAIL_H * 0.5, b[2]], 0.06, 0.05, C("#76583c"))
+      }
+    }
+    // i corimans des passerelis: i stes de fisiche, un pâl ogni metri e mieç
+    for (const r of RAILS) {
+      const len = Math.hypot(r.b[0] - r.a[0], r.b[1] - r.a[1])
+      const n = Math.max(1, Math.round(len / 1.5))
+      const y = r.y + 0.03
+      railing(Array.from({ length: n + 1 }, (_, i): V => [r.a[0] + ((r.b[0] - r.a[0]) * i) / n, y, r.a[1] + ((r.b[1] - r.a[1]) * i) / n]))
+    }
     for (const w of BOARDWALKS) {
       const alongX = w.maxX - w.minX > w.maxZ - w.minZ
       const len = alongX ? w.maxX - w.minX : w.maxZ - w.minZ
-      for (let a = 0.6; a < len; a += 2.4) {
-        for (const side of [0, 1]) {
-          const x = alongX ? w.minX + a : side ? w.maxX - 0.1 : w.minX + 0.1
-          const z = alongX ? (side ? w.maxZ - 0.1 : w.minZ + 0.1) : w.minZ + a
-          B.add("legno", cylBetween([x, LAND - 0.1, z], [x, LAND + 1, z], 0.06, 0.06, 5), C("#7a6448"))
-        }
-      }
-      for (const side of [0, 1]) {
-        const a: V = alongX ? [w.minX, LAND + 0.95, side ? w.maxZ - 0.12 : w.minZ + 0.08] : [side ? w.maxX - 0.12 : w.minX + 0.08, LAND + 0.95, w.minZ]
-        const b: V = alongX ? [w.maxX, LAND + 1.0, a[2] + 0.04] : [a[0] + 0.04, LAND + 1.0, w.maxZ]
-        B.add("legno", boxAt(a, b), C("#8a7050"))
-      }
       // lis breis (un fregul parsore la tiere dulà che si poin) e i trâfs disot
       const y = BOARDWALK_Y + 0.03
       for (let a = 0; a < len; a += 0.35) {
@@ -412,14 +457,9 @@ export const scenery: Scenery = {
       const P = PONT
       const yAt = (z: number) => (z < P.up ? LAND + ((P.deck - LAND) * (z - P.z0)) / (P.up - P.z0) : z > P.down ? P.deck - ((P.deck - LAND) * (z - P.down)) / (P.z1 - P.down) : P.deck)
       for (let z = P.z0 + 0.2; z < P.z1 - 0.1; z += 0.34) B.add("legno", boxAt([P.x0 - 0.05, yAt(z) - 0.02, z - 0.15], [P.x1 + 0.05, yAt(z) + 0.03, z + 0.15]), C("#ffffff").offsetHSL(0, 0, (R() - 0.5) * 0.12))
-      for (const x of [P.x0 - 0.06, P.x1 + 0.06]) {
-        for (let z = P.z0 + 0.3; z <= P.z1 - 0.2; z += 1.5) B.add("legno", cylBetween([x, z > P.up && z < P.down ? SEA : yAt(z) - 0.3, z], [x, yAt(z) + P.rail, z], 0.06, 0.06, 6), C("#6a5038"))
-        // il corimano: un toc par ogni tratt, che al seguìs la schene
-        for (const [a, b] of [[P.z0 + 0.3, P.up], [P.up, P.down], [P.down, P.z1 - 0.2]] as const) {
-          B.add("legno", cylBetween([x, yAt(a) + P.rail, a], [x, yAt(b) + P.rail, b], 0.05, 0.05, 6), C("#8a6a48"))
-          B.add("legno", cylBetween([x, yAt(a) + P.rail * 0.5, a], [x, yAt(b) + P.rail * 0.5, b], 0.035, 0.035, 5), C("#7a5e40"))
-        }
-      }
+      // il corimano: su la linie dal collider, che al seguìs la schene (pâi tai ponts di plee)
+      const zs = [P.z0 + 0.15, (P.z0 + P.up) / 2, P.up, P.up + (P.down - P.up) / 4, (P.up + P.down) / 2, P.down - (P.down - P.up) / 4, P.down, (P.down + P.z1) / 2, P.z1 - 0.15]
+      for (const x of [P.x0 - 0.06, P.x1 + 0.06]) railing(zs.map((z): V => [x, yAt(z), z]))
       // i pâi tal ploc sot dal plan
       for (const z of [P.up + 0.3, (P.up + P.down) / 2, P.down - 0.3]) {
         for (const x of [P.x0 + 0.3, P.x1 - 0.3]) B.add("legno", cylBetween([x, -1.5, z], [x, P.under, z], 0.12, 0.12, 6), C("#5a4434"))
@@ -590,7 +630,7 @@ export const scenery: Scenery = {
       root.add(pot)
       B.add("ferro", new THREE.TorusGeometry(0.5, 0.025, 6, 24).rotateX(Math.PI / 2).translate(cx, PIGNATE.top, cz), C("#7a8086"))
       for (const sx of [-1, 1]) B.add("ferro", new THREE.TorusGeometry(0.08, 0.02, 5, 10, Math.PI).translate(cx + sx * 0.52, PIGNATE.top - 0.08, cz).rotateY(0), C("#5a5e62"))
-      const beer = new THREE.Mesh(new THREE.CircleGeometry(0.47, 20).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: "#d89a2a", roughness: 0.15, emissive: "#3a2000" }))
+      const beer = new THREE.Mesh(new THREE.CircleGeometry(0.47, 20).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: "#d89a2a", roughness: 0.3, emissive: "#3a2000" }))
       beer.position.set(cx, PIGNATE.top - 0.1, cz)
       root.add(beer)
       for (let i = 0; i < 9; i++) {
@@ -630,7 +670,7 @@ export const scenery: Scenery = {
     // la bale di spieli, cu la cjadene
     const [bx, by, bz] = DISCO
     B.add("ferro", cylBetween([bx, by + 0.35, bz], [bx, K.top, bz], 0.01), C("#c0c0c0"))
-    const ballMat = new THREE.MeshStandardMaterial({ color: "#e8e8f0", metalness: 1, roughness: 0.12, flatShading: true, envMap: (kit.MATS.ferro as THREE.MeshStandardMaterial).envMap ?? null, emissive: "#202030" })
+    const ballMat = new THREE.MeshStandardMaterial({ color: "#e8e8f0", metalness: 1, roughness: 0.3, flatShading: true, envMap: (kit.MATS.ferro as THREE.MeshStandardMaterial).envMap ?? null, emissive: "#202030" })
     const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.35, 2), ballMat)
     ball.position.set(bx, by, bz)
     root.add(ball)
@@ -700,7 +740,12 @@ export const scenery: Scenery = {
     }
     const flyGeo = new THREE.BufferGeometry()
     flyGeo.setAttribute("position", new THREE.BufferAttribute(flyPos, 3))
-    const fly = new THREE.Points(flyGeo, new THREE.PointsMaterial({ color: new THREE.Color(2.2, 2.6, 0.8), size: 0.09, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }))
+    const flyMat = new THREE.PointsMaterial({ color: new THREE.Color(2.2, 2.6, 0.8), size: 0.09, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })
+    // une lusigne tal voli e deventave un lamp grant mieç schermi: dongje de cjamare no si viôt
+    flyMat.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader.replace("#include <fog_vertex>", "#include <fog_vertex>\n\tif (-mvPosition.z < 1.5) gl_PointSize = 0.0;")
+    }
+    const fly = new THREE.Points(flyGeo, flyMat)
     fly.frustumCulled = false
     root.add(fly)
 
@@ -787,7 +832,7 @@ export const scenery: Scenery = {
     // il mâr di fûr al à il bûs de mape: dentri e je za la aghe (dôs a 2 cm a tremavin)
     const ring = new THREE.Shape([new THREE.Vector2(-1300, -1300), new THREE.Vector2(1300, -1300), new THREE.Vector2(1300, 1300), new THREE.Vector2(-1300, 1300)])
     ring.holes.push(new THREE.Path([new THREE.Vector2(minX, -minZ), new THREE.Vector2(minX, -maxZ), new THREE.Vector2(maxX, -maxZ), new THREE.Vector2(maxX, -minZ)]))
-    const sea = new THREE.Mesh(new THREE.ShapeGeometry(ring).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: "#4a8088", roughness: 0.08, metalness: 0.25, transparent: true, opacity: 0.9 }))
+    const sea = new THREE.Mesh(new THREE.ShapeGeometry(ring).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: "#4a8088", roughness: 0.22, metalness: 0.25, transparent: true, opacity: 0.9 }))
     sea.position.y = WATER
     sea.receiveShadow = true
     // Maran a nord-ovest: lis cjasis e la tor milenarie

@@ -209,7 +209,9 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     stoffa: lam(null, { side: THREE.DoubleSide }),
     vetro: new THREE.MeshStandardMaterial({ color: "#26303c", vertexColors: true, roughness: 0.12, metalness: 0.5, envMap, envMapIntensity: 1.2 }),
     luce: new THREE.MeshBasicMaterial({ vertexColors: true }),
-    acqua: new THREE.MeshStandardMaterial({ color: "#3c7380", vertexColors: true, roughness: 0.06, metalness: 0.2, envMap, transparent: true, opacity: 0.88 }),
+    // non troppo a specchio: coi riflessi stretti delle luci puntiformi certe GPU (a mezza
+    // precisione) vanno fuori scala e il pixel diventa nero
+    acqua: new THREE.MeshStandardMaterial({ color: "#3c7380", vertexColors: true, roughness: 0.2, metalness: 0.2, envMap, transparent: true, opacity: 0.88 }),
     terra: lam(tex.terra, { bumpMap: tex.terra, bumpScale: 1.2 }),
     roccia: lam(tex.roccia, { bumpMap: tex.roccia, bumpScale: 1.6 }),
     sacs: lam(tex.sacs, { bumpMap: tex.sacs, bumpScale: 1.4 }),
