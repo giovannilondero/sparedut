@@ -20,6 +20,7 @@ import {
   FORESTERIE,
   LAND,
   LANDS,
+  LANTERNS,
   OPENINGS,
   PATHS,
   PIGNATE,
@@ -670,8 +671,50 @@ export const scenery: Scenery = {
       return { ...f, i }
     })
 
+    // --- di gnot: ferâi lunc i trois e lis passerelis, lis lusignis tal bosc ------------------
+    /** Un ferâl su pâl: la lûs vere dome dulà che e covente, i altris a lusin e vonde. */
+    const lantern = (x: number, z: number, y0: number, real: boolean) => {
+      const top = y0 + 2.1
+      // il pâl al rive fin tal font (chei des passerelis a stan te aghe)
+      B.add("legno", cylBetween([x, SEA - 0.1, z], [x, top, z], 0.06, 0.05, 6), C("#4a3a2a"))
+      B.add("legno", cylBetween([x, top - 0.05, z], [x + 0.35, top - 0.05, z], 0.03, 0.03, 4), C("#4a3a2a"))
+      B.add("ferro", boxAt([x + 0.22, top - 0.42, z - 0.13], [x + 0.48, top - 0.36, z + 0.13]), C("#2a2a2a"))
+      B.add("ferro", new THREE.ConeGeometry(0.2, 0.16, 4).rotateY(Math.PI / 4).translate(x + 0.35, top - 0.02, z), C("#2a2a2a"))
+      B.add("luce", boxAt([x + 0.25, top - 0.36, z - 0.1], [x + 0.45, top - 0.1, z + 0.1]), new THREE.Color(3, 2, 0.9))
+      if (!real) return
+      const l = new THREE.PointLight("#ffb860", 10, 13, 1.5)
+      l.position.set(x + 0.35, top - 0.3, z)
+      root.add(l)
+      quality.lights.push(l)
+    }
+    for (const l of LANTERNS) lantern(l.x, l.z, l.y, l.real)
+    // lis lusignis: pons che a svolin plan tal bosc e tes cjanis, e si piain e distudin
+    const flies = 140
+    const flyBase = new Float32Array(flies * 3)
+    const flyPos = new Float32Array(flies * 3)
+    for (let i = 0; i < flies; i++) {
+      const inWood = i < 100
+      const x = inWood ? 14 + R() * 24 : 6 + R() * 22
+      const z = inWood ? -30 + R() * 32 : 16 + R() * 10
+      flyBase.set([x, LAND + 0.5 + R() * 2.2, z], i * 3)
+    }
+    const flyGeo = new THREE.BufferGeometry()
+    flyGeo.setAttribute("position", new THREE.BufferAttribute(flyPos, 3))
+    const fly = new THREE.Points(flyGeo, new THREE.PointsMaterial({ color: new THREE.Color(2.2, 2.6, 0.8), size: 0.09, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }))
+    fly.frustumCulled = false
+    root.add(fly)
+
     return {
       update(t) {
+        for (let i = 0; i < flies; i++) {
+          const k = i * 3
+          // chê che e je distudade e va sot tiere
+          const on = Math.sin(t * (0.7 + (i % 7) * 0.13) + i * 2.3) > -0.2 ? 0 : -50
+          flyPos[k] = flyBase[k] + Math.sin(t * 0.31 + i) * 1.4
+          flyPos[k + 1] = flyBase[k + 1] + Math.sin(t * 0.53 + i * 1.7) * 0.4 + on
+          flyPos[k + 2] = flyBase[k + 2] + Math.cos(t * 0.27 + i * 0.9) * 1.4
+        }
+        flyGeo.attributes.position.needsUpdate = true
         const beat = (t * BPM) / 60
         const kick = Math.max(0, 1 - (beat % 1) * 3)
         const bar = Math.floor(beat)
@@ -766,6 +809,11 @@ export const scenery: Scenery = {
       roof.position.set(x, h + 1.5, z)
       town.add(house, roof)
     }
+    // lis cjasis di Maran di gnot: cualchi barcon impiât
+    const lit: number[] = []
+    for (let i = 0; i < 90; i++) lit.push(-320 + r() * 360, 2 + r() * 9, -326 + r() * 2 - (r() < 0.5 ? 0 : 20))
+    const windows = new THREE.Points(new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(lit, 3)), new THREE.PointsMaterial({ color: new THREE.Color(2.4, 1.6, 0.7), size: 1.6, sizeAttenuation: true, toneMapped: false, fog: false }))
+    town.add(windows)
     const tower = new THREE.Mesh(new THREE.BoxGeometry(8, 42, 8), new THREE.MeshLambertMaterial({ color: "#d8c4a0" }))
     tower.position.set(-180, 21, -350)
     const top = new THREE.Mesh(new THREE.ConeGeometry(6.5, 10, 4).rotateY(Math.PI / 4), roofs)
@@ -794,6 +842,7 @@ export const scenery: Scenery = {
       [0, 6, -72]
     ]
   },
-  light: { sun: [-0.4, 0.55, 0.7], fog: 0.0012 }
+  // di gnot: la lune alte a sud-est, une fumate sutile e blu
+  light: { sun: [0.45, 0.5, 0.75], fog: 0.002, sky: "gnot" }
 }
 

@@ -52,7 +52,7 @@ All'avvio il server stampa gli indirizzi di rete locale: gli altri computer dell
 | **Trinceis dal Pal Piçul** | le trincee della Grande Guerra sulle Alpi Carniche |
 | **Vençon** | il borgo murato di Venzone col Duomo di Sant'Andrea |
 | **Cave dal Predil** | la miniera di Raibl: binari e carrelli |
-| **Lagune di Maran** | la riserva delle Foci dello Stella, grande e quasi tutta acqua bassa, con barene dalle rive irregolari: si guada ma piano, le passerelle e i sentieri sono le strade veloci. La foresteria a due piani (salone, cucina e bagni; camerate e bagni sopra; tetto piano calpestabile con la mitragliatrice), l'argine, il bosco con due sentieri fra gli alberi e il ponticello di legno a schiena d'asino fino al capanno di osservazione, i casoni dei pescatori |
+| **Lagune di Maran** | di notte, col chiaro di luna, le lanterne lungo sentieri e passerelle e le lucciole nel bosco: la riserva delle Foci dello Stella, grande e quasi tutta acqua bassa, con barene dalle rive irregolari: si guada ma piano, le passerelle e i sentieri sono le strade veloci. La foresteria a due piani (salone, cucina e bagni; camerate e bagni sopra; tetto piano calpestabile con la mitragliatrice), l'argine, il bosco con due sentieri fra gli alberi e il ponticello di legno a schiena d'asino fino al capanno di osservazione, i casoni dei pescatori |
 
 Nella Laguna il **capanno di osservazione** ha la porta chiusa: si sfonda a pedate col mescul, a colpi o con un'esplosione.
 Dentro c'è la discoteca (palla a specchi, luci, pavimento che cambia colore a tempo, musica che da fuori si sente attutita),

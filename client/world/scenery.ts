@@ -10,6 +10,7 @@
 import type * as THREE from "three"
 import type { MapDef } from "../../shared/map.ts"
 import type { Quality } from "../contracts.ts"
+import type { Sky } from "./backdrop.ts"
 import type { Batch, Inst, V } from "./geo.ts"
 import type { Atlas, WorldTextures } from "./tex.ts"
 
@@ -91,6 +92,6 @@ export interface Scenery {
   backdrop(kit: SceneryKit): THREE.Object3D[]
   /** Il giro lento della camera del menu: punti (chiusi ad anello) e dove guarda. */
   readonly menu: { readonly path: readonly V[]; readonly look: readonly V[] }
-  /** Luce e foschia: direzione del sole (verso il sole), densità della nebbia. */
-  readonly light?: { readonly sun?: V; readonly fog?: number }
+  /** Luce e foschia: direzione del sole o della luna (verso l'astro), nebbia, giorno o notte. */
+  readonly light?: { readonly sun?: V; readonly fog?: number; readonly sky?: Sky }
 }

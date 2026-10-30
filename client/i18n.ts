@@ -326,7 +326,7 @@ const fur: Strings = {
     trincee: { name: "Trinceis dal Pal Piçul", sub: "La Grande Vuere tes Alps Cjargnelis" },
     venzone: { name: "Vençon", sub: "Il borc dentri lis muris e il Dom di Sant Andree" },
     predil: { name: "Cave dal Predil", sub: "La miniere di Raibl, binaris e carei" },
-    maran: { name: "Lagune di Maran", sub: "La riserve, la foresterie e il casot dai fenicotars" }
+    maran: { name: "Lagune di Maran", sub: "Di gnot, sot de lune: la riserve, il bosc e il casot dai fenicotars" }
   },
   levels: {
     zovin: { name: "Zovin", sub: "Facil: apene tornât di Udin" },
@@ -642,7 +642,7 @@ const it: Strings = {
     trincee: { name: "Trinceis dal Pal Piçul", sub: "La Grande Guerra sulle Alpi Carniche" },
     venzone: { name: "Vençon", sub: "Il borgo murato di Venzone e il Duomo di Sant'Andrea" },
     predil: { name: "Cave dal Predil", sub: "La miniera di Raibl: binari e carrelli" },
-    maran: { name: "Laguna di Marano", sub: "La riserva, la foresteria e il capanno dei fenicotteri" }
+    maran: { name: "Laguna di Marano", sub: "Di notte, sotto la luna: la riserva, il bosco e il capanno dei fenicotteri" }
   },
   levels: {
     zovin: { name: "Zovin", sub: "Facile: appena tornato da Udine" },

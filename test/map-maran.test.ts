@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { MODE_IDS } from "../shared/folklore.ts"
 import { IDLE_INPUT } from "../shared/input.ts"
-import { BOARDWALK_Y, LAND, MARAN, PONT, SEA, TREES } from "../shared/maps/maran.ts"
+import { BOARDWALK_Y, LAND, LANTERNS, MARAN, PONT, SEA, TREES } from "../shared/maps/maran.ts"
 import { stepBody, type Body } from "../shared/movement.ts"
 import { createPhysicsWorld, initPhysics } from "../shared/physics.ts"
 import { playBots } from "./play.ts"
@@ -89,4 +89,14 @@ test("i arbui dal bosc a son solits", async () => {
   // si cor cuintri il tronc di est: si reste di ca
   const r = walkFor(physics, [t.x + 3, LAND, t.z], Math.PI / 2, 60)
   expect(r.body.x).toBeGreaterThan(t.x)
+})
+
+test("i ferâi a son solits e no taponin i trois", async () => {
+  await initPhysics()
+  const physics = createPhysicsWorld(MARAN)
+  for (const l of LANTERNS) {
+    const hit = physics.raycast({ x: l.x + 1, y: l.y + 1, z: l.z }, { x: -1, y: 0, z: 0 }, 2)
+    expect(hit).not.toBeNull()
+    expect(Math.min(...MARAN.navPoints.map((p) => Math.hypot(p[0] - l.x, p[2] - l.z)))).toBeGreaterThan(1.2)
+  }
 })

@@ -541,6 +541,35 @@ for (const t of TREES) {
   box([t.x - r, LAND, t.z - r], [t.x + r, LAND + 3 * t.s, t.z + r], "invisibile")
 }
 
+// --- Ferâi (la mape e je di gnot) ------------------------------------------------------------
+
+/** I ferâi su pâl lunc i trois e lis passerelis: il pâl al colît; `real` = al fâs lûs vere. */
+export const LANTERNS: readonly { readonly x: number; readonly z: number; readonly y: number; readonly real: boolean }[] = (
+  [
+    [-12.4, -62.6, LAND, true], // lis puartis de foresterie
+    [16.6, -62.6, LAND, false],
+    [-2, -49, LAND, false], // il cjâf dal arzin
+    [6.6, -10.2, B, true], // la passerele dal bosc
+    [17, -11, LAND, false],
+    [27, -18.4, LAND, false],
+    [31.6, -4, LAND, false],
+    [27.6, 1.6, LAND, true], // il puintut
+    [32.4, 14.6, LAND, false],
+    [34.6, 21.6, LAND, false],
+    [38, 24.4, LAND, true], // la puarte dal casot
+    [42.4, -40, B, false], // la passerele tra lis cjanis
+    [42.4, -27, B, true],
+    [16.8, 24.8, B, true], // la zirade de passerele dal casot
+    [7, 21.6, B, false],
+    [-18.8, -3.2, B, true], // la passerele de barene
+    [-39.2, -40, B, false],
+    [-2, 61, LAND, false], // il borc
+    [-16, 66, LAND, true],
+    [20, 70, LAND, false]
+  ] as const
+).map(([x, z, y, real]) => ({ x, z, y, real }))
+for (const l of LANTERNS) box([l.x - 0.08, l.y, l.z - 0.08], [l.x + 0.08, l.y + 2.1, l.z + 0.08], "invisibile")
+
 /** Il cjar: de foresterie jù pal arzin fin tal borc dai casons. */
 const track: V3[] = [
   [0, LAND, -56],

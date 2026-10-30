@@ -10,7 +10,7 @@ import * as THREE from "three"
 import { buildingBlocks, type Block, type Building, type MapDef, type Mat } from "../shared/map.ts"
 import { CAMPANILE, COMUNE, DUOMO, G_DUOMO, G_LOW, G_MID } from "../shared/maps/glemone.ts"
 import type { WorldFrame, WorldScene, Quality } from "./contracts.ts"
-import { HORIZON, makeSky, makeTerrain, makeTown, nearGround } from "./world/backdrop.ts"
+import { makeSky, makeTerrain, makeTown, nearGround, SKIES } from "./world/backdrop.ts"
 import { createDynamic } from "./world/dynamic.ts"
 import { SCENERY } from "./world/maps/index.ts"
 import type { K, SceneryKit, SceneryLive } from "./world/scenery.ts"
@@ -144,15 +144,18 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
   root.name = `mappa-${map.id}`
   scene.add(root)
 
-  // Luce di fine pomeriggio: sole basso da sud-ovest, cielo caldo, foschia.
+  // Luce di fine pomeriggio (sole basso da sud-ovest, cielo caldo, foschia) o notte di luna.
+  const skyKind = scenery?.light?.sky ?? "di"
+  const palette = SKIES[skyKind]
   const sunDir = new THREE.Vector3(...(scenery?.light?.sun ?? [-0.62, 0.4, 0.68])).normalize()
-  scene.fog = new THREE.FogExp2(HORIZON.getHex(), scenery?.light?.fog ?? 0.0011)
-  scene.background = HORIZON.clone()
-  const sky = makeSky(sunDir)
+  const horizon = new THREE.Color(palette.horizon)
+  scene.fog = new THREE.FogExp2(horizon.getHex(), scenery?.light?.fog ?? 0.0011)
+  scene.background = horizon
+  const sky = makeSky(sunDir, skyKind)
   root.add(sky)
-  const hemi = new THREE.HemisphereLight("#cfe0f5", "#9a7a55", 1.25)
+  const hemi = new THREE.HemisphereLight(palette.hemi.sky, palette.hemi.ground, palette.hemi.intensity)
   root.add(hemi)
-  const sun = new THREE.DirectionalLight("#ffd3a0", 3.1)
+  const sun = new THREE.DirectionalLight(palette.sun.color, palette.sun.intensity)
   const focus = new THREE.Vector3((BOUNDS.minX + BOUNDS.maxX) / 2, 10, (BOUNDS.minZ + BOUNDS.maxZ) / 2)
   sun.position.copy(focus).addScaledVector(sunDir, 260)
   sun.target.position.copy(focus)
@@ -184,7 +187,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
   // Mappa d'ambiente dal cielo, per metalli, vetri, acqua e marmo.
   const pmrem = new THREE.PMREMGenerator(renderer)
   const envScene = new THREE.Scene()
-  envScene.add(makeSky(sunDir))
+  envScene.add(makeSky(sunDir, skyKind))
   const envMap = pmrem.fromScene(envScene, 0, 0.1, 10).texture
   pmrem.dispose()
 
