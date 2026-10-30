@@ -77,6 +77,12 @@ I **cjars di fen** (carri di fieno) lanciano sul ballatoio del campanile e sulla
 `R` ricaricare · `1-4` armi · `Q` arma precedente · rotella cambia arma · `G` bomba di sgnape · `F` mina di Raibl · `Tab` classifica ·
 `Invio`/`T` chat · `V` frasi rapide (Mandi!, Orpo!, …) · `B` armeria · `Esc` menu di partita.
 
+**Controller** (DualShock, o ogni pad che il browser riconosce con la mappatura standard; basta premere un tasto in partita):
+stick sinistro muoversi (analogico) · stick destro guardare · `R2` sparare · `L2` mirare · `✕` saltare · `◯` accucciarsi ·
+`L3` correre (finché si va avanti) · `▢` ricaricare · `△` arma dopo · croce armi (su principale, sinistra pistola, destra lanciafrico, giù arma precedente) ·
+`R3` mescul · `L1` bomba · `R1` mina · `Share` classifica · `Touchpad` armeria · `Options` menu di partita. Il pad vibra quando spari e quando ti colpiscono.
+I menu fuori dalla partita si usano ancora col mouse.
+
 ## Struttura
 
 Stack dalle linee guida (`giovannilondero/game-dev-guidelines`, 3D): **Ritmo** (ECS e simulazione) + **Three.js** + **Howler.js** + **Rapier 3D**.

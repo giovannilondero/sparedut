@@ -159,7 +159,8 @@ const KEYS_FUR = [
   ["Invio", "chat · <kbd>V</kbd> frasis sveltis"],
   ["B", "armarie"],
   ["Esc", "menù de partide · indaûr"],
-  ["F3", "prestazions"]
+  ["F3", "prestazions"],
+  ["🎮 DualShock", "stick çamp môf · stick dret cjale · <kbd>R2</kbd> spare · <kbd>L2</kbd> mire · <kbd>✕</kbd> salte · <kbd>◯</kbd> sbassiti · <kbd>L3</kbd> cor · <kbd>▢</kbd> torne a cjamâ · <kbd>△</kbd> arme dopo · crôs armis · <kbd>R3</kbd> mescul · <kbd>L1</kbd> bombe · <kbd>R1</kbd> mine · <kbd>Share</kbd> classifiche · <kbd>Touchpad</kbd> armarie · <kbd>Options</kbd> menù"]
 ]
 
 const KEYS_IT = [
@@ -176,7 +177,8 @@ const KEYS_IT = [
   ["Invio", "chat · <kbd>V</kbd> frasi rapide"],
   ["B", "armeria"],
   ["Esc", "menu partita · indietro"],
-  ["F3", "prestazioni"]
+  ["F3", "prestazioni"],
+  ["🎮 DualShock", "stick sinistro muoviti · stick destro guarda · <kbd>R2</kbd> spara · <kbd>L2</kbd> mira · <kbd>✕</kbd> salta · <kbd>◯</kbd> accucciati · <kbd>L3</kbd> corri · <kbd>▢</kbd> ricarica · <kbd>△</kbd> arma dopo · croce armi · <kbd>R3</kbd> mescul · <kbd>L1</kbd> bomba · <kbd>R1</kbd> mina · <kbd>Share</kbd> classifica · <kbd>Touchpad</kbd> armeria · <kbd>Options</kbd> menu"]
 ]
 
 const keysHtml = (rows: string[][]) => rows.map(([k, d]) => `<div><kbd>${k}</kbd> ${d}</div>`).join("")
@@ -271,7 +273,7 @@ const fur: Strings = {
     chatPh: "Scrîf… (Invio par mandâ)",
     deathTitle: "Ti àn fat frico!",
     deathHint: "Frache <kbd>B</kbd> par cambiâ l'arme principâl",
-    clickplay: "<div>Fâs clic par zuiâ</div><small>Esc pal menù de partide</small>",
+    clickplay: "<div>Fâs clic par zuiâ</div><small>o frache un boton dal controller · Esc pal menù de partide</small>",
     language: "Lenghe",
     mapLabel: "Mape"
   },
@@ -565,7 +567,7 @@ const it: Strings = {
     chatPh: "Scrivi… (Invio per mandare)",
     deathTitle: "Ti hanno fatto frico!",
     deathHint: "Premi <kbd>B</kbd> per cambiare arma principale",
-    clickplay: "<div>Clicca per giocare</div><small>Esc per il menu della partita</small>",
+    clickplay: "<div>Clicca per giocare</div><small>o premi un tasto del controller · Esc per il menu della partita</small>",
     language: "Lingua",
     mapLabel: "Mappa"
   },

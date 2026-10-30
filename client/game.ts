@@ -139,7 +139,8 @@ export class Game {
       onSlot: (slot) => this.selectSlot(slot),
       onLastWeapon: () => this.selectWeapon(this.lastWeapon),
       onWheel: (dir) => this.cycleWeapon(dir),
-      onKey: (code, down) => this.key(code, down)
+      onKey: (code, down) => this.key(code, down),
+      onPause: () => this.padPause()
     })
     d.renderer.domElement.addEventListener("click", () => {
       if (this.running && this.overlay === "none" && !this.chatting) this.controls.lock()
@@ -413,6 +414,7 @@ export class Game {
           }
           this.hud.damage(angle)
           this.shake = Math.min(1, this.shake + e.d / 60)
+          this.controls.rumble(e.d / 40, 0.4, 180)
         }
         return
       }
@@ -569,9 +571,19 @@ export class Game {
       this.toggleQuick(false)
       return
     }
-    if (code === "KeyV" && this.controls.locked) this.toggleQuick(!this.quickOpen)
-    if ((code === "Enter" || code === "KeyT") && this.controls.locked) this.openChat()
+    if (code === "KeyV" && this.controls.active) this.toggleQuick(!this.quickOpen)
+    if ((code === "Enter" || code === "KeyT") && this.controls.active) this.openChat()
     if (code === "KeyB") this.openOverlay(this.overlay === "loadout" ? "none" : "loadout")
+  }
+
+  /** Options sul pad: apre il menu di partita, o lo chiude (un passo alla volta come Esc). */
+  private padPause() {
+    if (!this.running || this.chatting) return
+    if (this.overlay === "none") {
+      if (document.pointerLockElement) document.exitPointerLock()
+      this.openOverlay("pause")
+    } else if (this.overlay === "pause") this.openOverlay("none")
+    else this.escape()
   }
 
   /** Esc chiude quel che è aperto, un passo alla volta. Il blocco del mouse lo ridà solo un clic. */
@@ -606,7 +618,7 @@ export class Game {
     const input = $<HTMLInputElement>("chat-input")
     input.blur()
     input.classList.add("hidden")
-    if (!this.controls.locked) this.controls.lock()
+    if (!this.controls.active) this.controls.lock()
   }
 
   /** Il modulo delle impostazioni torna nel menu principale. */
@@ -856,6 +868,7 @@ export class Game {
     const def = WEAPONS[id]
     viewmodel.fire()
     this.kickPitch += def.kick
+    this.controls.rumble(def.kick * 4, 0.15 + def.kick * 3, def.mode === "melee" ? 90 : 60)
     if (def.mode === "melee") {
       audio.play("melee_swing")
       return
@@ -948,6 +961,7 @@ export class Game {
     const now = performance.now() / 1000
     if (this.offset !== null) this.renderTick = now * 60 + this.offset - INTERP_TICKS
 
+    this.controls.poll(dt, this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over")
     this.acc += Math.min(dt, 0.25)
     while (this.acc >= DT) {
       this.acc -= DT
@@ -1064,7 +1078,7 @@ export class Game {
         speed: b ? Math.hypot(b.vx, b.vz) : 0,
         grounded: b?.grounded ?? true,
         aiming,
-        sprinting: sprinting({ ...IDLE_INPUT, mz: c.move().mz, buttons: c.buttons() }, b?.crouch ?? false),
+        sprinting: sprinting({ ...IDLE_INPUT, mz: c.move().mz, buttons: c.heldButtons() }, b?.crouch ?? false),
         crouch: b?.crouch ?? false,
         lookDx,
         lookDy,
@@ -1109,7 +1123,7 @@ export class Game {
       const px = (Math.tan(spread) / Math.tan(((camera.fov / 2) * Math.PI) / 180)) * (innerHeight / 2)
       this.hud.crosshair(Math.min(60, px * 1.6), you.alive && !scoped)
     }
-    this.hud.clickToPlay(!this.controls.locked && this.overlay === "none" && !this.chatting && !this.boardOpen && s?.phase.tag !== "Over")
+    this.hud.clickToPlay(!this.controls.active && this.overlay === "none" && !this.chatting && !this.boardOpen && s?.phase.tag !== "Over")
   }
 
   render() {
