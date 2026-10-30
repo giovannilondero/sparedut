@@ -1,13 +1,13 @@
 /**
  * Il mondo fisico statico di Gemona in Rapier 3D: muri, terreno, rampe.
  * Lo costruiscono sia il server (simulazione autoritativa) sia il client
- * (predizione del proprio movimento), dagli stessi dati di `map.ts`.
+ * (predizione del proprio movimento), dagli stessi dati della mappa.
  *
  * I giocatori non collidono fra loro (stile arena): ognuno è una capsula che il
  * character controller muove contro il solo mondo statico.
  */
 import RAPIER from "@dimforge/rapier3d-compat"
-import { BLOCKS, WEDGES } from "./map.ts"
+import type { MapDef } from "./map.ts"
 import type { Vec3 } from "./vec.ts"
 
 export const CAPSULE_RADIUS = 0.4
@@ -34,10 +34,14 @@ export interface MoveResult {
 export interface RayHit {
   readonly dist: number
   readonly normal: Vec3
+  /** L'indice della porta colpita (in `map.doors`), o null per un muro. */
+  readonly door: number | null
 }
 
 /** Ciò che la simulazione chiede alla fisica. */
 export interface PhysicsWorld {
+  /** La mappa da cui è costruito il mondo (cjars di fen, quota di caduta). */
+  readonly map: MapDef
   /** Sposta un personaggio coi piedi in `feet` di `delta`, scivolando sui muri. */
   readonly moveCharacter: (feet: Vec3, delta: Vec3, crouch: boolean) => MoveResult
   /** C'è spazio per alzarsi in piedi? */
@@ -45,6 +49,11 @@ export interface PhysicsWorld {
   /** Primo muro lungo il raggio (dir normalizzata), entro `maxDist`. */
   readonly raycast: (origin: Vec3, dir: Vec3, maxDist: number) => RayHit | null
   readonly lineOfSight: (a: Vec3, b: Vec3) => boolean
+  /**
+   * Porte in piedi (true) o sfondate, nell'ordine di `map.doors`. Idempotente: la
+   * simulazione lo chiama a ogni tick con lo stato salvato, il client a ogni istantanea.
+   */
+  readonly setDoors: (standing: readonly boolean[]) => void
 }
 
 let ready: Promise<void> | null = null
@@ -54,10 +63,10 @@ export const initPhysics = () => (ready ??= RAPIER.init())
 /** Parametri del character controller (sovrascrivibili nei test). */
 export const KCC = { offset: 0.02, autostep: true, snap: 0.35, split: true }
 
-export function createPhysicsWorld(tuning: Partial<typeof KCC> = {}): PhysicsWorld {
+export function createPhysicsWorld(map: MapDef, tuning: Partial<typeof KCC> = {}): PhysicsWorld {
   const k = { ...KCC, ...tuning }
   const world = new RAPIER.World({ x: 0, y: 0, z: 0 })
-  for (const b of BLOCKS) {
+  for (const b of map.blocks) {
     const hx = (b.max[0] - b.min[0]) / 2
     const hy = (b.max[1] - b.min[1]) / 2
     const hz = (b.max[2] - b.min[2]) / 2
@@ -67,7 +76,7 @@ export function createPhysicsWorld(tuning: Partial<typeof KCC> = {}): PhysicsWor
         .setCollisionGroups(WORLD_GROUPS)
     )
   }
-  for (const w of WEDGES) {
+  for (const w of map.wedges) {
     const base = Math.min(w.y0, w.y1) - 0.5
     const points = new Float32Array([
       w.x0, base, w.z0, w.x1, base, w.z0, w.x0, base, w.z1, w.x1, base, w.z1,
@@ -76,6 +85,17 @@ export function createPhysicsWorld(tuning: Partial<typeof KCC> = {}): PhysicsWor
     const desc = RAPIER.ColliderDesc.convexHull(points)
     if (desc) world.createCollider(desc.setCollisionGroups(WORLD_GROUPS))
   }
+  const doorColliders = map.doors.map((d) => {
+    const hx = (d.max[0] - d.min[0]) / 2
+    const hy = (d.max[1] - d.min[1]) / 2
+    const hz = (d.max[2] - d.min[2]) / 2
+    return world.createCollider(
+      RAPIER.ColliderDesc.cuboid(hx, hy, hz)
+        .setTranslation(d.min[0] + hx, d.min[1] + hy, d.min[2] + hz)
+        .setCollisionGroups(WORLD_GROUPS)
+    )
+  })
+  const doorOf = new Map(doorColliders.map((c, i) => [c.handle, i]))
   const stand = world.createCollider(RAPIER.ColliderDesc.capsule(HALF_STAND, CAPSULE_RADIUS).setCollisionGroups(CHARACTER_GROUPS))
   const crouch = world.createCollider(RAPIER.ColliderDesc.capsule(HALF_CROUCH, CAPSULE_RADIUS).setCollisionGroups(CHARACTER_GROUPS))
   const controller = world.createCharacterController(k.offset)
@@ -93,10 +113,11 @@ export function createPhysicsWorld(tuning: Partial<typeof KCC> = {}): PhysicsWor
     ray.dir = { x: dir.x, y: dir.y, z: dir.z }
     const hit = world.castRayAndGetNormal(ray, maxDist, true, undefined, RAY_GROUPS)
     if (!hit) return null
-    return { dist: hit.timeOfImpact, normal: { x: hit.normal.x, y: hit.normal.y, z: hit.normal.z } }
+    return { dist: hit.timeOfImpact, normal: { x: hit.normal.x, y: hit.normal.y, z: hit.normal.z }, door: doorOf.get(hit.collider.handle) ?? null }
   }
 
   return {
+    map,
     moveCharacter(feet, delta, crouching) {
       const collider = crouching ? crouch : stand
       const half = crouching ? HALF_CROUCH : HALF_STAND
@@ -146,6 +167,18 @@ export function createPhysicsWorld(tuning: Partial<typeof KCC> = {}): PhysicsWor
       const d = Math.sqrt(dx * dx + dy * dy + dz * dz)
       if (d < 1e-6) return true
       return raycast(a, { x: dx / d, y: dy / d, z: dz / d }, d) === null
+    },
+    setDoors(standing) {
+      let changed = false
+      doorColliders.forEach((c, i) => {
+        const on = standing[i] ?? true
+        if (c.isEnabled() !== on) {
+          c.setEnabled(on)
+          changed = true
+        }
+      })
+      // Le interrogazioni (raggi, character controller) vedono il cambio dopo un passo.
+      if (changed) world.step()
     }
   }
 }

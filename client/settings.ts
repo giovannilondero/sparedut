@@ -1,5 +1,7 @@
 /** Impostazioni del giocatore, salvate nel browser. */
 import type { BotLevel, ModeId } from "../shared/folklore.ts"
+import type { MapId } from "../shared/map.ts"
+import { MAP_IDS } from "../shared/maps/index.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 import type { Lang } from "./i18n.ts"
 
@@ -19,6 +21,8 @@ export interface Settings {
   /** Risoluzione dinamica: abbassa la risoluzione quando gli FPS calano. */
   autoRes: boolean
   lastMode: ModeId
+  /** L'ultima mappa scelta: è anche lo sfondo del menu. */
+  lastMap: MapId
   lastBots: number
   lastLevel: BotLevel
   lastMinutes: number
@@ -38,6 +42,7 @@ const DEFAULTS: Settings = {
   showInfo: false,
   autoRes: true,
   lastMode: "bataie",
+  lastMap: "glemone",
   lastBots: 4,
   lastLevel: "pari",
   lastMinutes: 10
@@ -45,7 +50,10 @@ const DEFAULTS: Settings = {
 
 export function loadSettings(): Settings {
   try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") }
+    const s: Settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") }
+    // Un valore salvato da una versione vecchia (o una mappa tolta) torna al predefinito.
+    if (!MAP_IDS.includes(s.lastMap)) s.lastMap = DEFAULTS.lastMap
+    return s
   } catch {
     return { ...DEFAULTS }
   }

@@ -187,7 +187,11 @@ const GRIP: Record<WeaponId, { p: [number, number, number]; r: [number, number, 
   cramar: { p: [0.13, -0.1, -0.3], r: [0, 0, 0] },
   doplete: { p: [0.13, -0.1, -0.3], r: [0, 0, 0] },
   cjampanili: { p: [0.13, -0.1, -0.28], r: [0, 0, 0] },
-  lanciafrico: { p: [0.16, -0.13, -0.24], r: [0, 0, 0] }
+  mulin: { p: [0.15, -0.16, -0.26], r: [0, 0, 0] },
+  miedi: { p: [0.14, -0.12, -0.28], r: [0, 0, 0] },
+  gjalinis: { p: [0.15, -0.13, -0.2], r: [0, 0, 0] },
+  lanciafrico: { p: [0.16, -0.13, -0.24], r: [0, 0, 0] },
+  mitraie: { p: [0.14, -0.1, -0.3], r: [0, 0, 0] }
 }
 
 function nameLabel(name: string, color: string) {
@@ -301,6 +305,8 @@ export function createAvatar(team: Team, name: string): Avatar {
     curWeapon = id
     const b = bakedWeapon(id)
     weapon.geometry = b.geometry
+    // alla torretta l'arma è quella della torretta, disegnata dal mondo
+    weapon.visible = id !== "mitraie"
     muzzleFlash.position.copy(b.muzzle)
     muzzleFlash.scale.setScalar(id === "lanciafrico" ? 0.6 : id === "doplete" ? 0.5 : 0.35)
     leftGrip = b.left

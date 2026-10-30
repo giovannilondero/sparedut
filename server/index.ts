@@ -6,8 +6,10 @@ import { existsSync } from "node:fs"
 import { networkInterfaces } from "node:os"
 import { join } from "node:path"
 import { isLocalHost } from "../shared/hosts.ts"
-import { initPhysics } from "../shared/physics.ts"
+import { MAP_IDS, MAPS } from "../shared/maps/index.ts"
+import { createPhysicsWorld, initPhysics, type PhysicsWorld } from "../shared/physics.ts"
 import { Hub, type Peer } from "./hub.ts"
+import { warmNavGraph } from "./nav.ts"
 import { networkOf, type NetworkId } from "./network.ts"
 
 const PORT = Number(process.env.PORT ?? 3007)
@@ -72,6 +74,21 @@ Bun.serve<SocketData>({
 })
 
 setInterval(() => hub.update(), 2)
+
+// Il grafo dei bot di una mappa costa qualche secondo di calcolo: meglio farlo subito, a
+// pezzetti (un punto alla volta, fra un tick e l'altro), che alla prima partita su quella mappa.
+const warm = [...MAP_IDS]
+let warming: PhysicsWorld | null = null
+const warmNext = () => {
+  if (!warming) {
+    const id = warm.shift()
+    if (!id) return
+    warming = createPhysicsWorld(MAPS[id])
+  }
+  if (warmNavGraph(warming)) warming = null
+  setTimeout(warmNext, 5)
+}
+setTimeout(warmNext, 200)
 
 const lan = Object.values(networkInterfaces())
   .flat()

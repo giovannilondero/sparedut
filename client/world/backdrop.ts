@@ -1,24 +1,90 @@
 /**
- * Lo sfondo irraggiungibile: cielo a gradiente col sole basso, Prealpi a nord e a est
- * (Chiampon, Glemina), il colle col castello, il resto del paese e la pianura a sud.
+ * Lo sfondo irraggiungibile: cielo a gradiente col sole basso e, per Gemona, Prealpi a
+ * nord e a est (Chiampon, Glemina), il colle col castello, il resto del paese e la
+ * pianura a sud. Le altre mappe usano `makeHeightfield` col loro rilievo.
  */
 import * as THREE from "three"
-import { BOUNDS, G_DUOMO, G_LOW, G_MID } from "../../shared/map.ts"
+import type { Bounds } from "../../shared/map.ts"
+import { G_DUOMO, G_LOW, G_MID, GLEMONE } from "../../shared/maps/glemone.ts"
 import { boxAt, Inst, rng } from "./geo.ts"
 
-export const HORIZON = new THREE.Color("#f0c592")
-const ZENITH = new THREE.Color("#4a79b8")
-const MID = new THREE.Color("#a7bfd8")
+/** Il cîl di une mape: di dì (fin dal dopomisdì, cul soreli bas) o di gnot (cu la lune). */
+export type Sky = "di" | "gnot"
+
+export interface SkyPalette {
+  readonly zenith: string
+  readonly mid: string
+  /** Orizont, fonts de sene e colôr de fumate. */
+  readonly horizon: string
+  /** Il lusôr largj ator dal astri, chel stret e il disc (in HDR). */
+  readonly glow: V3
+  readonly halo: V3
+  readonly disc: V3
+  /** Cosin dal ragjo dal disc: plui piçul = disc plui grant. */
+  readonly discCos: number
+  /** Nûi: tal scûr e cuintri lûs, e trop che a cuvierzin. */
+  readonly cloudDark: V3
+  readonly cloudLit: V3
+  readonly cloudAlpha: number
+  readonly stars: number
+  /** La lûs dal cîl e dal teren, e l'astri che al fâs lis ombris. */
+  readonly hemi: { readonly sky: string; readonly ground: string; readonly intensity: number }
+  readonly sun: { readonly color: string; readonly intensity: number }
+}
+type V3 = readonly [number, number, number]
+
+export const SKIES = {
+  di: {
+    zenith: "#4a79b8",
+    mid: "#a7bfd8",
+    horizon: "#f0c592",
+    glow: [0.55, 0.341, 0.165],
+    halo: [0.9, 0.72, 0.495],
+    disc: [6, 5.52, 4.8],
+    discCos: 0.9993,
+    cloudDark: [1.05, 0.82, 0.65],
+    cloudLit: [1.05, 0.98, 0.89],
+    cloudAlpha: 0.75,
+    stars: 0,
+    hemi: { sky: "#cfe0f5", ground: "#9a7a55", intensity: 1.25 },
+    sun: { color: "#ffd3a0", intensity: 3.1 }
+  },
+  gnot: {
+    zenith: "#050a18",
+    mid: "#0f1a33",
+    horizon: "#1c2a44",
+    glow: [0.05, 0.07, 0.12],
+    halo: [0.22, 0.26, 0.34],
+    disc: [2.6, 2.6, 2.35],
+    discCos: 0.9988,
+    cloudDark: [0.06, 0.08, 0.13],
+    cloudLit: [0.42, 0.46, 0.56],
+    cloudAlpha: 0.55,
+    stars: 1,
+    hemi: { sky: "#5a6c98", ground: "#1c1c26", intensity: 0.75 },
+    sun: { color: "#a8bce8", intensity: 1.3 }
+  }
+} as const satisfies Record<Sky, SkyPalette>
 
 /** Cielo su una sfera unitaria disegnata sul piano lontano (non serve far grande). */
-export function makeSky(sunDir: THREE.Vector3): THREE.Mesh {
+export function makeSky(sunDir: THREE.Vector3, sky: Sky = "di"): THREE.Mesh {
+  const p = SKIES[sky]
+  const v = (c: V3) => new THREE.Vector3(...c)
   const mat = new THREE.ShaderMaterial({
     uniforms: {
-      uZenith: { value: ZENITH },
-      uMid: { value: MID },
-      uHorizon: { value: HORIZON },
+      uZenith: { value: new THREE.Color(p.zenith) },
+      uMid: { value: new THREE.Color(p.mid) },
+      uHorizon: { value: new THREE.Color(p.horizon) },
       uSun: { value: sunDir.clone().normalize() },
-      uTime: { value: 0 }
+      uTime: { value: 0 },
+      uGlow: { value: v(p.glow) },
+      uHalo: { value: v(p.halo) },
+      uDisc: { value: v(p.disc) },
+      uDiscCos: { value: p.discCos },
+      uCloudDark: { value: v(p.cloudDark) },
+      uCloudLit: { value: v(p.cloudLit) },
+      uCloudAlpha: { value: p.cloudAlpha },
+      uStars: { value: p.stars }
     },
     vertexShader: /* glsl */ `
       varying vec3 vDir;
@@ -29,8 +95,8 @@ export function makeSky(sunDir: THREE.Vector3): THREE.Mesh {
         gl_Position = vec4(p.xy, p.w * 0.99999, p.w);
       }`,
     fragmentShader: /* glsl */ `
-      uniform vec3 uZenith, uMid, uHorizon, uSun;
-      uniform float uTime;
+      uniform vec3 uZenith, uMid, uHorizon, uSun, uGlow, uHalo, uDisc, uCloudDark, uCloudLit;
+      uniform float uTime, uDiscCos, uCloudAlpha, uStars;
       varying vec3 vDir;
       float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float noise(vec2 p) {
@@ -45,16 +111,25 @@ export function makeSky(sunDir: THREE.Vector3): THREE.Mesh {
         col = mix(col, uZenith, smoothstep(0.18, 0.75, h));
         col = mix(col, uHorizon * 0.92, smoothstep(0.0, -0.2, h));
         float s = max(dot(d, uSun), 0.0);
-        col += vec3(1.0, 0.62, 0.3) * pow(s, 8.0) * 0.55;
-        col += vec3(1.0, 0.8, 0.55) * pow(s, 64.0) * 0.9;
-        col += vec3(1.0, 0.92, 0.8) * smoothstep(0.9993, 0.9997, s) * 6.0;
+        // stelis: un grop di pons su la sfere, che a tremin
+        if (uStars > 0.0 && h > 0.0) {
+          vec2 g = floor(vec2(atan(d.z, d.x) * 260.0, asin(h) * 260.0));
+          float r = hash(g);
+          float tw = 0.6 + 0.4 * sin(uTime * (1.5 + r * 3.0) + r * 40.0);
+          col += vec3(0.85, 0.9, 1.0) * step(0.9965, r) * tw * smoothstep(0.03, 0.3, h) * uStars * (0.5 + 2.0 * fract(r * 913.0));
+        }
+        col += uGlow * pow(s, 8.0);
+        col += uHalo * pow(s, 64.0);
+        // il disc, cun cualchi marcje (la lune) o neti (il soreli)
+        float disc = smoothstep(uDiscCos, uDiscCos + 0.0004, s);
+        col += uDisc * disc * (1.0 - uStars * 0.3 * noise(d.xy * 1400.0 + d.z * 700.0));
         // nuvole a strisce, più fitte verso l'orizzonte
         if (h > 0.0) {
           vec2 q = d.xz / (h + 0.12) * 1.6 + vec2(uTime * 0.004, 0.0);
           float n = noise(q * vec2(0.6, 2.2)) * 0.6 + noise(q * vec2(1.3, 4.0)) * 0.3 + noise(q * 5.0) * 0.1;
           float c = smoothstep(0.55, 0.85, n) * smoothstep(0.0, 0.08, h) * (1.0 - smoothstep(0.35, 0.7, h));
-          vec3 cloud = mix(vec3(1.0, 0.78, 0.62), vec3(1.0, 0.93, 0.85), pow(s, 3.0));
-          col = mix(col, cloud * 1.05, c * 0.75);
+          vec3 cloud = mix(uCloudDark, uCloudLit, pow(s, 3.0));
+          col = mix(col, cloud, c * uCloudAlpha);
         }
         gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
@@ -78,7 +153,9 @@ export function makeSky(sunDir: THREE.Vector3): THREE.Mesh {
 
 // --- rilievo ----------------------------------------------------------------------------
 
-const hash2 = (x: number, y: number) => {
+const BOUNDS = GLEMONE.bounds
+
+export const hash2 = (x: number, y: number) => {
   const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453
   return s - Math.floor(s)
 }
@@ -89,8 +166,9 @@ function vnoise(x: number, y: number) {
   const a = hash2(ix, iy), b = hash2(ix + 1, iy), c = hash2(ix, iy + 1), d = hash2(ix + 1, iy + 1)
   return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy
 }
-const fbm = (x: number, y: number) => vnoise(x, y) * 0.55 + vnoise(x * 2.1, y * 2.1) * 0.28 + vnoise(x * 4.3, y * 4.3) * 0.17
-const smooth = (a: number, b: number, x: number) => {
+/** Rumore frattale in [0, 1] circa: rilievi e macchie. */
+export const fbm = (x: number, y: number) => vnoise(x, y) * 0.55 + vnoise(x * 2.1, y * 2.1) * 0.28 + vnoise(x * 4.3, y * 4.3) * 0.17
+export const smooth = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)))
   return t * t * (3 - 2 * t)
 }
@@ -123,12 +201,20 @@ function height(x: number, z: number): number {
   return near + (far - near) * b + (z < -100 ? castleHill(x, z) : 0)
 }
 
-/** Prealpi, colline e pianura: una griglia a facce piatte con colori per quota. */
-export function makeTerrain(): THREE.Mesh {
+/** Prealpi, colline e pianura attorno a Gemona. */
+export const makeTerrain = () => makeHeightfield(height, BOUNDS)
+
+/**
+ * Un rilievo attorno alla mappa: griglia a facce piatte di 2.6 km, colori per quota
+ * (campi in basso, bosco sopra 14 m, roccia in alto o sui pendii ripidi). Le celle
+ * dentro `hole` (i bordi della mappa) restano vuote: lì c'è il terreno giocabile.
+ */
+export function makeHeightfield(height: (x: number, z: number) => number, hole: Bounds, seed = 301): THREE.Mesh {
+  const BOUNDS = hole
   const N = 110, SIZE = 2600, step = SIZE / N
   const pos: number[] = []
   const col: number[] = []
-  const r = rng(301)
+  const r = rng(seed)
   const c = new THREE.Color()
   const field = [new THREE.Color("#8e9a4a"), new THREE.Color("#b3a85a"), new THREE.Color("#6f8a3e"), new THREE.Color("#c2a463"), new THREE.Color("#7b8f52")]
   const forest = new THREE.Color("#3d5e2a")
@@ -143,7 +229,7 @@ export function makeTerrain(): THREE.Mesh {
     const a = P(i, j), b = P(i + 1, j), d = P(i, j + 1), e = P(i + 1, j + 1)
     // le celle sotto il paese restano nascoste: le saltiamo
     const cx = (a[0] + e[0]) / 2, cz = (a[2] + e[2]) / 2
-    if (Math.abs(cx) < BOUNDS.maxX && cz > BOUNDS.minZ && cz < BOUNDS.maxZ) continue
+    if (cx > BOUNDS.minX && cx < BOUNDS.maxX && cz > BOUNDS.minZ && cz < BOUNDS.maxZ) continue
     for (const t of [[a, d, b], [b, d, e]]) {
       const y = (t[0][1] + t[1][1] + t[2][1]) / 3
       const slope = Math.max(Math.abs(t[0][1] - t[1][1]), Math.abs(t[1][1] - t[2][1]), Math.abs(t[0][1] - t[2][1])) / step

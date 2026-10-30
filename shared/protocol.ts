@@ -5,14 +5,16 @@
 import { z } from "zod"
 import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "./folklore.ts"
 import { PlayerInputSchema, type PlayerInput } from "./input.ts"
-import type { Team } from "./map.ts"
+import type { MapId, Team } from "./map.ts"
+import { MAP_IDS } from "./maps/index.ts"
 import type { Body } from "./movement.ts"
 import type { GameEvent } from "./sim/events.ts"
-import type { ArsenalValue, FlagState, HillValue } from "./sim/schema.ts"
-import type { PhaseView } from "./sim/view.ts"
-import { PRIMARIES, type PrimaryId, type WeaponId } from "./weapons.ts"
+import type { ArsenalValue, FlagState, HillValue, TurretState } from "./sim/schema.ts"
+import type { StormValue } from "./sim/rules.ts"
+import type { CartView, PhaseView } from "./sim/view.ts"
+import { PRIMARIES, type PrimaryId, type ProjectileKind, type WeaponId } from "./weapons.ts"
 
-export const PROTOCOL_VERSION = 5
+export const PROTOCOL_VERSION = 9
 export const MAX_PLAYERS = 16
 export const SNAPSHOT_EVERY = 2 // tick: 30 istantanee al secondo
 
@@ -25,6 +27,7 @@ export const ClientMessage = z.discriminatedUnion("t", [
   z.object({
     t: z.literal("create"),
     mode: z.enum(MODE_IDS as [ModeId, ...ModeId[]]),
+    map: z.enum(MAP_IDS as [MapId, ...MapId[]]),
     minutes: z.number().int().min(2).max(30),
     visibility: z.enum(["lan", "code"]),
     bots: z.number().int().min(0).max(7),
@@ -59,6 +62,7 @@ export interface RoomSummary {
   readonly code: string
   readonly host: string
   readonly mode: ModeId
+  readonly map: MapId
   readonly visibility: Visibility
   readonly players: number
   readonly bots: number
@@ -114,7 +118,15 @@ export interface Snapshot {
   readonly hill: HillValue
   /** "1" disponibile, "0" in attesa, nell'ordine di `PICKUPS`. */
   readonly pickups: string
-  readonly proj: readonly (readonly [kind: "frico" | "sgnape", x: number, y: number, z: number])[]
+  readonly proj: readonly (readonly [kind: ProjectileKind, x: number, y: number, z: number])[]
+  /** Solo in Spingi il Cjar. */
+  readonly cart: CartView | null
+  /** Solo nella Tampieste in corso. */
+  readonly storm: StormValue | null
+  /** Le torrette della mappa, nell'ordine di `map.turrets`. */
+  readonly turrets: ReadonlyArray<TurretState>
+  /** Salute delle porte da sfondare, nell'ordine di `map.doors` (0 = sfondata). */
+  readonly doors: readonly number[]
   readonly players: readonly SnapOther[]
   readonly you: SnapSelf | null
   readonly ev: readonly GameEvent[]

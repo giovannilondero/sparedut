@@ -5,7 +5,7 @@
  */
 import type * as THREE from "three"
 import type { PickupKind, Team } from "../shared/map.ts"
-import type { WeaponId } from "../shared/weapons.ts"
+import type { ProjectileKind, WeaponId } from "../shared/weapons.ts"
 
 export type P3 = readonly [number, number, number]
 
@@ -16,7 +16,7 @@ export type P3 = readonly [number, number, number]
  */
 export type Quality = "bassa" | "media" | "alta"
 
-// --- client/world.ts: export function createWorld(scene, renderer): WorldScene ---------
+// --- client/world.ts: export function createWorld(scene, renderer, map): WorldScene ----
 export interface FlagVisual {
   readonly pos: P3
   readonly state: "base" | "carried" | "dropped"
@@ -28,15 +28,34 @@ export interface WorldFrame {
   readonly flags: Readonly<Record<Team, FlagVisual>> | null
   /** Solo in modalità "culine". */
   readonly hill: { readonly owner: Team | null; readonly contested: boolean } | null
+  /** Solo in modalità "cjar": il carro sul binario. */
+  readonly cart: { readonly at: P3; readonly yaw: number; readonly contested: boolean; readonly pushers: number } | null
+  /** Solo nella Tampieste in corso: il cerchio sicuro. */
+  readonly storm: { readonly x: number; readonly z: number; readonly radius: number } | null
+  /** Una per torretta della mappa: dove guarda l'arma, quanto è calda, se qualcuno la usa. */
+  readonly turrets: readonly TurretVisual[]
+  /** Salute di ogni porta da sfondare, da 0 (sfondata) a 1 (intera). */
+  readonly doors: readonly number[]
   readonly camera: THREE.PerspectiveCamera
+}
+export interface TurretVisual {
+  readonly yaw: number
+  readonly pitch: number
+  readonly heat: number
+  readonly jammed: boolean
+  readonly manned: boolean
+  /** Chi la usa sono io: l'arma la disegna il viewmodel. */
+  readonly mine: boolean
 }
 export interface WorldScene {
   /** Da chiamare ogni frame. `t` in secondi dall'avvio. */
   update(dt: number, t: number, frame: WorldFrame): void
   /** Ombre e luci secondo la qualità; si può richiamare a partita in corso. */
   setQuality(q: Quality): void
-  /** Inquadratura per lo sfondo dei menu: la camera gira lenta attorno al Duomo. */
+  /** Inquadratura per lo sfondo dei menu: la camera gira lenta attorno alla mappa. */
   menuCamera(t: number, camera: THREE.PerspectiveCamera): void
+  /** Toglie la mappa dalla scena e libera geometrie, materiali e texture. */
+  dispose(): void
 }
 
 // --- client/avatars.ts: export function createAvatar(team, name): Avatar ------------------
@@ -82,6 +101,8 @@ export interface ViewmodelFrame {
   readonly lookDx: number
   readonly lookDy: number
   readonly sgnape: boolean
+  /** Rotazione del Mulin, da 0 a 1. */
+  readonly spin: number
 }
 export interface Viewmodel {
   readonly scene: THREE.Scene
@@ -105,9 +126,11 @@ export interface Fx {
   hitPuff(at: P3, head: boolean): void
   muzzle(at: P3): void
   /** Esplosione: palla di fuoco, schegge, onda d'urto. Con `ground` (y del pavimento sotto) lascia fuoco e bruciatura. */
-  explosion(at: P3, kind: "frico" | "sgnape", ground: number | null): void
-  /** Proiettili in volo: forme di frico che girano, bottiglie di sgnape. Chiamare a ogni frame con la lista corrente. */
-  projectiles(list: readonly (readonly ["frico" | "sgnape", number, number, number])[]): void
+  explosion(at: P3, kind: ProjectileKind, ground: number | null): void
+  /** Proiettili in volo e mine piantate: forme di frico che girano, bottiglie di sgnape, mine che lampeggiano. Chiamare a ogni frame con la lista corrente. */
+  projectiles(list: readonly (readonly [ProjectileKind, number, number, number])[]): void
+  /** Schegge di legno: una porta colpita, o (`big`) sfondata. */
+  splinters(at: P3, big: boolean): void
   /** Anelli/sbuffi di fieno quando qualcuno usa un cjar di fen. */
   padBurst(at: P3): void
   pickupBurst(at: P3, kind: PickupKind): void
@@ -122,6 +145,18 @@ export type SoundName =
   | "shot_cramar"
   | "shot_doplete"
   | "shot_cjampanili"
+  | "shot_mulin"
+  | "spin_mulin"
+  | "beam_miedi"
+  | "launch_gjaline"
+  | "boom_gjaline"
+  | "shot_mitraie"
+  | "turret_on"
+  | "turret_hot"
+  | "door_hit"
+  | "door_break"
+  | "mine_plant"
+  | "heal"
   | "launch_frico"
   | "throw"
   | "boom"
@@ -165,4 +200,9 @@ export interface GameAudio {
   /** Musica del menu (villotta) accesa o spenta. */
   menuMusic(on: boolean): void
   setVolumes(master: number, music: number): void
+  /**
+   * La musica da discoteca di una mappa (il casot di Maran): suona in loop nel punto `at`,
+   * attutita se la porta è chiusa. `null` la spegne.
+   */
+  disco(at: P3 | null, open: boolean): void
 }

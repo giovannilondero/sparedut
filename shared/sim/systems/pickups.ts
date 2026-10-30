@@ -1,10 +1,11 @@
 /**
  * Raccolte: frico (salute), gubane (corazza), sgnape (velocità), munizions, lanciafrico.
  */
-import { PICKUPS, type PickupKind } from "../../map.ts"
-import { WEAPON_IDS, WEAPONS } from "../../weapons.ts"
+import type { PickupKind } from "../../map.ts"
+import { MAPS } from "../../maps/index.ts"
+import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS } from "../../weapons.ts"
 import { MAX_ARMOR, MAX_HP, SGNAPE_TICKS } from "../rules.ts"
-import { Arsenal, Game, Life, Match, Motion, Out, Pickups, Player, type ArsenalValue } from "../schema.ts"
+import { Arsenal, Game, Life, Match, Motion, Out, Pickups, Player, Rules, type ArsenalValue } from "../schema.ts"
 
 export const RESPAWN_OF = {
   frico: 20 * 60,
@@ -24,7 +25,7 @@ export const CollectPickups = Game.System(
         selection: { player: Game.Query.read(Player), motion: Game.Query.read(Motion), life: Game.Query.write(Life), arsenal: Game.Query.write(Arsenal) }
       })
     },
-    resources: { pickups: Game.System.writeResource(Pickups) },
+    resources: { rules: Game.System.readResource(Rules), pickups: Game.System.writeResource(Pickups) },
     events: { out: Game.System.writeEvent(Out) },
     machines: { match: Game.System.machine(Match) }
   },
@@ -33,7 +34,7 @@ export const CollectPickups = Game.System(
     const states = resources.pickups.get()
     const next = states.map((s) => (s._tag === "down" ? (s.ticks <= 1 ? { _tag: "up" as const } : { _tag: "down" as const, ticks: s.ticks - 1 }) : s))
     const players = queries.players.each()
-    PICKUPS.forEach((spot, i) => {
+    MAPS[resources.rules.get().map].pickups.forEach((spot, i) => {
       if (next[i]._tag !== "up") return
       for (const m of players) {
         const life = m.data.life.get()
@@ -57,13 +58,13 @@ export const CollectPickups = Game.System(
             m.data.arsenal.set({ ...a, sgnape: SGNAPE_TICKS })
             break
           case "munizions": {
-            if (ammoFull(a) && a.bombs >= 2) {
+            if (ammoFull(a) && a.bombs >= SGNAPE_BOMB.perLife && a.mines >= RAIBL_MINE.perLife) {
               used = false
               break
             }
             const ammo = { ...a.ammo }
             for (const id of WEAPON_IDS) ammo[id] = { mag: ammo[id].mag, reserve: Math.max(ammo[id].reserve, WEAPONS[id].reserve) }
-            m.data.arsenal.set({ ...a, ammo, bombs: Math.max(a.bombs, 2) })
+            m.data.arsenal.set({ ...a, ammo, bombs: Math.max(a.bombs, SGNAPE_BOMB.perLife), mines: Math.max(a.mines, RAIBL_MINE.perLife) })
             break
           }
           case "lanciafrico":

@@ -69,6 +69,7 @@ export class Hub {
         const code = newCode((c) => this.rooms.has(c))
         const created = new Room(code, id, peer.name || "Furlan", peer.network.key, {
           mode: msg.mode,
+          map: msg.map,
           minutes: msg.minutes,
           visibility: msg.visibility,
           level: msg.level,
@@ -78,7 +79,7 @@ export class Hub {
         this.enter(peer, created, msg.primary)
         created.fillBots(msg.bots)
         this.roomChanged(created)
-        console.log(`🏰 Stanza ${code} (${msg.mode}, ${msg.visibility}) di ${peer.name}`)
+        console.log(`🏰 Stanza ${code} (${msg.mode} a ${msg.map}, ${msg.visibility}) di ${peer.name}`)
         return
       }
       case "join": {

@@ -1,9 +1,16 @@
 /**
- * Applica i danni del tick: corazza, morti, uccisioni, assist, serie, punti.
+ * Applica cure e danni del tick: è l'unico sistema che tocca la salute dei vivi
+ * dopo la rinascita. Corazza, morti, uccisioni, assist, serie, punti.
  */
 import { STREAK_AT } from "../../folklore.ts"
-import { absorb, ASSIST_WINDOW_TICKS, RESPAWN_TICKS } from "../rules.ts"
-import { Attackers, Damage, Game, Life, Match, Motion, Out, Player, Rules, Score, Stats, TeamOf, Tick } from "../schema.ts"
+import type { KillCause } from "../events.ts"
+import { absorb, ASSIST_WINDOW_TICKS, hostile, MAX_HP, RESPAWN_TICKS } from "../rules.ts"
+import { Attackers, Damage, Game, Heal, Life, Match, Motion, Out, Player, Rules, Score, Stats, TeamOf, Tick } from "../schema.ts"
+
+/** Le cause che possono colpire anche chi le ha lanciate (le altre, su sé stessi, sono una caduta). */
+const SELF_HARM: ReadonlySet<KillCause> = new Set(["sgnape", "lanciafrico", "mine", "tampieste"])
+/** Punti al medico per ogni punto di salute ridato a un compagno. */
+const HEAL_SCORE = 0.25
 
 export const ApplyDamage = Game.System(
   "Sparedut/ApplyDamage",
@@ -25,16 +32,34 @@ export const ApplyDamage = Game.System(
       rules: Game.System.readResource(Rules),
       score: Game.System.writeResource(Score)
     },
-    events: { damage: Game.System.thisTick(Game.System.readEvent(Damage)), out: Game.System.writeEvent(Out) },
+    events: {
+      damage: Game.System.thisTick(Game.System.readEvent(Damage)),
+      heal: Game.System.thisTick(Game.System.readEvent(Heal)),
+      out: Game.System.writeEvent(Out)
+    },
     machines: { match: Game.System.machine(Match) }
   },
   ({ queries, resources, events, machines }) => {
     const hits = events.damage.all()
-    if (hits.length === 0) return
+    const heals = events.heal.all()
+    if (hits.length === 0 && heals.length === 0) return
     const tick = resources.tick.get()
     const rules = resources.rules.get()
     const live = machines.match.get()._tag === "Live"
     const bySession = new Map(queries.players.each().map((m) => [m.data.player.get().session, m]))
+
+    for (const h of heals) {
+      const target = bySession.get(h.target)
+      if (!target) continue
+      const life = target.data.life.get()
+      if (life._tag !== "Alive" || life.hp >= MAX_HP) continue
+      const gained = Math.min(MAX_HP - life.hp, h.amount)
+      target.data.life.update({ state: "Alive", data: (l) => ({ hp: l.hp + gained, armor: l.armor, shield: l.shield }) })
+      if (h.healer !== h.target) {
+        bySession.get(h.healer)?.data.stats.update((s) => ({ ...s, score: s.score + gained * HEAL_SCORE }))
+        events.out.emit({ t: "heal", s: h.healer, v: h.target, n: gained })
+      }
+    }
 
     for (const hit of hits) {
       const victim = bySession.get(hit.victim)
@@ -44,7 +69,7 @@ export const ApplyDamage = Game.System(
       const attacker = hit.attacker === null ? undefined : bySession.get(hit.attacker)
       const self = hit.attacker === hit.victim
       const victimTeam = victim.data.team.get()
-      if (attacker && !self && !rules.friendlyFire && attacker.data.team.get() === victimTeam) continue
+      if (attacker && !self && !hostile(rules, attacker.data.team.get(), victimTeam)) continue
       if (life.shield > 0 && hit.weapon !== "fall") continue
 
       if (hit.push) {
@@ -98,7 +123,7 @@ export const ApplyDamage = Game.System(
       }
       victim.data.attackers.set([])
 
-      events.out.emit({ t: "kill", k: killer ? hit.attacker : null, v: hit.victim, w: self && hit.weapon !== "sgnape" && hit.weapon !== "lanciafrico" ? "fall" : hit.weapon, h: hit.head, n: streak })
+      events.out.emit({ t: "kill", k: killer ? hit.attacker : null, v: hit.victim, w: self && !SELF_HARM.has(hit.weapon) ? "fall" : hit.weapon, h: hit.head, n: streak })
     }
   }
 )

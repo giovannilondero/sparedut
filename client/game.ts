@@ -5,15 +5,16 @@
 import * as THREE from "three"
 import { BOT_LEVEL_IDS, QUICK_CHAT, TEAM_INFO, type BotLevel } from "../shared/folklore.ts"
 import { rayPose } from "../shared/hitbox.ts"
-import { BUTTON, type PlayerInput } from "../shared/input.ts"
-import { FLAG_BASES, PICKUPS, type Team } from "../shared/map.ts"
-import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE } from "../shared/movement.ts"
+import { BUTTON, IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
+import { turretAim, turretSeat, type MapId, type PickupKind, type Team } from "../shared/map.ts"
+import { DISCO } from "../shared/maps/maran.ts"
+import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, sprinting } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
-import type { GameEvent } from "../shared/sim/events.ts"
-import { owned } from "../shared/sim/rules.ts"
-import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
-import type { Avatar, Fx, GameAudio, P3, SoundName, Viewmodel, WorldScene } from "./contracts.ts"
+import type { GameEvent, Winner } from "../shared/sim/events.ts"
+import { outsideStorm, owned, RAISE_TICKS } from "../shared/sim/rules.ts"
+import { TURRET, WEAPONS, type WeaponId } from "../shared/weapons.ts"
+import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
 import { Controls } from "./controls.ts"
 import { boardHtml, esc, Hud, rosterHtml } from "./hud.ts"
 import { t } from "./i18n.ts"
@@ -28,7 +29,10 @@ const SHOT_SOUND: Partial<Record<WeaponId, SoundName>> = {
   mandi: "shot_mandi",
   cramar: "shot_cramar",
   doplete: "shot_doplete",
-  cjampanili: "shot_cjampanili"
+  cjampanili: "shot_cjampanili",
+  mulin: "shot_mulin",
+  miedi: "beam_miedi",
+  mitraie: "shot_mitraie"
 }
 const PICK_SOUND = {
   frico: "pickup_frico",
@@ -36,17 +40,17 @@ const PICK_SOUND = {
   sgnape: "pickup_sgnape",
   munizions: "pickup_munizions",
   lanciafrico: "pickup_lanciafrico"
-} as const satisfies Record<(typeof PICKUPS)[number]["kind"], SoundName>
+} as const satisfies Record<PickupKind, SoundName>
 
 export interface GameDeps {
   readonly renderer: THREE.WebGLRenderer
   readonly scene: THREE.Scene
   readonly camera: THREE.PerspectiveCamera
-  readonly world: WorldScene
+  /** Il mondo visibile e la fisica di una mappa (il mondo si ricostruisce solo se cambia). */
+  readonly loadMap: (id: MapId) => { readonly world: WorldScene; readonly physics: PhysicsWorld }
   readonly audio: GameAudio
   readonly fx: Fx
   readonly viewmodel: Viewmodel
-  readonly physics: PhysicsWorld
   readonly net: Net
   readonly settings: Settings
   readonly menu: Menu
@@ -72,6 +76,8 @@ export class Game {
   private hud = new Hud()
   private controls: Controls
   private predictor: Predictor
+  private world: WorldScene
+  private physics: PhysicsWorld
   private room: RoomInfo | null = null
   private me = ""
   private snap: Snapshot | null = null
@@ -89,6 +95,13 @@ export class Game {
   private shots: number[] = []
   private prevFire = false
   private prevBomb = false
+  private prevMine = false
+  /** Rotazione predetta del Mulin (tick), come la conta il server. */
+  private localSpin = 0
+  /** Tick al prossimo colpo predetto della mitraie, alla torretta. */
+  private turretCooldown = 0
+  /** Ultima volta (s) che ho suonato la cura, per non farne una raffica. */
+  private healSoundAt = 0
   private avatars = new Map<string, { avatar: Avatar; blob: THREE.Mesh; team: Team; stepAcc: number; last: { x: number; z: number } | null }>()
   /** Ombre vere dei giocatori solo in qualità alta; altrimenti un disco scuro ai piedi. */
   private dynamicShadows = false
@@ -122,12 +135,16 @@ export class Game {
   private readonly deathLook = new THREE.Vector3()
 
   constructor(private readonly d: GameDeps) {
-    this.predictor = new Predictor(d.physics)
+    const stage = d.loadMap(d.settings.lastMap)
+    this.world = stage.world
+    this.physics = stage.physics
+    this.predictor = new Predictor(stage.physics)
     this.controls = new Controls(d.renderer.domElement, {
       onSlot: (slot) => this.selectSlot(slot),
       onLastWeapon: () => this.selectWeapon(this.lastWeapon),
       onWheel: (dir) => this.cycleWeapon(dir),
-      onKey: (code, down) => this.key(code, down)
+      onKey: (code, down) => this.key(code, down),
+      onPause: () => this.padPause()
     })
     d.renderer.domElement.addEventListener("click", () => {
       if (this.running && this.overlay === "none" && !this.chatting) this.controls.lock()
@@ -163,7 +180,10 @@ export class Game {
     this.snap = null
     this.frames = []
     this.offset = null
-    this.predictor.reset()
+    const stage = this.d.loadMap(room.map)
+    this.world = stage.world
+    this.physics = stage.physics
+    this.predictor = new Predictor(stage.physics)
     this.wanted = this.d.settings.primary
     this.wantedSeq = 0
     this.shownWeapon = null
@@ -178,6 +198,7 @@ export class Game {
 
   stop() {
     this.running = false
+    this.d.audio.disco(null, false)
     this.openOverlay("none")
     for (const a of this.avatars.values()) {
       this.d.scene.remove(a.avatar.object, a.blob)
@@ -287,6 +308,8 @@ export class Game {
 
     const prev = this.snap
     this.snap = s
+    // Le porte sfondate non fermano più né i passi predetti né i colpi.
+    this.physics.setDoors(s.doors.map((hp) => hp > 0))
     const you = s.you
     if (you) {
       const mine = players.get(this.me)
@@ -301,7 +324,8 @@ export class Game {
         this.wanted = you.arsenal.current
         this.localMag = null
       } else if (you.alive) {
-        if (!this.predictor.body) this.predictor.body = you.body
+        if (this.mounted() >= 0) this.predictor.pin(you.body)
+        else if (!this.predictor.body) this.predictor.body = you.body
         else this.predictor.reconcile(you.body, you.seq, true)
       }
       this.wasAlive = you.alive
@@ -351,8 +375,10 @@ export class Game {
         if (e.s === me) return
         const muzzle: P3 = e.o
         for (const end of e.e) fx.tracer(muzzle, end, e.w)
-        fx.muzzle(muzzle)
-        this.avatars.get(e.s)?.avatar.flash()
+        if (WEAPONS[e.w].mode !== "beam") {
+          fx.muzzle(muzzle)
+          this.avatars.get(e.s)?.avatar.flash()
+        }
         const snd = SHOT_SOUND[e.w]
         if (snd) audio.play(snd, { at: muzzle })
         return
@@ -367,9 +393,15 @@ export class Game {
         return
       }
       case "launch": {
+        if (e.k === "mine") {
+          const at = this.posOf(e.s)
+          if (e.s === me) audio.play("mine_plant")
+          else if (at) audio.play("mine_plant", { at, volume: 0.6 })
+          return
+        }
         if (e.s === me) return
         const at = this.posOf(e.s)
-        if (at) audio.play(e.k === "frico" ? "launch_frico" : "throw", { at })
+        if (at) audio.play(e.k === "frico" ? "launch_frico" : e.k === "gjaline" ? "launch_gjaline" : "throw", { at })
         this.avatars.get(e.s)?.avatar.flash()
         return
       }
@@ -390,6 +422,7 @@ export class Game {
           }
           this.hud.damage(angle)
           this.shake = Math.min(1, this.shake + e.d / 60)
+          this.controls.rumble(e.d / 40, 0.4, 180)
         }
         return
       }
@@ -402,14 +435,40 @@ export class Game {
         }
         return
       case "boom": {
-        const down = this.d.physics.raycast({ x: e.p[0], y: e.p[1] + 0.3, z: e.p[2] }, { x: 0, y: -1, z: 0 }, 4)
+        const down = this.physics.raycast({ x: e.p[0], y: e.p[1] + 0.3, z: e.p[2] }, { x: 0, y: -1, z: 0 }, 4)
         fx.explosion(e.p, e.k, down ? e.p[1] + 0.3 - down.dist : null)
-        audio.play("boom", { at: e.p })
+        const hen = e.k === "gjaline"
+        audio.play(hen ? "boom_gjaline" : "boom", { at: e.p })
         const b = this.predictor.body
         if (b) {
           const d = Math.hypot(e.p[0] - b.x, e.p[1] - b.y, e.p[2] - b.z)
-          this.shake = Math.min(1.6, this.shake + Math.max(0, 1.4 - d / 22))
+          this.shake = Math.min(1.6, this.shake + Math.max(0, (hen ? 0.5 : 1.4) - d / 22))
         }
+        return
+      }
+      case "plumis":
+        if (e.v === me) {
+          this.hud.feathers(e.n / 60)
+          this.hud.announce(t().game.plumis)
+        }
+        return
+      case "turret": {
+        const spot = this.physics.map.turrets[e.i]
+        if (!spot) return
+        const at: P3 = [spot.at[0], spot.at[1] + 1.2, spot.at[2]]
+        if (e.a === "on" || e.a === "off") audio.play("turret_on", e.s === me ? {} : { at, volume: 0.7 })
+        if (e.a === "hot") audio.play("turret_hot", e.s === me ? {} : { at })
+        if (e.a === "on" && e.s === me) this.turretCooldown = 0
+        return
+      }
+      case "door": {
+        const door = this.physics.map.doors[e.i]
+        if (!door) return
+        const at: P3 = [(door.min[0] + door.max[0]) / 2, (door.min[1] + door.max[1]) / 2, (door.min[2] + door.max[2]) / 2]
+        const broken = e.a === "broken"
+        fx.splinters(at, broken)
+        audio.play(broken ? "door_break" : "door_hit", { at })
+        if (broken) this.hud.announce(t().game.doorBroken(this.names.get(e.s) ?? "?"), t().game.doorSub)
         return
       }
       case "bounce":
@@ -470,12 +529,28 @@ export class Game {
       case "match":
         if (e.a === "start") {
           audio.play("bells")
-          this.hud.announce(t().game.start, t().game.startSub)
-        } else {
-          const myTeam = this.teams.get(me)
-          audio.play(e.winner === myTeam ? "victory" : "defeat")
+          const mode = this.room?.mode
+          if (mode === "tampieste") this.hud.announce(t().game.stormStart, t().game.stormStartSub)
+          else if (mode === "cjar") this.hud.announce(t().game.start, t().game.cartSub(this.teams.get(me) === "benandanti"))
+          else this.hud.announce(t().game.start, t().game.startSub)
+        } else audio.play(e.winner && this.won(e.winner) ? "victory" : "defeat")
+        return
+      case "cart": {
+        const g = t().game
+        const ben = this.teams.get(me) === "benandanti"
+        this.hud.announce(g.cart[e.a], g.cartSub(ben))
+        const good = e.a === "push" || e.a === "arrived" ? ben : !ben
+        audio.play(e.a === "arrived" ? (good ? "flag_captured" : "flag_taken") : good ? "flag_returned" : "flag_taken", { volume: 0.7 })
+        return
+      }
+      case "heal": {
+        const now = performance.now() / 1000
+        if ((e.v === me || e.s === me) && now - this.healSoundAt > 0.45) {
+          this.healSoundAt = now
+          audio.play("heal")
         }
         return
+      }
     }
   }
 
@@ -483,6 +558,11 @@ export class Game {
 
   private you() {
     return this.snap?.you ?? null
+  }
+
+  /** La torretta che uso io, o -1. */
+  private mounted() {
+    return this.snap?.turrets.findIndex((t) => t.gunner === this.me) ?? -1
   }
 
   private selectWeapon(id: WeaponId) {
@@ -530,9 +610,19 @@ export class Game {
       this.toggleQuick(false)
       return
     }
-    if (code === "KeyV" && this.controls.locked) this.toggleQuick(!this.quickOpen)
-    if ((code === "Enter" || code === "KeyT") && this.controls.locked) this.openChat()
+    if (code === "KeyV" && this.controls.active) this.toggleQuick(!this.quickOpen)
+    if ((code === "Enter" || code === "KeyT") && this.controls.active) this.openChat()
     if (code === "KeyB") this.openOverlay(this.overlay === "loadout" ? "none" : "loadout")
+  }
+
+  /** Options sul pad: apre il menu di partita, o lo chiude (un passo alla volta come Esc). */
+  private padPause() {
+    if (!this.running || this.chatting) return
+    if (this.overlay === "none") {
+      if (document.pointerLockElement) document.exitPointerLock()
+      this.openOverlay("pause")
+    } else if (this.overlay === "pause") this.openOverlay("none")
+    else this.escape()
   }
 
   /** Esc chiude quel che è aperto, un passo alla volta. Il blocco del mouse lo ridà solo un clic. */
@@ -567,7 +657,7 @@ export class Game {
     const input = $<HTMLInputElement>("chat-input")
     input.blur()
     input.classList.add("hidden")
-    if (!this.controls.locked) this.controls.lock()
+    if (!this.controls.active) this.controls.lock()
   }
 
   /** Il modulo delle impostazioni torna nel menu principale. */
@@ -678,16 +768,24 @@ export class Game {
     }
   }
 
+  /** Ho vinto io (la mia squadra, o io da solo nella Tampieste)? */
+  private won(winner: Winner) {
+    return typeof winner === "object" ? winner.player === this.me : winner === this.teams.get(this.me)
+  }
+
   private renderEnd() {
     const s = this.snap
     if (!s || s.phase.tag !== "Over") return
     const el = $("endscreen")
     el.classList.remove("hidden")
     const winner = s.phase.winner
-    const myTeam = this.teams.get(this.me)
     const en = t().end
-    const title = winner === "pari" ? en.draw : winner === myTeam ? en.win : en.lose
-    const sub = winner === "pari" ? en.drawSub : en.winSub(t().teams[winner].name, t().teams[winner].motto)
+    const title = winner === "pari" ? en.draw : this.won(winner) ? en.win : en.lose
+    const sub =
+      winner === "pari" ? en.drawSub
+      : typeof winner === "object" ? `${en.lastStanding(esc(winner.name))} · ${en.lastStandingSub}`
+      : en.winSub(t().teams[winner].name, t().teams[winner].motto)
+    const color = winner === "pari" ? "var(--gold)" : typeof winner === "object" ? (this.won(winner) ? "var(--gold)" : "#9fd0ff") : TEAM_INFO[winner].color
     const rows = [...this.board]
     const best = <K extends keyof BoardRow>(k: K) => rows.slice().sort((a, b) => (b[k] as number) - (a[k] as number))[0]
     const award = (title: string, row: BoardRow | undefined, value: string) =>
@@ -697,8 +795,8 @@ export class Game {
     const streak = best("best")
     const head = best("headshots")
     el.innerHTML = `
-      <h1 class="end-title" style="color:${winner === "pari" ? "var(--gold)" : TEAM_INFO[winner].color}">${title}</h1>
-      <p style="text-align:center;font-family:var(--serif);font-style:italic">${sub} · ${s.score.benandanti} – ${s.score.malandanti}</p>
+      <h1 class="end-title" style="color:${color}">${title}</h1>
+      <p style="text-align:center;font-family:var(--serif);font-style:italic">${sub}${this.room?.mode === "tampieste" ? "" : ` · ${s.score.benandanti} – ${s.score.malandanti}`}</p>
       <div class="awards">
         ${award(en.mvp[mvp?.team ?? "benandanti"], mvp, en.points(mvp?.score ?? 0))}
         ${award(en.killer, killer, en.kills(killer?.kills ?? 0))}
@@ -732,6 +830,13 @@ export class Game {
     const you = this.you()
     const over = this.snap?.phase.tag === "Over"
     if (over || this.overlay !== "none") buttons = 0
+    // Alla torretta lo sguardo resta dentro l'arco in cui gira l'arma.
+    const turret = you?.alive ? this.mounted() : -1
+    if (turret >= 0) {
+      const aim = turretAim(this.physics.map.turrets[turret], c.yaw, c.pitch)
+      c.yaw = aim.yaw
+      c.pitch = aim.pitch
+    }
     const input: PlayerInput = {
       seq: ++this.seq,
       mx: over ? 0 : mx,
@@ -744,6 +849,18 @@ export class Game {
     }
     this.d.net.send({ t: "input", i: input })
     if (!you || !you.alive || over) return
+
+    if (turret >= 0) {
+      // Fermo al posto (lo dice il server); i colpi della mitraie si predicono come gli altri.
+      if (this.turretCooldown > 0) this.turretCooldown--
+      const gun = this.snap?.turrets[turret]
+      if ((buttons & BUTTON.fire) !== 0 && gun && !gun.jammed && this.turretCooldown === 0) {
+        this.localShot("mitraie", input)
+        this.turretCooldown = WEAPONS.mitraie.cooldownTicks
+      }
+      this.prevFire = (buttons & BUTTON.fire) !== 0
+      return
+    }
 
     const before = this.predictor.body
     this.predictor.apply(input, this.speedScale())
@@ -761,7 +878,7 @@ export class Game {
       }
     }
 
-    // Spari predetti: effetti subito, il danno lo decide il server.
+    // Spari predetti: effetti subito, il danno lo decide il server (con le stesse regole).
     if (this.localCooldown > 0) this.localCooldown--
     const def = WEAPONS[this.wanted]
     const fire = (buttons & BUTTON.fire) !== 0
@@ -769,8 +886,16 @@ export class Game {
     this.prevFire = fire
     const action = you.arsenal.action._tag
     const busy = action === "reload" || (action === "switch" && you.arsenal.current === this.wanted)
+    // Di corsa l'arma è abbassata: come sul server, e poi ci vuole un attimo per rialzarla.
+    const running = sprinting(input, after?.crouch ?? false)
+    if (running) this.localCooldown = Math.max(this.localCooldown, RAISE_TICKS)
+    if (def.spinTicks > 0) {
+      const turning = fire && !running && !busy
+      if (turning && this.localSpin === 0) this.d.audio.play("spin_mulin")
+      this.localSpin = turning ? Math.min(def.spinTicks, this.localSpin + 1) : Math.max(0, this.localSpin - 2)
+    } else this.localSpin = 0
     const mag = this.localMag ?? you.arsenal.ammo[this.wanted].mag
-    const trigger = def.mode === "auto" ? fire : pressedFire
+    const trigger = (def.mode === "auto" || def.mode === "beam" ? fire : pressedFire) && this.localSpin >= def.spinTicks
     if (trigger && this.localCooldown === 0 && !busy && you.arsenal.current === this.wanted) {
       if (def.mode !== "melee" && mag <= 0) {
         if (pressedFire) this.d.audio.play("dry")
@@ -790,19 +915,43 @@ export class Game {
       this.d.viewmodel.throwBomb()
       this.d.audio.play("throw")
     }
+    const mine = (buttons & BUTTON.mine) !== 0
+    if (mine && !this.prevMine && you.arsenal.mines > 0) this.d.viewmodel.throwBomb()
+    this.prevMine = mine
   }
 
   private localShot(id: WeaponId, input: PlayerInput) {
-    const { audio, fx, viewmodel, physics } = this.d
+    const { audio, fx, viewmodel } = this.d
+    const physics = this.physics
     const def = WEAPONS[id]
     viewmodel.fire()
     this.kickPitch += def.kick
+    this.controls.rumble(def.kick * 4, 0.15 + def.kick * 3, def.mode === "melee" ? 90 : 60)
     if (def.mode === "melee") {
       audio.play("melee_swing")
       return
     }
     if (def.mode === "projectile") {
-      audio.play("launch_frico")
+      audio.play(def.shell === "gjaline" ? "launch_gjaline" : "launch_frico")
+      return
+    }
+    if (def.mode === "beam") {
+      // il getto: dalla lancia fino al primo corpo o muro entro la portata
+      audio.play("beam_miedi")
+      const b = this.predictor.body
+      if (!b) return
+      const eye = { x: b.x, y: b.y + this.eye, z: b.z }
+      const dir = lookDir(input.yaw, input.pitch)
+      const wall = physics.raycast(eye, dir, def.range)
+      let reach = wall ? wall.dist : def.range
+      for (const [pid] of this.avatars) {
+        const p = this.interpolated(pid)
+        if (!p || !(p.f & FLAG_BIT.alive)) continue
+        const hit = rayPose(eye, dir, { x: p.x, y: p.y, z: p.z, crouch: (p.f & FLAG_BIT.crouch) !== 0 })
+        if (hit && hit.dist < reach) reach = hit.dist
+      }
+      const muzzle = viewmodel.muzzleWorld(new THREE.Vector3())
+      fx.tracer([muzzle.x, muzzle.y, muzzle.z], [eye.x + dir.x * reach, eye.y + dir.y * reach, eye.z + dir.z * reach], id)
       return
     }
     audio.play(SHOT_SOUND[id] ?? "shot_mandi")
@@ -865,10 +1014,12 @@ export class Game {
   frame(dt: number, t: number) {
     if (!this.running) return
     this.time = t
-    const { camera, audio, viewmodel, world, fx, settings } = this.d
+    const { camera, audio, viewmodel, fx, settings } = this.d
+    const world = this.world
     const now = performance.now() / 1000
     if (this.offset !== null) this.renderTick = now * 60 + this.offset - INTERP_TICKS
 
+    this.controls.poll(dt, this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over")
     this.acc += Math.min(dt, 0.25)
     while (this.acc >= DT) {
       this.acc -= DT
@@ -917,7 +1068,7 @@ export class Game {
         entry.blob.visible = !this.dynamicShadows && (q.f & FLAG_BIT.alive) !== 0
         if (entry.blob.visible) {
           // Il disco sta sul terreno sotto i piedi: in aria si rimpicciolisce.
-          const ground = this.d.physics.raycast({ x: q.x, y: q.y + 0.3, z: q.z }, { x: 0, y: -1, z: 0 }, 12)
+          const ground = this.physics.raycast({ x: q.x, y: q.y + 0.3, z: q.z }, { x: 0, y: -1, z: 0 }, 12)
           const gy = ground ? q.y + 0.3 - ground.dist : q.y
           const h = Math.max(0, q.y - gy)
           entry.blob.position.set(q.x, gy + 0.03, q.z)
@@ -937,7 +1088,9 @@ export class Game {
     // Camera.
     const c = this.controls
     this.kickPitch *= Math.exp(-dt * 9)
-    const def = WEAPONS[this.wanted]
+    const turret = you?.alive ? this.mounted() : -1
+    const inHand: WeaponId = turret >= 0 ? "mitraie" : this.wanted
+    const def = WEAPONS[inHand]
     const aiming = c.isHeld("aim") && !!you?.alive
     this.aimBlend += ((aiming ? 1 : 0) - this.aimBlend) * Math.min(1, dt * 12)
     const scoped = this.wanted === "cjampanili" && this.aimBlend > 0.85
@@ -977,40 +1130,61 @@ export class Game {
     c.lookDx = 0
     c.lookDy = 0
     if (you) {
-      if (this.shownWeapon !== this.wanted) {
-        this.shownWeapon = this.wanted
-        viewmodel.setWeapon(this.wanted)
+      if (this.shownWeapon !== inHand) {
+        this.shownWeapon = inHand
+        viewmodel.setWeapon(inHand)
       }
       viewmodel.update(dt, {
         speed: b ? Math.hypot(b.vx, b.vz) : 0,
         grounded: b?.grounded ?? true,
         aiming,
-        sprinting: c.isHeld("sprint") && c.move().mz > 0,
+        sprinting: turret < 0 && sprinting({ ...IDLE_INPUT, mz: c.move().mz, buttons: c.heldButtons() }, b?.crouch ?? false),
         crouch: b?.crouch ?? false,
         lookDx,
         lookDy,
-        sgnape: you.arsenal.sgnape > 0
+        sgnape: you.arsenal.sgnape > 0,
+        spin: def.spinTicks > 0 ? this.localSpin / def.spinTicks : 0
       })
     }
 
     // Mondo, effetti, audio.
     if (s) {
       const mode = this.room?.mode
+      const bases = this.physics.map.flagBases
       const flagPos = (team: Team): { pos: P3; state: "base" | "carried" | "dropped" } => {
         const f = s.flags[team]
-        if (f._tag === "base") return { pos: FLAG_BASES[team], state: "base" }
+        if (f._tag === "base") return { pos: bases[team], state: "base" }
         if (f._tag === "dropped") return { pos: [f.x, f.y, f.z], state: "dropped" }
         const carrier = f.by === this.me && b ? { x: b.x, y: b.y, z: b.z } : this.interpolated(f.by)
-        return { pos: carrier ? [carrier.x, carrier.y + 2.1, carrier.z] : FLAG_BASES[team], state: "carried" }
+        return { pos: carrier ? [carrier.x, carrier.y + 2.1, carrier.z] : bases[team], state: "carried" }
       }
       world.update(dt, t, {
         pickups: [...s.pickups].map((ch) => ch === "1"),
         flags: mode === "frico" ? { benandanti: flagPos("benandanti"), malandanti: flagPos("malandanti") } : null,
         hill: mode === "culine" ? { owner: s.hill.owner, contested: s.hill.contested } : null,
+        cart: s.cart ? { at: s.cart.at, yaw: s.cart.yaw, contested: s.cart.contested, pushers: s.cart.pushers } : null,
+        storm: s.storm,
+        turrets: s.turrets.map((tu, i): TurretVisual => {
+          const mine = tu.gunner === this.me
+          const gunner = tu.gunner && !mine ? this.interpolated(tu.gunner) : null
+          return {
+            yaw: mine ? c.yaw : gunner?.yaw ?? 0,
+            pitch: mine ? c.pitch : gunner?.pitch ?? 0,
+            heat: tu.heat,
+            jammed: tu.jammed,
+            manned: tu.gunner !== null,
+            mine: mine && i === turret
+          }
+        }),
+        doors: s.doors.map((hp, i) => hp / (this.physics.map.doors[i]?.hp ?? 1)),
         camera
       })
+      // La discoteca del casot: si sente solo vicino, e attutita finché la porta è chiusa.
+      audio.disco(this.room?.map === "maran" ? DISCO : null, (s.doors[0] ?? 1) <= 0)
       fx.projectiles(s.proj)
-      this.hud.top(s, this.room?.mode ?? "bataie", this.names)
+      const outside = !!s.storm && !!you?.alive && !!b && outsideStorm(s.storm, b)
+      this.hud.spectating = mode === "tampieste" && s.phase.tag === "Live"
+      this.hud.top(s, mode ?? "bataie", this.names, outside)
       this.hud.death(you, this.names, Math.floor(this.seed / 7))
       if (s.phase.tag === "Over" && Math.floor(t) !== Math.floor(t - dt)) this.renderEnd()
     }
@@ -1018,13 +1192,22 @@ export class Game {
     audio.setListener([camera.position.x, camera.position.y, camera.position.z], c.yaw)
 
     if (you) {
-      this.hud.vitals(you, { owned: (id) => owned(you.arsenal, id) }, this.wanted === you.arsenal.current ? this.localMag : null)
+      this.hud.vitals(you, { owned: (id) => owned(you.arsenal, id) }, this.wanted === you.arsenal.current ? this.localMag : null, turret >= 0)
+      // Alla torretta: il calore. Vicino a una libera: il tasto per montarla.
+      const gun = turret >= 0 ? s?.turrets[turret] ?? null : null
+      const near =
+        turret < 0 && you.alive && !!b && !!s &&
+        this.physics.map.turrets.some((spot, i) => {
+          const seat = turretSeat(spot)
+          return s.turrets[i]?.gunner === null && Math.hypot(b.x - seat[0], b.z - seat[2]) <= TURRET.reach && Math.abs(b.y - seat[1]) < 1.2
+        })
+      this.hud.turret(gun ? { heat: gun.heat, jammed: gun.jammed } : null, near)
       const speed = b ? Math.hypot(b.vx, b.vz) : 0
       const spread = aiming ? def.spread.aimed : speed > 1.5 || !b?.grounded ? def.spread.moving : def.spread.still
       const px = (Math.tan(spread) / Math.tan(((camera.fov / 2) * Math.PI) / 180)) * (innerHeight / 2)
       this.hud.crosshair(Math.min(60, px * 1.6), you.alive && !scoped)
     }
-    this.hud.clickToPlay(!this.controls.locked && this.overlay === "none" && !this.chatting && !this.boardOpen && s?.phase.tag !== "Over")
+    this.hud.clickToPlay(!this.controls.active && this.overlay === "none" && !this.chatting && !this.boardOpen && s?.phase.tag !== "Over")
   }
 
   render() {

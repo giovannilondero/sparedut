@@ -5,6 +5,7 @@
 import { Howl, Howler } from "howler"
 import type { GameAudio, P3, SoundName } from "./contracts.ts"
 import { wav } from "./audio/dsp.ts"
+import { renderDisco } from "./audio/disco.ts"
 import { renderVillotta } from "./audio/music.ts"
 import { SFX, renderSound } from "./audio/sfx.ts"
 
@@ -33,6 +34,18 @@ const SPECS: Record<SoundName, Spec> = {
   shot_cramar: spec("far", 8, 0.75, 0.04),
   shot_doplete: spec("far", 4, 1, 0.03),
   shot_cjampanili: spec("far", 3, 1, 0.02),
+  shot_mulin: spec("far", 10, 0.55, 0.05),
+  spin_mulin: spec("mid", 2, 0.6, 0.02),
+  beam_miedi: spec("mid", 4, 0.45, 0.06),
+  launch_gjaline: spec("far", 3, 0.85, 0.06),
+  boom_gjaline: spec("far", 4, 0.9, 0.08),
+  shot_mitraie: spec("far", 10, 0.7, 0.04),
+  turret_on: spec("mid", 2, 0.7),
+  turret_hot: spec("mid", 2, 0.75),
+  door_hit: spec("mid", 3, 0.9, 0.06),
+  door_break: spec("far", 2, 1),
+  mine_plant: spec("mid", 2, 0.7, 0.03),
+  heal: spec("near", 2, 0.45, 0.04),
   launch_frico: spec("far", 3, 0.9, 0.03),
   throw: spec("mid", 3, 0.6, 0.05),
   boom: spec("far", 4, 1, 0.06),
@@ -153,6 +166,40 @@ export function createAudio(): GameAudio {
     })
   }
 
+  // La discoteca del casot: due loop (aperta e attutita) nello stesso punto, uno sentito alla volta.
+  let disco: { open: Howl; muffled: Howl } | null = null
+  let discoLoading = false
+  let discoWant: { at: P3; open: boolean } | null = null
+  const discoGain = () => musicVol * 1.4
+  const applyDisco = () => {
+    if (!disco) return
+    for (const [h, on] of [[disco.open, discoWant?.open ?? false], [disco.muffled, !(discoWant?.open ?? true)]] as const) {
+      if (!discoWant) {
+        if (h.playing()) h.pause()
+        continue
+      }
+      h.pos(discoWant.at[0], discoWant.at[1], discoWant.at[2])
+      if (!h.playing()) h.play()
+      const target = on ? discoGain() : 0
+      if (Math.abs(h.volume() - target) > 0.01) h.fade(h.volume(), target, 400)
+    }
+  }
+  const loadDisco = () => {
+    if (disco || discoLoading) return
+    discoLoading = true
+    void renderDisco().then(({ open, muffled }) => {
+      ensure()
+      const attrs = { distanceModel: "inverse" as const, refDistance: 5, rolloffFactor: 1.3, maxDistance: 10000, panningModel: "HRTF" as const }
+      const a = new Howl({ src: [toUrl(open)], format: ["wav"], loop: true, volume: 0, ...attrs })
+      const m = new Howl({ src: [toUrl(muffled)], format: ["wav"], loop: true, volume: 0, ...attrs })
+      // stesso istante nei due loop: la porta che si apre non fa saltare il ritmo
+      a.once("play", () => m.seek(a.seek()))
+      disco = { open: a, muffled: m }
+      discoLoading = false
+      applyDisco()
+    })
+  }
+
   return {
     unlock() {
       ensure()
@@ -202,6 +249,15 @@ export function createAudio(): GameAudio {
       musicVol = Math.max(0, Math.min(1, mu))
       Howler.volume(master)
       if (music && musicOn) music.volume(musicVol)
+      applyDisco()
+    },
+
+    disco(at, open) {
+      const same = discoWant && at && discoWant.open === open && discoWant.at === at
+      if (same || (!discoWant && !at)) return
+      discoWant = at ? { at, open } : null
+      if (at) loadDisco()
+      applyDisco()
     }
   }
 }

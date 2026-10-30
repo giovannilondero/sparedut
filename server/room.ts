@@ -3,7 +3,8 @@
  */
 import { BOT_NAMES, QUICK_CHAT, type BotLevel, type ModeId } from "../shared/folklore.ts"
 import { IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
-import { TEAMS, type Team } from "../shared/map.ts"
+import { TEAMS, type MapId, type Team } from "../shared/map.ts"
+import { MAPS } from "../shared/maps/index.ts"
 import { createPhysicsWorld, type PhysicsWorld } from "../shared/physics.ts"
 import {
   FLAG_BIT,
@@ -44,6 +45,7 @@ export interface Member {
 
 export interface RoomSettings {
   readonly mode: ModeId
+  readonly map: MapId
   readonly minutes: number
   readonly visibility: Visibility
   readonly level: BotLevel
@@ -53,7 +55,7 @@ export interface RoomSettings {
 let botCounter = 0
 
 export class Room {
-  readonly physics: PhysicsWorld = createPhysicsWorld()
+  readonly physics: PhysicsWorld
   readonly sim: Sim
   readonly members = new Map<string, Member>()
   private bots = new Map<string, BotBrain>()
@@ -69,6 +71,7 @@ export class Room {
     readonly settings: RoomSettings
   ) {
     this.level = settings.level
+    this.physics = createPhysicsWorld(MAPS[settings.map])
     this.sim = createSim({ mode: settings.mode, minutes: settings.minutes, friendlyFire: settings.ff, seed: Math.floor(Math.random() * 2 ** 31), physics: this.physics })
     this.world = this.sim.view()
   }
@@ -107,7 +110,7 @@ export class Room {
     const used = new Set([...this.members.values()].map((m) => m.name))
     const name = BOT_NAMES[team].find((n) => !used.has(n)) ?? `${BOT_NAMES[team][0]} ${++botCounter}`
     const id = `bot-${++botCounter}`
-    const primaries: PrimaryId[] = ["cramar", "cramar", "doplete", "cjampanili"]
+    const primaries: PrimaryId[] = ["cramar", "cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis", "cramar"]
     const primary = primaries[botCounter % primaries.length]
     this.members.set(id, { id, name, team, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
     this.bots.set(id, new BotBrain(id, this.level, navGraph(this.physics), this.physics, botCounter))
@@ -234,7 +237,7 @@ export class Room {
         (p.buttons & 2 ? FLAG_BIT.aiming : 0) |
         (carriers.has(p.session) ? FLAG_BIT.carrier : 0) |
         (p.arsenal.sgnape > 0 ? FLAG_BIT.sgnape : 0),
-      w: p.arsenal.current,
+      w: w.turrets.some((t) => t.gunner === p.session) ? "mitraie" : p.arsenal.current,
       hp: Math.ceil(p.hp)
     }))
     const base: Omit<Snapshot, "you"> = {
@@ -244,6 +247,10 @@ export class Room {
       score: w.score,
       flags: w.flags,
       hill: w.hill,
+      cart: w.cart,
+      storm: w.storm,
+      turrets: w.turrets.map((t) => ({ ...t, heat: r2(t.heat) })),
+      doors: w.doors.map((d) => Math.ceil(d)),
       pickups: w.pickups.map((p) => (p ? "1" : "0")).join(""),
       proj: w.projectiles.map((p) => [p.kind, r2(p.x), r2(p.y), r2(p.z)] as const),
       players: others,
@@ -282,7 +289,7 @@ export class Room {
       deaths: p.stats.deaths,
       assists: p.stats.assists,
       caps: p.stats.caps,
-      score: p.stats.score,
+      score: Math.round(p.stats.score),
       best: p.stats.best,
       headshots: p.stats.headshots,
       damage: Math.round(p.stats.damage),
@@ -299,6 +306,7 @@ export class Room {
       code: this.code,
       host: this.hostName,
       mode: this.settings.mode,
+      map: this.settings.map,
       visibility: this.settings.visibility,
       players: this.humans.length,
       bots: this.bots.size,

@@ -10,7 +10,7 @@ export const TEAM_INFO = {
   malandanti: { short: "MAL", color: "#d0435a" }
 } as const satisfies Record<Team, { readonly short: string; readonly color: string }>
 
-export type ModeId = "bataie" | "frico" | "culine"
+export type ModeId = "bataie" | "frico" | "culine" | "cjar" | "tampieste"
 
 export const MODES = {
   /** Deathmatch a squadre. */
@@ -18,7 +18,11 @@ export const MODES = {
   /** Cattura la bandiera (il frico). */
   frico: { id: "frico", scoreLimit: 3 },
   /** Re della collina, in Vie Bini. */
-  culine: { id: "culine", scoreLimit: 120 }
+  culine: { id: "culine", scoreLimit: 120 },
+  /** Carrello: i Benandanti spingono il cjar fino in fondo, i punti sono la percentuale di strada. */
+  cjar: { id: "cjar", scoreLimit: 100 },
+  /** Tutti contro tutti, una vita sola, la tempesta stringe: vince l'ultimo in piedi. */
+  tampieste: { id: "tampieste", scoreLimit: 1 }
 } as const satisfies Record<ModeId, { readonly id: ModeId; readonly scoreLimit: number }>
 
 export const MODE_IDS = Object.keys(MODES) as ModeId[]

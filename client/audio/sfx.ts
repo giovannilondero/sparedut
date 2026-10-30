@@ -58,6 +58,46 @@ const shotCjampanili: Recipe = r => {
   return done(b)
 }
 
+const shotMulin: Recipe = r => {
+  // corto e secco: a 20 colpi al secondo diventa il ronzio del mulino
+  const b = gunshot(r, { crack: 2000, body: 140, bodyD: 0.022, tail: 0.03, tailLp: 1300, drv: 3, len: 0.18 })
+  voice(b, { dur: 0.03, wave: "sqr", f: exp(420, 160, 0.01), amp: 0.2, d: 0.01, lp: 1600 })
+  return done(b, 0.8)
+}
+
+const spinMulin: Recipe = r => {
+  // le canne che prendono giri: un fischio meccanico che sale, col cric degli ingranaggi
+  const b = buffer(0.85)
+  voice(b, { dur: 0.8, wave: "saw", f: t => 90 + 520 * (t / 0.8) ** 1.4, amp: t => 0.35 * Math.min(1, t / 0.15), lp: 2400 })
+  for (let i = 0; i < 14; i++) click(b, (i / 14) ** 0.7 * 0.75, 0.25, 2600, r)
+  return done(b, 0.6)
+}
+
+const beamMiedi: Recipe = r => {
+  // lo sbrufadôr: uno spruzzo soffice con un filo di bolle
+  const b = buffer(0.22)
+  voice(b, { dur: 0.2, wave: "noise", bp: exp(2600, 1800, 0.08), q: 1.2, amp: 0.7, a: 0.01, d: 0.06, rnd: r })
+  voice(b, { at: 0.02, dur: 0.06, wave: "sin", f: t => 700 + t * 4000, amp: 0.15, d: 0.02 })
+  return done(b, 0.5)
+}
+
+const minePlant: Recipe = r => {
+  // la mine che si pianta nel terreno e il bip di quando si arma
+  const b = buffer(1.2)
+  voice(b, { dur: 0.15, wave: "sin", f: exp(140, 60, 0.03), amp: 1, d: 0.04 })
+  voice(b, { dur: 0.1, wave: "noise", lp: 900, amp: 0.6, d: 0.03, rnd: r })
+  click(b, 0.05, 0.5, 1800, r)
+  for (const at of [0.9, 1.05]) voice(b, { at, dur: 0.07, wave: "sqr", f: 1760, amp: 0.25, a: 0.002, d: 0.03, lp: 3000 })
+  return done(b, 0.7)
+}
+
+const heal: Recipe = r => {
+  const b = buffer(0.5)
+  for (const [n, at] of [[880, 0], [1320, 0.07]] as const) mode(b, at, n, 0.35, 0.15)
+  voice(b, { dur: 0.3, wave: "noise", hp: 5000, amp: 0.08, d: 0.08, rnd: r })
+  return done(b, 0.45)
+}
+
 const launchFrico: Recipe = r => {
   const b = buffer(1)
   // "thoonk": tubo che risuona e colpo sordo
@@ -459,12 +499,112 @@ const respawn: Recipe = r => {
   return done(b, 0.7)
 }
 
+// --- galline, mitraie, porte ------------------------------------------------------------
+
+/** Un "co" di gallina: dente di sega nasale che scende, filtrato come una gola. */
+function cluck(b: Float32Array, at: number, f0: number, dur: number, amp: number, r: Rnd) {
+  voice(b, { at, dur, wave: "saw", f: t => f0 * (1 + 0.25 * Math.exp(-t / 0.02)) * (1 + 0.03 * Math.sin(t * 190)), bp: f0 * 2.6, q: 2.5, amp, a: 0.004, env: t => Math.min(1, t / 0.006) * Math.exp(-t / (dur * 0.55)) })
+  voice(b, { at, dur: dur * 0.6, wave: "noise", bp: 3200, q: 1.5, amp: amp * 0.15, d: dur * 0.2, rnd: r })
+}
+
+const launchGjaline: Recipe = r => {
+  // il "puff" del cjanon d'ottone, poi la gallina indignata: co-co-co-dèèè
+  const b = buffer(1.1)
+  voice(b, { dur: 0.25, wave: "sin", f: exp(140, 60, 0.04), amp: 0.9, a: 0.002, d: 0.06 })
+  voice(b, { dur: 0.15, wave: "noise", bp: 600, q: 1.5, amp: 1, d: 0.03, rnd: r })
+  mode(b, 0, 410, 0.35, 0.08)
+  const f = 470 + r() * 60
+  cluck(b, 0.12, f, 0.07, 0.7, r)
+  cluck(b, 0.22, f * 1.04, 0.07, 0.7, r)
+  cluck(b, 0.32, f * 0.98, 0.07, 0.7, r)
+  voice(b, { at: 0.43, dur: 0.38, wave: "saw", f: t => f * 1.9 - t * 500, bp: f * 4, q: 2, amp: 0.8, a: 0.01, env: t => Math.min(1, t / 0.02) * Math.exp(-t / 0.2) })
+  reverb(b, 0.12, 0.6)
+  return done(b, 0.85)
+}
+
+const boomGjaline: Recipe = r => {
+  // un "pof" soffice, l'ultimo strillo e lo sfarfallio delle piume
+  const b = buffer(1.3)
+  voice(b, { dur: 0.6, wave: "noise", lp: exp(4500, 300, 0.12), amp: 1, a: 0.002, d: 0.14, rnd: r })
+  voice(b, { dur: 0.4, wave: "sin", f: exp(110, 45, 0.08), amp: 0.9, d: 0.1 })
+  voice(b, { at: 0.02, dur: 0.3, wave: "saw", f: t => 1200 - t * 1800, bp: 2600, q: 3, amp: 0.5, env: t => Math.min(1, t / 0.01) * Math.exp(-t / 0.1) })
+  const flutter = () => (r() < 0.05 ? 0.9 : 0.05)
+  voice(b, { at: 0.08, dur: 1.1, wave: "noise", bp: 2200, q: 0.8, amp: flutter, env: t => Math.exp(-t / 0.35), rnd: r })
+  reverb(b, 0.2, 0.8)
+  return done(b, 0.9)
+}
+
+const shotMitraie: Recipe = r => {
+  // pesante e asciutta: un'arma vera, montata su tre gambe
+  const b = gunshot(r, { crack: 1200, body: 90, bodyD: 0.045, tail: 0.08, tailLp: 900, drv: 4, len: 0.4 })
+  voice(b, { dur: 0.05, wave: "sqr", f: exp(220, 70, 0.015), amp: 0.3, d: 0.02, lp: 900 })
+  mode(b, 0.005, 2900, 0.08, 0.02)
+  reverb(b, 0.1, 0.6)
+  return done(b, 0.85)
+}
+
+const turretOn: Recipe = r => {
+  // la manopola che si prende e il carrello armato
+  const b = buffer(0.5)
+  click(b, 0, 0.7, 1800, r)
+  mode(b, 0, 1300, 0.3, 0.03)
+  click(b, 0.18, 1, 2200, r)
+  mode(b, 0.18, 2100, 0.35, 0.02)
+  mode(b, 0.18, 640, 0.25, 0.05)
+  return done(b, 0.7)
+}
+
+const turretHot: Recipe = r => {
+  // la canna che sfrigola e fuma: vapore e un "ting" di metallo che si dilata
+  const b = buffer(2)
+  voice(b, { dur: 1.9, wave: "noise", bp: exp(5200, 2400, 0.8), q: 0.7, amp: 0.8, a: 0.03, d: 0.7, rnd: r })
+  for (const [at, f] of [[0.05, 3100], [0.55, 2600], [1.1, 3500]] as const) mode(b, at, f, 0.25, 0.12)
+  return done(b, 0.7)
+}
+
+const doorHit: Recipe = r => {
+  // una pedata alle assi
+  const b = buffer(0.5)
+  for (const [f, a, d] of [[140, 0.9, 0.08], [310, 0.5, 0.05], [760, 0.25, 0.03]] as const) mode(b, 0, f * (0.95 + r() * 0.1), a, d)
+  voice(b, { dur: 0.12, wave: "noise", lp: 1800, amp: 0.7, d: 0.03, rnd: r })
+  drive(b, 1.6)
+  reverb(b, 0.15, 0.6)
+  return done(b, 0.85)
+}
+
+const doorBreak: Recipe = r => {
+  // le assi che saltano e le schegge per terra
+  const b = buffer(1.6)
+  voice(b, { dur: 0.6, wave: "noise", lp: exp(5000, 600, 0.15), amp: 1, a: 0.002, d: 0.16, rnd: r })
+  for (const [f, a, d] of [[110, 1, 0.12], [240, 0.7, 0.08], [520, 0.4, 0.05]] as const) mode(b, 0, f, a, d)
+  for (let i = 0; i < 9; i++) {
+    const at = 0.15 + r() * 0.9
+    mode(b, at, 600 + r() * 1400, 0.15 + r() * 0.15, 0.02)
+    click(b, at, 0.3, 1500, r)
+  }
+  drive(b, 2)
+  reverb(b, 0.2, 0.9)
+  return done(b, 0.95)
+}
+
 /** Ricette e numero di varianti per suono. */
 export const SFX: Record<SoundName, readonly [Recipe, number]> = {
   shot_mandi: [shotMandi, 3],
   shot_cramar: [shotCramar, 4],
   shot_doplete: [shotDoplete, 2],
   shot_cjampanili: [shotCjampanili, 1],
+  shot_mulin: [shotMulin, 3],
+  spin_mulin: [spinMulin, 1],
+  beam_miedi: [beamMiedi, 2],
+  launch_gjaline: [launchGjaline, 2],
+  boom_gjaline: [boomGjaline, 2],
+  shot_mitraie: [shotMitraie, 3],
+  turret_on: [turretOn, 1],
+  turret_hot: [turretHot, 1],
+  door_hit: [doorHit, 2],
+  door_break: [doorBreak, 1],
+  mine_plant: [minePlant, 1],
+  heal: [heal, 1],
   launch_frico: [launchFrico, 1],
   throw: [throwSnd, 1],
   boom: [boom, 2],

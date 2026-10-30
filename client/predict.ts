@@ -58,6 +58,13 @@ export class Predictor {
     this.body = body
   }
 
+  /** Fermo dove dice il server (alla torretta): niente da predire né da rigiocare. */
+  pin(server: Body) {
+    this.body = server
+    this.prev = server
+    this.pending = []
+  }
+
   decay(dt: number) {
     const k = Math.exp(-dt * 12)
     this.smooth.x *= k

@@ -1,9 +1,14 @@
 /**
- * Obiettivi: Cjape il Frico (bandiera) e Re de Plaçute (collina).
+ * Obiettivi: Cjape il Frico (bandiera), Re de Plaçute (collina), Spingi il Cjar (carrello).
  */
-import { FLAG_BASES, HILL, TEAMS, type Team } from "../../map.ts"
-import { FLAG_RETURN_TICKS, otherTeam } from "../rules.ts"
-import { Flags, Game, Hill, Life, Match, Motion, Out, Player, Rules, Score, Stats, TeamOf, type FlagState } from "../schema.ts"
+import { TEAMS, trackLength, trackPoint, type Team } from "../../map.ts"
+import { MAPS } from "../../maps/index.ts"
+import { DT } from "../../movement.ts"
+import { CART, FLAG_RETURN_TICKS, otherTeam } from "../rules.ts"
+import { Cart, Flags, Game, Hill, Life, Match, Motion, Out, Player, Rules, Score, Stats, TeamOf, type CartValue, type FlagState } from "../schema.ts"
+
+type CartMotion = "push" | "stop" | "back" | "still"
+const cartMotion = (c: CartValue): CartMotion => (c.contested ? "stop" : c.pushers > 0 ? "push" : c.idle > CART.idleTicks && c.d > 0 ? "back" : "still")
 
 const TOUCH = 1.8
 
@@ -25,6 +30,7 @@ export const PlayObjectives = Game.System(
       rules: Game.System.readResource(Rules),
       flags: Game.System.writeResource(Flags),
       hill: Game.System.writeResource(Hill),
+      cart: Game.System.writeResource(Cart),
       score: Game.System.writeResource(Score)
     },
     events: { out: Game.System.writeEvent(Out) },
@@ -35,6 +41,7 @@ export const PlayObjectives = Game.System(
     const phase = machines.match.get()._tag
     if (phase === "Over") return
     const live = phase === "Live"
+    const { flagBases: FLAG_BASES, hill: HILL, track } = MAPS[rules.map]
     const players = queries.players.each().map((m) => ({
       m,
       session: m.data.player.get().session,
@@ -115,6 +122,37 @@ export const PlayObjectives = Game.System(
         for (const p of inside) p.m.data.stats.update((s) => ({ ...s, score: s.score + 5 }))
       }
       resources.hill.set({ owner, contested, ticks })
+    }
+
+    if (rules.mode === "cjar") {
+      const length = trackLength(track)
+      const cart = resources.cart.get()
+      if (cart.d >= length) return
+      const at = trackPoint(track, cart.d).at
+      const close = players.filter((p) => p.alive && near(p.body, at, CART.reach))
+      const pushers = close.filter((p) => p.team === "benandanti")
+      const contested = pushers.length > 0 && close.some((p) => p.team === "malandanti")
+      let d = cart.d
+      let idle = cart.idle
+      if (pushers.length > 0) {
+        idle = 0
+        if (!contested) d += CART.speed * (1 + 0.25 * (Math.min(pushers.length, CART.maxPushers) - 1)) * DT
+      } else {
+        idle++
+        if (idle > CART.idleTicks) d = Math.max(0, d - CART.backSpeed * DT)
+      }
+      d = Math.min(length, d)
+      const next: CartValue = { d, pushers: contested ? 0 : pushers.length, contested, idle }
+      const was = cartMotion(cart)
+      const now = cartMotion(next)
+      if (d >= length) events.out.emit({ t: "cart", a: "arrived" })
+      else if (now !== was && now !== "still") events.out.emit({ t: "cart", a: now })
+      // Chi spinge prende punti: due al secondo.
+      if (!contested && idle === 0 && Math.floor(d / (CART.speed / 2)) !== Math.floor(cart.d / (CART.speed / 2))) {
+        for (const p of pushers) p.m.data.stats.update((s) => ({ ...s, score: s.score + 1 }))
+      }
+      if (live) resources.score.set({ benandanti: Math.floor((d / Math.max(1, length)) * 100), malandanti: 0 })
+      resources.cart.set(next)
     }
   }
 )

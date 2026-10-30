@@ -121,6 +121,9 @@ export interface WorldTextures {
   fen: THREE.Texture
   coppi: THREE.Texture
   erba: THREE.Texture
+  terra: THREE.Texture
+  roccia: THREE.Texture
+  sacs: THREE.Texture
   marmo: THREE.Texture
   pavimento: THREE.Texture
   facciata: THREE.Texture
@@ -341,6 +344,85 @@ export function makeTextures(): WorldTextures {
     return c
   })()
 
+  // Terra battuta: fango secco, sassolini, impronte di scarponi.
+  const terra = (() => {
+    const s = 256
+    const [c, g] = canvas(s)
+    const r = rng(91)
+    g.fillStyle = "#7a6248"
+    g.fillRect(0, 0, s, s)
+    blotches(g, s, s, 40, "rgba(50,38,26,0.18)", 40, 92)
+    blotches(g, s, s, 30, "rgba(150,124,92,0.16)", 30, 93)
+    for (let i = 0; i < 700; i++) {
+      g.fillStyle = `hsl(${25 + r() * 15}, ${10 + r() * 15}%, ${30 + r() * 30}%)`
+      const d = 1 + r() * 3
+      g.fillRect(r() * s, r() * s, d, d * (0.6 + r() * 0.6))
+    }
+    grain(g, s, s, 26, 94)
+    return c
+  })()
+
+  // Roccia viva: calcare grigio con fratture e venature (Carso, Predil, colle di Osoppo).
+  const roccia = (() => {
+    const s = 512
+    const [c, g] = canvas(s)
+    const r = rng(101)
+    g.fillStyle = "#8d887e"
+    g.fillRect(0, 0, s, s)
+    blotches(g, s, s, 60, "rgba(60,58,54,0.16)", 70, 102)
+    blotches(g, s, s, 40, "rgba(190,184,170,0.16)", 50, 103)
+    g.lineCap = "round"
+    for (let i = 0; i < 70; i++) {
+      let x = r() * s, y = r() * s
+      g.strokeStyle = r() < 0.7 ? "rgba(40,38,34,0.45)" : "rgba(220,214,200,0.35)"
+      g.lineWidth = 0.8 + r() * 2.2
+      g.beginPath()
+      g.moveTo(x, y)
+      for (let k = 0; k < 5; k++) {
+        x += (r() - 0.5) * 60
+        y += (r() - 0.3) * 40
+        g.lineTo(x, y)
+      }
+      g.stroke()
+    }
+    grain(g, s, s, 30, 104)
+    return c
+  })()
+
+  // Sacchetti di sabbia: file sfalsate di cuscini di juta.
+  const sacs = (() => {
+    const s = 256
+    const [c, g] = canvas(s)
+    const r = rng(111)
+    g.fillStyle = "#4a3e2c"
+    g.fillRect(0, 0, s, s)
+    const rows = 4, cols = 3
+    const rh = s / rows, cw = s / cols
+    for (let j = 0; j < rows; j++) for (let i = -1; i <= cols; i++) {
+      const x = i * cw + (j % 2) * cw * 0.5
+      const y = j * rh
+      wrapRect(g, s, s, x + 2, y + 2, cw - 4, rh - 4, (px, py) => {
+        const grd = g.createLinearGradient(px, py, px, py + rh - 4)
+        const l = 52 + r() * 10
+        grd.addColorStop(0, `hsl(38, 30%, ${l}%)`)
+        grd.addColorStop(0.55, `hsl(36, 28%, ${l - 8}%)`)
+        grd.addColorStop(1, `hsl(34, 26%, ${l - 22}%)`)
+        g.fillStyle = grd
+        roundRect(g, px, py, cw - 4, rh - 4, 18)
+        g.fill()
+        // legatura e trama della juta
+        g.strokeStyle = "rgba(60,44,28,0.5)"
+        g.lineWidth = 2
+        g.beginPath()
+        g.moveTo(px + 10, py + (rh - 4) * 0.5)
+        g.lineTo(px + 2, py + (rh - 4) * 0.35)
+        g.stroke()
+      })
+    }
+    grain(g, s, s, 34, 112)
+    return c
+  })()
+
   const marmo = (() => {
     const s = 512
     const [c, g] = canvas(s)
@@ -422,6 +504,9 @@ export function makeTextures(): WorldTextures {
     fen: toTex(fen),
     coppi: toTex(coppi),
     erba: toTex(erba),
+    terra: toTex(terra),
+    roccia: toTex(roccia),
+    sacs: toTex(sacs),
     marmo: toTex(marmo),
     pavimento: toTex(pavimento),
     facciata: toTex(facciata)

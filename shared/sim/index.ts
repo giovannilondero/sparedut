@@ -4,10 +4,11 @@
 import { Random, type HostClock } from "@typeonce/ritmo"
 import { MODES, type ModeId } from "../folklore.ts"
 import type { PlayerInput } from "../input.ts"
-import { PICKUPS, type Team } from "../map.ts"
+import type { Team } from "../map.ts"
 import type { PhysicsWorld } from "../physics.ts"
 import type { PrimaryId } from "../weapons.ts"
 import type { GameEvent } from "./events.ts"
+import { freshDoors, freshTurrets } from "./rules.ts"
 import { simulate } from "./schedule.ts"
 import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, StartMatch } from "./schema.ts"
 import { ReadOutbox, ViewWorld, type WorldView } from "./view.ts"
@@ -18,6 +19,7 @@ export interface SimOptions {
   readonly scoreLimit?: number
   readonly friendlyFire?: boolean
   readonly seed: number
+  /** Il mondo fisico della mappa: la mappa della partita è la sua. */
   readonly physics: PhysicsWorld
 }
 
@@ -30,6 +32,7 @@ export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: H
     resources: {
       Rules: {
         mode: options.mode,
+        map: options.physics.map.id,
         scoreLimit: options.scoreLimit ?? MODES[options.mode].scoreLimit,
         timeLimitTicks: Math.round(options.minutes * 60 * 60),
         friendlyFire: options.friendlyFire ?? false
@@ -38,7 +41,10 @@ export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: H
       Score: { benandanti: 0, malandanti: 0 },
       Flags: { benandanti: { _tag: "base" }, malandanti: { _tag: "base" } },
       Hill: { owner: null, contested: false, ticks: 0 },
-      Pickups: PICKUPS.map(() => ({ _tag: "up" })),
+      Cart: { d: 0, pushers: 0, contested: false, idle: 0 },
+      Pickups: options.physics.map.pickups.map(() => ({ _tag: "up" })),
+      Turrets: freshTurrets(options.physics.map),
+      Doors: freshDoors(options.physics.map),
       History: [],
       Rng: Random.seed(options.seed)
     },

@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from "bun:test"
 import { BUTTON, IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
-import { CAMPANILE, COMUNE, JUMP_PADS } from "../shared/map.ts"
+import { CAMPANILE, COMUNE, GLEMONE } from "../shared/maps/glemone.ts"
 import { createPhysicsWorld, initPhysics, type PhysicsWorld } from "../shared/physics.ts"
 import { stepBody, type Body } from "../shared/movement.ts"
 import { createSim } from "../shared/sim/index.ts"
@@ -9,7 +9,7 @@ import { WARMUP_TICKS } from "../shared/sim/rules.ts"
 let physics: PhysicsWorld
 beforeAll(async () => {
   await initPhysics()
-  physics = createPhysicsWorld()
+  physics = createPhysicsWorld(GLEMONE)
 })
 
 const at = (x: number, y: number, z: number): Body => ({ x, y, z, vx: 0, vy: 0, vz: 0, grounded: true, crouch: false })
@@ -43,14 +43,14 @@ describe("movimento", () => {
   })
 
   test("il cjar di fen del campanile porta sul ballatoio", () => {
-    const pad = JUMP_PADS[0]
+    const pad = GLEMONE.jumpPads[0]
     const { b, maxY } = run(at(pad.at[0], pad.at[1] + 0.1, pad.at[2]), IDLE_INPUT, 60 * 4)
     console.log("campanile", b, maxY)
     expect(b.y).toBeCloseTo(CAMPANILE.balcony, 0)
   })
 
   test("il cjar di fen del Comun porta sul tetto", () => {
-    const pad = JUMP_PADS[1]
+    const pad = GLEMONE.jumpPads[1]
     const { b, maxY } = run(at(pad.at[0], pad.at[1] + 0.1, pad.at[2]), IDLE_INPUT, 60 * 4)
     console.log("comun", b, maxY)
     expect(b.y).toBeCloseTo(COMUNE.roof, 0)

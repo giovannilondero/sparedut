@@ -1,6 +1,7 @@
-// Anteprima del mondo: camera del menu (o fissa con ?cam=x,y,z,lx,ly,lz), modalità con ?mode=frico|culine.
+// Anteprima del mondo: mappa con ?map=osoppo, camera del menu (o fissa con ?cam=x,y,z,lx,ly,lz), modalità con ?mode=frico|culine|cjar|tampieste.
 import * as THREE from "three"
-import { FLAG_BASES, PICKUPS } from "../../shared/map.ts"
+import { trackLength, trackPoint, type MapId } from "../../shared/map.ts"
+import { MAP_IDS, MAPS } from "../../shared/maps/index.ts"
 import type { WorldFrame } from "../contracts.ts"
 import { createWorld } from "../world.ts"
 
@@ -18,7 +19,10 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, Number(q.get("pr") ?? 1.5)))
 const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera(75, 1, 0.05, 2500)
 const t0 = performance.now()
-const world = createWorld(scene, renderer)
+const mapId = MAP_IDS.find((id) => id === q.get("map")) ?? ("glemone" satisfies MapId)
+const map = MAPS[mapId]
+const { flagBases: FLAG_BASES, pickups: PICKUPS } = map
+const world = createWorld(scene, renderer, map)
 const buildMs = performance.now() - t0
 
 const resize = () => {
@@ -31,6 +35,19 @@ resize()
 
 const cam = q.get("cam")?.split(",").map(Number)
 const mode = q.get("mode")
+/** Il cjar che va avanti e indietro sul binario, la tempesta che si stringe. */
+const extras = (t: number): Pick<WorldFrame, "cart" | "storm" | "turrets" | "doors"> => {
+  const len = trackLength(map.track)
+  const p = trackPoint(map.track, ((Math.sin(t * 0.05) + 1) / 2) * len)
+  // le torrette girano e scaldano, le porte si rompono e tornano
+  const heat = (Math.sin(t * 0.4) + 1) / 2
+  return {
+    turrets: map.turrets.map((s, i) => ({ yaw: s.yaw + Math.sin(t * 0.7 + i) * 0.8, pitch: Math.sin(t * 0.5) * 0.15, heat, jammed: heat > 0.95, manned: true, mine: false })),
+    doors: map.doors.map(() => Math.max(0, Math.cos(t * 0.2))),
+    cart: mode === "cjar" ? { at: p.at, yaw: p.yaw, contested: Math.floor(t / 5) % 3 === 2, pushers: 1 } : null,
+    storm: mode === "tampieste" ? { x: map.hill.at[0], z: map.hill.at[2], radius: 10 + ((Math.cos(t * 0.1) + 1) / 2) * 80 } : null
+  }
+}
 const tFixed = q.get("t") ? Number(q.get("t")) : null
 let last = performance.now()
 let frames = 0
@@ -49,6 +66,7 @@ const loop = (now: number) => {
     pickups: PICKUPS.map((_, i) => (i + Math.floor(t / 3)) % 4 !== 0),
     flags: mode === "frico" ? { benandanti: { pos: FLAG_BASES.benandanti, state: "base" }, malandanti: { pos: [0, 2.1, 60], state: "carried" } } : null,
     hill: mode === "culine" ? { owner: Math.floor(t / 4) % 3 === 0 ? null : "malandanti", contested: Math.floor(t / 4) % 3 === 2 } : null,
+    ...extras(t),
     camera
   }
   world.update(dt, t, frame)
@@ -72,7 +90,7 @@ requestAnimationFrame(loop)
     camera.lookAt(c[3], c[4], c[5])
   } else world.menuCamera(t, camera)
   camera.updateMatrixWorld()
-  world.update(0.016, t, { pickups: PICKUPS.map(() => true), flags: mode === "frico" ? { benandanti: { pos: FLAG_BASES.benandanti, state: "base" }, malandanti: { pos: FLAG_BASES.malandanti, state: "base" } } : null, hill: mode === "culine" ? { owner: null, contested: false } : null, camera })
+  world.update(0.016, t, { pickups: PICKUPS.map(() => true), flags: mode === "frico" ? { benandanti: { pos: FLAG_BASES.benandanti, state: "base" }, malandanti: { pos: FLAG_BASES.malandanti, state: "base" } } : null, hill: mode === "culine" ? { owner: null, contested: false } : null, ...extras(t), camera })
   renderer.render(scene, camera)
   const out = document.createElement("canvas")
   out.width = w
