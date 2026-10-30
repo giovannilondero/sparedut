@@ -12,7 +12,7 @@ import type { ArsenalValue, FlagState, HillValue } from "./sim/schema.ts"
 import type { PhaseView } from "./sim/view.ts"
 import { PRIMARIES, type PrimaryId, type WeaponId } from "./weapons.ts"
 
-export const PROTOCOL_VERSION = 3
+export const PROTOCOL_VERSION = 4
 export const MAX_PLAYERS = 16
 export const SNAPSHOT_EVERY = 2 // tick: 30 istantanee al secondo
 
@@ -136,6 +136,9 @@ export interface BoardRow {
   readonly ping: number
 }
 
+/** Errori per il client: il testo lo sceglie lui, nella sua lingua. */
+export type ErrorCode = "invalid" | "version" | "notFound" | "lanOnly" | "full"
+
 export type ServerMessage =
   | { readonly t: "welcome"; readonly id: string; readonly version: number }
   | { readonly t: "rooms"; readonly rooms: readonly RoomSummary[] }
@@ -145,7 +148,7 @@ export type ServerMessage =
   | Snapshot
   | { readonly t: "board"; readonly rows: readonly BoardRow[] }
   | { readonly t: "chat"; readonly from: string; readonly name: string; readonly team: Team | null; readonly text: string }
-  | { readonly t: "error"; readonly message: string }
+  | { readonly t: "error"; readonly code: ErrorCode }
   | { readonly t: "pong"; readonly c: number; readonly tick: number }
 
 export type { PlayerInput, PrimaryId }

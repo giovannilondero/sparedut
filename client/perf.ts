@@ -7,6 +7,7 @@
  * budget, e lo rialza piano quando c'è margine.
  */
 import type * as THREE from "three"
+import { t } from "./i18n.ts"
 
 export interface NetStats {
   readonly ping: number
@@ -90,6 +91,7 @@ export class PerfMonitor {
     const fps = avg > 0 ? 1000 / avg : 0
     const canvas = this.renderer.domElement
     const n = extra.net
+    const L = t().perf
     const color = fps >= 58 ? "#9fe08a" : fps >= 40 ? "#f0c45d" : "#ff6b5a"
     this.el.innerHTML = `
       <b style="color:${color}">${fps.toFixed(0)} FPS</b>
@@ -97,7 +99,7 @@ export class PerfMonitor {
       <span>CPU ${cpu.toFixed(1)} ms</span>
       <span>${this.calls} draw call · ${(this.triangles / 1000).toFixed(0)}k tri</span>
       <span>${canvas.width}×${canvas.height} @ ${this.renderer.getPixelRatio().toFixed(2)}x · ${extra.quality}</span>
-      ${n ? `<span>ping ${Math.round(n.ping)} ms · tick ${n.tick}</span><span>istantanee ${n.snapEvery.toFixed(0)}±${n.snapJitter.toFixed(0)} ms · ${n.players} giocatori</span><span>correzioni ${n.corrections}/60 · max ${(n.worstCorrection * 100).toFixed(0)} cm</span>` : `<span>menu</span>`}
-      <small>F3 per nascondere</small>`
+      ${n ? `<span>ping ${Math.round(n.ping)} ms · tick ${n.tick}</span><span>${L.snaps} ${n.snapEvery.toFixed(0)}±${n.snapJitter.toFixed(0)} ms · ${n.players} ${L.players}</span><span>${L.corrections} ${n.corrections}/60 · max ${(n.worstCorrection * 100).toFixed(0)} cm</span>` : `<span>${L.menu}</span>`}
+      <small>${L.hide}</small>`
   }
 }

@@ -55,8 +55,31 @@ button.big small { opacity: 0.75; font-size: 13px; }
 .small-buttons button { font-size: 14px; padding: 8px 10px; }
 
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
-.field input, .field select { background: rgba(0, 0, 0, 0.35); border: 1px solid var(--stone-line); border-radius: 8px; padding: 8px 10px; color: var(--ink); font-size: 15px; }
+.field input { background: rgba(0, 0, 0, 0.35); border: 1px solid var(--stone-line); border-radius: 8px; padding: 8px 10px; color: var(--ink); font-size: 15px; }
 .field input[type="range"] { padding: 0; accent-color: var(--gold); }
+
+/* Le select: tendina scura come il resto, freccia d'oro, testo lungo troncato. */
+:root { color-scheme: dark; }
+select { appearance: none; min-inline-size: 0; max-inline-size: 100%; text-overflow: ellipsis; white-space: nowrap; overflow: clip; cursor: pointer;
+  background: rgba(0, 0, 0, 0.35) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23e8b64c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center / 12px 8px;
+  border: 1px solid var(--stone-line); border-radius: 8px; padding-block: 8px; padding-inline: 10px 32px; color: var(--ink); }
+select option { background: #1d1813; color: var(--ink); }
+select:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { select:hover { border-color: rgba(232, 182, 76, 0.6); } }
+.field select { font-size: 15px; }
+.inline-field { display: inline-flex; align-items: center; gap: 6px; }
+.inline-field select { padding-block: 5px; font-size: 13px; }
+
+/* Bravura dei bot: tre schede invece di una tendina con testi lunghi. */
+.levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; color: var(--ink); }
+
+/* Lingua: interruttore in alto a destra. */
+.lang { position: absolute; inset-block-start: 0; inset-inline-end: 0; display: flex; align-items: center; gap: 4px; padding: 4px 4px 4px 12px; border-radius: 999px;
+  background: var(--stone); border: 1px solid var(--stone-line); backdrop-filter: blur(6px); font-size: 12px; color: var(--muted); }
+.lang span { margin-inline-end: 4px; letter-spacing: 0.12em; text-transform: uppercase; }
+.lang button { padding: 5px 12px; font-size: 13px; border-radius: 999px; border-color: transparent; }
+.lang button.selected { border-color: var(--gold); background: rgba(232, 182, 76, 0.18); color: var(--gold); }
+button kbd { margin-inline-start: 6px; opacity: 0.7; }
 .field b { color: var(--ink); font-weight: 600; }
 .check { display: flex; gap: 8px; align-items: center; font-size: 14px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

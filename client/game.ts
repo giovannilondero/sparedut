@@ -3,7 +3,7 @@
  * corpo, interpolazione degli altri, eventi → suoni ed effetti, HUD e overlay.
  */
 import * as THREE from "three"
-import { BOT_LEVEL_IDS, BOT_LEVELS, MODES, QUICK_CHAT, TEAM_INFO, type BotLevel } from "../shared/folklore.ts"
+import { BOT_LEVEL_IDS, QUICK_CHAT, TEAM_INFO, type BotLevel } from "../shared/folklore.ts"
 import { rayPose } from "../shared/hitbox.ts"
 import { BUTTON, type PlayerInput } from "../shared/input.ts"
 import { FLAG_BASES, PICKUPS, type Team } from "../shared/map.ts"
@@ -16,6 +16,7 @@ import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, Viewmodel, WorldScene } from "./contracts.ts"
 import { Controls } from "./controls.ts"
 import { boardHtml, esc, Hud, rosterHtml } from "./hud.ts"
+import { t } from "./i18n.ts"
 import type { Menu } from "./menu.ts"
 import type { Net } from "./net.ts"
 import { Predictor } from "./predict.ts"
@@ -96,6 +97,10 @@ export class Game {
   private chatting = false
   private quickOpen = false
   private overlay: "none" | "pause" | "loadout" = "none"
+  /** Da dove si è aperta l'armeria: Esc ci torna. */
+  private loadoutFrom: "none" | "pause" = "none"
+  /** Quando il browser ha tolto il blocco del mouse: lo stesso Esc non deve anche chiudere la pausa. */
+  private unlockedAt = 0
   private eye = EYE_STAND
   private stepAcc = 0
   private wasGrounded = true
@@ -127,6 +132,7 @@ export class Game {
     document.addEventListener("pointerlockchange", () => {
       if (!this.running) return
       const locked = document.pointerLockElement === d.renderer.domElement
+      if (!locked) this.unlockedAt = performance.now()
       if (!locked && this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over") this.openOverlay("pause")
       if (locked && this.overlay !== "none") this.openOverlay("none")
     })
@@ -164,7 +170,7 @@ export class Game {
     this.d.viewmodel.setVisible(true)
     this.openOverlay("none")
     this.controls.lock()
-    this.hud.announce(`${MODES[room.mode].name}`, MODES[room.mode].rules)
+    this.hud.announce(t().modes[room.mode].name, t().modes[room.mode].rules)
   }
 
   stop() {
@@ -413,25 +419,25 @@ export class Game {
         if (at) fx.pickupBurst(at, e.k)
         if (e.s === me) audio.play(PICK_SOUND[e.k])
         else if (at) audio.play(PICK_SOUND[e.k], { at, volume: 0.6 })
-        if (e.s === me && e.k === "sgnape") this.hud.announce("Salût!", "La sgnape ti fâs corie")
+        if (e.s === me && e.k === "sgnape") this.hud.announce(t().game.sgnape, t().game.sgnapeSub)
         return
       }
       case "flag": {
-        const info = TEAM_INFO[e.team]
+        const g = t().game
         const who = e.s ? this.names.get(e.s) ?? "?" : ""
         const mine = this.teams.get(me) === e.team
         const text = {
-          taken: mine ? "Nus àn robât il frico!" : "Il frico al è stât cjapât!",
-          dropped: "Il frico al è par tiere!",
-          returned: "Il frico al è tornât a cjase",
-          captured: mine ? "Nus àn fat il pont!" : "PONT! Frico puartât a cjase!"
+          taken: mine ? g.flag.takenMine : g.flag.taken,
+          dropped: g.flag.dropped,
+          returned: g.flag.returned,
+          captured: mine ? g.flag.capturedMine : g.flag.captured
         }[e.a]
-        this.hud.announce(text, `${who} · frico dai ${info.name}`)
+        this.hud.announce(text, g.flagSub(who, t().teams[e.team].name))
         audio.play(e.a === "captured" ? "flag_captured" : e.a === "returned" ? "flag_returned" : "flag_taken")
         return
       }
       case "hill":
-        if (this.room?.mode === "culine") this.hud.announce(e.team ? `${TEAM_INFO[e.team].name} in plaçute!` : "Plaçute libare")
+        if (this.room?.mode === "culine") this.hud.announce(e.team ? t().game.hillTaken(t().teams[e.team].name) : t().hud.hillFree)
         return
       case "pad": {
         const at = this.posOf(e.s)
@@ -463,7 +469,7 @@ export class Game {
       case "match":
         if (e.a === "start") {
           audio.play("bells")
-          this.hud.announce("Al tache la bataie!", "Lis cjampanis dal Dom a sunin")
+          this.hud.announce(t().game.start, t().game.startSub)
         } else {
           const myTeam = this.teams.get(me)
           audio.play(e.winner === myTeam ? "victory" : "defeat")
@@ -514,6 +520,7 @@ export class Game {
       return
     }
     if (!down) return
+    if (code === "Escape") return this.escape()
     if (this.quickOpen && /^Digit\d$/.test(code)) {
       const n = Number(code.slice(5))
       const phrase = QUICK_CHAT[(n + 9) % 10]
@@ -526,11 +533,19 @@ export class Game {
     if (code === "KeyB") this.openOverlay(this.overlay === "loadout" ? "none" : "loadout")
   }
 
+  /** Esc chiude quel che è aperto, un passo alla volta. Il blocco del mouse lo ridà solo un clic. */
+  private escape() {
+    if (this.quickOpen) this.toggleQuick(false)
+    else if (this.overlay === "loadout") this.openOverlay(this.loadoutFrom)
+    else if (this.overlay === "pause" && performance.now() - this.unlockedAt > 300) this.openOverlay("none")
+  }
+
   private toggleQuick(on: boolean) {
     this.quickOpen = on
     const q = $("quickchat")
     q.classList.toggle("hidden", !on)
-    if (on) q.innerHTML = QUICK_CHAT.map((p, i) => `<div><kbd>${(i + 1) % 10}</kbd>${esc(p)}</div>`).join("")
+    const gloss = t().game.quickGloss
+    if (on) q.innerHTML = QUICK_CHAT.map((p, i) => `<div><kbd>${(i + 1) % 10}</kbd>${esc(p)}${gloss ? ` <span class="muted">· ${gloss[i]}</span>` : ""}</div>`).join("")
   }
 
   private openChat() {
@@ -553,6 +568,7 @@ export class Game {
   }
 
   private openOverlay(which: "none" | "pause" | "loadout") {
+    if (which === "loadout" && this.overlay !== "loadout") this.loadoutFrom = this.overlay === "pause" ? "pause" : "none"
     this.overlay = which
     $("pause").classList.toggle("hidden", which !== "pause")
     $("loadout").classList.toggle("hidden", which !== "loadout")
@@ -560,7 +576,8 @@ export class Game {
     if (which === "loadout") {
       if (document.pointerLockElement) document.exitPointerLock()
       const el = $("loadout")
-      el.innerHTML = `<h2>Armarie</h2><p class="muted">L'arma principale nuova arriva alla prossima rinascita.</p><div class="weapons" id="loadout-list"></div><div class="row"><button id="lo-close" class="primary">Torne a zuiâ</button></div>`
+      const lo = t().loadout
+      el.innerHTML = `<h2>${lo.title}</h2><p class="muted">${lo.note}</p><div class="weapons" id="loadout-list"></div><div class="row"><button id="lo-close" class="primary">${lo.resume}</button></div>`
       this.d.menu.buildArmarie($("loadout-list"), (p) => this.d.net.send({ t: "primary", p }))
       $("lo-close").onclick = () => {
         this.openOverlay("none")
@@ -578,30 +595,32 @@ export class Game {
     const myTeam = this.teams.get(this.me)
     const other: Team = myTeam === "benandanti" ? "malandanti" : "benandanti"
     const phase = this.snap?.phase.tag ?? "Warmup"
+    const s = t()
+    const p = s.pause
     el.innerHTML = `
-      <h2>${MODES[room.mode].name} <small class="muted">· ${MODES[room.mode].sub}</small></h2>
+      <h2>${s.modes[room.mode].name} <small class="muted">· ${s.modes[room.mode].sub}</small></h2>
       <div class="row" style="align-items:center;justify-content:space-between">
-        <div><div class="muted">Codiç de partide</div><div class="invite">${room.code}</div></div>
-        <div style="text-align:right"><button id="p-copy">Copie il link d'invît</button><div class="muted" style="font-size:12px;margin-top:4px">${room.visibility === "lan" ? "Visibile in rete locale" : "Solo con codice"}</div></div>
+        <div><div class="muted">${p.code}</div><div class="invite">${room.code}</div></div>
+        <div style="text-align:right"><button id="p-copy">${p.copy}</button><div class="muted" style="font-size:12px;margin-top:4px">${room.visibility === "lan" ? p.visLan : p.visCode}</div></div>
       </div>
       <div class="roster">${rosterHtml(room, this.me)}</div>
       ${
         host
           ? `<div class="host-tools">👑 Host:
-        <button id="p-start" class="primary">${phase === "Warmup" ? "Fâs partî la partide" : "Ricomince"}</button>
+        <button id="p-start" class="primary">${phase === "Warmup" ? p.start : p.restart}</button>
         <button data-bot="benandanti:1">+ bot ${TEAM_INFO.benandanti.short}</button><button data-bot="benandanti:-1">− bot ${TEAM_INFO.benandanti.short}</button>
         <button data-bot="malandanti:1">+ bot ${TEAM_INFO.malandanti.short}</button><button data-bot="malandanti:-1">− bot ${TEAM_INFO.malandanti.short}</button>
-        <select id="p-level">${BOT_LEVEL_IDS.map((l) => `<option value="${l}"${l === room.level ? " selected" : ""}>${BOT_LEVELS[l].name}</option>`).join("")}</select>
+        <label class="inline-field">${p.level} <select id="p-level">${BOT_LEVEL_IDS.map((l) => `<option value="${l}"${l === room.level ? " selected" : ""}>${s.levels[l].name}</option>`).join("")}</select></label>
       </div>`
-          : `<div class="muted" style="margin-top:8px">L'host (👑) al fâs partî la partide.</div>`
+          : `<div class="muted" style="margin-top:8px">${p.hostOnly}</div>`
       }
       <div class="row">
-        <button id="p-resume" class="primary">Torne a zuiâ</button>
-        <button id="p-team">Passe cui ${TEAM_INFO[other].name}</button>
-        <button id="p-loadout">Armarie</button>
-        <button id="p-leave">Va fûr · Mandi!</button>
+        <button id="p-resume" class="primary">${s.loadout.resume}</button>
+        <button id="p-team">${p.switchTeam(s.teams[other].name)}</button>
+        <button id="p-loadout">${s.loadout.title}</button>
+        <button id="p-leave">${p.leave}</button>
       </div>
-      <label class="field" style="margin-top:10px"><span>Sensibilità mouse</span><input type="range" id="p-sens" min="0.2" max="3" step="0.05" value="${this.d.settings.sensitivity}" /></label>`
+      <label class="field" style="margin-top:10px"><span>${p.sens}</span><input type="range" id="p-sens" min="0.2" max="3" step="0.05" value="${this.d.settings.sensitivity}" /></label>`
     $("p-resume").onclick = () => {
       this.openOverlay("none")
       this.controls.lock()
@@ -614,7 +633,7 @@ export class Game {
     }
     $("p-copy").onclick = () => {
       void navigator.clipboard?.writeText(link)
-      $("p-copy").textContent = "Copiât! Mandi a ducj"
+      $("p-copy").textContent = p.copied
     }
     $<HTMLInputElement>("p-sens").oninput = (e) => {
       this.d.settings.sensitivity = Number((e.target as HTMLInputElement).value)
@@ -644,8 +663,9 @@ export class Game {
     el.classList.remove("hidden")
     const winner = s.phase.winner
     const myTeam = this.teams.get(this.me)
-    const title = winner === "pari" ? "Pari e patte!" : winner === myTeam ? "Vitorie!" : "Pierdût…"
-    const sub = winner === "pari" ? "Nissun al à vinçût: si fâs un altri zîr" : `A vincin i ${TEAM_INFO[winner].name} · ${TEAM_INFO[winner].motto}`
+    const en = t().end
+    const title = winner === "pari" ? en.draw : winner === myTeam ? en.win : en.lose
+    const sub = winner === "pari" ? en.drawSub : en.winSub(t().teams[winner].name, t().teams[winner].motto)
     const rows = [...this.board]
     const best = <K extends keyof BoardRow>(k: K) => rows.slice().sort((a, b) => (b[k] as number) - (a[k] as number))[0]
     const award = (title: string, row: BoardRow | undefined, value: string) =>
@@ -658,14 +678,14 @@ export class Game {
       <h1 class="end-title" style="color:${winner === "pari" ? "var(--gold)" : TEAM_INFO[winner].color}">${title}</h1>
       <p style="text-align:center;font-family:var(--serif);font-style:italic">${sub} · ${s.score.benandanti} – ${s.score.malandanti}</p>
       <div class="awards">
-        ${award(mvp?.team === "malandanti" ? "Malandant dal An" : "Benandant dal An", mvp, `${mvp?.score ?? 0} ponts`)}
-        ${award("Sclopetari", killer, `${killer?.kills ?? 0} copâts`)}
-        ${award("Cjampane a feste", streak, `${streak?.best ?? 0} di file`)}
-        ${award("Voli di falcon", head, `${head?.headshots ?? 0} tal cjâf`)}
+        ${award(en.mvp[mvp?.team ?? "benandanti"], mvp, en.points(mvp?.score ?? 0))}
+        ${award(en.killer, killer, en.kills(killer?.kills ?? 0))}
+        ${award(en.streak, streak, en.row(streak?.best ?? 0))}
+        ${award(en.head, head, en.heads(head?.headshots ?? 0))}
       </div>
       ${boardHtml(rows, this.me)}
-      <p class="muted" style="text-align:center">Si ricomince tra ${Math.max(0, Math.ceil((s.phase.restarts - s.tick) / 60))} seconts…</p>
-      <div class="row"><button id="e-leave">Va fûr</button>${this.room?.hostId === this.me ? `<button id="e-again" class="primary">Subit un altri zîr!</button>` : ""}</div>`
+      <p class="muted" style="text-align:center">${en.restartIn(Math.max(0, Math.ceil((s.phase.restarts - s.tick) / 60)))}</p>
+      <div class="row"><button id="e-leave">${en.leave}</button>${this.room?.hostId === this.me ? `<button id="e-again" class="primary">${en.again}</button>` : ""}</div>`
     $("e-leave").onclick = () => {
       this.d.net.send({ t: "leave" })
       this.d.onLeave()

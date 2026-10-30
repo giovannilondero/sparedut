@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="it">
+<html lang="fur">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#14110f" />
-    <title>Sparedût — Bataie tal Dom di Glemone</title>
+    <title>Sparedût</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./style.css" />
   </head>
@@ -15,98 +15,91 @@
     <div id="menu" class="screen">
       <div class="menu-shade"></div>
       <header class="brand">
-        <div class="brand-kicker">Glemone · Zone dal Dom · MCMLXXVI → MMXXVI</div>
+        <div class="brand-kicker" data-t="kicker"></div>
         <h1 class="brand-title">Sparedût</h1>
-        <div class="brand-sub">Bataie tra <b class="ben">Benandants</b> e <b class="mal">Malandants</b> sot il Cjampanili</div>
+        <div class="brand-sub" data-t="sub"></div>
+        <div class="lang" role="group"><span data-t="language"></span><button data-lang="fur">Furlan</button><button data-lang="it">Italiano</button></div>
       </header>
 
       <nav id="menu-home" class="panel home">
         <label class="field name-field">
-          <span>Il to non · Il tuo nome</span>
-          <input id="name" maxlength="20" placeholder="Toni di Glemone" autocomplete="off" />
+          <span data-t="nameLabel"></span>
+          <input id="name" maxlength="20" data-t-ph="namePh" autocomplete="off" />
         </label>
         <button class="big primary" data-go="quick">
-          <span>Zuie cuintri i bot</span><small>Partita veloce contro la CPU</small>
+          <span data-t="quick"></span><small data-t="quickSub"></small>
         </button>
         <button class="big" data-go="create">
-          <span>Cree une partide</span><small>Online con codice o in rete locale</small>
+          <span data-t="create"></span><small data-t="createSub"></small>
         </button>
         <button class="big" data-go="join">
-          <span>Jentre cun codiç</span><small>Hai un codice di 4 lettere?</small>
+          <span data-t="join"></span><small data-t="joinSub"></small>
         </button>
         <div class="lan-box">
-          <div class="lan-title">Partidis in rêt locâl <small>(stessa rete)</small></div>
-          <ul id="lan-list"><li class="muted">Nissune partide. Creane une!</li></ul>
+          <div class="lan-title" data-t="lanTitle"></div>
+          <ul id="lan-list"></ul>
         </div>
         <div class="row small-buttons">
-          <button data-go="armarie">Armarie</button>
-          <button data-go="settings">Impostazions</button>
-          <button data-go="vocabolari">Vocabolari</button>
+          <button data-go="armarie" data-t="armarie"></button>
+          <button data-go="settings" data-t="settings"></button>
+          <button data-go="vocabolari" data-t="vocab"></button>
         </div>
       </nav>
 
       <section id="menu-create" class="panel hidden">
-        <h2>Cree une partide</h2>
+        <h2 data-t="create"></h2>
         <div id="mode-cards" class="cards"></div>
         <div class="grid2">
-          <label class="field"><span>Durata</span><select id="c-minutes"><option value="5">5 minuti</option><option value="10">10 minuti</option><option value="15">15 minuti</option><option value="20">20 minuti</option></select></label>
-          <label class="field"><span>Bot per squadra</span><select id="c-bots"></select></label>
-          <label class="field"><span>Bravura dei bot</span><select id="c-level"></select></label>
-          <label class="field"><span>Chi la vede</span><select id="c-vis"><option value="lan">Rete locale (in lista) + codice</option><option value="code">Solo con codice (online)</option></select></label>
+          <label class="field"><span data-t="minutesLabel"></span><select id="c-minutes"></select></label>
+          <label class="field"><span data-t="botsLabel"></span><select id="c-bots"></select></label>
         </div>
-        <label class="check"><input type="checkbox" id="c-ff" /> Fuoco amico (i compagni si fanno male)</label>
+        <div class="field"><span data-t="levelLabel"></span><div id="c-level" class="levels" role="radiogroup"></div></div>
+        <label class="field"><span data-t="visLabel"></span><select id="c-vis"><option value="lan" data-t="visLan"></option><option value="code" data-t="visCode"></option></select></label>
+        <label class="check"><input type="checkbox" id="c-ff" /> <span data-t="ff"></span></label>
         <div class="row">
-          <button data-go="home">Indaûr</button>
-          <button class="primary" id="c-go">Cree e jentre</button>
+          <button data-go="home" data-t="back"></button>
+          <button class="primary" id="c-go" data-t="createGo"></button>
         </div>
       </section>
 
       <section id="menu-join" class="panel hidden">
-        <h2>Jentre cun codiç</h2>
+        <h2 data-t="join"></h2>
         <input id="j-code" class="code-input" maxlength="4" placeholder="ABCD" autocomplete="off" />
         <div class="row">
-          <button data-go="home">Indaûr</button>
-          <button class="primary" id="j-go">Jentre</button>
+          <button data-go="home" data-t="back"></button>
+          <button class="primary" id="j-go" data-t="joinGo"></button>
         </div>
       </section>
 
       <section id="menu-armarie" class="panel wide hidden">
-        <h2>Armarie <small>· scegli l'arma principale</small></h2>
+        <h2 data-t="armarieTitle"></h2>
         <div id="armarie" class="weapons"></div>
-        <div class="row"><button data-go="home">Indaûr</button></div>
+        <div class="row"><button data-go="home" data-t="back"></button></div>
       </section>
 
       <section id="menu-settings" class="panel hidden">
-        <h2>Impostazions</h2>
-        <label class="field"><span>Sensibilità del mouse <b id="s-sens-v"></b></span><input type="range" id="s-sens" min="0.2" max="3" step="0.05" /></label>
-        <label class="field"><span>Campo visivo <b id="s-fov-v"></b></span><input type="range" id="s-fov" min="65" max="105" step="1" /></label>
-        <label class="field"><span>Volume <b id="s-master-v"></b></span><input type="range" id="s-master" min="0" max="1" step="0.05" /></label>
-        <label class="field"><span>Musica <b id="s-music-v"></b></span><input type="range" id="s-music" min="0" max="1" step="0.05" /></label>
-        <label class="field"><span>Qualità grafica</span><select id="s-quality"><option value="bassa">Bassa (portatile del nono)</option><option value="media">Media</option><option value="alta">Alta (ombre belle)</option></select></label>
-        <label class="check"><input type="checkbox" id="s-autores" /> Risoluzione dinamica (abbassa la risoluzione se gli FPS calano)</label>
-        <label class="check"><input type="checkbox" id="s-info" /> Mostra info prestazioni (FPS, ping…) · anche col tasto <kbd>F3</kbd></label>
-        <label class="check"><input type="checkbox" id="s-invert" /> Inverti asse verticale</label>
-        <div class="keys">
-          <div><kbd>WASD</kbd> muoviti</div><div><kbd>Mouse</kbd> mira · <kbd>Sx</kbd> spara · <kbd>Dx</kbd> mira fine</div>
-          <div><kbd>Spazio</kbd> salta</div><div><kbd>Ctrl</kbd>/<kbd>C</kbd> accucciati</div>
-          <div><kbd>Shift</kbd> corri</div><div><kbd>R</kbd> ricarica</div>
-          <div><kbd>1-4</kbd> armi · <kbd>Q</kbd> ultima</div><div><kbd>G</kbd> bombe di sgnape</div>
-          <div><kbd>Tab</kbd> classifica</div><div><kbd>Invio</kbd> chat · <kbd>V</kbd> frasi rapide</div>
-          <div><kbd>B</kbd> armeria</div><div><kbd>Esc</kbd> menu partita</div>
-          <div><kbd>F3</kbd> info prestazioni</div>
-        </div>
-        <div class="row"><button data-go="home">Indaûr</button></div>
+        <h2 data-t="settings"></h2>
+        <label class="field"><span><span data-t="sens"></span> <b id="s-sens-v"></b></span><input type="range" id="s-sens" min="0.2" max="3" step="0.05" /></label>
+        <label class="field"><span><span data-t="fov"></span> <b id="s-fov-v"></b></span><input type="range" id="s-fov" min="65" max="105" step="1" /></label>
+        <label class="field"><span><span data-t="volume"></span> <b id="s-master-v"></b></span><input type="range" id="s-master" min="0" max="1" step="0.05" /></label>
+        <label class="field"><span><span data-t="music"></span> <b id="s-music-v"></b></span><input type="range" id="s-music" min="0" max="1" step="0.05" /></label>
+        <label class="field"><span data-t="quality"></span><select id="s-quality"><option value="bassa" data-t="qLow"></option><option value="media" data-t="qMid"></option><option value="alta" data-t="qHigh"></option></select></label>
+        <label class="check"><input type="checkbox" id="s-autores" /> <span data-t="autoRes"></span></label>
+        <label class="check"><input type="checkbox" id="s-info" /> <span data-t="showInfo"></span></label>
+        <label class="check"><input type="checkbox" id="s-invert" /> <span data-t="invert"></span></label>
+        <div class="keys" data-t="keys"></div>
+        <div class="row"><button data-go="home" data-t="back"></button></div>
       </section>
 
       <section id="menu-vocabolari" class="panel wide hidden">
-        <h2>Vocabolari furlan-talian</h2>
+        <h2 data-t="vocabTitle"></h2>
         <div id="vocabolari" class="vocab"></div>
-        <div class="row"><button data-go="home">Indaûr</button></div>
+        <div class="row"><button data-go="home" data-t="back"></button></div>
       </section>
 
       <footer class="menu-foot">
         <div id="tip" class="tip"></div>
-        <div class="status" id="status">Conession…</div>
+        <div class="status" id="status" data-t="connecting"></div>
       </footer>
     </div>
 
@@ -120,13 +113,13 @@
       <div id="hitmarker"></div>
 
       <div id="topbar">
-        <div class="score ben"><span class="team-name">Benandants</span><b id="score-ben">0</b></div>
+        <div class="score ben"><span class="team-name" id="name-ben"></span><b id="score-ben">0</b></div>
         <div class="center-info">
           <div id="clock">10:00</div>
           <div id="mode-label"></div>
           <div id="objective"></div>
         </div>
-        <div class="score mal"><b id="score-mal">0</b><span class="team-name">Malandants</span></div>
+        <div class="score mal"><b id="score-mal">0</b><span class="team-name" id="name-mal"></span></div>
       </div>
 
       <div id="killfeed"></div>
@@ -140,28 +133,28 @@
       </div>
 
       <div id="ammo">
-        <div id="weapon-name">Mitra dal Cramâr</div>
+        <div id="weapon-name"></div>
         <div class="ammo-row"><b id="mag">30</b><span>/</span><span id="reserve">150</span></div>
-        <div id="bombs">🍶 ×2</div>
+        <div id="bombs"></div>
         <div id="slots"></div>
       </div>
 
-      <div id="chat"><div id="chat-log"></div><input id="chat-input" class="hidden" maxlength="120" placeholder="Scrîf… (Invio per mandare)" /></div>
+      <div id="chat"><div id="chat-log"></div><input id="chat-input" class="hidden" maxlength="120" data-t-ph="chatPh" /></div>
       <div id="quickchat" class="hidden"></div>
 
       <div id="death" class="hidden">
-        <div class="death-title">Ti àn fat frico!</div>
+        <div class="death-title" data-t="deathTitle"></div>
         <div id="death-by"></div>
         <div id="death-line"></div>
         <div id="death-timer"></div>
-        <div class="death-hint">Premi <kbd>B</kbd> per cambiare arma principale</div>
+        <div class="death-hint" data-t="deathHint"></div>
       </div>
 
       <div id="board" class="hidden"></div>
       <div id="loadout" class="hidden overlay"></div>
       <div id="pause" class="hidden overlay"></div>
       <div id="endscreen" class="hidden overlay"></div>
-      <div id="clickplay" class="hidden"><div>Fâs clic par zuiâ</div><small>Esc per il menu della partita</small></div>
+      <div id="clickplay" class="hidden" data-t="clickplay"></div>
     </div>
 
     <div id="toast" class="hidden"></div>

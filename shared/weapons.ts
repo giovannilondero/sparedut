@@ -1,6 +1,7 @@
 /**
  * L'armeria furlana. Ogni arma è dati: la simulazione, l'HUD, il viewmodel,
- * i suoni e il menu di equipaggiamento leggono tutti da qui.
+ * i suoni e il menu di equipaggiamento leggono tutti da qui (nomi e descrizioni
+ * stanno in `client/i18n.ts`).
  */
 
 export type WeaponId = "mescul" | "mandi" | "cramar" | "doplete" | "cjampanili" | "lanciafrico"
@@ -9,10 +10,6 @@ export type FireMode = "melee" | "semi" | "auto" | "projectile"
 
 export interface WeaponDef {
   readonly id: WeaponId
-  /** Nome in furlan, come compare nell'HUD. */
-  readonly name: string
-  /** Sottotitolo scherzoso per menu e kill feed. */
-  readonly blurb: string
   readonly mode: FireMode
   /** Danno per colpo (per pallino con la doppietta). */
   readonly damage: number
@@ -42,8 +39,6 @@ export interface WeaponDef {
 export const WEAPONS = {
   mescul: {
     id: "mescul",
-    name: "Mescul de Polente",
-    blurb: "Il bastone per girare la polenta. Gira anche le facce.",
     mode: "melee",
     damage: 55,
     headMultiplier: 1.4,
@@ -62,8 +57,6 @@ export const WEAPONS = {
   },
   mandi: {
     id: "mandi",
-    name: "La Mandi",
-    blurb: "Pistola semiautomatica. Saluta e spara, in chest ordin.",
     mode: "semi",
     damage: 24,
     headMultiplier: 2,
@@ -82,8 +75,6 @@ export const WEAPONS = {
   },
   cramar: {
     id: "cramar",
-    name: "Mitra dal Cramâr",
-    blurb: "I cramârs vendevano spezie in Austria. Questo vende piombo.",
     mode: "auto",
     damage: 15,
     headMultiplier: 1.8,
@@ -102,8 +93,6 @@ export const WEAPONS = {
   },
   doplete: {
     id: "doplete",
-    name: "Dopiete di Pre Checo",
-    blurb: "La doppietta del parroco. Benedice a corto raggio.",
     mode: "semi",
     damage: 11,
     headMultiplier: 1.5,
@@ -122,8 +111,6 @@ export const WEAPONS = {
   },
   cjampanili: {
     id: "cjampanili",
-    name: "Il Cjampanili",
-    blurb: "Fucile di precisione. Alto, dritto e rifatto pietra su pietra.",
     mode: "semi",
     damage: 80,
     headMultiplier: 2.5,
@@ -142,8 +129,6 @@ export const WEAPONS = {
   },
   lanciafrico: {
     id: "lanciafrico",
-    name: "Lanciafrico",
-    blurb: "Spara forme di frico bollenti che rimbalzano e scoppiano. Arma potente: si raccoglie in Vie Bini.",
     mode: "projectile",
     damage: 110,
     headMultiplier: 1,
@@ -170,7 +155,6 @@ export const PRIMARIES = ["cramar", "doplete", "cjampanili"] as const satisfies 
 
 /** La granata: una boce di sgnape (grappa) con la miccia. */
 export const SGNAPE_BOMB = {
-  name: "Bombe di Sgnape",
   perLife: 2,
   fuseTicks: 130,
   speed: 17,

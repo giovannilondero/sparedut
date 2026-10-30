@@ -251,7 +251,7 @@ function frame() {
   renderer.render(vm.scene, vm.camera)
   renderer.setScissorTest(false)
 
-  info.textContent = `arma: ${WEAPONS[WEAPON_IDS[wIndex]].name}   [1-6 arma, F spara, R ricarica, G bomba, E esplosione, P ${auto ? "ferma" : "riprendi"} ciclo]\ndraw calls: ${renderer.info.render.calls}`
+  info.textContent = `arma: ${WEAPON_IDS[wIndex]}   [1-6 arma, F spara, R ricarica, G bomba, E esplosione, P ${auto ? "ferma" : "riprendi"} ciclo]\ndraw calls: ${renderer.info.render.calls}`
   requestAnimationFrame(frame)
 }
 renderer.info.autoReset = false

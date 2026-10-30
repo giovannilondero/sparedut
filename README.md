@@ -5,6 +5,7 @@ Due squadre del folklore friulano si contendono il sagrato, Via Bini e Piazza de
 i **Benandanti** (fusti di finocchio, salvano il raccolto) contro i **Malandanti** (canne di sorgo, vogliono la grandine).
 
 Multigiocatore online con codice d'invito e in rete locale, fino a 16 giocatori, con bot a tre livelli di bravura.
+Interfaccia in **friulano** o **italiano** (selettore in alto a destra nel menu); `Esc` torna indietro in tutti i menu.
 
 ## Avvio
 
@@ -69,7 +70,8 @@ Stack dalle linee guida (`giovannilondero/game-dev-guidelines`, 3D): **Ritmo** (
 - `shared/physics.ts`: il mondo statico in Rapier 3D e il character controller (server e client)
 - `shared/movement.ts`: il movimento in prima persona, funzione pura usata dal server e dalla predizione del client
 - `shared/sim/`: la simulazione Ritmo (60 tick/s): schema, sistemi (ingressi, partita, rinascita, movimento, armi con compensazione della latenza, proiettili, danni, raccolte, obiettivi), proiezioni per l'host
-- `shared/weapons.ts`, `shared/folklore.ts`: armi, squadre, modalità, battute, consigli
+- `shared/weapons.ts`, `shared/folklore.ts`: armi, squadre, modalità, bot (solo dati, senza lingua)
+- `client/i18n.ts`: tutti i testi in friulano e italiano: menu, HUD, battute, consigli, vocabolario
 - `shared/protocol.ts`: messaggi client ↔ server, validati con zod
 - `server/`: server autoritativo Bun (stanze, rete locale, codici), bot e loro grafo di navigazione
 - `client/`: rendering Three.js (mondo, avatar, arma in prima persona, effetti), audio sintetizzato con Howler, predizione e interpolazione, HUD e menu

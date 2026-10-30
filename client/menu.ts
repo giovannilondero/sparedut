@@ -1,11 +1,12 @@
 /**
- * Il menu principale: nome, partite, armeria, impostazioni, vocabolario.
+ * Il menu principale: nome, lingua, partite, armeria, impostazioni, vocabolario.
  */
-import { BOT_LEVEL_IDS, BOT_LEVELS, MODE_IDS, MODES, TEAM_INFO, TIPS, type BotLevel, type ModeId } from "../shared/folklore.ts"
+import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "../shared/folklore.ts"
 import type { RoomSummary, Visibility } from "../shared/protocol.ts"
 import { PRIMARIES, WEAPON_IDS, WEAPONS, type PrimaryId } from "../shared/weapons.ts"
 import type { GameAudio } from "./contracts.ts"
 import { esc } from "./hud.ts"
+import { onLangChange, setLang, t, type Lang } from "./i18n.ts"
 import type { Settings } from "./settings.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -27,45 +28,18 @@ export interface MenuHandlers {
 
 const SCREENS = ["home", "create", "join", "armarie", "settings", "vocabolari"] as const
 type ScreenName = (typeof SCREENS)[number]
-
-const VOCABOLARI: [string, string][] = [
-  ["Sparedût", "sparatoria, scaramuccia (gioco di parole su 'sparâ', sparare)"],
-  ["Glemone", "Gemona, in friulano"],
-  ["Dom", "il Duomo di Santa Maria Assunta"],
-  ["Cjampanili", "campanile. Quello di Gemona è stato ricostruito dopo il 1976"],
-  ["Benandants", "i benandanti: contadini nati con la camicia che combattevano di notte, in spirito, con fusti di finocchio"],
-  ["Malandants", "i loro nemici, streghe e stregoni armati di canne di sorgo"],
-  ["Fenoli · Sorc", "finocchio · sorgo"],
-  ["Frico", "formaggio Montasio e patate in padella, croccante fuori e morbido dentro. Qui cura 40 punti"],
-  ["Gubane", "dolce a spirale di noci e uvetta. Qui fa da corazza"],
-  ["Sgnape", "grappa. Fa correre, e girare la testa"],
-  ["Mescul", "il bastone per girare la polenta"],
-  ["Cramâr", "venditore ambulante carnico che portava spezie oltralpe"],
-  ["Plevan", "il pievano, il parroco della pieve"],
-  ["Pre Checo", "don Francesco, parroco di fantasia con una doppietta molto benedetta"],
-  ["Cjar di fen", "carro di fieno: qui ti lancia in alto"],
-  ["Plaçute", "piazzetta"],
-  ["Mandi!", "ciao, arrivederci: il saluto friulano per eccellenza"],
-  ["Ce fastu?", "che fai? come va?"],
-  ["Orpo!", "esclamazione di sorpresa"],
-  ["Mostro!", "accipicchia! (in senso buono)"],
-  ["Salût!", "salute! (si brinda)"],
-  ["Ajût!", "aiuto!"],
-  ["Tal cjâf", "in testa (colpo alla testa)"],
-  ["Al à fat frico di…", "lo ha ridotto a frico: lo ha fatto fuori"],
-  ["Agane · Sbilf", "fata delle acque · folletto dispettoso della Carnia"],
-  ["Pan e vin", "il falò dell'Epifania: dal fumo si legge l'annata"],
-  ["Messe dal Talar", "il 6 gennaio nel Duomo il sindaco offre un tallero d'argento al pievano: tradizione vera di Gemona"],
-  ["Anastilosi", "ricostruzione pietra su pietra: così è rinato il Duomo dopo il terremoto del 1976. 'Prime lis fabrichis, po lis cjasis, po lis glesiis.'"]
-]
+const MINUTES = [5, 10, 15, 20]
 
 export class Menu {
   private screen: ScreenName = "home"
   private mode: ModeId
-  private tipIndex = Math.floor(Math.random() * TIPS.length)
+  private level: BotLevel
+  private roomList: readonly RoomSummary[] = []
+  private tipIndex = Math.floor(Math.random() * 100)
 
   constructor(private readonly settings: Settings, private readonly audio: GameAudio, private readonly handlers: MenuHandlers) {
     this.mode = settings.lastMode
+    this.level = settings.lastLevel
     for (const el of document.querySelectorAll<HTMLElement>("[data-go]")) {
       el.addEventListener("click", () => {
         audio.unlock()
@@ -75,8 +49,25 @@ export class Menu {
         else this.go(go as ScreenName)
       })
     }
+    for (const el of document.querySelectorAll<HTMLButtonElement>("[data-lang]")) {
+      el.addEventListener("click", () => {
+        audio.play("ui_click")
+        settings.lang = el.dataset.lang as Lang
+        setLang(settings.lang)
+        handlers.settingsChanged()
+      })
+    }
     document.addEventListener("mouseover", (e) => {
       if ((e.target as HTMLElement).closest?.("#menu button")) audio.play("ui_hover", { volume: 0.4 })
+    })
+    // Esc: dai sottomenu si torna alla schermata principale.
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape" || $("menu").classList.contains("hidden")) return
+      if (this.screen !== "home") {
+        e.preventDefault()
+        audio.play("ui_click")
+        this.go("home")
+      } else if (document.activeElement instanceof HTMLInputElement) document.activeElement.blur()
     })
     const name = $<HTMLInputElement>("name")
     name.value = settings.name
@@ -84,21 +75,34 @@ export class Menu {
       settings.name = name.value.trim()
       handlers.settingsChanged()
     })
-    this.buildCreate()
-    this.buildArmarie()
-    this.buildSettings()
-    $("vocabolari").innerHTML = VOCABOLARI.map(([w, d]) => `<p><b>${w}</b> — ${d}</p>`).join("")
+    this.bindCreate()
+    this.bindSettings()
     $("j-go").addEventListener("click", () => this.joinCode())
     $("j-code").addEventListener("keydown", (e) => e.key === "Enter" && this.joinCode())
-    this.showTip()
+    onLangChange(() => this.renderTexts())
+    setLang(settings.lang)
     setInterval(() => this.showTip(), 9000)
+  }
+
+  /** Tutto quello che il menu scrive da JS, nella lingua attiva. */
+  private renderTexts() {
+    for (const el of document.querySelectorAll<HTMLButtonElement>("[data-lang]")) {
+      el.classList.toggle("selected", el.dataset.lang === this.settings.lang)
+      el.setAttribute("aria-pressed", String(el.dataset.lang === this.settings.lang))
+    }
+    this.renderCreate()
+    this.buildArmarie()
+    $("vocabolari").innerHTML = t().menu.vocab.map(([w, d]) => `<p><b>${w}</b> — ${d}</p>`).join("")
+    this.rooms(this.roomList)
+    $("tip").textContent = t().tips[this.tipIndex % t().tips.length]
   }
 
   private showTip() {
     const tip = $("tip")
     tip.style.opacity = "0"
     setTimeout(() => {
-      tip.textContent = TIPS[this.tipIndex++ % TIPS.length]
+      const tips = t().tips
+      tip.textContent = tips[++this.tipIndex % tips.length]
       tip.style.opacity = "1"
     }, 400)
   }
@@ -122,12 +126,12 @@ export class Menu {
     const input = $<HTMLInputElement>("name")
     this.go("home")
     input.focus()
-    input.placeholder = "Prime il non! (Prima il nome)"
+    input.placeholder = t().menu.needName
     return true
   }
 
   go(screen: ScreenName) {
-    if (screen !== "home" && screen !== "settings" && screen !== "vocabolari" && screen !== "armarie" && this.needName()) return
+    if ((screen === "create" || screen === "join") && this.needName()) return
     this.screen = screen
     for (const s of SCREENS) $(`menu-${s}`).classList.toggle("hidden", s !== screen)
     if (screen === "join") setTimeout(() => $("j-code").focus(), 50)
@@ -144,49 +148,46 @@ export class Menu {
   }
 
   rooms(list: readonly RoomSummary[]) {
+    this.roomList = list
     const ul = $("lan-list")
     if (!list.length) {
-      ul.innerHTML = `<li class="muted">Nissune partide in rêt. Creane une!</li>`
+      ul.innerHTML = `<li class="muted">${t().menu.lanEmpty}</li>`
       return
     }
     ul.innerHTML = list
       .map(
         (r) =>
-          `<li><button data-code="${r.code}"><span><b>${esc(r.host)}</b> · ${MODES[r.mode].name}</span><span>${r.players}👤 ${r.bots}🤖 · ${r.code}</span></button></li>`
+          `<li><button data-code="${r.code}"><span><b>${esc(r.host)}</b> · ${t().modes[r.mode].name}</span><span>${r.players}👤 ${r.bots}🤖 · ${r.code}</span></button></li>`
       )
       .join("")
     for (const b of ul.querySelectorAll<HTMLButtonElement>("button")) b.addEventListener("click", () => !this.needName() && this.handlers.join(b.dataset.code!))
   }
 
-  private buildCreate() {
-    const cards = $("mode-cards")
-    const render = () => {
-      cards.innerHTML = MODE_IDS.map(
-        (id) => `<button class="card${id === this.mode ? " selected" : ""}" data-mode="${id}"><b>${MODES[id].name}</b><small>${MODES[id].sub}</small><small>${MODES[id].rules}</small></button>`
-      ).join("")
-      for (const b of cards.querySelectorAll<HTMLButtonElement>("button")) {
-        b.addEventListener("click", () => {
-          this.mode = b.dataset.mode as ModeId
-          this.audio.play("ui_click")
-          render()
-        })
-      }
-    }
-    render()
-    const bots = $<HTMLSelectElement>("c-bots")
-    bots.innerHTML = Array.from({ length: 8 }, (_, i) => `<option value="${i}">${i === 0 ? "Nissun (solo persone)" : i}</option>`).join("")
-    bots.value = String(this.settings.lastBots)
-    const level = $<HTMLSelectElement>("c-level")
-    level.innerHTML = BOT_LEVEL_IDS.map((l) => `<option value="${l}">${BOT_LEVELS[l].name} — ${BOT_LEVELS[l].sub}</option>`).join("")
-    level.value = this.settings.lastLevel
-    $<HTMLSelectElement>("c-minutes").value = String(this.settings.lastMinutes)
+  // ---------------------------------------------------------------- crea partita
+
+  /** Ascoltatori una volta sola: le schede si ridisegnano a ogni scelta e a ogni cambio di lingua. */
+  private bindCreate() {
+    $("mode-cards").addEventListener("click", (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-mode]")
+      if (!b) return
+      this.mode = b.dataset.mode as ModeId
+      this.audio.play("ui_click")
+      this.renderCreate()
+    })
+    $("c-level").addEventListener("click", (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-level]")
+      if (!b) return
+      this.level = b.dataset.level as BotLevel
+      this.audio.play("ui_click")
+      this.renderCreate()
+    })
     $("c-go").addEventListener("click", () => {
       const o: CreateOptions = {
         mode: this.mode,
         minutes: Number($<HTMLSelectElement>("c-minutes").value),
         visibility: $<HTMLSelectElement>("c-vis").value as Visibility,
-        bots: Number(bots.value),
-        level: level.value as BotLevel,
+        bots: Number($<HTMLSelectElement>("c-bots").value),
+        level: this.level,
         ff: $<HTMLInputElement>("c-ff").checked
       }
       Object.assign(this.settings, { lastMode: o.mode, lastBots: o.bots, lastLevel: o.level, lastMinutes: o.minutes })
@@ -195,18 +196,43 @@ export class Menu {
     })
   }
 
+  private renderCreate() {
+    const s = t()
+    $("mode-cards").innerHTML = MODE_IDS.map(
+      (id) =>
+        `<button class="card${id === this.mode ? " selected" : ""}" data-mode="${id}" aria-pressed="${id === this.mode}"><b>${s.modes[id].name}</b><small>${s.modes[id].sub}</small><small>${s.modes[id].rules}</small></button>`
+    ).join("")
+    $("c-level").innerHTML = BOT_LEVEL_IDS.map(
+      (l) =>
+        `<button class="card${l === this.level ? " selected" : ""}" data-level="${l}" role="radio" aria-checked="${l === this.level}"><b>${s.levels[l].name}</b><small>${s.levels[l].sub}</small></button>`
+    ).join("")
+    // Le select si riscrivono tenendo il valore scelto.
+    const minutes = $<HTMLSelectElement>("c-minutes")
+    const keepMinutes = minutes.value || String(this.settings.lastMinutes)
+    minutes.innerHTML = MINUTES.map((m) => `<option value="${m}">${s.menu.minutes(m)}</option>`).join("")
+    minutes.value = keepMinutes
+    const bots = $<HTMLSelectElement>("c-bots")
+    const keepBots = bots.value || String(this.settings.lastBots)
+    bots.innerHTML = Array.from({ length: 8 }, (_, i) => `<option value="${i}">${i === 0 ? s.menu.botsNone : i}</option>`).join("")
+    bots.value = keepBots
+  }
+
+  // ---------------------------------------------------------------- armeria
+
   buildArmarie(target: HTMLElement = $("armarie"), onPick?: (p: PrimaryId) => void) {
     const max = { damage: 110, rate: 10, range: 400, mag: 30 }
     const render = () => {
+      const s = t()
       target.innerHTML = WEAPON_IDS.map((id) => {
         const w = WEAPONS[id]
+        const text = s.weapons[id]
         const primary = (PRIMARIES as readonly string[]).includes(id)
         const rate = 60 / w.cooldownTicks
         const bar = (label: string, v: number) => `<div class="stat">${label}<i style="width:${Math.min(100, v * 100)}%"></i></div>`
-        const tag = primary ? "Arma principale · clic per sceglierla" : id === "lanciafrico" ? "Arma potente · si raccoglie" : id === "mescul" ? "Corpo a corpo · sempre con te" : "Pistola · sempre con te"
+        const tag = primary ? s.menu.tag.primary : id === "lanciafrico" ? s.menu.tag.power : id === "mescul" ? s.menu.tag.melee : s.menu.tag.pistol
         return `<button class="weapon${id === this.settings.primary ? " selected" : ""}${primary ? "" : " locked"}" data-w="${id}">
-          <span class="tag">${w.slot === 1 ? "1" : w.slot} · ${tag}</span><b>${w.name}</b><span class="blurb">${w.blurb}</span>
-          ${bar("Danno", (w.damage * w.pellets) / max.damage)}${bar("Cadenza", rate / max.rate)}${bar("Portata", (w.range || 120) / max.range)}${bar("Caricatore", Math.max(w.magazine, 1) / max.mag)}
+          <span class="tag">${w.slot} · ${tag}</span><b>${text.name}</b><span class="blurb">${text.blurb}</span>
+          ${bar(s.menu.stat.damage, (w.damage * w.pellets) / max.damage)}${bar(s.menu.stat.rate, rate / max.rate)}${bar(s.menu.stat.range, (w.range || 120) / max.range)}${bar(s.menu.stat.mag, Math.max(w.magazine, 1) / max.mag)}
         </button>`
       }).join("")
       for (const b of target.querySelectorAll<HTMLButtonElement>("button.weapon:not(.locked)")) {
@@ -222,7 +248,9 @@ export class Menu {
     render()
   }
 
-  private buildSettings() {
+  // ---------------------------------------------------------------- impostazioni
+
+  private bindSettings() {
     const s = this.settings
     const bind = (id: string, key: "sensitivity" | "fov" | "master" | "music", fmt: (v: number) => string) => {
       const input = $<HTMLInputElement>(id)
@@ -245,7 +273,7 @@ export class Menu {
       s.quality = q.value as Settings["quality"]
       this.handlers.settingsChanged()
     })
-    for (const [id, key] of [["s-autores", "autoRes"], ["s-info", "showInfo"]] as const) {
+    for (const [id, key] of [["s-autores", "autoRes"], ["s-info", "showInfo"], ["s-invert", "invertY"]] as const) {
       const box = $<HTMLInputElement>(id)
       box.checked = s[key]
       box.addEventListener("change", () => {
@@ -253,13 +281,5 @@ export class Menu {
         this.handlers.settingsChanged()
       })
     }
-    const inv = $<HTMLInputElement>("s-invert")
-    inv.checked = s.invertY
-    inv.addEventListener("change", () => {
-      s.invertY = inv.checked
-      this.handlers.settingsChanged()
-    })
   }
 }
-
-export { TEAM_INFO }

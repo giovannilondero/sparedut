@@ -38,7 +38,7 @@ export class Hub {
       return
     }
     if (!parsed.success) {
-      this.send(peer, { t: "error", message: "Messaggio non valido." })
+      this.send(peer, { t: "error", code: "invalid" })
       return
     }
     const msg = parsed.data
@@ -47,7 +47,7 @@ export class Hub {
     switch (msg.t) {
       case "hello":
         peer.name = msg.name
-        if (msg.version !== PROTOCOL_VERSION) this.send(peer, { t: "error", message: "Versione diversa dal server: ricarica la pagina." })
+        if (msg.version !== PROTOCOL_VERSION) this.send(peer, { t: "error", code: "version" })
         this.send(peer, { t: "welcome", id, version: PROTOCOL_VERSION })
         return
       case "list":
@@ -72,11 +72,11 @@ export class Hub {
       }
       case "join": {
         const target = this.rooms.get(msg.code)
-        if (!target) return this.send(peer, { t: "error", message: "Nessuna partita con questo codice. Controlla, o chiedi all'host." })
+        if (!target) return this.send(peer, { t: "error", code: "notFound" })
         if (target.settings.visibility === "lan" && target.networkKey !== peer.network.key) {
-          return this.send(peer, { t: "error", message: "Questa partita è solo per la rete locale di chi l'ha creata." })
+          return this.send(peer, { t: "error", code: "lanOnly" })
         }
-        if (target.full && ![...target.members.values()].some((m) => m.bot)) return this.send(peer, { t: "error", message: "Partita piena: siamo già in sedici, come a una sagra." })
+        if (target.full && ![...target.members.values()].some((m) => m.bot)) return this.send(peer, { t: "error", code: "full" })
         this.leave(peer)
         this.enter(peer, target, msg.primary)
         this.roomChanged(target)
@@ -132,7 +132,7 @@ export class Hub {
 
   private enter(peer: Peer, room: Room, primary: Parameters<Room["addHuman"]>[2]) {
     const ok = room.addHuman(peer.id!, peer.name || "Furlan", primary, (m) => this.send(peer, m))
-    if (!ok) return this.send(peer, { t: "error", message: "Partita piena." })
+    if (!ok) return this.send(peer, { t: "error", code: "full" })
     peer.room = room
     this.send(peer, { t: "joined", room: room.info(), you: peer.id!, tick: room.tick })
   }

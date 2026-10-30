@@ -8,6 +8,7 @@ import { createAudio } from "./audio.ts"
 import { createAvatar } from "./avatars.ts"
 import { createFx } from "./fx.ts"
 import { Game } from "./game.ts"
+import { t } from "./i18n.ts"
 import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
 import { PerfMonitor } from "./perf.ts"
@@ -131,7 +132,7 @@ function toast(text: string) {
 
 function ensureOnline() {
   if (net.open) return true
-  toast("Il server nol rispuint. Al è impiât? (pnpm dev)")
+  toast(t().net.down)
   void connect()
   return false
 }
@@ -162,33 +163,33 @@ net.on((msg: ServerMessage) => {
       backToMenu()
       return
     case "error":
-      toast(msg.message)
+      toast(t().errors[msg.code])
       return
   }
 })
 
 async function connect() {
-  menu.status("Conession al server…")
+  menu.status(t().net.connecting)
   try {
     await net.connect(settings.name || "Furlan")
-    menu.status(`Conetût · Mandi, ${settings.name || "forest"}!`)
+    menu.status(t().net.connected(settings.name || t().net.stranger))
     net.send({ t: "list" })
     const invite = new URLSearchParams(location.search).get("p")
     if (invite && settings.name) {
-      menu.status(`Invît a la partide ${invite}…`)
+      menu.status(t().net.invite(invite))
       net.send({ t: "join", code: invite.toUpperCase(), primary: settings.primary })
-    } else if (invite) toast(`Scrîf il to non e jentre cun codiç ${invite}`)
+    } else if (invite) toast(t().net.inviteNeedName(invite))
   } catch {
-    menu.status("Server no rivât. Torni a provâ…")
+    menu.status(t().net.retry)
     setTimeout(connect, 2500)
   }
 }
 net.onClose = () => {
   if (game?.active) {
-    toast("Conession pierdude. Mandi!")
+    toast(t().net.lost)
     backToMenu()
   }
-  menu.status("Conession pierdude: torni a provâ…")
+  menu.status(t().net.lostRetry)
   setTimeout(connect, 2000)
 }
 void connect()
@@ -204,15 +205,15 @@ let last = performance.now()
 const loop = (now: number) => {
   const dt = Math.min(0.1, (now - last) / 1000)
   last = now
-  const t = now / 1000
+  const time = now / 1000
   const cpuStart = performance.now()
   if (game?.active) {
-    game.frame(dt, t)
+    game.frame(dt, time)
     game.render()
   } else {
-    world.menuCamera(t, camera)
+    world.menuCamera(time, camera)
     camera.updateMatrixWorld()
-    world.update(dt, t, { pickups: [], flags: null, hill: null, camera })
+    world.update(dt, time, { pickups: [], flags: null, hill: null, camera })
     fx.update(dt, camera)
     renderer.info.reset()
     renderer.autoClear = true
@@ -220,7 +221,7 @@ const loop = (now: number) => {
   }
   perf.sample(dt * 1000, performance.now() - cpuStart)
   if (settings.autoRes && !document.hidden && perf.adapt(now, minRatio(), maxRatio())) resize()
-  perf.panel(now, { quality: `${quality}${settings.autoRes ? " · ris. dinamica" : ""}`, net: game?.active ? game.netStats() : null })
+  perf.panel(now, { quality: `${t().quality[quality]}${settings.autoRes ? ` · ${t().perf.dynRes}` : ""}`, net: game?.active ? game.netStats() : null })
   requestAnimationFrame(loop)
 }
 requestAnimationFrame(loop)

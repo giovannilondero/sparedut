@@ -1,11 +1,12 @@
 /**
  * L'HUD in DOM: legge solo dati semplici che gli passa il loop di gioco.
  */
-import { DEATH_LINES, KILL_VERBS, MODES, pick, SPECIAL_KILLS, STREAKS, TEAM_INFO, type ModeId } from "../shared/folklore.ts"
+import { MODES, pick, TEAM_INFO, type ModeId } from "../shared/folklore.ts"
 import type { Team } from "../shared/map.ts"
 import type { BoardRow, RoomInfo, SnapSelf, Snapshot } from "../shared/protocol.ts"
 import type { KillCause } from "../shared/sim/events.ts"
-import { SGNAPE_BOMB, WEAPONS, type WeaponId } from "../shared/weapons.ts"
+import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
+import { t } from "./i18n.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -67,19 +68,19 @@ export class Hud {
     this.style("armor-bar", "width", `${you.armor}%`)
     const a = you.arsenal
     const def = WEAPONS[a.current]
-    this.text("weapon-name", def.name)
+    this.text("weapon-name", t().weapons[a.current].name)
     const ammo = a.ammo[a.current]
     this.text("mag", def.mode === "melee" ? "∞" : String(localMag ?? ammo.mag))
     this.text("reserve", def.mode === "melee" ? "" : String(ammo.reserve))
     this.toggleOn($("reserve").previousElementSibling!, "slash", "hidden", def.mode === "melee")
-    this.text("bombs", `${SGNAPE_BOMB.name}: ${"🍶".repeat(a.bombs) || "—"}`)
+    this.text("bombs", `${t().bomb}: ${"🍶".repeat(a.bombs) || "—"}`)
     const slots: [string, WeaponId][] = [["1", a.primary], ["2", "mandi"], ["3", "lanciafrico"], ["4", "mescul"]]
     this.html("slots", slots
-      .map(([k, id]) => `<span class="${id === a.current ? "on" : slot.owned(id) ? "" : "off"}">${k} ${WEAPONS[id].name.split(" ")[0]}</span>`)
+      .map(([k, id]) => `<span class="${id === a.current ? "on" : slot.owned(id) ? "" : "off"}">${k} ${t().weapons[id].short}</span>`)
       .join(""))
     const buffs: string[] = []
     if (a.sgnape > 0) buffs.push(`🍶 Sgnape ${Math.ceil(a.sgnape / 60)}s`)
-    if (you.shield > 0) buffs.push("✨ Protet")
+    if (you.shield > 0) buffs.push(t().hud.shield)
     this.text("buffs", buffs.join(" · "))
     this.toggle("sgnape-fx", "on", a.sgnape > 0)
   }
@@ -114,40 +115,44 @@ export class Hud {
   }
 
   top(snap: Snapshot, mode: ModeId, names: Map<string, string>) {
+    const s = t()
+    this.text("name-ben", s.teams.benandanti.name)
+    this.text("name-mal", s.teams.malandanti.name)
     this.text("score-ben", String(snap.score.benandanti))
     this.text("score-mal", String(snap.score.malandanti))
     const phase = snap.phase
-    this.text("clock", phase.tag === "Live" ? fmtClock(phase.ends - snap.tick) : phase.tag === "Warmup" ? "—:—" : "FIN")
-    this.text("mode-label", `${MODES[mode].name} · fin a ${MODES[mode].scoreLimit}`)
+    this.text("clock", phase.tag === "Live" ? fmtClock(phase.ends - snap.tick) : phase.tag === "Warmup" ? "—:—" : s.hud.over)
+    this.text("mode-label", s.hud.modeLabel(s.modes[mode].name, MODES[mode].scoreLimit))
     let obj = ""
     if (mode === "frico") {
       obj = (["benandanti", "malandanti"] as const)
-        .map((t) => {
-          const f = snap.flags[t]
-          const s = f._tag === "base" ? "a cjase" : f._tag === "carried" ? `cjapât da ${esc(names.get(f.by) ?? "?")}` : `par tiere ${Math.ceil(f.ticks / 60)}s`
-          return `<span class="${t === "benandanti" ? "ben" : "mal"}">🧀 ${s}</span>`
+        .map((team) => {
+          const f = snap.flags[team]
+          const state = f._tag === "base" ? s.hud.flagHome : f._tag === "carried" ? s.hud.flagCarried(esc(names.get(f.by) ?? "?")) : s.hud.flagDropped(Math.ceil(f.ticks / 60))
+          return `<span class="${team === "benandanti" ? "ben" : "mal"}">🧀 ${state}</span>`
         })
         .join(" · ")
     } else if (mode === "culine") {
       const h = snap.hill
       const color = h.owner ? TEAM_INFO[h.owner].color : "#888"
-      const label = h.contested ? "Contese!" : h.owner ? `Plaçute: ${TEAM_INFO[h.owner].name}` : "Plaçute libare"
+      const label = h.contested ? s.hud.contested : h.owner ? s.hud.hillOwned(s.teams[h.owner].name) : s.hud.hillFree
       obj = `${label}<div class="hillbar"><i style="width:${((h.ticks % 60) / 60) * 100}%;background:${color}"></i></div>`
     }
     this.html("objective", obj)
-    this.html("banner", phase.tag === "Warmup" ? "Riscjaldament · l'host al fâs partî la partide dal menu (<kbd>Esc</kbd>)" : "")
+    this.html("banner", phase.tag === "Warmup" ? s.hud.warmup : "")
   }
 
   killfeed(k: string | null, v: string, w: KillCause, head: boolean, names: Map<string, string>, teams: Map<string, Team>, me: string, seed: number) {
     const div = document.createElement("div")
     div.className = `kf${k === me || v === me ? " me" : ""}`
+    const kill = t().hud.kill
     const victim = teamSpan(names.get(v) ?? "?", teams.get(v))
     if (!k) {
-      div.innerHTML = w === "fall" ? `${victim} <em>${SPECIAL_KILLS.fall}</em>` : `${victim} <em>${SPECIAL_KILLS.self}</em>`
+      div.innerHTML = w === "fall" ? `${victim} <em>${kill.fall}</em>` : `${victim} <em>${kill.self}</em>`
     } else {
-      const verb = w === "sgnape" ? pick(SPECIAL_KILLS.sgnape, seed) : w === "fall" ? "al à butât jù" : pick(KILL_VERBS[w], seed)
-      const weapon = w === "sgnape" ? "🍶" : w === "fall" ? "" : WEAPONS[w].name
-      div.innerHTML = `${teamSpan(names.get(k) ?? "?", teams.get(k))} <em>${verb}</em> ${victim}${head ? ` <em>${SPECIAL_KILLS.head}</em> 🎯` : ""} <span class="w">${weapon}</span>`
+      const verb = w === "sgnape" ? pick(kill.sgnape, seed) : w === "fall" ? kill.pushed : pick(kill[w], seed)
+      const weapon = w === "sgnape" ? "🍶" : w === "fall" ? "" : t().weapons[w].name
+      div.innerHTML = `${teamSpan(names.get(k) ?? "?", teams.get(k))} <em>${verb}</em> ${victim}${head ? ` <em>${kill.head}</em> 🎯` : ""} <span class="w">${weapon}</span>`
     }
     const feed = $("killfeed")
     feed.append(div)
@@ -166,17 +171,18 @@ export class Hud {
   }
 
   streak(name: string, n: number) {
-    const text = STREAKS[n]
-    if (text) this.announce(text, `${name} · ${n} di fila`)
+    const text = t().hud.streaks[n]
+    if (text) this.announce(text, t().hud.streak(name, n))
   }
 
   death(you: SnapSelf | null, names: Map<string, string>, seed: number) {
     const dead = !!you && !you.alive
     this.toggle("death", "hidden", !dead)
     if (!dead || !you) return
-    this.html("death-by", you.killer ? `Ti à fat fûr <b>${esc(names.get(you.killer) ?? "?")}</b>` : "Ti sês fat dal mâl di bessôl")
-    this.text("death-line", pick(DEATH_LINES, seed))
-    this.text("death-timer", you.respawn > 0 ? `Si torne in pîts tra ${Math.ceil(you.respawn / 60)}…` : "…")
+    const s = t().hud
+    this.html("death-by", you.killer ? s.deathBy(esc(names.get(you.killer) ?? "?")) : s.deathSelf)
+    this.text("death-line", pick(s.deathLines, seed))
+    this.text("death-timer", you.respawn > 0 ? s.respawnIn(Math.ceil(you.respawn / 60)) : "…")
   }
 
   chat(name: string, team: Team | null, text: string) {
@@ -206,9 +212,9 @@ export function boardHtml(rows: readonly BoardRow[], me: string) {
   return (["benandanti", "malandanti"] as const)
     .map((team) => {
       const list = rows.filter((r) => r.team === team).sort((a, b) => b.score - a.score)
-      const info = TEAM_INFO[team]
-      return `<h3 style="color:${info.color}">${info.name} <small style="color:var(--muted);font-size:13px">· ${info.motto}</small></h3>
-      <table><tr><th>Non</th><th>Pont</th><th>Copâts</th><th>Muarts</th><th>Ajût</th><th>Frics</th><th>Serie</th><th>Ping</th></tr>
+      const info = t().teams[team]
+      return `<h3 style="color:${TEAM_INFO[team].color}">${info.name} <small style="color:var(--muted);font-size:13px">· ${info.motto}</small></h3>
+      <table><tr>${t().hud.board.map((h) => `<th>${h}</th>`).join("")}</tr>
       ${list
         .map(
           (r) =>
@@ -223,7 +229,7 @@ export function rosterHtml(room: RoomInfo, me: string) {
   return (["benandanti", "malandanti"] as const)
     .map(
       (team) =>
-        `<ul><li style="color:${TEAM_INFO[team].color};font-family:var(--serif)"><b>${TEAM_INFO[team].name}</b></li>${room.roster
+        `<ul><li style="color:${TEAM_INFO[team].color};font-family:var(--serif)"><b>${t().teams[team].name}</b></li>${room.roster
           .filter((r) => r.team === team)
           .map((r) => `<li${r.id === me ? ' style="color:var(--gold)"' : ""}>${esc(r.name)}${r.bot ? " 🤖" : ""}${r.id === room.hostId ? " 👑" : ""}</li>`)
           .join("")}</ul>`

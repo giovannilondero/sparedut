@@ -1,9 +1,12 @@
 /** Impostazioni del giocatore, salvate nel browser. */
 import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
+import type { Lang } from "./i18n.ts"
 
 export interface Settings {
   name: string
+  /** Lingua dell'interfaccia: friulano o italiano. */
+  lang: Lang
   sensitivity: number
   fov: number
   master: number
@@ -24,6 +27,7 @@ export interface Settings {
 const KEY = "sparedut.settings"
 const DEFAULTS: Settings = {
   name: "",
+  lang: "fur",
   sensitivity: 1,
   fov: 80,
   master: 0.8,

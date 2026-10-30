@@ -1,7 +1,7 @@
 /**
  * Applica i danni del tick: corazza, morti, uccisioni, assist, serie, punti.
  */
-import { STREAKS } from "../../folklore.ts"
+import { STREAK_AT } from "../../folklore.ts"
 import { absorb, ASSIST_WINDOW_TICKS, RESPAWN_TICKS } from "../rules.ts"
 import { Attackers, Damage, Game, Life, Match, Motion, Out, Player, Rules, Score, Stats, TeamOf, Tick } from "../schema.ts"
 
@@ -85,7 +85,7 @@ export const ApplyDamage = Game.System(
           const team = killer.data.team.get()
           resources.score.update((s) => ({ ...s, [team]: s[team] + 1 }))
         }
-        if (STREAKS[streak]) events.out.emit({ t: "streak", s: hit.attacker ?? "", n: streak })
+        if (STREAK_AT.has(streak)) events.out.emit({ t: "streak", s: hit.attacker ?? "", n: streak })
       } else if (live && rules.mode === "bataie" && (self || hit.weapon === "fall")) {
         // Suicidio: il punto va agli altri. Lo sbilf ride.
         const other = victimTeam === "benandanti" ? "malandanti" : "benandanti"
