@@ -241,6 +241,9 @@ const loop = (now: number) => {
   const dt = Math.min(0.1, (now - last) / 1000)
   last = now
   const time = now / 1000
+  // La risoluzione dinamica cambia la misura del canvas, e cambiarla lo svuota: va fatto
+  // prima di disegnare, mai dopo (altrimenti il frame arriva a schermo nero: i lampi neri).
+  if (settings.autoRes && !document.hidden && perf.adapt(now, minRatio(), maxRatio())) resize()
   const cpuStart = performance.now()
   if (game?.active) {
     game.frame(dt, time)
@@ -255,7 +258,6 @@ const loop = (now: number) => {
     renderer.render(scene, camera)
   }
   perf.sample(dt * 1000, performance.now() - cpuStart)
-  if (settings.autoRes && !document.hidden && perf.adapt(now, minRatio(), maxRatio())) resize()
   perf.panel(now, { quality: `${t().quality[quality]}${settings.autoRes ? ` · ${t().perf.dynRes}` : ""}`, net: game?.active ? game.netStats() : null })
   requestAnimationFrame(loop)
 }
