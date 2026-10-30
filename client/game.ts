@@ -53,6 +53,8 @@ export interface GameDeps {
   readonly createAvatar: (team: Team, name: string) => Avatar
   readonly saveSettings: () => void
   readonly onLeave: () => void
+  /** Origine e percorso per i link d'invito (l'indirizzo pubblico se si gioca da localhost). */
+  readonly inviteBase: () => string
 }
 
 interface Frame {
@@ -599,7 +601,7 @@ export class Game {
     if (!room) return
     const host = room.hostId === this.me
     const el = $("pause")
-    const link = `${location.origin}${location.pathname}?p=${room.code}`
+    const link = `${this.d.inviteBase()}?p=${room.code}`
     const myTeam = this.teams.get(this.me)
     const other: Team = myTeam === "benandanti" ? "malandanti" : "benandanti"
     const phase = this.snap?.phase.tag ?? "Warmup"

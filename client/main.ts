@@ -7,6 +7,7 @@ import { PROTOCOL_VERSION, type ServerMessage } from "../shared/protocol.ts"
 import { createAudio } from "./audio.ts"
 import { createAvatar } from "./avatars.ts"
 import { createFx } from "./fx.ts"
+import { isLocalHost } from "../shared/hosts.ts"
 import { Game } from "./game.ts"
 import { t } from "./i18n.ts"
 import { Menu } from "./menu.ts"
@@ -101,6 +102,10 @@ const menu = new Menu(settings, audio, {
   settingsChanged: persist
 })
 
+/** Indirizzo pubblico annunciato dal server: serve ai link d'invito quando si gioca da localhost. */
+let publicUrl: string | null = null
+const inviteBase = () => `${publicUrl && isLocalHost(location.hostname) ? publicUrl : location.origin}${location.pathname}`
+
 /** La partita veloce contro i bot parte subito, senza riscaldamento. */
 let autostart = false
 const physicsReady = initPhysics().then(() => {
@@ -118,7 +123,8 @@ const physicsReady = initPhysics().then(() => {
     menu,
     createAvatar,
     saveSettings: () => saveSettings(settings),
-    onLeave: backToMenu
+    onLeave: backToMenu,
+    inviteBase
   })
   game.setQuality(quality)
 })
@@ -145,6 +151,12 @@ function backToMenu() {
 
 net.on((msg: ServerMessage) => {
   switch (msg.t) {
+    case "welcome":
+      publicUrl = msg.publicUrl
+      return
+    case "public":
+      publicUrl = msg.url
+      return
     case "rooms":
       menu.rooms(msg.rooms)
       return

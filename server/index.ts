@@ -5,6 +5,7 @@
 import { existsSync } from "node:fs"
 import { networkInterfaces } from "node:os"
 import { join } from "node:path"
+import { isLocalHost } from "../shared/hosts.ts"
 import { initPhysics } from "../shared/physics.ts"
 import { Hub, type Peer } from "./hub.ts"
 import { networkOf, type NetworkId } from "./network.ts"
@@ -20,6 +21,21 @@ interface SocketData {
 
 await initPhysics()
 const hub = new Hub()
+if (process.env.PUBLIC_URL) hub.setPublicUrl(new URL(process.env.PUBLIC_URL).origin)
+
+/**
+ * Chi arriva da un tunnel o da un dominio (Cloudflare, reverse proxy) porta nell'Host
+ * l'indirizzo pubblico: lo ricordiamo per i link d'invito di chi gioca da localhost.
+ */
+function learnPublicUrl(req: Request) {
+  if (process.env.PUBLIC_URL) return
+  const host = (req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "").split(",")[0].trim()
+  if (!host) return
+  const hostname = new URL(`http://${host}`).hostname
+  if (isLocalHost(hostname)) return
+  const proto = req.headers.get("x-forwarded-proto")?.split(",")[0].trim() ?? (/^[\d.]+$/.test(hostname) ? "http" : "https")
+  hub.setPublicUrl(`${proto}://${host}`)
+}
 
 Bun.serve<SocketData>({
   port: PORT,
@@ -27,6 +43,7 @@ Bun.serve<SocketData>({
   fetch(req, server) {
     const url = new URL(req.url)
     if (url.pathname === "/ws") {
+      learnPublicUrl(req)
       const forwarded = TRUST_PROXY ? req.headers.get("x-forwarded-for")?.split(",")[0].trim() : undefined
       const network = networkOf(forwarded ?? server.requestIP(req)?.address)
       if (server.upgrade(req, { data: { network, peer: null } })) return
@@ -62,3 +79,4 @@ const lan = Object.values(networkInterfaces())
   .map((i) => i!.address)
 console.log(`🔔 Sparedût: server su :${PORT}`)
 for (const ip of lan) console.log(`   In rete locale: http://${ip}:${existsSync(DIST) ? PORT : 5173}`)
+if (!process.env.PUBLIC_URL) console.log("   Per i link d'invito da fuori: PUBLIC_URL=https://… (o basta che qualcuno entri dal tunnel)")

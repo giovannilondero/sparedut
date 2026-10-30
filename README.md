@@ -86,6 +86,8 @@ pnpm check   # tipi, oxlint + ritmo-devtools lint, test
 
 Dietro un reverse proxy imposta `TRUST_PROXY=1`, così il server legge l'IP reale da `X-Forwarded-For`.
 
+Link d'invito: se giochi da `localhost` il link usa l'indirizzo pubblico del gioco. Il server lo impara dal primo client che entra da un tunnel o da un dominio, oppure lo prende da `PUBLIC_URL=https://…` (che Vite aggiunge anche agli host accettati).
+
 ## Nota
 
 Gemona è stata distrutta dal terremoto del 1976 e ricostruita "dov'era e com'era"; il Duomo è rinato pietra su pietra.

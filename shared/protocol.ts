@@ -12,7 +12,7 @@ import type { ArsenalValue, FlagState, HillValue } from "./sim/schema.ts"
 import type { PhaseView } from "./sim/view.ts"
 import { PRIMARIES, type PrimaryId, type WeaponId } from "./weapons.ts"
 
-export const PROTOCOL_VERSION = 4
+export const PROTOCOL_VERSION = 5
 export const MAX_PLAYERS = 16
 export const SNAPSHOT_EVERY = 2 // tick: 30 istantanee al secondo
 
@@ -140,7 +140,10 @@ export interface BoardRow {
 export type ErrorCode = "invalid" | "version" | "notFound" | "lanOnly" | "full"
 
 export type ServerMessage =
-  | { readonly t: "welcome"; readonly id: string; readonly version: number }
+  /** `publicUrl`: indirizzo pubblico del gioco (tunnel o PUBLIC_URL), se il server lo conosce. */
+  | { readonly t: "welcome"; readonly id: string; readonly version: number; readonly publicUrl: string | null }
+  /** Il server ha scoperto (o cambiato) l'indirizzo pubblico. */
+  | { readonly t: "public"; readonly url: string }
   | { readonly t: "rooms"; readonly rooms: readonly RoomSummary[] }
   | { readonly t: "joined"; readonly room: RoomInfo; readonly you: string; readonly tick: number }
   | { readonly t: "room"; readonly room: RoomInfo }

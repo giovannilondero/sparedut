@@ -19,10 +19,21 @@ let sessionCounter = 0
 
 export class Hub {
   readonly rooms = new Map<string, Room>()
+  private readonly peers = new Set<Peer>()
+  /** Indirizzo pubblico per i link d'invito: da PUBLIC_URL o dal primo client arrivato da fuori. */
+  private publicUrl: string | null = null
+
+  setPublicUrl(url: string) {
+    if (url === this.publicUrl) return
+    this.publicUrl = url
+    console.log(`🌍 Indirizzo pubblico: ${url}`)
+    for (const peer of this.peers) this.send(peer, { t: "public", url })
+  }
   private last = performance.now()
   private acc = 0
 
   open(peer: Peer) {
+    this.peers.add(peer)
     peer.id = `p${++sessionCounter}-${Math.random().toString(36).slice(2, 7)}`
   }
 
@@ -48,7 +59,7 @@ export class Hub {
       case "hello":
         peer.name = msg.name
         if (msg.version !== PROTOCOL_VERSION) this.send(peer, { t: "error", code: "version" })
-        this.send(peer, { t: "welcome", id, version: PROTOCOL_VERSION })
+        this.send(peer, { t: "welcome", id, version: PROTOCOL_VERSION, publicUrl: this.publicUrl })
         return
       case "list":
         this.send(peer, { t: "rooms", rooms: this.visibleTo(peer) })
@@ -127,6 +138,7 @@ export class Hub {
   }
 
   close(peer: Peer) {
+    this.peers.delete(peer)
     this.leave(peer)
   }
 
