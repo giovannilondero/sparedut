@@ -6,6 +6,7 @@ import type { Team } from "../shared/map.ts"
 import type { BoardRow, RoomInfo, SnapSelf, Snapshot } from "../shared/protocol.ts"
 import type { KillCause } from "../shared/sim/events.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
+import { WARMUP_TICKS } from "../shared/sim/rules.ts"
 import { t } from "./i18n.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -121,7 +122,7 @@ export class Hud {
     this.text("score-ben", String(snap.score.benandanti))
     this.text("score-mal", String(snap.score.malandanti))
     const phase = snap.phase
-    this.text("clock", phase.tag === "Live" ? fmtClock(phase.ends - snap.tick) : phase.tag === "Warmup" ? "—:—" : s.hud.over)
+    this.text("clock", phase.tag === "Live" ? fmtClock(phase.ends - snap.tick) : phase.tag === "Warmup" ? fmtClock(WARMUP_TICKS - snap.tick) : s.hud.over)
     this.text("mode-label", s.hud.modeLabel(s.modes[mode].name, MODES[mode].scoreLimit))
     let obj = ""
     if (mode === "frico") {
@@ -139,7 +140,7 @@ export class Hud {
       obj = `${label}<div class="hillbar"><i style="width:${((h.ticks % 60) / 60) * 100}%;background:${color}"></i></div>`
     }
     this.html("objective", obj)
-    this.html("banner", phase.tag === "Warmup" ? s.hud.warmup : "")
+    this.html("banner", phase.tag === "Warmup" ? s.hud.warmup(fmtClock(WARMUP_TICKS - snap.tick)) : "")
   }
 
   killfeed(k: string | null, v: string, w: KillCause, head: boolean, names: Map<string, string>, teams: Map<string, Team>, me: string, seed: number) {

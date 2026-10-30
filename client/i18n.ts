@@ -61,7 +61,7 @@ export interface Strings {
     readonly contested: string
     readonly hillOwned: Fn
     readonly hillFree: string
-    readonly warmup: string
+    readonly warmup: Fn
     readonly streak: Fn<[string, number]>
     readonly deathBy: Fn
     readonly deathSelf: string
@@ -330,7 +330,7 @@ const fur: Strings = {
     contested: "Contindude!",
     hillOwned: (team) => `Plaçute: ${team}`,
     hillFree: "Plaçute libare",
-    warmup: "Riscjaldament · l'host al fâs partî la partide dal menù (<kbd>Esc</kbd>)",
+    warmup: (left) => `Riscjaldament: i ponts no contin. Si partìs tra ${left}, o l'host al fâs partî subite dal menù (<kbd>Esc</kbd>)`,
     streak: (name, n) => `${name} · ${n} di file`,
     deathBy: (name) => `Ti à fat fûr <b>${name}</b>`,
     deathSelf: "Tu ti sês fat mâl di bessôl",
@@ -574,7 +574,7 @@ const it: Strings = {
     contested: "Contesa!",
     hillOwned: (team) => `Piazzetta: ${team}`,
     hillFree: "Piazzetta libera",
-    warmup: "Riscaldamento · l'host fa partire la partita dal menu (<kbd>Esc</kbd>)",
+    warmup: (left) => `Riscaldamento: i punti non contano. Si parte tra ${left}, o l'host fa partire subito dal menu (<kbd>Esc</kbd>)`,
     streak: (name, n) => `${name} · ${n} di fila`,
     deathBy: (name) => `Ti ha fatto fuori <b>${name}</b>`,
     deathSelf: "Ti sei fatto male da solo",

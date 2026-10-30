@@ -4,6 +4,7 @@ import { CAMPANILE, COMUNE, JUMP_PADS } from "../shared/map.ts"
 import { createPhysicsWorld, initPhysics, type PhysicsWorld } from "../shared/physics.ts"
 import { stepBody, type Body } from "../shared/movement.ts"
 import { createSim } from "../shared/sim/index.ts"
+import { WARMUP_TICKS } from "../shared/sim/rules.ts"
 
 let physics: PhysicsWorld
 beforeAll(async () => {
@@ -166,5 +167,14 @@ describe("simulazione", () => {
     const a = sim.view().players[0].arsenal
     expect(a.primary).toBe("doplete")
     expect(a.current).toBe("doplete")
+  })
+
+  test("il riscaldamento finisce da solo e poi i punti contano", () => {
+    const sim = createSim({ mode: "bataie", minutes: 5, seed: 2, physics })
+    sim.join("a", "Toni", "benandanti", false, "cramar")
+    for (let i = 0; i < WARMUP_TICKS - 5; i++) sim.step()
+    expect(sim.view().phase.tag).toBe("Warmup")
+    for (let i = 0; i < 10; i++) sim.step()
+    expect(sim.view().phase.tag).toBe("Live")
   })
 })

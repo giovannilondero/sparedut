@@ -2,7 +2,7 @@
  * Il flusso della partita: riscaldamento → in corso → finita → di nuovo in corso.
  */
 import { PICKUPS, TEAMS } from "../../map.ts"
-import { NO_STATS, OVER_TICKS } from "../rules.ts"
+import { NO_STATS, OVER_TICKS, WARMUP_TICKS } from "../rules.ts"
 import { Attackers, Flags, Game, Hill, Life, Match, Out, Pickups, Player, Rules, Score, StartMatch, Stats, Tick } from "../schema.ts"
 
 export const AdvanceTick = Game.System(
@@ -62,7 +62,8 @@ export const MatchFlow = Game.System(
 
     switch (match._tag) {
       case "Warmup":
-        if (startRequested) begin()
+        // Senza questo, se l'host non preme "parti" i punti non contano mai.
+        if (startRequested || tick >= WARMUP_TICKS) begin()
         return
       case "Live": {
         const score = resources.score.get()

@@ -13,6 +13,8 @@ export const SGNAPE_TICKS = 600
 export const SGNAPE_SPEED = 1.3
 export const ASSIST_WINDOW_TICKS = 600
 export const OVER_TICKS = 15 * 60
+/** Il riscaldamento finisce da solo dopo 30 s dalla creazione; l'host può partire prima. */
+export const WARMUP_TICKS = 30 * 60
 export const FLAG_RETURN_TICKS = 30 * 60
 
 export const otherTeam = (team: Team): Team => (team === "benandanti" ? "malandanti" : "benandanti")
