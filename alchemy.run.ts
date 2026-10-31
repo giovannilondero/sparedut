@@ -15,10 +15,14 @@ import { dirname, join } from "node:path"
  * Rapier "compat" ships its WASM as base64 and compiles it at runtime, which Workers don't
  * allow. Here the base64 gives way to the package's `.wasm` file (the same bytes),
  * which the bundler loads as a precompiled module: `RAPIER.init()` stays as it is.
+ *
+ * A class instance, not an object literal: when planning an update Alchemy copies the props
+ * as plain data and drops functions, which left the hook without its handler. An instance is
+ * dropped whole, so the plan bundles without the plugin and the deploy with it.
  */
-const rapierWasm = {
-  name: "sparedut:rapier-wasm",
-  transform: {
+class RapierWasm {
+  readonly name = "sparedut:rapier-wasm"
+  readonly transform = {
     filter: { id: /rapier3d-compat[\\/]dist[\\/]rapier\.mjs$/ },
     handler(code: string, id: string) {
       const inline = /[\w$]+\.toByteArray\("[A-Za-z0-9+/=]+"\)(\.buffer)?/g
@@ -29,6 +33,7 @@ const rapierWasm = {
     }
   }
 }
+const rapierWasm = new RapierWasm()
 
 export default Alchemy.Stack(
   "Sparedut",
