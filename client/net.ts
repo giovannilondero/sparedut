@@ -24,6 +24,9 @@ export class Net {
       }
       ws.onerror = () => reject(new Error("Server unreachable."))
       ws.onclose = () => {
+        // A connection that never opened has already failed: whoever called `connect` retries.
+        // Telling `onClose` too would start a second retry for every failed one.
+        if (!this.open) return reject(new Error("Server unreachable."))
         this.open = false
         clearInterval(this.pingTimer)
         this.onClose?.()

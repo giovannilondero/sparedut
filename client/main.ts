@@ -204,10 +204,22 @@ net.on((msg: ServerMessage) => {
   }
 })
 
+/** A single pending retry: a failure or a click while offline never adds a second one. */
+let retry = 0
+let connecting = false
+const reconnect = (ms: number) => {
+  clearTimeout(retry)
+  retry = window.setTimeout(connect, ms)
+}
+
 async function connect() {
+  clearTimeout(retry)
+  if (connecting || net.open) return
+  connecting = true
   menu.status(t().net.connecting)
   try {
     await net.connect(settings.name || "Furlan")
+    connecting = false
     menu.status(t().net.connected(settings.name || t().net.stranger))
     net.send({ t: "list" })
     const invite = new URLSearchParams(location.search).get("p")
@@ -216,8 +228,9 @@ async function connect() {
       net.send({ t: "join", code: invite.toUpperCase(), primary: settings.primary })
     } else if (invite) toast(t().net.inviteNeedName(invite))
   } catch {
+    connecting = false
     menu.status(t().net.retry)
-    setTimeout(connect, 2500)
+    reconnect(2500)
   }
 }
 net.onClose = () => {
@@ -226,7 +239,7 @@ net.onClose = () => {
     backToMenu()
   }
   menu.status(t().net.lostRetry)
-  setTimeout(connect, 2000)
+  reconnect(2000)
 }
 void connect()
 setInterval(() => net.open && !game?.active && net.send({ t: "list" }), 3000)
