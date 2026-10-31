@@ -19,7 +19,15 @@ export const MAX_PLAYERS = 16
 export const SNAPSHOT_EVERY = 2 // tick: 30 istantanee al secondo
 
 const team = z.enum(["benandanti", "malandanti"])
-const name = z.string().trim().min(1).max(20)
+/** Caratteri di controllo e di direzione del testo (U+202E rigira un nome): via da nomi e chat. */
+const INVISIBLE = /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g
+const visible = (max: number) =>
+  z
+    .string()
+    .max(max * 4)
+    .transform((s) => s.replace(INVISIBLE, ""))
+    .pipe(z.string().trim().min(1).max(max))
+const name = visible(20)
 
 export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("hello"), name, version: z.number() }),
@@ -40,7 +48,7 @@ export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("input"), i: PlayerInputSchema }),
   z.object({ t: z.literal("team"), team }),
   z.object({ t: z.literal("primary"), p: z.enum(PRIMARIES) }),
-  z.object({ t: z.literal("chat"), text: z.string().trim().min(1).max(120) }),
+  z.object({ t: z.literal("chat"), text: visible(120) }),
   z.object({ t: z.literal("start") }),
   z.object({ t: z.literal("bot"), team, delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ t: z.literal("level"), level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]) }),
@@ -149,7 +157,7 @@ export interface BoardRow {
 }
 
 /** Errori per il client: il testo lo sceglie lui, nella sua lingua. */
-export type ErrorCode = "invalid" | "version" | "notFound" | "lanOnly" | "full"
+export type ErrorCode = "invalid" | "version" | "notFound" | "lanOnly" | "full" | "busy"
 
 export type ServerMessage =
   /** `publicUrl`: indirizzo pubblico del gioco (tunnel o PUBLIC_URL), se il server lo conosce. */

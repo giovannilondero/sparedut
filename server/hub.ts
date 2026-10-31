@@ -17,9 +17,37 @@ export interface Peer {
 const STEP_MS = 1000 / TICK_RATE
 let sessionCounter = 0
 
+/** Il messaggio più lungo del client (un `create`) sta ben sotto: oltre è spazzatura o un attacco. */
+const MESSAGE_MAX = 2048
+/** Messaggi al secondo per connessione: l'input a 60 Hz e il ping, con margine. */
+const MESSAGES = { perSecond: 90, burst: 180 }
+/** I comandi (creare, entrare, chat, squadra, bot…): a un umano ne bastano pochi; a chi prova i codici no. */
+const COMMANDS = { perSecond: 2, burst: 8 }
+/** Ogni stanza ha il suo mondo fisico e fino a 14 bot: un tetto, in tutto e per rete. */
+const MAX_ROOMS = 40
+const MAX_ROOMS_PER_NETWORK = 6
+
+/** Un secchio di gettoni: si riempie a `perSecond`, fino a `burst`. */
+class Bucket {
+  private tokens: number
+  private last = performance.now()
+  constructor(private readonly rate: { perSecond: number; burst: number }) {
+    this.tokens = rate.burst
+  }
+  take() {
+    const now = performance.now()
+    this.tokens = Math.min(this.rate.burst, this.tokens + ((now - this.last) / 1000) * this.rate.perSecond)
+    this.last = now
+    if (this.tokens < 1) return false
+    this.tokens -= 1
+    return true
+  }
+}
+
 export class Hub {
   readonly rooms = new Map<string, Room>()
   private readonly peers = new Set<Peer>()
+  private readonly limits = new Map<Peer, { messages: Bucket; commands: Bucket }>()
   /** Indirizzo pubblico per i link d'invito: da PUBLIC_URL o dal primo client arrivato da fuori. */
   private publicUrl: string | null = null
 
@@ -34,6 +62,7 @@ export class Hub {
 
   open(peer: Peer) {
     this.peers.add(peer)
+    this.limits.set(peer, { messages: new Bucket(MESSAGES), commands: new Bucket(COMMANDS) })
     peer.id = `p${++sessionCounter}-${Math.random().toString(36).slice(2, 7)}`
   }
 
@@ -42,6 +71,9 @@ export class Hub {
   }
 
   message(peer: Peer, raw: string) {
+    // Chi esagera perde i messaggi in più, prima di spendere CPU a leggerli.
+    const limits = this.limits.get(peer)
+    if (!limits || raw.length > MESSAGE_MAX || !limits.messages.take()) return
     let parsed: ReturnType<typeof ClientMessage.safeParse>
     try {
       parsed = ClientMessage.safeParse(JSON.parse(raw))
@@ -53,6 +85,7 @@ export class Hub {
       return
     }
     const msg = parsed.data
+    if (msg.t !== "input" && msg.t !== "ping" && !limits.commands.take()) return
     const id = peer.id!
     const room = peer.room
     switch (msg.t) {
@@ -65,6 +98,8 @@ export class Hub {
         this.send(peer, { t: "rooms", rooms: this.visibleTo(peer) })
         return
       case "create": {
+        const mine = [...this.rooms.values()].filter((r) => r.networkKey === peer.network.key).length
+        if (this.rooms.size >= MAX_ROOMS || mine >= MAX_ROOMS_PER_NETWORK) return this.send(peer, { t: "error", code: "busy" })
         this.leave(peer)
         const code = newCode((c) => this.rooms.has(c))
         const created = new Room(code, id, peer.name || "Furlan", peer.network.key, {
@@ -140,6 +175,7 @@ export class Hub {
 
   close(peer: Peer) {
     this.peers.delete(peer)
+    this.limits.delete(peer)
     this.leave(peer)
   }
 
@@ -167,6 +203,11 @@ export class Hub {
 
   private visibleTo(peer: Peer) {
     return [...this.rooms.values()].filter((r) => r.settings.visibility === "lan" && r.networkKey === peer.network.key).map((r) => r.summary())
+  }
+
+  /** Nessuno connesso e nessuna stanza: il loop si può fermare (su Cloudflare l'oggetto va a dormire). */
+  get idle() {
+    return this.peers.size === 0 && this.rooms.size === 0
   }
 
   /** Da chiamare spesso: avanza le stanze di quanti tick sono maturati. */
