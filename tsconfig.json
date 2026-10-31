@@ -12,5 +12,6 @@
     "verbatimModuleSyntax": true,
     "noUncheckedIndexedAccess": false
   },
-  "include": ["shared", "server", "client", "test", "vite.config.ts"]
+  "include": ["shared", "server", "client", "test", "scripts", "vite.config.ts", "alchemy.run.ts"],
+  "exclude": ["server/worker.ts"]
 }

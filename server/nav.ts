@@ -6,6 +6,7 @@ import { IDLE_INPUT } from "../shared/input.ts"
 import type { MapId, V3 } from "../shared/map.ts"
 import { stepBody, type Body } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
+import { NAV_GRAPHS } from "./nav-graphs.ts"
 
 export interface NavGraph {
   readonly points: readonly V3[]
@@ -41,6 +42,8 @@ function walkable(physics: PhysicsWorld, a: V3, b: V3): boolean {
 
 /** Un grafo per mappa: la fisica è statica, si calcola una volta per processo. */
 const cached = new Map<MapId, NavGraph>()
+/** Le mappe di cui abbiamo già guardato il grafo precalcolato, buono o no. */
+const checked = new Set<MapId>()
 /** I grafi a metà: gli archi dei primi `next` punti, e il tempo speso finora. */
 const partial = new Map<MapId, { edges: number[][]; next: number; ms: number }>()
 
@@ -64,6 +67,16 @@ function advance(physics: PhysicsWorld, rows: number): NavGraph | null {
   const hit = cached.get(id)
   if (hit) return hit
   const points = physics.map.navPoints
+  if (!checked.has(id)) {
+    checked.add(id)
+    const ready = NAV_GRAPHS[id]
+    if (ready && ready.map === mapFingerprint(physics.map)) {
+      const graph = { points, edges: ready.edges }
+      cached.set(id, graph)
+      return graph
+    }
+    console.warn(`🧭 Grafo dei bot (${id}) da rifare: la mappa è cambiata, lancia \`pnpm nav\``)
+  }
   const state = partial.get(id) ?? { edges: [], next: 0, ms: 0 }
   partial.set(id, state)
   const started = performance.now()
@@ -78,8 +91,29 @@ function advance(physics: PhysicsWorld, rows: number): NavGraph | null {
   return graph
 }
 
+/**
+ * Il grafo di una mappa: quello precalcolato in `nav-graphs.ts` se la mappa non è cambiata,
+ * se no calcolato qui (secondi di CPU, decine per la Laguna).
+ */
 export function navGraph(physics: PhysicsWorld): NavGraph {
   return advance(physics, Infinity)!
+}
+
+/** Calcola il grafo da capo, senza guardare quello precalcolato: per `pnpm nav` e i test. */
+export function computeNavGraph(physics: PhysicsWorld): NavGraph {
+  const points = physics.map.navPoints
+  return { points, edges: points.map((_, i) => rowOf(physics, i)) }
+}
+
+/**
+ * L'impronta dei dati di una mappa (FNV-1a): il grafo precalcolato vale finché non cambia.
+ * Cambiare il movimento o la fisica non la tocca: lì se ne accorge `nav.test.ts`.
+ */
+export function mapFingerprint(map: PhysicsWorld["map"]): string {
+  const text = JSON.stringify(map)
+  let hash = 0x811c9dc5
+  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 0x01000193)
+  return (hash >>> 0).toString(16).padStart(8, "0")
 }
 
 /**

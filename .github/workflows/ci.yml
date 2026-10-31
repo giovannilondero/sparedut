@@ -1,0 +1,44 @@
+# Controlla ogni pull request; su main fa anche il deploy su Cloudflare con Alchemy.
+# Il deploy vuole, nelle impostazioni del repository:
+#   secret CLOUDFLARE_API_TOKEN, variabile CLOUDFLARE_ACCOUNT_ID
+#   variabile DEPLOY_DOMAIN, il dominio (senza, niente deploy: i fork restano tranquilli)
+# e un primo `pnpm cf:deploy` dal proprio computer, che installa lo stato di Alchemy nell'account.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Un push nuovo su una pull request sostituisce il controllo; un deploy finisce sempre.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.10.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm build
+      - name: Deploy su Cloudflare
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.DEPLOY_DOMAIN != ''
+        run: pnpm cf:deploy --yes
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOY_DOMAIN: ${{ vars.DEPLOY_DOMAIN }}

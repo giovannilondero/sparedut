@@ -24,6 +24,21 @@ pnpm build && pnpm start   # http://localhost:3007
 
 All'avvio il server stampa gli indirizzi di rete locale: gli altri computer della stessa rete aprono quell'indirizzo.
 
+### Su Cloudflare
+
+Con [Alchemy](https://alchemy.run) (`alchemy.run.ts`): il client come asset statici, le partite in un Durable Object
+(`server/worker.ts`, lo stesso `Hub` del server Bun) creato in Europa occidentale.
+
+```sh
+pnpm exec alchemy profile edit --add Cloudflare    # una volta: login all'account Cloudflare
+pnpm cf:deploy                                     # https://sparedut.<account>.workers.dev
+DEPLOY_DOMAIN=sparedut.example.com pnpm cf:deploy  # su un dominio dell'account
+pnpm cf:destroy
+```
+
+Il primo deploy installa nell'account lo stato di Alchemy, condiviso con la CI.
+Un deploy chiude le partite in corso.
+
 ## Partite
 
 - **Zuie cuintri i bot**: partita privata contro la CPU, subito.
@@ -105,7 +120,8 @@ Stack dalle linee guida (`giovannilondero/game-dev-guidelines`, 3D): **Ritmo** (
 - `shared/weapons.ts`, `shared/folklore.ts`: armi, squadre, modalità, bot (solo dati, senza lingua)
 - `client/i18n.ts`: tutti i testi in friulano e italiano: menu, HUD, battute, consigli, vocabolario
 - `shared/protocol.ts`: messaggi client ↔ server, validati con zod
-- `server/`: server autoritativo Bun (stanze, rete locale, codici), bot e loro grafo di navigazione
+- `server/`: server autoritativo Bun (stanze, rete locale, codici), bot e loro grafo di navigazione; `worker.ts` è lo stesso server in un Durable Object
+- `server/nav-graphs.ts`: i grafi dei bot precalcolati (costano decine di secondi di CPU); `pnpm nav` li rifà quando cambia una mappa, il movimento o la fisica, e `test/nav.test.ts` controlla che siano aggiornati
 - `client/`: rendering Three.js (mondo, avatar, arma in prima persona, effetti), audio sintetizzato con Howler, predizione e interpolazione, HUD e menu
 - `test/`: test senza browser della simulazione, del grafo dei bot e di partite intere fra bot
 
@@ -116,7 +132,7 @@ interpola gli altri giocatori 100 ms nel passato, e il server colpisce dove il t
 pnpm check   # tipi, oxlint + ritmo-devtools lint, test
 ```
 
-Dietro un reverse proxy imposta `TRUST_PROXY=1`, così il server legge l'IP reale da `X-Forwarded-For`.
+Dietro un proxy sulla stessa macchina (il tunnel `cloudflared`, Vite) il server legge da solo l'IP reale da `CF-Connecting-IP` o `X-Forwarded-For`; dietro un reverse proxy su un'altra macchina imposta `TRUST_PROXY=1`.
 
 Link d'invito: se giochi da `localhost` il link usa l'indirizzo pubblico del gioco. Il server lo impara dal primo client che entra da un tunnel o da un dominio, oppure lo prende da `PUBLIC_URL=https://…` (che Vite aggiunge anche agli host accettati).
 
