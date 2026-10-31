@@ -1,7 +1,7 @@
 /**
- * Effetti del mondo: scie, sbuffi, briciole di polenta, lampi, esplosioni di frico e
- * di sgnape, proiettili in volo. Tutto a pool fissi creati qui: a regime nessuna
- * allocazione per colpo. Le particelle sono quad istanziati orientati in shader.
+ * World effects: tracers, puffs, polenta crumbs, flashes, frico and sgnape
+ * explosions, projectiles in flight. Everything uses fixed pools created here: at steady state no
+ * allocation per shot. Particles are instanced quads oriented in the shader.
  */
 import * as THREE from "three"
 import type { Fx, P3 } from "./contracts.ts"
@@ -13,7 +13,7 @@ import { fricoDisc, gjaline, sgnapeBottle } from "./models/props.ts"
 const C = (hex: number) => new THREE.Color(hex)
 const rnd = (a: number, b: number) => a + Math.random() * (b - a)
 
-// --- particelle a quad istanziati ---------------------------------------------------------
+// --- instanced-quad particles -------------------------------------------------------------
 const VERT = /* glsl */ `
 attribute vec3 iPos;
 attribute vec4 iCol;
@@ -64,7 +64,7 @@ class Billboards {
   private readonly pos: THREE.InstancedBufferAttribute
   private readonly col: THREE.InstancedBufferAttribute
   private readonly sr: THREE.InstancedBufferAttribute
-  // stato per particella, in colonne
+  // per-particle state, in columns
   private readonly f: Float32Array[]
   private px!: Float32Array; private py!: Float32Array; private pz!: Float32Array
   private vx!: Float32Array; private vy!: Float32Array; private vz!: Float32Array
@@ -164,7 +164,7 @@ class Billboards {
   }
 }
 
-// --- detriti solidi: briciole, pezzi di frico, schegge di vetro, fili di fieno -----------
+// --- solid debris: crumbs, frico chunks, glass shards, hay strands ------------------------
 class Debris {
   readonly mesh: THREE.InstancedMesh
   private n = 0
@@ -231,7 +231,7 @@ class Debris {
       f[1][i] += f[4][i] * dt
       f[2][i] += f[5][i] * dt
       if (f[1][i] < this.floor[i]) {
-        // rimbalzo smorzato sul terreno
+        // damped bounce on the ground
         f[1][i] = this.floor[i]
         f[4][i] = Math.abs(f[4][i]) * 0.3
         f[3][i] *= 0.6; f[5][i] *= 0.6
@@ -250,7 +250,7 @@ class Debris {
   }
 }
 
-// --- scie dei proiettili -----------------------------------------------------------------
+// --- bullet tracers ----------------------------------------------------------------------
 const TRACER: Record<WeaponId, { color: THREE.Color; speed: number; len: number; width: number } | null> = {
   mescul: null,
   mandi: { color: C(0xffd27a), speed: 380, len: 3.5, width: 0.02 },
@@ -258,11 +258,11 @@ const TRACER: Record<WeaponId, { color: THREE.Color; speed: number; len: number;
   doplete: { color: C(0xfff0c0), speed: 330, len: 2.2, width: 0.014 },
   cjampanili: { color: C(0xd8f4ff), speed: 650, len: 12, width: 0.04 },
   mulin: { color: C(0xffb85a), speed: 400, len: 3, width: 0.016 },
-  // il getto del miedi: lento, corto e largo, verde camomilla
+  // the miedi's jet: slow, short and wide, chamomile green
   miedi: { color: C(0x9effb0), speed: 38, len: 2.4, width: 0.07 },
   gjalinis: null,
   lanciafrico: null,
-  // la mitraie delle torrette: scie lunghe e calde, una ogni quattro tick
+  // the turrets' mitraie: long, warm tracers, one every four ticks
   mitraie: { color: C(0xffc070), speed: 520, len: 5, width: 0.026 }
 }
 
@@ -342,7 +342,7 @@ class Tracers {
   }
 }
 
-// --- colori -------------------------------------------------------------------------------
+// --- colours ------------------------------------------------------------------------------
 const K = {
   dust: C(0xb8a68a), dustEnd: C(0x8a7d6a),
   spark: C(0xffd27a), sparkEnd: C(0xff6a20),
@@ -370,7 +370,7 @@ const PICKUP: Record<PickupKind, THREE.Color> = {
   lanciafrico: C(0xff6a20)
 }
 
-/** Bruciatura a terra: disco scuro sfumato, disegnato una volta. */
+/** Scorch mark on the ground: a soft dark disc, drawn once. */
 function scorchTex() {
   const c = document.createElement("canvas")
   c.width = c.height = 128
@@ -382,7 +382,7 @@ function scorchTex() {
   grad.addColorStop(1, "rgba(30,20,12,0)")
   g.fillStyle = grad
   g.fillRect(0, 0, 128, 128)
-  // macchie irregolari sul bordo
+  // irregular blotches around the edge
   for (let i = 0; i < 26; i++) {
     const a = Math.random() * 6.283
     const r = 30 + Math.random() * 26
@@ -398,7 +398,7 @@ function scorchTex() {
 
 const BLAST = { frico: FRICO_SHELL.radius, sgnape: SGNAPE_BOMB.radius, mine: RAIBL_MINE.radius, gjaline: GJALINE.radius } as const satisfies Record<ProjectileKind, number>
 
-/** La mine di Raibl: un disco di ferro con la spoletta e una luce rossa che lampeggia. */
+/** The Raibl mine: an iron disc with a fuse and a blinking red light. */
 function raiblMine(): { g: THREE.Group; light: THREE.MeshBasicMaterial } {
   const g = new THREE.Group()
   const iron = new THREE.MeshLambertMaterial({ color: 0x4a4a40 })
@@ -412,9 +412,9 @@ function raiblMine(): { g: THREE.Group; light: THREE.MeshBasicMaterial } {
   g.add(body, cap, led)
   return { g, light }
 }
-/** Quanto resta acceso il fuoco a terra (s). */
+/** How long the ground fire stays lit (s). */
 const FIRE_LIFE = 7
-/** Schegge che lasciano una scia di fumo. */
+/** Shards that leave a smoke trail. */
 const TRAILS = 64
 
 export function createFx(scene: THREE.Scene): Fx {
@@ -424,7 +424,7 @@ export function createFx(scene: THREE.Scene): Fx {
   const tracers = new Tracers(96)
   scene.add(smoke.mesh, add.mesh, debris.mesh, tracers.mesh)
 
-  // luci a numero fisso (cambiarlo ricompilerebbe gli shader del mondo)
+  // fixed number of lights (changing it would recompile the world's shaders)
   const lights = Array.from({ length: 4 }, () => {
     const l = new THREE.PointLight(0xffffff, 0, 10, 1.5)
     l.castShadow = false
@@ -445,7 +445,7 @@ export function createFx(scene: THREE.Scene): Fx {
     best.t = 0
   }
 
-  // lampi di volata
+  // muzzle flashes
   const flashes = Array.from({ length: 10 }, () => {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTex(), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }))
     s.visible = false
@@ -455,7 +455,7 @@ export function createFx(scene: THREE.Scene): Fx {
   })
   let flashCursor = 0
 
-  // proiettili: si riusano, se ne creano solo quando la lista cresce oltre il visto
+  // projectiles: reused, new ones are created only when the list grows beyond what's been seen
   const fricos: THREE.Group[] = []
   const bottles: THREE.Group[] = []
   const mines: { g: THREE.Group; light: THREE.MeshBasicMaterial }[] = []
@@ -466,11 +466,11 @@ export function createFx(scene: THREE.Scene): Fx {
   let time = 0
 
   const at3 = (a: P3) => a as [number, number, number]
-  /** Quantità di particelle per qualità: in bassa la metà. */
+  /** Particle count by quality: half on low. */
   let detail = 1
   const n = (k: number) => Math.max(1, Math.round(k * detail))
 
-  // onda d'urto: anello piatto che si allarga
+  // shockwave: a flat ring that expands
   const ringMat = () => new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })
   const rings = Array.from({ length: 6 }, () => {
     const m = new THREE.Mesh(new THREE.RingGeometry(0.82, 1, 48).rotateX(-Math.PI / 2), ringMat())
@@ -481,7 +481,7 @@ export function createFx(scene: THREE.Scene): Fx {
   })
   let ringCursor = 0
 
-  // bruciature a terra
+  // scorch marks on the ground
   const scorchMap = scorchTex()
   const scorches = Array.from({ length: 10 }, () => {
     const m = new THREE.Mesh(
@@ -495,11 +495,11 @@ export function createFx(scene: THREE.Scene): Fx {
   })
   let scorchCursor = 0
 
-  // fuochi a terra: lingue di fiamma che nascono in un disco per qualche secondo
+  // ground fires: tongues of flame spawning within a disc for a few seconds
   const fires = Array.from({ length: 8 }, () => ({ x: 0, y: 0, z: 0, r: 1, t: FIRE_LIFE, acc: 0, smokeAcc: 0, blue: false }))
   let fireCursor = 0
 
-  // schegge con la scia: punti che volano in parabola lasciando fumo e braci
+  // trailing shards: points flying in a parabola leaving smoke and embers
   const tr = { x: new Float32Array(TRAILS), y: new Float32Array(TRAILS), z: new Float32Array(TRAILS), vx: new Float32Array(TRAILS), vy: new Float32Array(TRAILS), vz: new Float32Array(TRAILS), t: new Float32Array(TRAILS).fill(9), life: new Float32Array(TRAILS), floor: new Float32Array(TRAILS), blue: new Uint8Array(TRAILS) }
   let trailCursor = 0
 
@@ -567,7 +567,7 @@ export function createFx(scene: THREE.Scene): Fx {
       const [x, y, z] = at3(at)
       const R = BLAST[kind]
       if (kind === "gjaline") {
-        // niente fuoco: un pof bianco e una nevicata di piume che scendono piano
+        // no fire: a white poof and a snowfall of slowly drifting feathers
         flashLight(at, K.white, 30, R * 4, 0.25)
         add.spawn(x, y, z, 0, 0, 0, 0.2, R * 0.4, R * 1.2, K.white, K.featherEnd, 0.8)
         burst(smoke, n(22), at, R * 2.2, 1, [0.8, 1.5], [R * 0.25, R * 0.45, R * 0.6, R * 0.9], K.featherDust, K.featherEnd, 0.85, -0.3, 3, 0, 0.3 * R)
@@ -581,7 +581,7 @@ export function createFx(scene: THREE.Scene): Fx {
         return
       }
       const blue = kind === "sgnape"
-      // a terra se il pavimento è vicino; in aria niente fuoco né bruciatura
+      // on the ground if the floor is close; in the air no fire or scorch
       const onGround = ground !== null && y - ground < 2.5
       const floor = ground ?? y - 0.25
       const hot = blue ? K.flameHot : K.core
@@ -589,18 +589,18 @@ export function createFx(scene: THREE.Scene): Fx {
       const fireEnd = blue ? K.flameEnd : K.fireEnd
 
       flashLight(at, blue ? K.flame : K.fire, 160, R * 7, 0.8)
-      // lampo bianco e palla di fuoco grande quanto il raggio del danno
+      // white flash and a fireball as big as the damage radius
       add.spawn(x, y, z, 0, 0, 0, 0.16, R * 0.6, R * 2, hot, fire, 1)
       add.spawn(x, y + 0.3, z, 0, 1, 0, 0.45, R * 0.9, R * 1.5, fire, fireEnd, 0.9)
       burst(add, n(46), at, R * 3.2, 2, [0.4, 0.9], [R * 0.3, R * 0.5, R * 0.6, R], fire, fireEnd, 0.85, -1.5, 5, 0.25, 0.4 * R)
-      // corpo pieno della palla di fuoco (non additivo: si vede anche di giorno), che si spegne in fumo nero
+      // solid body of the fireball (not additive: visible even by day), fading into black smoke
       burst(smoke, n(28), at, R * 2.6, 2.5, [0.8, 1.4], [R * 0.35, R * 0.55, R * 0.7, R * 1.1], fire, blue ? K.smokeEnd : K.blackSmoke, 0.95, -1.5, 4, 0, 0.35 * R)
-      // colonna che sale
+      // rising column
       burst(add, n(18), at, 2.5, 7, [0.7, 1.2], [R * 0.25, R * 0.4, R * 0.5, R * 0.8], fire, fireEnd, 0.8, -4, 1.8, 0.5, 0.2 * R)
       if (blue) burst(add, n(14), at, 4, 4, [0.4, 0.8], [0.6, 1.2, 0.2, 0.5], K.flameHot, K.violet, 1, -1, 2, 0.4, 0.5)
       else burst(add, n(16), at, 5, 4, [0.6, 1.1], [0.3, 0.5, 0.12, 0.25], K.cheese, K.cheeseEnd, 1, 2, 1.5, 0.4, 0.5)
 
-      // frammentazione: scintille a raggiera, pezzi che rimbalzano, schegge col fumo
+      // fragmentation: radial sparks, bouncing chunks, smoking shards
       burst(add, n(80), at, R * 7, 5, [0.5, 1.2], [0.06, 0.11, 0.02, 0.04], K.spark, K.sparkEnd, 1, 12, 0.5, 0.3)
       chunks(n(44), at, R * 4, 10, [2, 3.5], [0.05, 0.15], blue ? K.glass : K.crisp, blue ? K.white : K.crispDark, blue ? 0.15 : 0.35, floor, 0.25)
       chunks(n(16), at, R * 2.5, 8, [2.5, 4], [0.08, 0.2], K.ash, K.blackSmoke, 0.6, floor, 0.25)
@@ -613,7 +613,7 @@ export function createFx(scene: THREE.Scene): Fx {
         tr.t[k] = 0; tr.life[k] = rnd(0.9, 1.6); tr.floor[k] = floor; tr.blue[k] = blue ? 1 : 0
       }
 
-      // onda d'urto e polvere che corre a terra
+      // shockwave and dust racing along the ground
       const ring = rings[ringCursor++ % rings.length]
       ring.m.position.set(x, onGround ? floor + 0.08 : y, z)
       ;(ring.m.material as THREE.MeshBasicMaterial).color.copy(blue ? K.flameHot : K.spark)
@@ -627,7 +627,7 @@ export function createFx(scene: THREE.Scene): Fx {
           smoke.spawn(x + Math.cos(a) * 0.6, floor + 0.25, z + Math.sin(a) * 0.6, Math.cos(a) * v, rnd(0.3, 1.2), Math.sin(a) * v, rnd(1.4, 2.4), 0.8, 2.8, K.dust, K.dustEnd, 0.75, 0, 2.6)
         }
       }
-      // fumo: denso e scuro per il frico, chiaro per la sgnape
+      // smoke: thick and dark for frico, light for sgnape
       burst(smoke, n(30), at, 4, 3, [2.8, 5], [R * 0.3, R * 0.5, R * 0.9, R * 1.5], blue ? K.smokeEnd : K.blackSmoke, blue ? K.steamEnd : K.smokeEnd, blue ? 0.45 : 0.8, -0.9, 1.1, 0, 0.3 * R)
 
       if (onGround) {
@@ -657,7 +657,7 @@ export function createFx(scene: THREE.Scene): Fx {
           }
           m.g.visible = true
           m.g.position.set(x, y, z)
-          // lampeggia: una volta al secondo, sfasate fra loro
+          // blinks once per second, out of phase with each other
           m.light.color.setHex((time + nm * 0.37) % 1 < 0.15 ? 0xff3a20 : 0x3a0a06)
           nm++
         } else if (kind === "gjaline") {
@@ -669,7 +669,7 @@ export function createFx(scene: THREE.Scene): Fx {
             hens.push(h)
           }
           h.g.visible = true
-          // guarda dove va: dalla posizione precedente alla nuova
+          // faces where it's going: from the previous position to the new one
           const dx = x - h.last.x
           const dz = z - h.last.z
           if (dx * dx + dz * dz > 1e-4) h.g.rotation.y = Math.atan2(dx, dz)
@@ -750,7 +750,7 @@ export function createFx(scene: THREE.Scene): Fx {
     update(dt, _camera) {
       dt = Math.min(dt, 0.1)
       time += dt
-      // scie dei proiettili in volo: vapore dal frico, scintille dalla miccia
+      // trails of projectiles in flight: steam from the frico, sparks from the fuse
       trailAcc += dt
       if (trailAcc > 0.035) {
         trailAcc = 0
@@ -764,7 +764,7 @@ export function createFx(scene: THREE.Scene): Fx {
           add.spawn(p.x, p.y, p.z, 0, 0.3, 0, 0.3, 0.14, 0.05, K.flame, K.flameEnd, 0.6, 0, 1, 0.5)
         }
       }
-      // schegge con la scia
+      // trailing shards
       for (let k = 0; k < TRAILS; k++) {
         if (tr.t[k] >= tr.life[k]) continue
         tr.t[k] += dt
@@ -775,7 +775,7 @@ export function createFx(scene: THREE.Scene): Fx {
         add.spawn(tr.x[k], tr.y[k], tr.z[k], 0, 0, 0, 0.18, 0.22 * fade + 0.05, 0.02, tr.blue[k] ? K.flameHot : K.ember, tr.blue[k] ? K.flame : K.emberEnd, 1)
         if (Math.random() < 0.3) smoke.spawn(tr.x[k], tr.y[k], tr.z[k], rnd(-0.2, 0.2), 0.3, rnd(-0.2, 0.2), rnd(0.7, 1.2), 0.15, 0.7 * fade + 0.2, K.ash, K.smokeEnd, 0.55 * fade, -0.3, 1)
       }
-      // fuochi a terra
+      // ground fires
       for (const f of fires) {
         if (f.t >= FIRE_LIFE) continue
         f.t += dt
@@ -789,7 +789,7 @@ export function createFx(scene: THREE.Scene): Fx {
           const s0 = rnd(2, 3.4) * (1 - (r / f.r) * 0.45)
           const fx = f.x + Math.cos(a) * r
           const fz = f.z + Math.sin(a) * r
-          // lingua di fiamma piena (sollevata: il quad non deve finire mezzo sotto terra), più un alone
+          // solid tongue of flame (raised: the quad must not end up half underground), plus a halo
           smoke.spawn(fx, f.y + s0 * 0.22, fz, rnd(-0.2, 0.2), rnd(1.2, 2.4), rnd(-0.2, 0.2), rnd(0.6, 1), s0, s0 * 0.35, f.blue ? K.flame : K.fire, f.blue ? K.flameEnd : K.fireEnd, 0.95, -1, 1.5)
           if (Math.random() < 0.5) add.spawn(fx, f.y + s0 * 0.5, fz, 0, rnd(0.8, 1.6), 0, rnd(0.3, 0.5), s0 * 1.1, s0 * 0.6, f.blue ? K.flameHot : K.cheese, f.blue ? K.flame : K.fireEnd, 0.8, 0, 1, 0.5)
           if (Math.random() < 0.15) add.spawn(f.x + Math.cos(a) * r, f.y + 0.2, f.z + Math.sin(a) * r, rnd(-0.6, 0.6), rnd(2, 4), rnd(-0.6, 0.6), rnd(0.6, 1.2), 0.05, 0.01, f.blue ? K.flameHot : K.ember, f.blue ? K.violet : K.emberEnd, 1, 1, 0.5)

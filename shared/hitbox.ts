@@ -1,6 +1,6 @@
 /**
- * Hitbox dei giocatori: un parallelepipedo per il corpo e una sfera per la testa.
- * Pura geometria, usata dalla simulazione per i colpi istantanei.
+ * Player hitboxes: a box for the body and a sphere for the head.
+ * Pure geometry, used by the simulation for hitscan shots.
  */
 import type { Vec3 } from "./vec.ts"
 
@@ -17,7 +17,7 @@ const HEAD_R = 0.24
 export const headCenter = (p: Pose): Vec3 => ({ x: p.x, y: p.y + (p.crouch ? 1.12 : 1.62), z: p.z })
 export const bodyCenter = (p: Pose): Vec3 => ({ x: p.x, y: p.y + (p.crouch ? 0.5 : 0.75), z: p.z })
 
-/** Distanza lungo il raggio (dir normalizzata) dell'ingresso nella sfera, o null. */
+/** Distance along the ray (normalized dir) to where it enters the sphere, or null. */
 export function raySphere(o: Vec3, d: Vec3, c: Vec3, r: number): number | null {
   const ox = o.x - c.x
   const oy = o.y - c.y
@@ -45,7 +45,7 @@ export function rayBox(o: Vec3, d: Vec3, min: Vec3, max: Vec3): number | null {
   return t0
 }
 
-/** Il colpo prende il giocatore in `pose`? Restituisce distanza e se è in testa. */
+/** Does the shot hit the player in `pose`? Returns the distance and whether it's a headshot. */
 export function rayPose(o: Vec3, d: Vec3, pose: Pose): { dist: number; head: boolean } | null {
   const head = raySphere(o, d, headCenter(pose), HEAD_R)
   const top = pose.y + (pose.crouch ? 0.9 : 1.4)

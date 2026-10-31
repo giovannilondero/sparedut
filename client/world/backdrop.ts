@@ -1,33 +1,33 @@
 /**
- * Lo sfondo irraggiungibile: cielo a gradiente col sole basso e, per Gemona, Prealpi a
- * nord e a est (Chiampon, Glemina), il colle col castello, il resto del paese e la
- * pianura a sud. Le altre mappe usano `makeHeightfield` col loro rilievo.
+ * The unreachable backdrop: gradient sky with a low sun and, for Gemona, the Prealps to
+ * the north and east (Chiampon, Glemina), the castle hill, the rest of the town and the
+ * plain to the south. The other maps use `makeHeightfield` with their own relief.
  */
 import * as THREE from "three"
 import type { Bounds } from "../../shared/map.ts"
 import { G_DUOMO, G_LOW, G_MID, GLEMONE } from "../../shared/maps/glemone.ts"
 import { boxAt, Inst, rng } from "./geo.ts"
 
-/** Il cîl di une mape: di dì (fin dal dopomisdì, cul soreli bas) o di gnot (cu la lune). */
+/** A map's sky: by day (late afternoon, with a low sun) or by night (with the moon). */
 export type Sky = "di" | "gnot"
 
 export interface SkyPalette {
   readonly zenith: string
   readonly mid: string
-  /** Orizont, fonts de sene e colôr de fumate. */
+  /** Horizon, scene background and fog colour. */
   readonly horizon: string
-  /** Il lusôr largj ator dal astri, chel stret e il disc (in HDR). */
+  /** The wide glow around the body, the tight one and the disc (in HDR). */
   readonly glow: V3
   readonly halo: V3
   readonly disc: V3
-  /** Cosin dal ragjo dal disc: plui piçul = disc plui grant. */
+  /** Cosine of the disc radius: smaller = bigger disc. */
   readonly discCos: number
-  /** Nûi: tal scûr e cuintri lûs, e trop che a cuvierzin. */
+  /** Clouds: in shadow and against the light, and how much they cover. */
   readonly cloudDark: V3
   readonly cloudLit: V3
   readonly cloudAlpha: number
   readonly stars: number
-  /** La lûs dal cîl e dal teren, e l'astri che al fâs lis ombris. */
+  /** Sky and ground light, and the body that casts the shadows. */
   readonly hemi: { readonly sky: string; readonly ground: string; readonly intensity: number }
   readonly sun: { readonly color: string; readonly intensity: number }
 }
@@ -66,7 +66,7 @@ export const SKIES = {
   }
 } as const satisfies Record<Sky, SkyPalette>
 
-/** Cielo su una sfera unitaria disegnata sul piano lontano (non serve far grande). */
+/** Sky on a unit sphere drawn at the far plane (no need to make it big). */
 export function makeSky(sunDir: THREE.Vector3, sky: Sky = "di"): THREE.Mesh {
   const p = SKIES[sky]
   const v = (c: V3) => new THREE.Vector3(...c)
@@ -91,7 +91,7 @@ export function makeSky(sunDir: THREE.Vector3, sky: Sky = "di"): THREE.Mesh {
       void main() {
         vDir = position;
         vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        // appena dentro il piano lontano: sempre dietro a tutto, mai tagliato
+        // just inside the far plane: always behind everything, never clipped
         gl_Position = vec4(p.xy, p.w * 0.99999, p.w);
       }`,
     fragmentShader: /* glsl */ `
@@ -111,7 +111,7 @@ export function makeSky(sunDir: THREE.Vector3, sky: Sky = "di"): THREE.Mesh {
         col = mix(col, uZenith, smoothstep(0.18, 0.75, h));
         col = mix(col, uHorizon * 0.92, smoothstep(0.0, -0.2, h));
         float s = max(dot(d, uSun), 0.0);
-        // stelis: un grop di pons su la sfere, che a tremin
+        // stars: a bunch of points on the sphere, twinkling
         if (uStars > 0.0 && h > 0.0) {
           vec2 g = floor(vec2(atan(d.z, d.x) * 260.0, asin(h) * 260.0));
           float r = hash(g);
@@ -120,10 +120,10 @@ export function makeSky(sunDir: THREE.Vector3, sky: Sky = "di"): THREE.Mesh {
         }
         col += uGlow * pow(s, 8.0);
         col += uHalo * pow(s, 64.0);
-        // il disc, cun cualchi marcje (la lune) o neti (il soreli)
+        // the disc, with some markings (the moon) or clean (the sun)
         float disc = smoothstep(uDiscCos, uDiscCos + 0.0004, s);
         col += uDisc * disc * (1.0 - uStars * 0.3 * noise(d.xy * 1400.0 + d.z * 700.0));
-        // nuvole a strisce, più fitte verso l'orizzonte
+        // streaky clouds, denser towards the horizon
         if (h > 0.0) {
           vec2 q = d.xz / (h + 0.12) * 1.6 + vec2(uTime * 0.004, 0.0);
           float n = noise(q * vec2(0.6, 2.2)) * 0.6 + noise(q * vec2(1.3, 4.0)) * 0.3 + noise(q * 5.0) * 0.1;
@@ -143,7 +143,7 @@ export function makeSky(sunDir: THREE.Vector3, sky: Sky = "di"): THREE.Mesh {
   m.frustumCulled = false
   m.renderOrder = -1000
   m.name = "cielo"
-  // segue la camera che lo disegna (anche le cube camera della mappa d'ambiente)
+  // follows the camera drawing it (including the environment map's cube cameras)
   m.onBeforeRender = (_r, _s, cam) => {
     m.position.setFromMatrixPosition(cam.matrixWorld)
     m.updateMatrixWorld()
@@ -151,7 +151,7 @@ export function makeSky(sunDir: THREE.Vector3, sky: Sky = "di"): THREE.Mesh {
   return m
 }
 
-// --- rilievo ----------------------------------------------------------------------------
+// --- relief -----------------------------------------------------------------------------
 
 const BOUNDS = GLEMONE.bounds
 
@@ -166,7 +166,7 @@ function vnoise(x: number, y: number) {
   const a = hash2(ix, iy), b = hash2(ix + 1, iy), c = hash2(ix, iy + 1), d = hash2(ix + 1, iy + 1)
   return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy
 }
-/** Rumore frattale in [0, 1] circa: rilievi e macchie. */
+/** Fractal noise in roughly [0, 1]: relief and patches. */
 export const fbm = (x: number, y: number) => vnoise(x, y) * 0.55 + vnoise(x * 2.1, y * 2.1) * 0.28 + vnoise(x * 4.3, y * 4.3) * 0.17
 export const smooth = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)))
@@ -174,14 +174,14 @@ export const smooth = (a: number, b: number, x: number) => {
 }
 const terrace = (z: number) => (z < -28 ? G_DUOMO : z < 10 ? G_MID : G_LOW)
 
-/** Distanza dal rettangolo del paese vicino (fuori dai BOUNDS di ~110 m). */
+/** Distance from the nearby town's rectangle (~110 m outside the BOUNDS). */
 const outside = (x: number, z: number) => {
   const dx = Math.max(Math.abs(x) - 150, 0)
   const dz = Math.max(z < 0 ? -205 - z : z - 205, 0)
   return Math.hypot(dx, dz)
 }
 
-/** Colle del castello. */
+/** Castle hill. */
 const CASTLE = { x: 0, z: -178, top: 31 }
 const castleHill = (x: number, z: number) => {
   const d = Math.hypot((x - CASTLE.x) * 0.9, z - CASTLE.z)
@@ -201,13 +201,13 @@ function height(x: number, z: number): number {
   return near + (far - near) * b + (z < -100 ? castleHill(x, z) : 0)
 }
 
-/** Prealpi, colline e pianura attorno a Gemona. */
+/** Prealps, hills and plain around Gemona. */
 export const makeTerrain = () => makeHeightfield(height, BOUNDS)
 
 /**
- * Un rilievo attorno alla mappa: griglia a facce piatte di 2.6 km, colori per quota
- * (campi in basso, bosco sopra 14 m, roccia in alto o sui pendii ripidi). Le celle
- * dentro `hole` (i bordi della mappa) restano vuote: lì c'è il terreno giocabile.
+ * Relief around the map: a 2.6 km flat-shaded grid, coloured by height
+ * (fields low down, woods above 14 m, rock up high or on steep slopes). Cells
+ * inside `hole` (the map bounds) stay empty: the playable terrain is there.
  */
 export function makeHeightfield(height: (x: number, z: number) => number, hole: Bounds, seed = 301): THREE.Mesh {
   const BOUNDS = hole
@@ -227,7 +227,7 @@ export function makeHeightfield(height: (x: number, z: number) => number, hole: 
   }
   for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
     const a = P(i, j), b = P(i + 1, j), d = P(i, j + 1), e = P(i + 1, j + 1)
-    // le celle sotto il paese restano nascoste: le saltiamo
+    // cells under the town stay hidden: skip them
     const cx = (a[0] + e[0]) / 2, cz = (a[2] + e[2]) / 2
     if (cx > BOUNDS.minX && cx < BOUNDS.maxX && cz > BOUNDS.minZ && cz < BOUNDS.maxZ) continue
     for (const t of [[a, d, b], [b, d, e]]) {
@@ -246,7 +246,7 @@ export function makeHeightfield(height: (x: number, z: number) => number, hole: 
   const g = new THREE.BufferGeometry()
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3))
   g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3))
-  // normali lisce dal campo d'altezza: rilievo morbido, colori a tasselli
+  // smooth normals from the heightfield: soft relief, tiled colours
   const nor: number[] = []
   const e = 6
   for (let i = 0; i < pos.length; i += 3) {
@@ -262,7 +262,7 @@ export function makeHeightfield(height: (x: number, z: number) => number, hole: 
   return m
 }
 
-/** Il resto di Gemona: case semplici istanziate oltre i BOUNDS, alberi, il castello. */
+/** The rest of Gemona: simple instanced houses beyond the BOUNDS, trees, the castle. */
 export function makeTown(tex: { facciata: THREE.Texture; coppi: THREE.Texture; pietra: THREE.Texture }): THREE.Object3D {
   const root = new THREE.Group()
   root.name = "paese"
@@ -284,7 +284,7 @@ export function makeTown(tex: { facciata: THREE.Texture; coppi: THREE.Texture; p
     const out = outside(px, pz)
     if (out > 40 || ground > 30) continue
     if (r() < 0.22) {
-      // un albero al posto della casa
+      // a tree instead of the house
       const s = 0.8 + r() * 0.8
       trees.push(m.compose(new THREE.Vector3(px, ground, pz), q.identity(), new THREE.Vector3(s, s * (1 + r()), s)))
       continue
@@ -295,7 +295,7 @@ export function makeTown(tex: { facciata: THREE.Texture; coppi: THREE.Texture; p
     walls.push(m.compose(new THREE.Vector3(px, ground + h / 2 - 0.5, pz), q, new THREE.Vector3(w, h + 1, d)), plaster[Math.floor(r() * plaster.length)])
     roofs.push(m.compose(new THREE.Vector3(px, ground + h, pz), q, new THREE.Vector3(w + 0.8, Math.min(w, d) * 0.35, d + 0.8)), roofCol[Math.floor(r() * roofCol.length)])
   }
-  // Pioppi e cipressi nella pianura e sui pendii.
+  // Poplars and cypresses on the plain and the slopes.
   for (let i = 0; i < 260; i++) {
     const px = (r() - 0.5) * 1400, pz = 160 + r() * 700
     const s = 1 + r()
@@ -312,7 +312,7 @@ export function makeTown(tex: { facciata: THREE.Texture; coppi: THREE.Texture; p
   const wallGeo = new THREE.BoxGeometry(1, 1, 1)
   const wallMat = new THREE.MeshLambertMaterial({ map: tex.facciata })
   root.add(walls.build(wallGeo, wallMat, true))
-  // tetto a capanna unitario: base 1×1 a y=0, colmo a y=1
+  // unit gable roof: 1×1 base at y=0, ridge at y=1
   const roofGeo = (() => {
     const s = new THREE.Shape()
     s.moveTo(-0.5, 0)
@@ -335,14 +335,14 @@ export function makeTown(tex: { facciata: THREE.Texture; coppi: THREE.Texture; p
   return root
 }
 
-/** Castello di Gemona sul colle a nord: mura merlate, mastio e torre dell'orologio. */
+/** Gemona castle on the hill to the north: crenellated walls, keep and clock tower. */
 function makeCastle(pietra: THREE.Texture): THREE.Mesh {
   const parts: THREE.BufferGeometry[] = []
   const y0 = G_DUOMO + castleHill(CASTLE.x, CASTLE.z + 6) - 1
   const cx = CASTLE.x, cz = CASTLE.z + 6
   const wall = (x0: number, z0: number, x1: number, z1: number, h: number) => {
     parts.push(boxAt([Math.min(x0, x1) - 0.8, y0 - 4, Math.min(z0, z1) - 0.8], [Math.max(x0, x1) + 0.8, y0 + h, Math.max(z0, z1) + 0.8]))
-    // merli
+    // merlons
     const len = Math.hypot(x1 - x0, z1 - z0)
     for (let s = 0; s < len; s += 2.2) {
       const t = s / len
@@ -355,16 +355,16 @@ function makeCastle(pietra: THREE.Texture): THREE.Mesh {
   wall(cx + W, cz - D, cx + W, cz + D, 7)
   wall(cx + W, cz + D, cx - W, cz + D, 7)
   wall(cx - W, cz + D, cx - W, cz - D, 7)
-  // mastio
+  // keep
   parts.push(boxAt([cx - 4, y0 - 4, cz - 8], [cx + 4, y0 + 22, cz]))
   for (const [dx, dz] of [[-4, -8], [0, -8], [3, -8], [-4, -4], [3, -4], [-4, -1], [0, -1], [3, -1]]) parts.push(boxAt([cx + dx, y0 + 22, cz + dz], [cx + dx + 1, y0 + 23.4, cz + dz + 1]))
-  // torre dell'orologio, con tettuccio
+  // clock tower, with a little roof
   parts.push(boxAt([cx + 14, y0 - 4, cz + 8], [cx + 19, y0 + 16, cz + 13]))
   const roof = new THREE.ConeGeometry(4, 4, 4)
   roof.rotateY(Math.PI / 4)
   roof.translate(cx + 16.5, y0 + 18, cz + 10.5)
   parts.push(roof)
-  // palazzo dentro le mura
+  // palace inside the walls
   parts.push(boxAt([cx - 20, y0 - 4, cz + 4], [cx - 6, y0 + 10, cz + 14]))
   const merged = mergeAll(parts)
   const m = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ map: pietra, color: "#d8d0c2" }))
@@ -391,7 +391,7 @@ function mergeAll(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
   const out = new THREE.BufferGeometry()
   out.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3))
   out.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3))
-  // UV in mondo, 4 m
+  // world-space UVs, 4 m
   const uv: number[] = []
   for (let i = 0; i < pos.length / 3; i++) {
     const ax = Math.abs(nor[i * 3]), ay = Math.abs(nor[i * 3 + 1]), az = Math.abs(nor[i * 3 + 2])
@@ -404,7 +404,7 @@ function mergeAll(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
   return out
 }
 
-/** Terreno vicino fuori dai BOUNDS: le terrazze proseguono piatte sotto le case. */
+/** Nearby ground outside the BOUNDS: the terraces continue flat under the houses. */
 export function nearGround(): { min: [number, number, number]; max: [number, number, number] }[] {
   const out: { min: [number, number, number]; max: [number, number, number] }[] = []
   const bands: [number, number, number][] = [[-260, -28, G_DUOMO], [-28, 10, G_MID], [10, 260, G_LOW]]

@@ -1,7 +1,7 @@
 import { beforeAll, expect, test } from "bun:test"
 import { BUTTON } from "../shared/input.ts"
 
-/** Un pad finto con la mappatura "standard": 17 tasti, 4 assi. */
+/** A fake pad with the "standard" mapping: 17 buttons, 4 axes. */
 const pad = {
   index: 0,
   connected: true,
@@ -13,7 +13,7 @@ const set = (i: number, on: boolean) => (pad.buttons[i] = { pressed: on, value: 
 
 let Controls: typeof import("../client/controls.ts").Controls
 beforeAll(async () => {
-  // Controls ascolta il DOM: in Bun bastano ascoltatori finti e il pad finto.
+  // Controls listens to the DOM: in Bun fake listeners and the fake pad are enough.
   const noop = { addEventListener() {} }
   Object.assign(globalThis, { document: noop, window: noop })
   Object.defineProperty(globalThis.navigator, "getGamepads", { value: () => [pad], configurable: true })
@@ -32,9 +32,9 @@ const make = () => {
   return { c, calls }
 }
 
-test("lo stick sinistro muove in analogico, il destro gira lo sguardo", () => {
+test("the left stick moves analogically, the right one turns the view", () => {
   const { c } = make()
-  set(0, true) // un tasto per farsi riconoscere
+  set(0, true) // a button press to get recognised
   pad.axes = [0, -1, 0, 0]
   c.poll(1 / 60)
   set(0, false)
@@ -49,16 +49,16 @@ test("lo stick sinistro muove in analogico, il destro gira lo sguardo", () => {
   pad.axes = [0, 0, 1, 0]
   const yaw = c.yaw
   for (let i = 0; i < 60; i++) c.poll(1 / 60)
-  // Un secondo a fondo: circa LOOK_YAW radianti verso destra (yaw cala).
+  // One second fully deflected: about LOOK_YAW radians to the right (yaw decreases).
   expect(yaw - c.yaw).toBeGreaterThan(3)
   pad.axes = [0.05, 0.05, 0.05, 0.05]
   const still = c.yaw
   c.poll(1 / 60)
-  expect(c.yaw).toBe(still) // zona morta
+  expect(c.yaw).toBe(still) // dead zone
   expect(c.move()).toEqual({ mx: 0, mz: 0 })
 })
 
-test("R2 spara (anche un colpo breve fra due tick), L2 mira, ✕ salta", () => {
+test("R2 fires (even a short tap between two ticks), L2 aims, ✕ jumps", () => {
   const { c } = make()
   set(7, true)
   c.poll(1 / 60)
@@ -71,7 +71,7 @@ test("R2 spara (anche un colpo breve fra due tick), L2 mira, ✕ salta", () => {
   const b = c.buttons()
   expect(b & BUTTON.aim).toBe(BUTTON.aim)
   expect(b & BUTTON.jump).toBe(BUTTON.jump)
-  // Leggere i tenuti non consuma le pressioni brevi.
+  // Reading held buttons doesn't consume short presses.
   set(6, false)
   set(0, false)
   set(4, true)
@@ -82,7 +82,7 @@ test("R2 spara (anche un colpo breve fra due tick), L2 mira, ✕ salta", () => {
   expect(c.buttons() & BUTTON.bomb).toBe(BUTTON.bomb)
 })
 
-test("L3 accende la corsa finché si va avanti", () => {
+test("L3 turns on sprint while moving forward", () => {
   const { c } = make()
   pad.axes = [0, -1, 0, 0]
   set(10, true)
@@ -95,11 +95,11 @@ test("L3 accende la corsa finché si va avanti", () => {
   expect(c.isHeld("sprint")).toBe(false)
   pad.axes = [0, -1, 0, 0]
   c.poll(1 / 60)
-  expect(c.isHeld("sprint")).toBe(false) // fermarsi la spegne
+  expect(c.isHeld("sprint")).toBe(false) // stopping turns it off
   pad.axes = [0, 0, 0, 0]
 })
 
-test("Options, Share, croce e △ passano dagli stessi percorsi dei tasti", () => {
+test("Options, Share, d-pad and △ go through the same paths as the keys", () => {
   const { c, calls } = make()
   for (const i of [9, 8, 12, 14, 13, 3]) {
     set(i, true)
@@ -110,7 +110,7 @@ test("Options, Share, croce e △ passano dagli stessi percorsi dei tasti", () =
   expect(calls).toEqual(["pause", "Tab:down", "Tab:up", "Digit1:down", "slot1", "Digit1:up", "Digit2:down", "slot2", "Digit2:up", "KeyE:down", "KeyE:up", "wheel1"])
 })
 
-test("col menu aperto lo sguardo e i passi si fermano, Options va ancora", () => {
+test("with the menu open look and movement stop, Options still works", () => {
   const { c, calls } = make()
   pad.axes = [0, -1, 1, 0]
   const yaw = c.yaw

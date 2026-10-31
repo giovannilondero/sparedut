@@ -1,5 +1,5 @@
 /**
- * La simulazione di una stanza, pronta per l'host: intenti dentro, vista ed eventi fuori.
+ * A room's simulation, ready for the host: intents in, view and events out.
  */
 import { Random, type HostClock } from "@typeonce/ritmo"
 import { MODES, type ModeId } from "../folklore.ts"
@@ -19,13 +19,13 @@ export interface SimOptions {
   readonly scoreLimit?: number
   readonly friendlyFire?: boolean
   readonly seed: number
-  /** Il mondo fisico della mappa: la mappa della partita è la sua. */
+  /** The map's physics world: the match map is its map. */
   readonly physics: PhysicsWorld
 }
 
 export type Sim = ReturnType<typeof createSim>
 
-/** Il runtime Ritmo della stanza; `debug` lo usano i devtools (lint, sessioni). */
+/** The room's Ritmo runtime; `debug` is used by the devtools (lint, sessions). */
 export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: HostClock.HostClock }) {
   const made = Game.Runtime.make({
     services: Game.Runtime.services(Game.Runtime.service(Physics, options.physics)),
@@ -51,7 +51,7 @@ export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: H
     machines: Game.Runtime.machines(Game.Runtime.machine(Match, { _tag: "Warmup" })),
     ...(debug ? { debug } : {})
   })
-  if (!made.ok) throw new Error(`Simulazione non valida: ${JSON.stringify(made.error)}`)
+  if (!made.ok) throw new Error(`Invalid simulation: ${JSON.stringify(made.error)}`)
   return made.value
 }
 
@@ -65,10 +65,10 @@ export function createSim(options: SimOptions) {
     team: (session: string, team: Team) => runtime.send(ChangeTeam, { session, team }),
     primary: (session: string, primary: PrimaryId) => runtime.send(ChangePrimary, { session, primary }),
     start: () => runtime.send(StartMatch, {}),
-    /** Avanza di un tick e restituisce gli eventi di gioco che ha prodotto. */
+    /** Advances one tick and returns the game events it produced. */
     step(): GameEvent[] {
       const ticked = runtime.tick(simulate)
-      if (!ticked.ok) throw new Error(`Tick fallito: ${JSON.stringify(ticked.error)}`)
+      if (!ticked.ok) throw new Error(`Tick failed: ${JSON.stringify(ticked.error)}`)
       return runtime.inspect(ReadOutbox)
     },
     view: (): WorldView => runtime.inspect(ViewWorld)

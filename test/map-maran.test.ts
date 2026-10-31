@@ -7,7 +7,7 @@ import { createPhysicsWorld, initPhysics } from "../shared/physics.ts"
 import { playBots } from "./play.ts"
 
 for (const mode of MODE_IDS) {
-  test(`i bot giocano una partita a Lagune di Maran: ${mode}`, async () => {
+  test(`bots play a match at Lagune di Maran: ${mode}`, async () => {
     await initPhysics()
     const { kills, view: v } = playBots("maran", mode)
     console.log("maran", mode, { score: v.score, kills })
@@ -15,7 +15,7 @@ for (const mode of MODE_IDS) {
   }, 120000)
 }
 
-test("il percors dal cjar a Lagune di Maran si fâs a pît", async () => {
+test("the cjar route at Lagune di Maran can be walked on foot", async () => {
   await initPhysics()
   const physics = createPhysicsWorld(MARAN)
   const track = MARAN.track
@@ -34,7 +34,7 @@ test("il percors dal cjar a Lagune di Maran si fâs a pît", async () => {
         break
       }
       body = stepBody(body, { ...IDLE_INPUT, mz: 1, yaw: Math.atan2(-dx, -dz) }, physics, 1).body
-      // distanza dal segmento
+      // distance from the segment
       const k = Math.max(0, Math.min(1, ((body.x - ax) * (bx - ax) + (body.z - az) * (bz - az)) / (len * len)))
       worst = Math.max(worst, Math.hypot(body.x - (ax + (bx - ax) * k), body.z - (az + (bz - az) * k)))
     }
@@ -54,24 +54,24 @@ const walkFor = (physics: ReturnType<typeof createPhysicsWorld>, from: [number, 
   return { body, top }
 }
 
-test("a vuat si va plan, su la passerele no; e de aghe si torne su la rive", async () => {
+test("wading is slow, on the boardwalk it isn't; and from the water you get back onto the bank", async () => {
   await initPhysics()
   const physics = createPhysicsWorld(MARAN)
-  // un secont viers sud: in aghe tal canâl fra l'arzin e la barene, po su la passerele
+  // one second southwards: in the water in the canal between the arzin and the barene, then on the boardwalk
   const wet = walkFor(physics, [-15, SEA, 20], Math.PI, 60)
   const dry = walkFor(physics, [-15, BOARDWALK_Y, -4.8], -Math.PI / 2, 60)
   const wetRun = Math.abs(wet.body.z - 20)
   const dryRun = Math.abs(dry.body.x + 15)
   expect(wetRun).toBeLessThan(dryRun * 0.7)
   expect(wetRun).toBeGreaterThan(dryRun * 0.4)
-  // de aghe si monte su la rive cence saltâ, ancje plan e di sbighet
+  // from the water you climb onto the bank without jumping, even slowly and at an angle
   for (const [from, yaw] of [[[12, SEA, -24], Math.PI / 2], [[15, SEA, -40], 0], [[-20, SEA, -8], -Math.PI / 2 - 0.4], [[35, SEA, 50], 0.3]] as const) {
     const out = walkFor(physics, from as [number, number, number], yaw, 150)
     expect(out.body.y).toBeGreaterThan(-0.05)
   }
 })
 
-test("il puintut si passe a pît, a schene di mus", async () => {
+test("the puintut can be crossed on foot, humpbacked as it is", async () => {
   await initPhysics()
   const physics = createPhysicsWorld(MARAN)
   const r = walkFor(physics, [30, LAND, PONT.z0 - 1.5], Math.PI, 200)
@@ -80,18 +80,18 @@ test("il puintut si passe a pît, a schene di mus", async () => {
   expect(r.body.y).toBeGreaterThan(-0.05)
 })
 
-test("i arbui dal bosc a son solits", async () => {
+test("the trees in the bosc are solid", async () => {
   await initPhysics()
   const physics = createPhysicsWorld(MARAN)
   const bosc = TREES.filter((t) => t.x > 12 && t.x < 40 && t.z > -34 && t.z < 5)
   expect(bosc.length).toBeGreaterThan(20)
   const t = bosc[0]
-  // si cor cuintri il tronc di est: si reste di ca
+  // running into the trunk from the east: you stay on this side
   const r = walkFor(physics, [t.x + 3, LAND, t.z], Math.PI / 2, 60)
   expect(r.body.x).toBeGreaterThan(t.x)
 })
 
-test("i ferâi a son solits e no taponin i trois", async () => {
+test("the lanterns are solid and don't block the paths", async () => {
   await initPhysics()
   const physics = createPhysicsWorld(MARAN)
   for (const l of LANTERNS) {
@@ -101,15 +101,15 @@ test("i ferâi a son solits e no taponin i trois", async () => {
   }
 })
 
-test("dai corimans no si passe: passerele e puintut", async () => {
+test("handrails can't be crossed: boardwalk and puintut", async () => {
   await initPhysics()
   const physics = createPhysicsWorld(MARAN)
   expect(RAILS.length).toBeGreaterThan(8)
-  // de passerele de barene (z fra -6 e -3.6) viers sud: il corimano al ferme
+  // from the barene boardwalk (z between -6 and -3.6) southwards: the handrail stops you
   const side = walkFor(physics, [-10, BOARDWALK_Y, -4.8], Math.PI, 90)
   expect(side.body.z).toBeLessThan(-3.6)
   expect(side.body.y).toBeGreaterThan(-0.05)
-  // dal puintut viers est
+  // from the puintut eastwards
   const deck = walkFor(physics, [30, PONT.deck, 8], -Math.PI / 2, 90)
   expect(deck.body.x).toBeLessThan(PONT.x1)
   expect(deck.body.y).toBeGreaterThan(PONT.deck - 0.1)

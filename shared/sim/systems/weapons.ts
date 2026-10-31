@@ -1,8 +1,8 @@
 /**
- * Armi: cambio, ricarica, fuoco istantaneo con compensazione della latenza,
- * corpo a corpo, getto del miedi, rotazione del Mulin, lanci di frico e di galline,
- * bombe di sgnape e mine di Raibl, la mitraie delle torrette. Chi corre tiene l'arma
- * abbassata e non spara. Spari e pedate scheggiano le porte da sfondare.
+ * Weapons: switching, reloading, hitscan fire with lag compensation,
+ * melee, the miedi's beam, the Mulin's spin-up, frico and hen launches,
+ * sgnape bombs and Raibl mines, the turrets' mitraie. Sprinting players keep the weapon
+ * lowered and don't fire. Shots and kicks splinter breakable doors.
  */
 import { Random } from "@typeonce/ritmo"
 import { rayPose, type Pose } from "../../hitbox.ts"
@@ -39,7 +39,7 @@ import {
 import { held, justPressed } from "./input.ts"
 
 const SWITCH_TICKS = 18
-/** Oltre questo ritardo (tick) non si torna indietro nel tempo per colpire. */
+/** Beyond this delay (ticks) hits are not rewound back in time. */
 const MAX_REWIND = 18
 
 const r3 = (v: Vec3): P3 => [Math.round(v.x * 100) / 100, Math.round(v.y * 100) / 100, Math.round(v.z * 100) / 100]
@@ -103,7 +103,7 @@ export const UseWeapons = Game.System(
       const frame = history.find((h) => h.tick === target)
       if (!frame) return currentPoses
       const out = new Map<string, Pose>()
-      // Solo chi è vivo adesso può essere colpito, nella posa di allora (o attuale se appena nato).
+      // Only those alive now can be hit, in their pose back then (or the current one if just spawned).
       for (const [session, now] of currentPoses) out.set(session, frame.poses.find((p) => p.session === session) ?? now)
       return out
     }
@@ -120,7 +120,7 @@ export const UseWeapons = Game.System(
       const targets = posesAt(input.view)
       const hittable = (other: string) => other !== session && hostile(rules, team, teamOf.get(other) ?? team)
 
-      /** Colpi istantanei (pallini, proiettili, la mitraie): il primo corpo o muro lungo ogni raggio. */
+      /** Hitscan shots (pellets, bullets, the mitraie): the first body or wall along each ray. */
       const bullets = (weapon: WeaponId, spread: number, eye: Vec3, yaw0: number, pitch0: number) => {
         const def = WEAPONS[weapon]
         const ends: P3[] = []
@@ -158,7 +158,7 @@ export const UseWeapons = Game.System(
         events.out.emit({ t: "shot", s: session, w: weapon, o: r3(eye), e: ends, hw: hitWorld })
       }
 
-      // Alla torretta: la mitraie al posto dell'arma, niente bombe né mine.
+      // On a turret: the mitraie instead of your weapon, no bombs or mines.
       const mounted = turretOf(turrets, session)
       if (mounted >= 0) {
         a = { ...a, sgnape: Math.max(0, a.sgnape - 1), bombCooldown: Math.max(0, a.bombCooldown - 1), mineCooldown: Math.max(0, a.mineCooldown - 1), spin: 0 }
@@ -176,16 +176,16 @@ export const UseWeapons = Game.System(
         continue
       }
 
-      // Timer dell'arsenale.
+      // Arsenal timers.
       a = { ...a, sgnape: Math.max(0, a.sgnape - 1), bombCooldown: Math.max(0, a.bombCooldown - 1), mineCooldown: Math.max(0, a.mineCooldown - 1) }
 
-      // Cambio arma.
+      // Weapon switch.
       const wanted = controls.switchTo
       if (wanted && wanted !== a.current && owned(a, wanted)) {
         a = { ...a, current: wanted, action: { _tag: "switch", ticks: SWITCH_TICKS }, spin: 0 }
       }
 
-      // Avanzamento dell'azione in corso.
+      // Advance the current action.
       const action = a.action
       if (action._tag !== "ready") {
         const left = action.ticks - 1
@@ -197,7 +197,7 @@ export const UseWeapons = Game.System(
         } else a = { ...a, action: { _tag: "ready" } }
       }
 
-      // Di corsa l'arma è abbassata: niente colpi, e a fine corsa ci vuole un attimo per rialzarla.
+      // While sprinting the weapon is lowered: no shots, and after sprinting it takes a moment to raise it.
       const running = sprinting(input, motion.body.crouch)
       if (running && (a.action._tag === "ready" || a.action._tag === "cooldown")) {
         a = { ...a, action: { _tag: "cooldown", ticks: Math.max(RAISE_TICKS, a.action._tag === "cooldown" ? a.action.ticks : 0) } }
@@ -208,7 +208,7 @@ export const UseWeapons = Game.System(
       const needsAmmo = def.mode !== "melee"
       const automatic = def.mode === "auto" || def.mode === "beam"
       const trigger = automatic ? held(controls, "fire") : justPressed(controls, "fire")
-      // Il Mulin gira finché si tiene il grilletto (e l'arma è su), poi rallenta.
+      // The Mulin spins while the trigger is held (and the weapon is up), then slows down.
       if (def.spinTicks > 0) {
         const turning = held(controls, "fire") && !running && a.action._tag !== "reload" && a.action._tag !== "switch"
         a = { ...a, spin: turning ? Math.min(def.spinTicks, a.spin + 1) : Math.max(0, a.spin - 2) }
@@ -225,7 +225,7 @@ export const UseWeapons = Game.System(
         const speed = Math.sqrt(motion.body.vx * motion.body.vx + motion.body.vz * motion.body.vz)
         const spread = aiming ? def.spread.aimed : speed > 1.5 || !motion.body.grounded ? def.spread.moving : def.spread.still
         if (def.mode === "beam") {
-          // Il getto del miedi: il primo corpo lungo il raggio, compagno o nemico.
+          // The miedi's beam: the first body along the ray, teammate or enemy.
           const dir = lookDir(input.yaw, input.pitch)
           const wall = physics.raycast(eye, dir, def.range)
           let reach = wall ? wall.dist : def.range
@@ -254,7 +254,7 @@ export const UseWeapons = Game.System(
           }
           if (best) events.damage.emit({ victim: best.session, attacker: session, amount: damageAt("mescul", best.dist, best.head), weapon: "mescul", head: best.head, push: null })
           else {
-            // Una pedata alla porta.
+            // A kick at the door.
             const wall = physics.raycast(eye, dir, def.range)
             if (wall?.door != null) events.doorHit.emit({ door: wall.door, amount: def.damage * DOOR_MELEE_SCALE, by: session })
           }
@@ -292,7 +292,7 @@ export const UseWeapons = Game.System(
         if (life.shield > 0) m.data.life.update({ state: "Alive", data: (l) => ({ hp: l.hp, armor: l.armor, shield: 0 }) })
       }
 
-      // Bombe di sgnape.
+      // Sgnape bombs.
       if (justPressed(controls, "bomb") && a.bombs > 0 && a.bombCooldown === 0) {
         const dir = lookDir(input.yaw, input.pitch + 0.12)
         const eye = { x: motion.body.x, y: motion.body.y + eyeHeight(motion.body), z: motion.body.z }
@@ -319,7 +319,7 @@ export const UseWeapons = Game.System(
         events.out.emit({ t: "launch", s: session, k: "sgnape" })
       }
 
-      // Mine di Raibl: si buttano davanti ai piedi.
+      // Raibl mines: dropped in front of your feet.
       if (justPressed(controls, "mine") && a.mines > 0 && a.mineCooldown === 0 && (minesOf.get(session) ?? 0) < RAIBL_MINE.maxActive) {
         const dir = lookDir(input.yaw, Math.min(input.pitch, 0.1) - 0.15)
         const eye = { x: motion.body.x, y: motion.body.y + eyeHeight(motion.body), z: motion.body.z }

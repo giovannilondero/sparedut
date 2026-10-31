@@ -1,10 +1,10 @@
 /**
- * Il mondo visibile di una mappa, costruito dagli stessi dati delle collisioni
- * (`shared/maps/`). Tutto ciò che si tocca coincide coi blocchi e le rampe; sopra ci
- * sono solo decori sottili: finestre, archi, tetti, statue, insegne.
- * Gemona (Duomo, campanile, Comune) è disegnata qui; le altre mappe aggiungono i loro
- * monumenti con uno scenario (`client/world/maps/`).
- * Geometria statica fusa per materiale, ripetizioni istanziate, texture su canvas.
+ * A map's visible world, built from the same data as the collisions
+ * (`shared/maps/`). Everything you can touch matches the blocks and ramps; on top there
+ * are only thin decorations: windows, arches, roofs, statues, signs.
+ * Gemona (Duomo, bell tower, Comune) is drawn here; the other maps add their
+ * monuments through a scenery (`client/world/maps/`).
+ * Static geometry merged by material, instanced repeats, canvas textures.
  */
 import * as THREE from "three"
 import { buildingBlocks, type Block, type Building, type MapDef, type Mat } from "../shared/map.ts"
@@ -51,9 +51,9 @@ const PALETTE = ["#e0ac66", "#e3a090", "#efe8d8", "#ecc864", "#d98f6a", "#e8d2b0
 const SHUTTERS = ["#4d6b3a", "#3f5e45", "#6b4a2e", "#7d8f74", "#5e3326", "#56704f"].map(C)
 const UP = new THREE.Vector3(0, 1, 0)
 
-// --- appoggi geometrici --------------------------------------------------------------------
+// --- geometry helpers ---------------------------------------------------------------------
 
-/** Una faccia di una scatola come quadrilatero (normale uscente). */
+/** One face of a box as a quad (outward normal). */
 function face(min: V, max: V, side: "top" | "bottom" | "east" | "west" | "south" | "north"): THREE.BufferGeometry {
   const [x0, y0, z0] = min
   const [x1, y1, z1] = max
@@ -67,7 +67,7 @@ function face(min: V, max: V, side: "top" | "bottom" | "east" | "west" | "south"
   }
 }
 
-/** Gira la geometria perché la normale guardi verso `dir`. */
+/** Rotates the geometry so its normal faces `dir`. */
 function orient(g: THREE.BufferGeometry, dir: V): THREE.BufferGeometry {
   g.computeVertexNormals()
   const n = g.getAttribute("normal")
@@ -88,7 +88,7 @@ function orient(g: THREE.BufferGeometry, dir: V): THREE.BufferGeometry {
   return g
 }
 
-/** Cilindro fra due punti (arti delle statue, aste). */
+/** Cylinder between two points (statue limbs, poles). */
 function cylBetween(a: V, b: V, r0: number, r1 = r0, seg = 8): THREE.BufferGeometry {
   const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b)
   const len = va.distanceTo(vb)
@@ -102,7 +102,7 @@ function cylBetween(a: V, b: V, r0: number, r1 = r0, seg = 8): THREE.BufferGeome
 
 const sphere = (c: V, r: number, sy = 1, seg = 10) => new THREE.SphereGeometry(r, seg, Math.max(6, seg - 2)).scale(1, sy, 1).translate(...c)
 
-/** Il terreno di una mappa: blocchi `terreno` e rampe. */
+/** A map's ground: `terreno` blocks and ramps. */
 function groundOf(map: MapDef) {
   const terrain = map.blocks.filter((b) => b.look === "terreno")
   return (x: number, z: number): number => {
@@ -116,7 +116,7 @@ function groundOf(map: MapDef) {
 }
 
 type Rect = { minX: number; maxX: number; minZ: number; maxZ: number }
-/** Un punto appena fuori da una facciata è libero (né dentro un altro edificio né fuori dal mondo)? */
+/** Is a point just outside a façade free (neither inside another building nor outside the world)? */
 function openOf(map: MapDef) {
   const solids: Rect[] = map.buildings.map((b) => ({ minX: b.min[0], maxX: b.max[0], minZ: b.min[2], maxZ: b.max[2] }))
   if (map.id === "glemone") solids.push(DUOMO, COMUNE, CAMPANILE)
@@ -127,7 +127,7 @@ function openOf(map: MapDef) {
   }
 }
 
-// --- il mondo -------------------------------------------------------------------------------
+// --- the world -----------------------------------------------------------------------------
 
 export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, map: MapDef): WorldScene {
   setAnisotropy(renderer.capabilities.getMaxAnisotropy())
@@ -139,12 +139,12 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
   const groundAt = groundOf(map)
   const open = openOf(map)
   const { blocks: BLOCKS, wedges: WEDGES, buildings: BUILDINGS, jumpPads: JUMP_PADS, bounds: BOUNDS } = map
-  /** Tutto ciò che appartiene alla mappa: si toglie in blocco col cambio mappa. */
+  /** Everything belonging to the map: removed in one go on map change. */
   const root = new THREE.Group()
   root.name = `mappa-${map.id}`
   scene.add(root)
 
-  // Luce di fine pomeriggio (sole basso da sud-ovest, cielo caldo, foschia) o notte di luna.
+  // Late-afternoon light (low sun from the south-west, warm sky, haze) or a moonlit night.
   const skyKind = scenery?.light?.sky ?? "di"
   const palette = SKIES[skyKind]
   const sunDir = new THREE.Vector3(...(scenery?.light?.sun ?? [-0.62, 0.4, 0.68])).normalize()
@@ -165,7 +165,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
   sun.shadow.bias = -0.0003
   sun.shadow.normalBias = 0.05
   {
-    // Il frustum d'ombra abbraccia esattamente il paese giocabile (più campanile e castello vicino).
+    // The shadow frustum tightly wraps the playable town (plus the bell tower and nearby castle).
     const cam = new THREE.OrthographicCamera()
     cam.position.copy(sun.position)
     cam.lookAt(focus)
@@ -184,14 +184,14 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
   }
   root.add(sun, sun.target)
 
-  // Mappa d'ambiente dal cielo, per metalli, vetri, acqua e marmo.
+  // Environment map from the sky, for metals, glass, water and marble.
   const pmrem = new THREE.PMREMGenerator(renderer)
   const envScene = new THREE.Scene()
   envScene.add(makeSky(sunDir, skyKind))
   const envMap = pmrem.fromScene(envScene, 0, 0.1, 10).texture
   pmrem.dispose()
 
-  // --- materiali ---
+  // --- materials ---
   const lam = (map: THREE.Texture | null, extra: THREE.MeshLambertMaterialParameters = {}) => new THREE.MeshLambertMaterial({ map, vertexColors: true, ...extra })
   const MATS: Record<K, THREE.Material> = {
     pietra: lam(tex.pietra, { bumpMap: tex.pietra, bumpScale: 1.2 }),
@@ -209,8 +209,8 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     stoffa: lam(null, { side: THREE.DoubleSide }),
     vetro: new THREE.MeshStandardMaterial({ color: "#26303c", vertexColors: true, roughness: 0.12, metalness: 0.5, envMap, envMapIntensity: 1.2 }),
     luce: new THREE.MeshBasicMaterial({ vertexColors: true }),
-    // non troppo a specchio: coi riflessi stretti delle luci puntiformi certe GPU (a mezza
-    // precisione) vanno fuori scala e il pixel diventa nero
+    // not too mirror-like: with the tight highlights of point lights some GPUs (at half
+    // precision) overflow and the pixel turns black
     acqua: new THREE.MeshStandardMaterial({ color: "#3c7380", vertexColors: true, roughness: 0.2, metalness: 0.2, envMap, transparent: true, opacity: 0.88 }),
     terra: lam(tex.terra, { bumpMap: tex.terra, bumpScale: 1.2 }),
     roccia: lam(tex.roccia, { bumpMap: tex.roccia, bumpScale: 1.6 }),
@@ -219,7 +219,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
   }
   const B = new Batch<K>(SCALES, ["atlas"])
 
-  // Istanze ripetute.
+  // Repeated instances.
   const I = {
     vetro: new Inst(),
     cornice: new Inst(),
@@ -237,22 +237,22 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
   const matKey = (m: Mat): K => (m.startsWith("intonaco") ? "intonaco" : (m as K))
   const matColor = (m: Mat) => C(PLASTER[m] ?? "#ffffff")
 
-  // --- 1. terreno e rampe -------------------------------------------------------------------
+  // --- 1. ground and ramps -----------------------------------------------------------------
   const isTerrain = (b: Block) => b.look === "terreno"
-  /** Il materiale del Batch per un `Mat` della mappa. */
+  /** The Batch material for a map `Mat`. */
   const surface = (m: Mat): K => (m === "invisibile" ? "pietra" : matKey(m))
   for (const b of BLOCKS) {
-    // il terreno invisibile lo disegna lo scenario (rive irregolari, a Maran)
+    // invisible ground is drawn by the scenery (irregular banks, at Maran)
     if (!isTerrain(b) || b.mat === "invisibile") continue
     const k = surface(b.mat)
     B.add(k, face(b.min, b.max, "top"), matColor(b.mat))
     if (gemona) {
-      // il gradino verso sud è un muro di sostegno in pietra, con una copertina chiara
+      // the step to the south is a stone retaining wall, with a light coping
       B.add("pietra", face(b.min, b.max, "south"), C("#d8d0c4"))
       B.add("pietraChiara", boxAt([b.min[0], b.max[1] - 0.25, b.max[2]], [b.max[0], b.max[1], b.max[2] + 0.06]))
       continue
     }
-    // Fianchi dei gradoni: si vedono solo dove il terreno accanto è più basso.
+    // Sides of the terraces: only visible where the ground beside them is lower.
     const sideKey: K = k === "porfido" ? "pietra" : k === "erba" ? "terra" : k
     for (const side of ["east", "west", "south", "north"] as const) {
       const [x0, , z0] = b.min
@@ -264,8 +264,8 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     }
   }
   for (const w of WEDGES) {
-    // lo stesso solido del collider (base mezzo metro sotto il punto più basso): una rampa
-    // sospesa, come una scala, si vede anche da sotto e dalle teste
+    // the same solid as the collider (base half a metre below the lowest point): a raised
+    // ramp, like a staircase, is visible from below and from the ends too
     const yb = Math.min(w.y0, w.y1) - 0.5
     const top = surface(w.mat)
     const sideKey: K = top === "porfido" ? "pietra" : top === "erba" ? "terra" : top
@@ -276,13 +276,13 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     B.add(sideKey, orient(quad([w.x0, yb, w.z1], [w.x1, yb, w.z1], [w.x1, w.y1, w.z1], [w.x0, w.y1, w.z1]), [0, 0, 1]))
     B.add(sideKey, orient(quad([w.x0, yb, w.z0], [w.x1, yb, w.z0], [w.x1, yb, w.z1], [w.x0, yb, w.z1]), [0, -1, 0]))
   }
-  // Le terrazze proseguono oltre i bordi, sotto il resto del paese.
+  // The terraces continue beyond the edges, under the rest of the town.
   if (gemona) for (const g of nearGround()) {
     B.add("erba", face(g.min, g.max, "top"), C("#c8c4a0"))
     for (const s of ["south", "north"] as const) B.add("pietra", face(g.min, g.max, s), C("#b8b0a4"))
   }
 
-  // --- 2. edifici ------------------------------------------------------------------------
+  // --- 2. buildings ---------------------------------------------------------------------
   const buildingKeys = new Set<string>()
   const key = (b: Block) => `${b.min.join()}|${b.max.join()}`
   BUILDINGS.forEach((b, bi) => {
@@ -290,7 +290,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     drawBuilding(b, bi)
   })
 
-  /** Punti di rottura lungo un asse: ogni 6-10 m una casa diversa. */
+  /** Break points along an axis: a different house every 6-10 m. */
   function breaks(a0: number, a1: number, seed: number): number[] {
     const r = rng(seed)
     const out = [a0]
@@ -342,7 +342,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
       if (b.roof === "piano") B.add("intonaco", face(blk.min, blk.max, "top"), base)
     }
 
-    // Facce esposte: zoccolo, marcapiano, cornicione, finestre.
+    // Exposed faces: plinth, string course, cornice, windows.
     type F = { n: V; plane: number; a0: number; a1: number; y0: number; y1: number; alongX: boolean; inner: boolean }
     const faces: F[] = []
     for (const blk of blocks) {
@@ -368,7 +368,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
       const n = Math.floor((len - 0.8) / 3)
       if (n < 1) continue
       const ground = f.y0 <= y0 + 0.01
-      // zoccolo e cornicione (solo dove la facciata si vede)
+      // plinth and cornice (only where the façade is visible)
       if (ground && outside(f, (f.a0 + f.a1) / 2)) {
         const lo = at(f, f.a0, f.y0), hi = at(f, f.a1, f.y0 + 0.7, 0.05)
         B.add("pietra", boxAt([Math.min(lo[0], hi[0]), lo[1], Math.min(lo[2], hi[2])], [Math.max(lo[0], hi[0]), hi[1], Math.max(lo[2], hi[2])]), C("#c9c0b2"))
@@ -392,7 +392,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
           if (yc - 1.3 < f.y0 - 0.01 || yc + 1.1 > f.y1) return
           if (fl === 0) {
             if (f.inner) {
-              // bottega sotto il portico: porta e vetrina
+              // shop under the arcade: door and shop window
               if (i % 2 === 0) door(f.n, at(f, a, f.y0), 1.3, 2.5, shutter)
               else win(f.n, at(f, a, f.y0 + 1.5), 1.6, 1.8, null, false)
               return
@@ -414,7 +414,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
 
     if (b.roof === "falde") {
       const { ridge, alongZ, rise } = roof(x0, z0, x1, z1, y1, segColor(0))
-      // comignoli
+      // chimneys
       const r = rng(bi * 13 + 5)
       const len = alongZ ? z1 - z0 : x1 - x0
       const hw = (alongZ ? x1 - x0 : z1 - z0) / 2
@@ -427,7 +427,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     }
   }
 
-  /** Tetto a falde (colmo lungo il lato lungo): coppi, timpani, sottogronda, colmo. */
+  /** Pitched roof (ridge along the long side): tiles, gables, eaves soffit, ridge. */
   function roof(x0: number, z0: number, x1: number, z1: number, yTop: number, gable: THREE.Color, rise0?: number, gableKey: K = "intonaco") {
     const alongZ = z1 - z0 >= x1 - x0
     const P = (u: number, y: number, w: number): V => (alongZ ? [w, y, u] : [u, y, w])
@@ -450,7 +450,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     for (const [u, sign] of [[u0, -1], [u1, 1]] as const) {
       const n: V = alongZ ? [0, 0, sign] : [sign, 0, 0]
       B.add(gableKey, orient(tri(P(u, yTop, w0), P(u, yTop, w1), P(u, yr, wc)), n), gable)
-      // bordo del tetto sul timpano
+      // roof edge over the gable
       for (const we of [w0 - o, w1 + o]) {
         B.add("coppi", orient(quad(P(u + sign * o, ye - 0.2, we), P(u + sign * o, yr - 0.2, wc), P(u + sign * o, yr + 0.02, wc), P(u + sign * o, ye + 0.02, we)), n), C("#b07060"))
       }
@@ -480,7 +480,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     for (const g of rail) B.add("ferro", g.applyMatrix4(m), C("#2a2622"))
   }
 
-  // --- 3. blocchi generici ---------------------------------------------------------------
+  // --- 3. generic blocks ----------------------------------------------------------------
   const camp = (b: Block) => gemona && b.min[0] === CAMPANILE.minX && b.max[0] === CAMPANILE.maxX && b.min[2] === CAMPANILE.minZ && b.max[1] === CAMPANILE.floor + CAMPANILE.height
   const comuneUpper = (b: Block) => gemona && b.min[0] === COMUNE.minX && b.max[0] === COMUNE.maxX && b.min[1] === COMUNE.floor + COMUNE.loggiaHeight
   const inDuomo = (b: Block) => gemona && b.min[0] >= DUOMO.minX && b.max[0] <= DUOMO.maxX && b.min[2] >= DUOMO.minZ && b.max[2] <= DUOMO.maxZ
@@ -499,7 +499,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
       continue
     }
     if (b.look === "cassa" && b.mat === "legno" && !inDuomo(b)) {
-      // casse di legno: la scatola divisa in casse da ~1.4 m
+      // wooden crates: the box split into ~1.4 m crates
       const nx = Math.max(1, Math.round((x1 - x0) / 1.4)), nz = Math.max(1, Math.round((z1 - z0) / 1.4))
       for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
         const g = new THREE.BoxGeometry((x1 - x0) / nx, y1 - y0, (z1 - z0) / nz)
@@ -509,7 +509,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
       continue
     }
     if (b.look === "cassa" && b.mat === "legno") {
-      // banchi della chiesa: seduta, schienale e fianchi nello stesso volume
+      // church pews: seat, backrest and sides within the same volume
       B.add("legno", boxAt(b.min, b.max), C("#e8c8a8"))
       B.add("legno", boxAt([x0 - 0.04, y0, z1 - 0.12], [x1 + 0.04, y1 + 0.02, z1]), C("#c89a78"))
       continue
@@ -534,23 +534,23 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     B.add(k, boxAt(b.min, b.max), k === "pietra" && inDuomo(b) ? C("#e6e0d6") : col)
   }
 
-  // --- 4-6. solo a Gemona: Duomo, campanile, Comune --------------------------------------------
+  // --- 4-6. Gemona only: Duomo, bell tower, Comune -------------------------------------------
   const altarLight = new THREE.PointLight("#ffb46a", 70, 22, 1.3)
   const naveLight = new THREE.PointLight("#ffc888", 45, 20, 1.3)
   const clockHands: THREE.Mesh[] = []
   if (gemona) {
-  // --- 4. Duomo di Santa Maria Assunta -----------------------------------------------------
+  // --- 4. Duomo of Santa Maria Assunta ----------------------------------------------------
   {
     const { minX, maxX, minZ, maxZ, floor: f, height: h } = DUOMO
     const top = f + h
     const fz = maxZ
     const stone = C("#f1ece2")
     const add = (k: K, g: THREE.BufferGeometry, c = stone) => B.add(k, g, c)
-    // lesene e cornice ad archetti pensili
+    // pilaster strips and a cornice of blind arches
     for (const x of [-13.6, -10.7, 10.1, 13.0]) add("pietraChiara", boxAt([x, f, fz], [x + 0.6, top, fz + 0.25]))
     add("pietraChiara", boxAt([minX - 0.1, top - 0.6, fz], [maxX + 0.1, top, fz + 0.35]))
     for (let x = minX + 0.6; x < maxX - 0.4; x += 0.9) add("pietraChiara", archRing(0.32, 0.42, 0.18, 0).translate(x, top - 1.1, fz + 0.1))
-    // timpano e tetto a capanna sopra la copertura
+    // pediment and gable roof above the roofline
     const roofBase = top + 0.8
     const r = roof(minX, minZ, maxX, maxZ - 1.2, roofBase, C("#d8d2c6"), 6.5, "pietra")
     {
@@ -562,7 +562,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
       const g = new THREE.ExtrudeGeometry(s, { depth: 1.2, bevelEnabled: false })
       g.translate(0, roofBase - 0.8, fz - 1.2)
       add("pietra", g)
-      // cornice inclinata del timpano
+      // sloped cornice of the pediment
       const ang = Math.atan2(r.ridge - roofBase + 0.6, maxX + 0.3)
       for (const sx of [-1, 1]) {
         const len = Math.hypot(maxX + 0.3, r.ridge - roofBase + 0.6)
@@ -571,7 +571,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
         c.translate((sx * (maxX + 0.3)) / 2, roofBase - 0.8 + (r.ridge - roofBase + 0.6) / 2 + 0.2, fz - 0.55)
         add("pietraChiara", c)
       }
-      // croce e pinnacoli
+      // cross and pinnacles
       const cy = r.ridge + 0.2
       add("pietraChiara", boxAt([-0.12, cy, fz - 0.7], [0.12, cy + 2.2, fz - 0.45]))
       add("pietraChiara", boxAt([-0.7, cy + 1.3, fz - 0.7], [0.7, cy + 1.55, fz - 0.45]))
@@ -580,7 +580,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
         add("pietraChiara", pin)
       }
     }
-    // portale maggiore: strombatura, colonnine, archivolto acuto, lunetta
+    // main portal: splay, colonnettes, pointed archivolt, lunette
     const doorTop = f + 6
     for (const s of [-1, 1]) {
       add("pietraChiara", boxAt([s < 0 ? -3.5 : 2.5, f, fz], [s < 0 ? -2.5 : 3.5, doorTop, fz + 0.35]))
@@ -589,23 +589,23 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     add("pietraChiara", archRing(2.5, 3.5, 0.5, 0.6).translate(0, doorTop, fz + 0.22))
     add("pietraChiara", archRing(2.75, 3.25, 0.2, 0.66).translate(0, doorTop, fz + 0.52), C("#d9cdb6"))
     add("pietraChiara", archPanel(2.5, 0, 0.6).translate(0, doorTop, fz + 0.02), C("#cfc6b4"))
-    // Madonna in trono nella lunetta
+    // enthroned Madonna in the lunette
     add("pietraChiara", cylBetween([0, doorTop + 0.2, fz + 0.1], [0, doorTop + 1.6, fz + 0.1], 0.55, 0.32), C("#ece2cc"))
     add("pietraChiara", sphere([0, doorTop + 1.9, fz + 0.12], 0.26), C("#ece2cc"))
     add("marmo", new THREE.TorusGeometry(0.38, 0.04, 6, 20).translate(0, doorTop + 1.95, fz + 0.05), C("#d9b45a"))
-    // portali minori
+    // smaller portals
     for (const s of [-1, 1]) {
       const x = s * 7.75
       add("pietraChiara", boxAt([x - 1.65, f, fz], [x - 1.25, f + 4.5, fz + 0.3]))
       add("pietraChiara", boxAt([x + 1.25, f, fz], [x + 1.65, f + 4.5, fz + 0.3]))
       add("pietraChiara", archRing(1.25, 1.75, 0.4, 0.3).translate(x, f + 4.5, fz + 0.2))
       add("pietraChiara", archPanel(1.25, 0, 0.3).translate(x, f + 4.5, fz + 0.02), C("#cfc6b4"))
-      // battenti aperti, dentro, contro la facciata
+      // open door leaves, inside, against the façade
       for (const d of [-1, 1]) add("legno", boxAt([x + d * 1.25 + (d < 0 ? -1.3 : 0), f, fz - 1.32], [x + d * 1.25 + (d < 0 ? 0 : 1.3), f + 4.4, fz - 1.22]), C("#7a4a2c"))
     }
     for (const d of [-1, 1]) add("legno", boxAt([d < 0 ? -5.1 : 2.5, f, fz - 1.32], [d < 0 ? -2.5 : 5.1, doorTop - 0.1, fz - 1.22]), C("#6a3e22"))
 
-    // galleria dell'Epifania sopra il portale: mensola, nicchie e statuine
+    // Epiphany gallery above the portal: ledge, niches and statuettes
     const gy = 16.55 + f - 6
     add("pietraChiara", boxAt([-4.7, gy - 0.25, fz], [4.7, gy, fz + 0.6]))
     for (let i = 0; i < 7; i++) {
@@ -613,7 +613,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
       add("pietra", archPanel(0.5, 1.3, 0).translate(x, gy + 1.4, fz + 0.01), C("#8a8276"))
       add("pietraChiara", archRing(0.5, 0.62, 0.2, 0).translate(x, gy + 1.4, fz + 0.1))
       if (i < 6) add("pietraChiara", cylBetween([x + 0.65, gy, fz + 0.12], [x + 0.65, gy + 1.4, fz + 0.12], 0.07))
-      // la figura: veste, testa; i Magi hanno la corona, al centro la Madonna col Bambino
+      // the figure: robe, head; the Magi wear crowns, in the centre the Madonna and Child
       const fc = C(i === 3 ? "#efe6d2" : "#e2d8c4")
       const hgt = i === 3 ? 1.05 : 1.25
       add("pietraChiara", cylBetween([x, gy, fz + 0.3], [x, gy + hgt * 0.78, fz + 0.3], 0.26, 0.13), fc)
@@ -622,7 +622,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
       if (i === 3) add("pietraChiara", sphere([x + 0.12, gy + 0.62, fz + 0.42], 0.09), fc)
       if (i === 2) add("pietraChiara", sphere([x + 0.2, gy + 0.55, fz + 0.38], 0.08), C("#d9b45a"))
     }
-    // tre rosoni: il grande di Buzeta e i due minori
+    // three rose windows: Buzeta's large one and the two smaller ones
     const rose = (x: number, y: number, rad: number) => {
       add("atlas", atlasDisc(atlas.rose, rad, 40).translate(x, y, fz + 0.02))
       add("pietraChiara", new THREE.TorusGeometry(rad + 0.12, 0.2, 8, 40).translate(x, y, fz + 0.1))
@@ -632,21 +632,21 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     rose(-7.75, f + 9.6, 1.15)
     rose(7.75, f + 9.6, 1.15)
 
-    // San Cristoforo (1331): gigante a rilievo a destra del portale, col Bambino in spalla
+    // San Cristoforo (1331): giant relief to the right of the portal, with the Child on his shoulder
     {
       const parts: [THREE.BufferGeometry, string][] = []
       const P = (g: THREE.BufferGeometry, c = "#e8e0cf") => parts.push([g, c])
       P(boxAt([-1.15, 0, -0.1], [1.15, 0.35, 0.65]), "#d6ccb8")
-      // acqua del fiume ai piedi
+      // river water at his feet
       for (let i = 0; i < 4; i++) P(new THREE.TorusGeometry(0.3 + i * 0.05, 0.05, 4, 12, Math.PI).translate(-0.6 + i * 0.4, 0.4, 0.45), "#c8c2b4")
       P(cylBetween([-0.32, 0.35, 0.2], [-0.3, 3.0, 0.15], 0.24, 0.3))
       P(cylBetween([0.36, 0.35, 0.3], [0.28, 3.0, 0.15], 0.24, 0.3))
       P(cylBetween([0, 1.7, 0.1], [0, 3.6, 0.1], 0.95, 0.68), "#d9c6a8")
       P(cylBetween([0, 3.55, 0.1], [0, 5.5, 0.1], 0.66, 0.74), "#d9c6a8")
       P(new THREE.TorusGeometry(0.68, 0.07, 5, 16).rotateX(Math.PI / 2).translate(0, 3.65, 0.1), "#b89a6a")
-      // mantello
+      // cloak
       P(boxAt([-0.9, 2.2, -0.15], [0.9, 5.4, 0.05]), "#c9b08a")
-      // braccio destro con il bastone fiorito, sinistro che regge il Bambino
+      // right arm with the flowering staff, left one holding the Child
       P(cylBetween([-0.78, 5.3, 0.1], [-1.05, 4.3, 0.25], 0.2, 0.22))
       P(cylBetween([-1.05, 4.3, 0.25], [-1.0, 4.85, 0.6], 0.18, 0.2))
       P(cylBetween([-1.0, 0.35, 0.6], [-1.0, 7.0, 0.6], 0.09, 0.1), "#b8a582")
@@ -660,7 +660,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
       P(sphere([0, 6.15, 0.15], 0.46, 1.1, 12))
       P(new THREE.ConeGeometry(0.32, 0.6, 8).rotateX(Math.PI).translate(0, 5.75, 0.38), "#cdbf9f")
       P(new THREE.CylinderGeometry(0.75, 0.75, 0.06, 24).rotateX(Math.PI / 2).translate(0, 6.2, -0.2), "#d9b45a")
-      // il Bambino sulla spalla
+      // the Child on his shoulder
       P(cylBetween([0.7, 5.55, 0.15], [0.72, 6.15, 0.2], 0.22, 0.16), "#e0d2b8")
       P(sphere([0.74, 6.38, 0.22], 0.18))
       P(new THREE.CylinderGeometry(0.3, 0.3, 0.04, 16).rotateX(Math.PI / 2).translate(0.74, 6.42, 0.04), "#d9b45a")
@@ -671,7 +671,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
       }
     }
 
-    // fianchi: lesene e monofore ogivali
+    // sides: pilaster strips and pointed lancet windows
     for (const [x, nx] of [[minX, -1], [maxX, 1]] as const) {
       for (let z = minZ + 3; z < maxZ - 2; z += 6) {
         add("pietraChiara", boxAt([nx < 0 ? x - 0.3 : x, f, z - 0.3], [nx < 0 ? x : x + 0.3, top, z + 0.3]))
@@ -685,7 +685,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     }
     add("pietraChiara", archRing(2.5, 3.0, 0.4, 0.4).rotateY(Math.PI / 2).translate(maxX + 0.1, f + 4.5 - 1.6, -79.5))
 
-    // interno: pavimento a rombi, arcate sopra le colonne, travi, altare e luci
+    // interior: diamond floor, arcades above the columns, beams, altar and lights
     B.add("pavimento", face([minX + 1.2, f, -91], [maxX - 1.2, f + 0.015, fz - 1.2], "top"))
     const cols = [-93, -87, -81, -75, -69]
     const spans: [number, number][] = []
@@ -701,11 +701,11 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     }
     for (const z of cols) add("legno", boxAt([minX + 1.2, top - 0.5, z - 0.25], [maxX - 1.2, top, z + 0.25]), C("#6a4630"))
     for (let z = minZ + 2; z < fz - 1.2; z += 2) add("legno", boxAt([minX + 1.2, top - 0.25, z - 0.1], [maxX - 1.2, top - 0.05, z + 0.1]), C("#7a5638"))
-    // pala d'altare dorata
+    // gilded altarpiece
     add("marmo", boxAt([-3.2, f + 1.6, minZ + 1.2], [3.2, f + 7.4, minZ + 1.45]), C("#d4a84a"))
     B.add("stoffa", face([-2.8, f + 2.0, minZ + 1.2], [2.8, f + 7.0, minZ + 1.47], "south"), C("#2b3a6a"))
     for (let i = 0; i < 3; i++) B.add("stoffa", face([-2.4 + i * 1.75, f + 2.4, minZ + 1.2], [-1.4 + i * 1.75, f + 5.8, minZ + 1.49], "south"), C(i === 1 ? "#9b2a2a" : "#c8a060"))
-    // candele sull'altare
+    // candles on the altar
     const altarTop = f + 1.4
     for (let i = 0; i < 6; i++) {
       const x = -1.6 + i * 0.64
@@ -715,7 +715,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     }
     add("marmo", boxAt([-0.05, altarTop, -97.1], [0.05, altarTop + 1.1, -97.0]), C("#d4a84a"))
     add("marmo", boxAt([-0.35, altarTop + 0.7, -97.1], [0.35, altarTop + 0.8, -97.0]), C("#d4a84a"))
-    // lampadari: catena e corona di luci
+    // chandeliers: chain and ring of lights
     for (const z of [-72, -84]) {
       B.add("ferro", cylBetween([0, top, z], [0, f + 9, z], 0.03), C("#3a3028"))
       B.add("ferro", new THREE.TorusGeometry(1.0, 0.05, 5, 20).rotateX(Math.PI / 2).translate(0, f + 9, z), C("#8a6a3a"))
@@ -729,18 +729,18 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
   naveLight.position.set(0, DUOMO.floor + 8.5, -80)
   root.add(altarLight, naveLight)
 
-  // --- 5. Campanile ---------------------------------------------------------------------
+  // --- 5. Bell tower -------------------------------------------------------------------
   {
     const { minX, maxX, minZ, maxZ, floor: f, height, balcony } = CAMPANILE
     const cut = f + 13
     const belfry = f + 32
     const topY = f + height
-    // la parte medievale sopravvissuta al '76, più scura; poi la ricostruzione
+    // the medieval part that survived '76, darker; then the reconstruction
     B.add("pietra", boxAt([minX, f, minZ], [maxX, cut, maxZ]), C("#a8a194"))
     B.add("pietra", boxAt([minX, cut, minZ], [maxX, belfry, maxZ]), C("#f2ede4"))
     B.add("pietra", boxAt([minX - 0.06, cut - 0.15, minZ - 0.06], [maxX + 0.06, cut + 0.35, maxZ + 0.06]), C("#c07a5a"))
     B.add("pietra", boxAt([minX - 0.04, cut + 0.35, minZ - 0.04], [maxX + 0.04, cut + 0.5, maxZ + 0.04]), C("#9a5a40"))
-    // mensole sotto il ballatoio
+    // corbels under the gallery
     const w = 1.6
     for (let s = minX - w + 0.4; s < maxX + w - 0.2; s += 1.2) {
       for (const z of [minZ - w + 0.1, maxZ + w - 0.4]) B.add("pietraChiara", boxAt([s - 0.12, balcony - 1.0, Math.min(z, z + 0.3)], [s + 0.12, balcony - 0.4, Math.max(z, z + 0.3)]))
@@ -748,14 +748,14 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     for (let s = minZ + 0.4; s < maxZ; s += 1.2) {
       for (const x of [minX - w + 0.1, maxX + w - 0.4]) B.add("pietraChiara", boxAt([x, balcony - 1.0, s - 0.12], [x + 0.3, balcony - 0.4, s + 0.12]))
     }
-    // feritoie
+    // slit windows
     for (const [n, px, pz] of [[[0, 0, 1], (minX + maxX) / 2, maxZ], [[0, 0, -1], (minX + maxX) / 2, minZ], [[1, 0, 0], maxX, (minZ + maxZ) / 2], [[-1, 0, 0], minX, (minZ + maxZ) / 2]] as [V, number, number][]) {
       for (const y of [f + 9, f + 17, f + 27]) {
         const m = faceMatrix(n, [px + n[0] * 0.02, y, pz + n[2] * 0.02])
         B.add("vetro", archPanel(0.28, 1.1, 0).applyMatrix4(m), C("#555"))
         B.add("pietraChiara", archRing(0.28, 0.42, 0.12, 0).applyMatrix4(m))
       }
-      // cella campanaria: bifore aperte
+      // belfry: open mullioned windows
       const m = faceMatrix(n, [px, belfry, pz])
       const spring = 5
       for (const x of [-1.175, 1.175]) B.add("pietraChiara", spandrel(1.0, topY - belfry - spring, 0.8).translate(x, spring, -0.4).applyMatrix4(m), C("#f2ede4"))
@@ -771,13 +771,13 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     B.add("pietra", new THREE.CylinderGeometry(2.7, 2.9, 2.2, 8).translate(cx, topY + 3.2, cz), C("#ece6da"))
     B.add("coppi", new THREE.ConeGeometry(3.1, 6.5, 8).translate(cx, topY + 7.55, cz), C("#9aa89a"))
     for (const [x, z] of [[minX, minZ], [maxX, minZ], [minX, maxZ], [maxX, maxZ]]) B.add("pietraChiara", new THREE.ConeGeometry(0.4, 1.6, 4).translate(x, topY + 2.9, z))
-    // l'angelo dorato in cima
+    // the golden angel on top
     const ay = topY + 10.8
     B.add("marmo", sphere([cx, ay, cz], 0.3), C("#e0b850"))
     B.add("marmo", cylBetween([cx, ay + 0.2, cz], [cx, ay + 1.4, cz], 0.32, 0.15), C("#e0b850"))
     B.add("marmo", sphere([cx, ay + 1.6, cz], 0.18), C("#e0b850"))
     for (const s of [-1, 1]) B.add("marmo", boxAt([cx + s * 0.1, ay + 0.6, cz - 0.04], [cx + s * 0.85, ay + 1.5, cz + 0.04]).rotateZ(0), C("#e0b850"))
-    // campane
+    // bells
     const bellProf = [[0, 1], [0.25, 0.98], [0.32, 0.8], [0.38, 0.4], [0.55, 0.05], [0.58, 0], [0, 0]].map(([x, y]) => new THREE.Vector2(x, y))
     for (const [dx, s] of [[-1.4, 0.9], [0, 1.2], [1.4, 0.8]] as const) {
       const g = new THREE.LatheGeometry(bellProf, 16).scale(s * 1.3, s * 1.2, s * 1.3).translate(cx + dx, belfry + 3.6 - s * 1.2, cz)
@@ -786,7 +786,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     B.add("legno", boxAt([minX + 0.6, belfry + 3.6, cz - 0.2], [maxX - 0.6, belfry + 4.0, cz + 0.2]), C("#5a3a22"))
   }
 
-  // --- 6. Palazzo Comunale e loggia ---------------------------------------------------------
+  // --- 6. Palazzo Comunale and loggia ------------------------------------------------------
   {
     const { minX, maxX, minZ, floor: f, loggiaDepth, loggiaHeight: lh, roof: rf } = COMUNE
     const colsX = [-15.5, -9.5, -3.5, 2.5, 8.5, 14.5]
@@ -801,16 +801,16 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
       const a = (loggiaDepth - 1) / 2
       B.add("pietraChiara", spandrel(a, a + 0.15, 1).rotateY(Math.PI / 2).translate(x, f + lh - a - 0.15, minZ + 1 + a), C("#efe7d8"))
     }
-    // portoni in fondo alla loggia
+    // main doors at the back of the loggia
     for (const x of [-6, 0, 6]) door([0, 0, -1], [x, f, minZ + loggiaDepth], 1.8, 3.2, C("#5a3a22"))
-    // marcapiano, cornicione, cantonali
+    // string course, cornice, quoins
     B.add("pietraChiara", boxAt([minX - 0.1, f + lh, minZ - 0.18], [maxX + 0.1, f + lh + 0.3, minZ]))
     B.add("pietraChiara", boxAt([minX - 0.2, rf - 0.4, minZ - 0.3], [maxX + 0.2, rf - 0.1, minZ]))
     for (let y = f + lh + 0.3; y < rf - 0.4; y += 0.6) for (const x of [minX, maxX]) {
       const wq = ((y - f) / 0.6) % 2 < 1 ? 0.9 : 0.6
       B.add("pietraChiara", boxAt([x < 0 ? x - 0.04 : x - wq, y, minZ - 0.04], [x < 0 ? x + wq : x + 0.04, y + 0.55, minZ + 0.6]))
     }
-    // finestre rinascimentali con timpano
+    // Renaissance windows with pediments
     for (const x of [-12, -6, 0, 6, 12]) {
       const p: V = [x, f + lh + 3, minZ]
       win([0, 0, -1], p, 1.2, 2.0, null, false)
@@ -822,7 +822,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
       B.add("pietraChiara", new THREE.ExtrudeGeometry(ped, { depth: 0.2, bevelEnabled: false }).rotateY(Math.PI).translate(x, p[1] + 1.15, minZ))
     }
     balconyAt([0, 0, -1], [0, f + lh + 1.9, minZ])
-    // insegna e bandiere (Italia e Friuli)
+    // sign and flags (Italy and Friuli)
     B.add("atlas", atlasQuad(atlas.signs.municipio, 0.7).rotateY(Math.PI).translate(0, f + lh + 0.95, minZ - 0.03))
     for (const [x, cols] of [[-1.6, ["#2a8a4a", "#f2f2f2", "#c83a3a"]], [1.6, ["#2a5ab8", "#2a5ab8", "#2a5ab8"]]] as const) {
       const base: V = [x, f + lh + 2.1, minZ - 0.6]
@@ -834,7 +834,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
       })
       if (x > 0) B.add("stoffa", tri([tip[0] + 0.01, tip[1] - 0.25, tip[2] + 0.3], [tip[0] + 0.01, tip[1] - 0.85, tip[2] + 0.3], [tip[0] + 0.01, tip[1] - 0.55, tip[2] + 0.75]), C("#f0c830"))
     }
-    // torre dell'orologio
+    // clock tower
     const tz = 88
     B.add("pietraChiara", boxAt([-3.3, rf + 9, tz - 0.3], [3.3, rf + 9.35, 94.3]))
     B.add("coppi", new THREE.ConeGeometry(4.6, 3.2, 4).rotateY(Math.PI / 4).translate(0, rf + 9.35 + 1.6, 91), C("#ffffff"))
@@ -853,7 +853,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     }
   }
   {
-    // vertex colors per le mani dell'orologio (il materiale ferro usa vertexColors)
+    // vertex colours for the clock hands (the ferro material uses vertexColors)
     for (const h of clockHands) {
       const n = h.geometry.getAttribute("position").count
       h.geometry.setAttribute("color", new THREE.BufferAttribute(new Float32Array(n * 3).fill(0.08), 3))
@@ -862,7 +862,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
 
   }
 
-  // --- 7. portici di Via Bini: archi, costoloni, volte, insegne -----------------------------
+  // --- 7. Via Bini arcades: arches, ribs, vaults, signs ------------------------------------
   const porticoSigns = ["ostarie", "latarie", "frico", "farmacie"] as const
   let signIdx = 0
   BUILDINGS.forEach((b) => {
@@ -879,7 +879,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     const vaultX = p.side === "east" ? innerX : x0 + 0.8
     for (let i = 0; i < cols.length; i++) {
       const c = cols[i]
-      // costolone trasversale dalla colonna al muro
+      // transverse rib from the column to the wall
       const rib = spandrel(depth / 2, depth / 2 + 0.15, 0.45).rotateY(0).translate(ribX, top - depth / 2 - 0.15, (c.min[2] + c.max[2]) / 2)
       B.add("pietraChiara", rib, C("#ece4d4"))
       if (i === cols.length - 1) break
@@ -888,13 +888,13 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
       const zm = za + a
       B.add("pietraChiara", spandrel(a, a + 0.15, 0.8).rotateY(Math.PI / 2).translate(outerX, top - a - 0.15, zm), C("#efe7d8"))
       B.add("intonaco", vault(a, 0.7, depth).rotateY(Math.PI / 2).translate(vaultX, top - 0.7, zm), C("#f6f0e4"))
-      // insegna appesa a metà portico, si legge camminando
+      // sign hanging mid-arcade, readable as you walk
       if (i % 3 === 1) {
         const id = porticoSigns[signIdx++ % porticoSigns.length]
         const reg: Region = atlas.signs[id]
         const sh = 0.42
         const sw = Math.min(depth * 0.85, sh * reg.aspect)
-        // due facce schiena contro schiena, così si legge dritta da entrambi i lati
+        // two faces back to back, so it reads correctly from both sides
         B.add("atlas", atlasQuad(reg, sw / reg.aspect, sw).translate(ribX, top - 1.05, zm + 0.01))
         B.add("atlas", atlasQuad(reg, sw / reg.aspect, sw).rotateY(Math.PI).translate(ribX, top - 1.05, zm - 0.01))
         for (const dz of [-sw / 2 + 0.1, sw / 2 - 0.1]) B.add("ferro", cylBetween([ribX + dz, top - 0.85, zm], [ribX + dz, top - 0.3, zm], 0.012), C("#2a2622"))
@@ -902,7 +902,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     }
   })
 
-  // --- 8. fontane, bancarelle, cjars di fen ------------------------------------------------
+  // --- 8. fountains, market stalls, cjars di fen --------------------------------------------
   function fountain(b: Block) {
     const [x0, y0, z0] = b.min
     const [x1, y1, z1] = b.max
@@ -921,11 +921,11 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     B.add("pietraChiara", new THREE.CylinderGeometry(big ? 0.9 : 0.45, big ? 0.3 : 0.18, 0.25, 16).translate(cx, y1 + ht * 0.65, cz))
     B.add("acqua", new THREE.CylinderGeometry(big ? 0.82 : 0.4, big ? 0.82 : 0.4, 0.02, 16).translate(cx, y1 + ht * 0.65 + 0.12, cz))
     if (big) {
-      // una piccola statua sopra: la Madonna col manto
+      // a small statue on top: the Madonna in her mantle
       B.add("pietraChiara", cylBetween([cx, y1 + ht, cz], [cx, y1 + ht + 1.0, cz], 0.32, 0.14), C("#f0e8d8"))
       B.add("pietraChiara", sphere([cx, y1 + ht + 1.15, cz], 0.15), C("#f0e8d8"))
     }
-    // zampilli
+    // water jets
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const a: V = [cx + dx * 0.15, y1 + ht * 0.6, cz + dz * 0.15]
       const m: V = [cx + dx * (big ? 1.0 : 0.6), y1 + ht * 0.5, cz + dz * (big ? 1.0 : 0.6)]
@@ -940,12 +940,12 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     const [x1, y1, z1] = b.max
     const malandanti = (z0 + z1) / 2 > 0
     B.add("legno", boxAt(b.min, b.max), C("#e0b088"))
-    // ruote di carro sui fianchi corti
+    // cart wheels on the short sides
     for (const x of [x0 - 0.06, x1 + 0.06]) {
       B.add("legno", new THREE.CylinderGeometry(0.75, 0.75, 0.1, 16).rotateZ(Math.PI / 2).translate(x, 0.78, (z0 + z1) / 2), C("#9a6a44"))
       B.add("ferro", new THREE.TorusGeometry(0.75, 0.04, 4, 20).rotateY(Math.PI / 2).translate(x + Math.sign(x - x0 - 0.1) * 0.02, 0.78, (z0 + z1) / 2), C("#2a2622"))
     }
-    // mensole con forme di formaggio e frico, su entrambi i lati lunghi
+    // shelves with cheese wheels and frico, on both long sides
     for (const [z, d] of [[z0, -1], [z1, 1]] as const) {
       B.add("legno", boxAt([x0 + 0.2, y0 + 0.95, Math.min(z, z + d * 0.4)], [x1 - 0.2, y0 + 1.02, Math.max(z, z + d * 0.4)]), C("#8a5a38"))
       for (let x = x0 + 0.6; x < x1 - 0.4; x += 0.62) {
@@ -954,12 +954,12 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
         const stack = wheel ? 1 + Math.floor(R() * 2) : 1
         for (let k = 0; k < stack; k++) B.add("marmo", new THREE.CylinderGeometry(r0, r0, wheel ? 0.13 : 0.05, 14).translate(x, y0 + 1.02 + (wheel ? 0.065 : 0.025) + k * 0.135, z + d * 0.2), C(wheel ? "#f0d080" : "#d89a38"))
       }
-      // salami e trecce d'aglio appesi alla gronda
+      // salami and garlic braids hanging from the eaves
       for (let x = x0 + 0.5; x < x1 - 0.3; x += 0.8) {
         B.add("legno", cylBetween([x, y1 - 0.35, z + d * 0.6], [x, y1 + 0.05, z + d * 0.6], 0.05, 0.05, 6), C(R() < 0.5 ? "#7a2a22" : "#efe2c0"))
       }
     }
-    // tendone a capanna a strisce
+    // striped gabled awning
     const cols = malandanti ? ["#c8394e", "#f4ead2"] : ["#3f8a3a", "#f4ead2"]
     const ridgeY = y1 + 0.75, eaveY = y1 + 0.15
     const zc = (z0 + z1) / 2
@@ -968,14 +968,14 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
       for (let i = 0; i < n; i++) {
         const a = x0 - 0.3 + ((x1 - x0 + 0.6) * i) / n, c = x0 - 0.3 + ((x1 - x0 + 0.6) * (i + 1)) / n
         B.add("stoffa", orient(quad([a, eaveY, ze], [c, eaveY, ze], [c, ridgeY, zc], [a, ridgeY, zc]), [0, 1, d]), C(cols[i % 2]))
-        // la balza
+        // the valance
         B.add("stoffa", tri([a, eaveY, ze], [c, eaveY, ze], [(a + c) / 2, eaveY - 0.22, ze]), C(cols[i % 2]))
       }
     }
     for (const x of [x0 + 0.1, x1 - 0.1]) for (const z of [z0 + 0.1, z1 - 0.1]) B.add("legno", boxAt([x - 0.05, y1, z - 0.05], [x + 0.05, eaveY + 0.2, z + 0.05]), C("#5a3a22"))
   }
 
-  // Cjar di fen: carro di legno, il fieno respira in update.
+  // Cjar di fen: wooden hay cart, the hay breathes in update.
   const hay: THREE.Mesh[] = []
   {
     const hayParts: THREE.BufferGeometry[] = []
@@ -1020,14 +1020,14 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     }
   }
 
-  // --- 9. stendardi, festoni, insegne, lanterne (Gemona) ----------------------------------------
+  // --- 9. banners, bunting, signs, lanterns (Gemona) -------------------------------------------
   if (gemona) {
   const banner = (reg: Region, n: V, p: V, h: number) => {
     const m = faceMatrix(n, [p[0] + n[0] * 0.05, p[1], p[2] + n[2] * 0.05])
     B.add("atlas", atlasQuad(reg, h).applyMatrix4(m))
     B.add("ferro", cylBetween([-h * reg.aspect * 0.6, h / 2 + 0.02, 0.05], [h * reg.aspect * 0.6, h / 2 + 0.02, 0.05], 0.03, 0.03, 6).applyMatrix4(m), C("#c9a040"))
   }
-  // Benandanti attorno al sagrato, Malandanti attorno alla piazza.
+  // Benandanti around the churchyard, Malandanti around the square.
   for (const z of [-68, -82, -96]) banner(atlas.bannerB, [1, 0, 0], [-20, G_DUOMO + 6.5, z], 5)
   for (const z of [-50, -64, -78]) banner(atlas.bannerB, [-1, 0, 0], [30, G_DUOMO + 6.5, z], 5)
   for (const z of [52, 66]) {
@@ -1036,7 +1036,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
   }
   for (const x of [-28, -21, 21, 28]) banner(atlas.bannerM, [0, 0, -1], [x, G_LOW + 5.5, 80], 4.5)
 
-  // Festoni di bandierine fra le case.
+  // Bunting strung between the houses.
   const bunting = (a: V, b: V, sag: number, cols: string[]) => {
     const len = Math.hypot(b[0] - a[0], b[2] - a[2])
     const n = Math.floor(len / 0.8)
@@ -1056,7 +1056,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
   for (const z of [24, 32, 40]) bunting([-5, G_LOW + 8, z], [5, G_LOW + 8, z + 1], 0.6, FRIUL)
   for (const z of [52, 60, 70]) bunting([-34, G_LOW + 8, z], [34, G_LOW + 8, z + 2], 2.5, RED)
 
-  // Insegne a muro.
+  // Wall signs.
   const sign = (reg: Region, n: V, p: V, h: number) => B.add("atlas", atlasQuad(reg, h).applyMatrix4(faceMatrix(n, [p[0] + n[0] * 0.04, p[1], p[2] + n[2] * 0.04])))
   sign(atlas.signs.cineteca, [1, 0, 0], [-28, G_DUOMO + 3.9, -45], 0.75)
   sign(atlas.signs.viebini, [1, 0, 0], [-5, G_MID + 4.9, -26.5], 0.35)
@@ -1065,7 +1065,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
   sign(atlas.signs.farmacie, [-1, 0, 0], [28, G_LOW + 3.0, 28], 0.6)
   sign(atlas.signs.ostarie, [-1, 0, 0], [28, G_MID + 3.0, -2], 0.6)
 
-  // Lanterne a muro (vetro acceso, braccio di ferro).
+  // Wall lanterns (lit glass, iron bracket).
   const lantern = (n: V, p: V) => {
     const m = faceMatrix(n, p)
     const parts: [K, THREE.BufferGeometry, THREE.Color][] = [
@@ -1091,15 +1091,15 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
 
   }
 
-  // --- 9b. lo scenario delle altre mappe ------------------------------------------------------
+  // --- 9b. the other maps' scenery ---------------------------------------------------------
   const kit: SceneryKit = { map, B, I, root, MATS, tex, atlas, R, C, groundAt, face, orient, cylBetween, sphere, roof, win, door }
   const live: SceneryLive = scenery?.build(kit) ?? {}
 
-  // --- 10. costruzione -------------------------------------------------------------------
+  // --- 10. assembly --------------------------------------------------------------------
   const statics = B.build(MATS, { cast: (k) => k !== "luce" && k !== "acqua" && k !== "atlas" && k !== "vetro" && k !== "erba" })
   for (const m of statics) root.add(m)
 
-  // Geometrie delle istanze.
+  // Instance geometries.
   const glassGeo = new THREE.PlaneGeometry(1, 1)
   const frameGeo = (() => {
     const g = [
@@ -1167,14 +1167,14 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     I.comignolo.build(chimGeo, MATS.intonaco, true)
   )
 
-  // Sfondo.
+  // Backdrop.
   if (scenery) root.add(...scenery.backdrop(kit))
   else root.add(makeTerrain(), makeTown(tex))
 
-  // Parti dinamiche.
+  // Dynamic parts.
   const dyn = createDynamic(root, envMap, map)
 
-  // --- camera del menu: un giro lento fra Duomo, campanile e Via Bini --------------------------
+  // --- menu camera: a slow tour around Duomo, bell tower and Via Bini -------------------------
   const v3 = (p: V) => new THREE.Vector3(...p)
   const camPath = new THREE.CatmullRomCurve3(
     scenery ? scenery.menu.path.map(v3) : [
@@ -1214,7 +1214,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     const changed = renderer.shadowMap.enabled !== shadows
     renderer.shadowMap.enabled = shadows
     renderer.shadowMap.type = q === "alta" ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap
-    // In "media" il paese non si muove: la mappa d'ombra si fa una volta e basta.
+    // On "media" the town doesn't move: the shadow map is rendered once and that's it.
     renderer.shadowMap.autoUpdate = q === "alta"
     renderer.shadowMap.needsUpdate = true
     const size = q === "alta" ? sm : 2048
@@ -1240,7 +1240,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
         h.scale.set(1 - b * 0.015, 1 + b * 0.05, 1 - b * 0.015)
       }
       altarLight.intensity = 70 * (0.9 + 0.06 * Math.sin(t * 13) + 0.04 * Math.sin(t * 29 + 1))
-      // l'orologio segna l'ora vera
+      // the clock shows the real time
       const d = new Date()
       const min = d.getMinutes() + d.getSeconds() / 60
       const hr = (d.getHours() % 12) + min / 60

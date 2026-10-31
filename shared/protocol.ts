@@ -1,6 +1,6 @@
 /**
- * Messaggi fra client e server (JSON su WebSocket).
- * Quelli del client sono validati con zod: il server non si fida.
+ * Messages between client and server (JSON over WebSocket).
+ * Client messages are validated with zod: the server doesn't trust them.
  */
 import { z } from "zod"
 import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "./folklore.ts"
@@ -16,10 +16,10 @@ import { PRIMARIES, type PrimaryId, type ProjectileKind, type WeaponId } from ".
 
 export const PROTOCOL_VERSION = 9
 export const MAX_PLAYERS = 16
-export const SNAPSHOT_EVERY = 2 // tick: 30 istantanee al secondo
+export const SNAPSHOT_EVERY = 2 // ticks: 30 snapshots per second
 
 const team = z.enum(["benandanti", "malandanti"])
-/** Caratteri di controllo e di direzione del testo (U+202E rigira un nome): via da nomi e chat. */
+/** Control and text-direction characters (U+202E flips a name): stripped from names and chat. */
 const INVISIBLE = /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g
 const visible = (max: number) =>
   z
@@ -86,7 +86,7 @@ export interface RoomInfo extends RoomSummary {
   readonly roster: readonly RosterEntry[]
 }
 
-/** Un altro giocatore, compatto. */
+/** Another player, compact. */
 export interface SnapOther {
   readonly id: string
   readonly x: number
@@ -97,7 +97,7 @@ export interface SnapOther {
   readonly vx: number
   readonly vy: number
   readonly vz: number
-  /** Bit: 1 vivo, 2 accucciato, 4 a terra, 8 protetto, 16 spara, 32 mira, 64 porta il frico, 128 sgnape. */
+  /** Bits: 1 alive, 2 crouched, 4 grounded, 8 shielded, 16 firing, 32 aiming, 64 carrying the frico, 128 sgnape. */
   readonly f: number
   readonly w: WeaponId
   readonly hp: number
@@ -124,16 +124,16 @@ export interface Snapshot {
   readonly score: Readonly<Record<Team, number>>
   readonly flags: Readonly<Record<Team, FlagState>>
   readonly hill: HillValue
-  /** "1" disponibile, "0" in attesa, nell'ordine di `PICKUPS`. */
+  /** "1" available, "0" pending, in `PICKUPS` order. */
   readonly pickups: string
   readonly proj: readonly (readonly [kind: ProjectileKind, x: number, y: number, z: number])[]
-  /** Solo in Spingi il Cjar. */
+  /** Only in Spingi il Cjar. */
   readonly cart: CartView | null
-  /** Solo nella Tampieste in corso. */
+  /** Only during a running Tampieste. */
   readonly storm: StormValue | null
-  /** Le torrette della mappa, nell'ordine di `map.turrets`. */
+  /** The map's turrets, in `map.turrets` order. */
   readonly turrets: ReadonlyArray<TurretState>
-  /** Salute delle porte da sfondare, nell'ordine di `map.doors` (0 = sfondata). */
+  /** Health of the breakable doors, in `map.doors` order (0 = broken down). */
   readonly doors: readonly number[]
   readonly players: readonly SnapOther[]
   readonly you: SnapSelf | null
@@ -156,13 +156,13 @@ export interface BoardRow {
   readonly ping: number
 }
 
-/** Errori per il client: il testo lo sceglie lui, nella sua lingua. */
+/** Errors for the client: it picks the text, in its own language. */
 export type ErrorCode = "invalid" | "version" | "notFound" | "lanOnly" | "full" | "busy"
 
 export type ServerMessage =
-  /** `publicUrl`: indirizzo pubblico del gioco (tunnel o PUBLIC_URL), se il server lo conosce. */
+  /** `publicUrl`: the game's public address (tunnel or PUBLIC_URL), if the server knows it. */
   | { readonly t: "welcome"; readonly id: string; readonly version: number; readonly publicUrl: string | null }
-  /** Il server ha scoperto (o cambiato) l'indirizzo pubblico. */
+  /** The server discovered (or changed) the public address. */
   | { readonly t: "public"; readonly url: string }
   | { readonly t: "rooms"; readonly rooms: readonly RoomSummary[] }
   | { readonly t: "joined"; readonly room: RoomInfo; readonly you: string; readonly tick: number }

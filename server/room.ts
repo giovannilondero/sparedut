@@ -1,5 +1,5 @@
 /**
- * Una stanza: la simulazione autoritativa, i giocatori collegati, i bot.
+ * A room: the authoritative simulation, the connected players, the bots.
  */
 import { BOT_NAMES, QUICK_CHAT, type BotLevel, type ModeId } from "../shared/folklore.ts"
 import { IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
@@ -23,11 +23,11 @@ import type { PrimaryId } from "../shared/weapons.ts"
 import { BotBrain } from "./bot.ts"
 import { navGraph } from "./nav.ts"
 
-/** Comandi in attesa per giocatore: oltre, il client corre troppo e si scartano i vecchi. */
+/** Pending commands per player: beyond this the client is running ahead and the old ones are dropped. */
 const MAX_QUEUE = 20
-/** Comandi applicati al massimo in un tick (recupero dopo un ritardo di rete, non di più). */
+/** Max commands applied in one tick (catching up after network lag, no more). */
 const STEPS_PER_TICK = 3
-/** Passi accumulabili durante un ritardo, da recuperare dopo. */
+/** Steps that can accumulate during lag, to be caught up afterwards. */
 const MAX_CREDIT = 12
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
@@ -94,7 +94,7 @@ export class Room {
 
   addHuman(id: string, name: string, primary: PrimaryId, send: (msg: ServerMessage) => void) {
     if (this.full) {
-      // Un bot lascia il posto a una persona.
+      // A bot gives up its seat to a person.
       const bot = [...this.members.values()].findLast((m) => m.bot)
       if (!bot) return false
       this.removeMember(bot.id)
@@ -145,7 +145,7 @@ export class Room {
   setTeam(id: string, team: Team) {
     const m = this.members.get(id)
     if (!m || m.team === team) return
-    // Non si sbilanciano le squadre: se l'altra è più numerosa, un bot fa cambio.
+    // Don't unbalance the teams: if the other one is larger, a bot swaps.
     if (this.teamCount(team) >= this.teamCount(m.team)) {
       const swap = [...this.members.values()].find((o) => o.bot && o.team === team)
       if (!swap) return
@@ -159,12 +159,12 @@ export class Room {
   queueInput(id: string, input: PlayerInput) {
     const m = this.members.get(id)
     if (!m || m.bot) return
-    // Fuori ordine o doppio (rete): si scarta.
+    // Out of order or duplicate (network): drop it.
     const lastSeq = m.queue.length ? m.queue[m.queue.length - 1].seq : m.last.seq
     if (input.seq <= lastSeq) return
     m.queue.push(input)
     if (m.queue.length > MAX_QUEUE) {
-      // Si tengono le pressioni dei comandi scartati.
+      // Keep the button presses of dropped commands.
       const dropped = m.queue.shift()!
       m.queue[0] = { ...m.queue[0], buttons: m.queue[0].buttons | dropped.buttons }
     }
@@ -180,14 +180,14 @@ export class Room {
     this.sim.start()
   }
 
-  /** Un tick: ingressi, bot, simulazione. */
+  /** One tick: inputs, bots, simulation. */
   step() {
-    // Ogni comando è un passo: si consegnano quelli arrivati, fino a STEPS_PER_TICK
-    // (il resto resta in coda per il tick dopo). Niente comandi ripetuti: il server
-    // farebbe un passo che il client non ha mai fatto, e la camera scatterebbe.
+    // Each command is one step: deliver the ones that arrived, up to STEPS_PER_TICK
+    // (the rest stays queued for the next tick). No repeated commands: the server
+    // would take a step the client never took, and the camera would snap.
     for (const m of this.members.values()) {
       if (m.bot) continue
-      // Credito di passi: in media uno per tick, così nessuno corre più veloce mandando più comandi.
+      // Step credit: one per tick on average, so nobody runs faster by sending more commands.
       m.credit = Math.min(MAX_CREDIT, m.credit + 1)
       for (let i = 0; i < STEPS_PER_TICK && m.queue.length && m.credit >= 1; i++) {
         m.credit--
@@ -201,7 +201,7 @@ export class Room {
     this.world = this.sim.view()
     for (const e of events) {
       this.events.push(e)
-      // I bot sono furlans: ogni tanto commentano.
+      // Bots are furlans: now and then they comment.
       if (e.t === "kill" && e.k && this.bots.has(e.k) && Math.random() < 0.18) {
         this.chat(e.k, QUICK_CHAT[Math.floor(Math.random() * QUICK_CHAT.length)])
       }

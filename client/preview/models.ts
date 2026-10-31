@@ -1,8 +1,8 @@
 /**
- * Anteprima di avatar, viewmodel ed effetti. A sinistra il mondo in terza persona,
- * a destra la prima persona con l'arma che cicla. Tasti: 1-6 arma, F spara,
- * R ricarica, G bomba, E esplosione, P pausa del ciclo automatico. Con ?w=gjalinis
- * resta ferma su un'arma.
+ * Preview of avatars, viewmodel and effects. On the left the world in third person,
+ * on the right first person with the weapon cycling. Keys: 1-6 weapon, F fire,
+ * R reload, G bomb, E explosion, P pause the automatic cycle. With ?w=gjalinis
+ * it stays on one weapon.
  */
 import * as THREE from "three"
 import { createAvatar } from "../avatars.ts"
@@ -20,7 +20,7 @@ renderer.autoClear = false
 document.body.appendChild(renderer.domElement)
 const info = document.getElementById("info")!
 
-// un pezzo di plaçute al tramonto
+// a bit of plaçute at sunset
 const scene = new THREE.Scene()
 scene.background = new THREE.Color(0xe8b98a)
 scene.fog = new THREE.Fog(0xe8b98a, 25, 70)
@@ -48,7 +48,7 @@ scene.add(fpCam)
 const fx = createFx(scene)
 const vm = createViewmodel(fpCam)
 
-// avatar: per squadra, uno per comportamento
+// avatars: per team, one per behaviour
 type Act = "walk" | "run" | "crouch" | "death" | "jump" | "idle"
 interface Actor {
   avatar: ReturnType<typeof createAvatar>
@@ -83,7 +83,7 @@ function poseOf(a: Actor, t: number): AvatarPose {
   const base = { pitch: Math.sin(t * 0.7) * 0.5, crouch: false, grounded: true, alive: true, weapon: a.weapon, firing: false, shield: a.shield, carrier: a.carrier, sgnape: a.sgnape }
   const circle = (r: number, w: number) => {
     const ang = t * w
-    // tangente del cerchio: direzione di marcia, quindi yaw
+    // tangent of the circle: direction of travel, hence yaw
     const vx = -Math.sin(ang) * r * w
     const vz = Math.cos(ang) * r * w
     return { x: a.ox + Math.cos(ang) * r, z: a.oz + Math.sin(ang) * r, vx, vz, yaw: Math.atan2(-vx, -vz) }
@@ -106,7 +106,7 @@ function poseOf(a: Actor, t: number): AvatarPose {
   }
 }
 
-// ciclo automatico dell'arma in prima persona
+// automatic cycle of the first-person weapon
 const fixed = WEAPON_IDS.indexOf(new URLSearchParams(location.search).get("w") as WeaponId)
 let auto = fixed < 0
 const force = { aim: null as boolean | null, walk: null as boolean | null }
@@ -147,7 +147,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "p") auto = !auto
 })
 
-// proiettili in volo e qualche effetto di contorno
+// projectiles in flight and some background effects
 const proj: ["frico" | "sgnape", number, number, number][] = []
 const kinds: PickupKind[] = ["frico", "gubane", "sgnape", "munizions", "lanciafrico"]
 let fxTimer = 0
@@ -172,7 +172,7 @@ function frame() {
     if (a.act === "idle" && Math.random() < dt * 3) a.avatar.flash()
   }
 
-  // ciclo dell'arma: alza, spara, ricarica, bomba, cambia
+  // weapon cycle: raise, fire, reload, bomb, switch
   if (auto) {
     wTimer += dt
     const id = WEAPON_IDS[wIndex]
@@ -209,7 +209,7 @@ function frame() {
     sgnape: Math.sin(t * 0.13) > 0.8
   })
 
-  // effetti di contorno nella vista in terza persona
+  // background effects in the third-person view
   fxTimer += dt
   if (fxTimer > 1.1) {
     fxTimer = 0
@@ -232,7 +232,7 @@ function frame() {
   tpCam.lookAt(0, 1, -1)
   fx.update(dt, tpCam)
 
-  // sinistra: terza persona; destra: prima persona + arma
+  // left: third person; right: first person + weapon
   const W = innerWidth
   const H = innerHeight
   const split = Math.floor(W * 0.4)
@@ -254,7 +254,7 @@ function frame() {
   renderer.render(vm.scene, vm.camera)
   renderer.setScissorTest(false)
 
-  info.textContent = `arma: ${WEAPON_IDS[wIndex]}   [1-6 arma, F spara, R ricarica, G bomba, E esplosione, P ${auto ? "ferma" : "riprendi"} ciclo]\ndraw calls: ${renderer.info.render.calls}`
+  info.textContent = `weapon: ${WEAPON_IDS[wIndex]}   [1-6 weapon, F fire, R reload, G bomb, E explosion, P ${auto ? "pause" : "resume"} cycle]\ndraw calls: ${renderer.info.render.calls}`
   requestAnimationFrame(frame)
 }
 renderer.info.autoReset = false

@@ -1,7 +1,7 @@
 /**
- * Le parti che si muovono: raccoglibili, frico-bandiera, cerchio della culine,
- * il cjar sul suo binario (Spingi il Cjar), il muro della tempesta (La Tampieste),
- * le torrette con la mitraie che girano e scaldano, le porte da sfondare.
+ * The moving parts: pickups, frico flags, the culine (hill) circle,
+ * the cjar on its track (Spingi il Cjar), the storm wall (La Tampieste),
+ * the mitraie turrets that turn and heat up, the doors to break down.
  */
 import * as THREE from "three"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
@@ -13,7 +13,7 @@ export const TEAM_COLOR: Record<Team, THREE.Color> = {
   malandanti: new THREE.Color("#d0435a")
 }
 
-/** Fonde primitive colorate per vertice in un'unica geometria. */
+/** Merges per-vertex-coloured primitives into a single geometry. */
 function bake(parts: [THREE.BufferGeometry, string][]): THREE.BufferGeometry {
   const c = new THREE.Color()
   const list = parts.map(([g0, hex]) => {
@@ -34,7 +34,7 @@ function fricoDisc(r: number, h: number): [THREE.BufferGeometry, string][] {
   const crust = new THREE.TorusGeometry(r * 0.93, h * 0.55, 6, 20)
   crust.rotateX(Math.PI / 2)
   const out: [THREE.BufferGeometry, string][] = [[disc, "#e8b648"], [crust, "#b8742a"]]
-  // bolle croccanti
+  // crispy bubbles
   for (let i = 0; i < 9; i++) {
     const a = i * 2.4, d = r * (0.2 + (i % 3) * 0.22)
     const b = new THREE.SphereGeometry(r * 0.09, 6, 4)
@@ -53,7 +53,7 @@ function pickupGeo(kind: PickupKind): THREE.BufferGeometry {
       return g
     }
     case "gubane": {
-      // spirale di pasta dorata su base a cupola
+      // spiral of golden pastry on a domed base
       const pts: THREE.Vector3[] = []
       for (let i = 0; i <= 80; i++) {
         const a = (i / 80) * Math.PI * 5
@@ -130,12 +130,12 @@ const KIND_GLOW: Record<PickupKind, string> = {
   lanciafrico: "#ff7a3a"
 }
 
-/** Anello luminoso a terra, additivo. */
+/** Glowing ring on the ground, additive. */
 function glowMaterial(color: THREE.Color | string, opacity = 0.6): THREE.MeshBasicMaterial {
   return new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
 }
 
-/** La mitraie su treppiede con lo scudo: `yaw` gira lo scudo e l'arma, `pitch` solo l'arma. */
+/** The mitraie on a tripod with its shield: `yaw` turns the shield and the gun, `pitch` only the gun. */
 function turretModel(envMap: THREE.Texture | null) {
   const steel = new THREE.MeshStandardMaterial({ color: "#4a4e52", metalness: 0.5, roughness: 0.45, envMap })
   const dark = new THREE.MeshStandardMaterial({ color: "#2a2c2e", metalness: 0.4, roughness: 0.55, envMap })
@@ -151,7 +151,7 @@ function turretModel(envMap: THREE.Texture | null) {
     parent.add(o)
     return o
   }
-  // treppiede: tre gambe dal perno a terra
+  // tripod: three legs from the pivot to the ground
   const PIV = 1.2
   for (const a of [Math.PI, Math.PI / 3, -Math.PI / 3]) {
     const foot = new THREE.Vector3(Math.sin(a) * 0.75, 0, Math.cos(a) * 0.75)
@@ -164,14 +164,14 @@ function turretModel(envMap: THREE.Texture | null) {
   const yawG = new THREE.Group()
   yawG.position.y = PIV
   root.add(yawG)
-  // lo scudo, curvo, con la feritoia per mirare
+  // the shield, curved, with the slit for aiming
   const shield = new THREE.CylinderGeometry(1.6, 1.6, 0.66, 18, 1, true, -0.28, 0.56).rotateY(Math.PI).translate(0, 0, 1.6)
   const sh = mesh(shield, olive, yawG, 0, -0.12, -0.42)
   ;(sh.material as THREE.Material).side = THREE.DoubleSide
   mesh(new THREE.BoxGeometry(0.06, 0.4, 0.06), dark, yawG, 0, -0.1, -0.3)
   const pitchG = new THREE.Group()
   yawG.add(pitchG)
-  // l'arma: camicia d'acqua (che arrossa col calore), castello, impugnature a vanga
+  // the gun: water jacket (reddens with heat), receiver, spade grips
   const jacket = mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.75, 16).rotateX(Math.PI / 2), hot, pitchG, 0, 0.06, -0.55)
   mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.18, 10).rotateX(Math.PI / 2), dark, pitchG, 0, 0.06, -1.0)
   mesh(new THREE.BoxGeometry(0.16, 0.15, 0.4), steel, pitchG, 0, 0.05, -0.02)
@@ -181,10 +181,10 @@ function turretModel(envMap: THREE.Texture | null) {
     mesh(new THREE.BoxGeometry(0.02, 0.02, 0.12), dark, pitchG, gx, 0.1, 0.24)
     mesh(new THREE.BoxGeometry(0.02, 0.02, 0.12), dark, pitchG, gx, -0.02, 0.24)
   }
-  // cassetta delle munizioni e nastro
+  // ammo box and belt
   mesh(new THREE.BoxGeometry(0.14, 0.18, 0.28), olive, pitchG, 0.2, -0.05, 0)
   for (let i = 0; i < 5; i++) mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.06, 6).rotateZ(Math.PI / 2), brass, pitchG, 0.11, 0.06 - i * 0.02, -0.02)
-  // vapore quando è surriscaldata: sbuffi che salgono dalla camicia
+  // steam when overheated: puffs rising from the jacket
   const steamMat = new THREE.MeshBasicMaterial({ color: "#e8eef0", transparent: true, opacity: 0.35, depthWrite: false })
   const steam = Array.from({ length: 5 }, (_, i) => {
     const m = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), steamMat)
@@ -196,7 +196,7 @@ function turretModel(envMap: THREE.Texture | null) {
   return { root, yawG, pitchG, hot, jacket, steam, gun: pitchG }
 }
 
-/** Una porta di assi (le dimensioni del suo blocco), con le traverse. */
+/** A plank door (the size of its block), with crossbars. */
 function doorModel(min: readonly number[], max: readonly number[]) {
   const g = new THREE.Group()
   const w = max[0] - min[0]
@@ -229,7 +229,7 @@ function doorModel(min: readonly number[], max: readonly number[]) {
 
 export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | null, map: MapDef) {
   const { pickups: PICKUPS, hill: HILL, track: TRACK } = map
-  // --- torrette e porte ---
+  // --- turrets and doors ---
   const turrets = map.turrets.map((spot) => {
     const t = turretModel(envMap)
     t.root.position.set(spot.at[0], spot.at[1], spot.at[2])
@@ -242,7 +242,7 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
     return { g, rest: g.position.clone() }
   })
   const hotColor = new THREE.Color()
-  // --- raccoglibili ---
+  // --- pickups ---
   const pickMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.1, envMap, emissive: "#3a2410", emissiveIntensity: 0.6 })
   const ghostMat = new THREE.MeshBasicMaterial({ color: "#fff4dc", transparent: true, opacity: 0.16, depthWrite: false })
   const geos = new Map<PickupKind, THREE.BufferGeometry>()
@@ -260,7 +260,7 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
     return { mesh, ring, phase: i * 1.7, y: p.at[1] + 1 }
   })
 
-  // --- frico-bandiere ---
+  // --- frico flags ---
   const flags = TEAMS.map((team) => {
     const g = new THREE.Group()
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 3.2, 8), new THREE.MeshLambertMaterial({ color: "#5a3c22" }))
@@ -335,7 +335,7 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
   const neutral = new THREE.Color("#fff6e0")
   const amber = new THREE.Color("#ffb347")
 
-  // --- il cjar e il suo percorso ---
+  // --- the cjar and its track ---
   const cart = new THREE.Group()
   const wheels: THREE.Mesh[] = []
   {
@@ -359,11 +359,11 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
       mesh.castShadow = true
       cart.add(mesh)
     }
-    // il timone, per tirare
+    // the drawbar, for pulling
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2, 6).rotateZ(Math.PI / 2), dark)
     pole.position.set(L + 0.95, 0.45, 0)
     cart.add(pole)
-    // ruote a raggi
+    // spoked wheels
     for (const x of [-L * 0.6, L * 0.6]) for (const z of [-W - 0.2, W + 0.2]) {
       const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.1, 18).rotateX(Math.PI / 2), wood)
       const rim = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.04, 4, 20), iron)
@@ -379,7 +379,7 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
       cart.add(wheel)
       wheels.push(wheel)
     }
-    // il carico: fieno a mucchio
+    // the load: a heap of hay
     const r = (i: number) => (Math.sin(i * 12.9898) * 43758.5453) % 1
     for (let i = 0; i < 7; i++) {
       const lump = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 7), hay)
@@ -395,7 +395,7 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
   cart.visible = false
   scene.add(cart)
 
-  // il percorso: un nastro tratteggiato appena sopra il terreno
+  // the track: a dashed ribbon just above the ground
   const trail = (() => {
     const pos: number[] = []
     const uv: number[] = []
@@ -442,7 +442,7 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
   let cartLast: { x: number; z: number } | null = null
   let wheelA = 0
 
-  // --- la tempesta: un muro di grandine che si stringe ---
+  // --- the storm: a closing wall of hail ---
   const stormMat = new THREE.ShaderMaterial({
     uniforms: { uTime: { value: 0 } },
     vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
@@ -451,7 +451,7 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
       varying vec2 vUv;
       float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       void main() {
-        // strisce di grandine che cadono, più fitte in basso
+        // falling streaks of hail, denser at the bottom
         vec2 q = vec2(vUv.x * 900.0, vUv.y * 40.0 + uTime * 9.0);
         float streak = step(0.93, h(floor(q))) * (1.0 - fract(q.y));
         float base = 0.28 + 0.2 * (1.0 - vUv.y);
@@ -474,7 +474,7 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
         const v = frame.turrets[i]
         const yaw = v?.manned ? v.yaw : tu.spot.yaw
         const pitch = v?.manned ? v.pitch : -0.05
-        // l'arma insegue lo sguardo di chi la usa, a riposo torna dritta
+        // the gun follows its user's aim; when idle it straightens back
         let dy = yaw - tu.yaw
         dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI
         const k = Math.min(1, dt * (v?.manned ? 25 : 3))
@@ -498,7 +498,7 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
       doors.forEach((d, i) => {
         const hp = frame.doors[i] ?? 1
         d.g.visible = hp > 0
-        // più è presa, più le assi sono storte
+        // the more damaged, the more crooked the planks
         const hurt = 1 - hp
         d.g.rotation.set(hurt * 0.05, hurt * 0.12, hurt * 0.04)
         d.g.position.set(d.rest.x, d.rest.y - hurt * 0.04, d.rest.z)
@@ -507,7 +507,7 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
       cart.visible = trail.m.visible = !!c
       if (c) {
         cart.position.set(c.at[0], c.at[1], c.at[2])
-        // il cjar guarda lungo il binario: la sua lunghezza è sull'asse x
+        // the cjar faces along the track: its length is on the x axis
         cart.rotation.y = c.yaw + Math.PI / 2
         if (cartLast) wheelA -= Math.hypot(c.at[0] - cartLast.x, c.at[2] - cartLast.z) / 0.55
         cartLast = { x: c.at[0], z: c.at[2] }
@@ -543,7 +543,7 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
         f.beam.visible = !carried
         f.base.visible = v.state === "base"
         f.wheel.rotation.z = t * 0.8
-        // il drappo sventola
+        // the banner waves
         const pos = f.banner.geometry.getAttribute("position") as THREE.BufferAttribute
         for (let i = 0; i < pos.count; i++) {
           const x = f.rest[i * 3]

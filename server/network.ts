@@ -1,6 +1,6 @@
-// "Stessa rete" = stesso IP pubblico visto dal server (stesso NAT di casa/ufficio).
-// Se il server gira in LAN i client hanno IP privati: li consideriamo tutti
-// della stessa rete, perché per raggiungere il server devono esserci già dentro.
+// "Same network" = same public IP as seen by the server (same home/office NAT).
+// If the server runs on a LAN the clients have private IPs: we consider them all
+// on the same network, because to reach the server they must already be inside it.
 
 export interface NetworkId {
   key: string;
@@ -11,7 +11,7 @@ export function networkOf(rawIp: string | undefined): NetworkId {
   const ip = (rawIp ?? "").replace(/^::ffff:/, "");
   if (!ip || isPrivate(ip)) return { key: "lan", lan: true };
   if (ip.includes(":")) {
-    // IPv6: ogni dispositivo ha il suo indirizzo, la rete è il prefisso /64.
+    // IPv6: every device has its own address, the network is the /64 prefix.
     return { key: expandV6(ip).slice(0, 4).join(":"), lan: false };
   }
   return { key: ip, lan: false };

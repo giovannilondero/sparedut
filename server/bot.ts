@@ -1,5 +1,5 @@
 /**
- * I bot: leggono la vista del mondo e producono lo stesso intento di una persona.
+ * Bots: they read the world view and produce the same intent a person would.
  */
 import type { BotLevel } from "../shared/folklore.ts"
 import { BUTTON, IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
@@ -37,7 +37,7 @@ export class BotBrain {
   private seq = 0
   private tick = 0
   private fireHeld = false
-  private role: "attacca" | "difende"
+  private role: "attack" | "defend"
   private roam = 0
 
   constructor(
@@ -47,7 +47,7 @@ export class BotBrain {
     private readonly physics: PhysicsWorld,
     seed: number
   ) {
-    this.role = seed % 3 === 0 ? "difende" : "attacca"
+    this.role = seed % 3 === 0 ? "defend" : "attack"
     this.roam = seed * 7
   }
 
@@ -64,7 +64,7 @@ export class BotBrain {
     const skill = SKILL[this.level]
     const eye = { x: me.body.x, y: me.body.y + eyeHeight(me.body), z: me.body.z }
 
-    // Bersaglio: il nemico visibile più vicino.
+    // Target: the nearest visible enemy.
     let enemy: PlayerView | null = null
     let enemyDist = Infinity
     for (const p of world.players) {
@@ -82,7 +82,7 @@ export class BotBrain {
       this.seen = 0
     }
 
-    // Arma: il lanciafrico se c'è, la doppietta solo da vicino, altrimenti la principale.
+    // Weapon: the lanciafrico if there is one, the double-barrel only up close, otherwise the primary.
     const a = me.arsenal
     let weapon: WeaponId = a.primary
     if (a.launcher && a.ammo.lanciafrico.mag + a.ammo.lanciafrico.reserve > 0) weapon = "lanciafrico"
@@ -93,7 +93,7 @@ export class BotBrain {
     let mx = 0
     let mz = 0
 
-    // Il medico senza nemici a tiro va a curare il compagno più malconcio che vede.
+    // With no enemies in range, the medic goes to heal the most battered teammate in sight.
     let patient: PlayerView | null = null
     if (a.primary === "miedi" && !(enemy && enemyDist < 25)) {
       let worst = 75
@@ -106,10 +106,10 @@ export class BotBrain {
       }
       if (patient) weapon = "miedi"
     }
-    // Mine davanti ai piedi, ogni tanto, quando non c'è nessuno in giro.
+    // Mines at its feet, now and then, when nobody is around.
     if (!enemy && a.mines > 0 && this.level !== "zovin" && (this.tick + this.roam) % 900 === 0) buttons |= BUTTON.mine
 
-    // Dove andare.
+    // Where to go.
     const goal: V3 = patient ? [patient.body.x, patient.body.y, patient.body.z] : this.chooseGoal(world, me)
     const goalMoved = !this.goal || Math.hypot(this.goal[0] - goal[0], this.goal[2] - goal[2]) > 6
     if (goalMoved || this.path.length === 0) {
@@ -129,7 +129,7 @@ export class BotBrain {
     if (waypoint) wantYaw = Math.atan2(-(waypoint[0] - me.body.x), -(waypoint[2] - me.body.z))
 
     if (enemy && this.seen >= skill.reaction) {
-      // Mira (con un po' di errore che si riduce col tempo) e spara.
+      // Aim (with some error that shrinks over time) and shoot.
       const aimY = enemy.body.y + (this.level === "plevan" ? 1.55 : 1.15) * (enemy.body.crouch ? 0.7 : 1)
       const dx = enemy.body.x - eye.x
       const dz = enemy.body.z - eye.z
@@ -140,12 +140,12 @@ export class BotBrain {
       const aimYaw = Math.atan2(-(dx + enemy.body.vx * lead), -(dz + enemy.body.vz * lead)) + wobble
       const aimPitch = Math.atan2(dy, Math.hypot(dx, dz)) + wobble * 0.6 + (weapon === "lanciafrico" ? Math.min(0.25, enemyDist * 0.004) : 0)
       const yawErr = Math.abs(wrap(aimYaw - this.yaw))
-      // Girarsi verso il nemico, poi sparare quando la mira è buona.
+      // Turn towards the enemy, then shoot once the aim is good.
       this.turn(aimYaw, aimPitch, skill.aimSpeed)
       const tolerance = 0.05 + 0.5 / Math.max(4, enemyDist)
       const def = WEAPONS[weapon]
       const inRange = def.mode === "projectile" ? enemyDist > 5 : def.mode === "melee" ? enemyDist < def.range : enemyDist < def.range * 0.9
-      // Il Mulin si tiene in rotazione finché il nemico è in vista.
+      // Keep the Mulin spinning while the enemy is in sight.
       if (def.spinTicks > 0 && enemyDist < def.range) buttons |= BUTTON.fire
       if (yawErr < tolerance && inRange) {
         if (def.spinTicks > 0 || def.mode === "beam") buttons |= BUTTON.fire
@@ -156,7 +156,7 @@ export class BotBrain {
         }
       }
       if (weapon === "cjampanili" && enemyDist > 20) buttons |= BUTTON.aim
-      // Schivare: strafe avanti e indietro, ogni tanto un salto.
+      // Dodge: strafe back and forth, a jump now and then.
       if (--this.strafeTimer <= 0) {
         this.strafe = -this.strafe
         this.strafeTimer = 25 + ((this.tick * 13 + this.roam) % 50)
@@ -164,7 +164,7 @@ export class BotBrain {
       mx = this.strafe
       const wantDist = weapon === "cjampanili" ? 30 : weapon === "doplete" || weapon === "mescul" || weapon === "miedi" ? 3 : 12
       mz = enemyDist > wantDist + 4 ? 1 : enemyDist < wantDist - 4 ? -0.6 : 0
-      // Chi ha un obiettivo corre e spara: il frico non si porta da solo.
+      // Whoever has an objective runs and guns: the frico won't carry itself.
       if (waypoint && this.pushesObjective(world, me)) {
         const dx = waypoint[0] - me.body.x
         const dz = waypoint[2] - me.body.z
@@ -174,11 +174,11 @@ export class BotBrain {
         mz = (dx * fx + dz * fz) / d
         mx = (dx * -fz + dz * fx) / d + this.strafe * 0.3
       }
-      // Muoversi in relazione al nemico: il percorso si riprende dopo.
+      // Move relative to the enemy: the path resumes afterwards.
       if (this.level !== "zovin" && (this.tick + this.roam) % 140 === 0) buttons |= BUTTON.jump
       if (a.bombs > 0 && enemyDist > 9 && enemyDist < 22 && this.level !== "zovin" && (this.tick + this.roam) % 420 === 0) buttons |= BUTTON.bomb
     } else if (patient) {
-      // Mira al petto del compagno e lo cura col getto; da vicino si ferma.
+      // Aim at the teammate's chest and heal with the stream; stop when close.
       const dx = patient.body.x - eye.x
       const dz = patient.body.z - eye.z
       const d = Math.hypot(dx, dz)
@@ -193,12 +193,12 @@ export class BotBrain {
         if (Math.abs(wrap(wantYaw - this.yaw)) > 1.2) mz = 0.2
         if (!enemy && this.path.length > 2 && me.arsenal.current !== "cjampanili" && me.arsenal.current !== "mulin") buttons |= BUTTON.sprint
       }
-      // Ricarica a mani libere.
+      // Reload while idle.
       const ammo = a.ammo[a.current]
       if (WEAPONS[a.current].magazine > 0 && ammo.mag < WEAPONS[a.current].magazine * 0.5 && ammo.reserve > 0) buttons |= BUTTON.reload
     }
 
-    // Bloccato? Salta e ricalcola.
+    // Stuck? Jump and recompute.
     const moved = Math.hypot(me.body.x - this.lastPos.x, me.body.z - this.lastPos.z)
     if (mz > 0.5 && moved < 0.02) this.stuckTimer++
     else this.stuckTimer = Math.max(0, this.stuckTimer - 2)
@@ -228,7 +228,7 @@ export class BotBrain {
     if (mode === "frico") {
       const enemyTeam: Team = me.team === "benandanti" ? "malandanti" : "benandanti"
       const theirs = world.flags[enemyTeam]
-      return (theirs._tag === "carried" && theirs.by === me.session) || this.role === "attacca"
+      return (theirs._tag === "carried" && theirs.by === me.session) || this.role === "attack"
     }
     const { hill } = this.physics.map
     if (mode === "culine") return Math.hypot(me.body.x - hill.at[0], me.body.z - hill.at[2]) > hill.radius * 0.6
@@ -242,7 +242,7 @@ export class BotBrain {
     const enemyTeam: Team = team === "benandanti" ? "malandanti" : "benandanti"
     const mode = world.rules.mode
     const { flagBases: FLAG_BASES, hill: HILL, pickups: PICKUPS } = this.physics.map
-    // Poca salute: un frico vicino.
+    // Low health: a nearby frico.
     if (me.hp < 45) {
       const frico = PICKUPS.map((p, i) => ({ p, i })).filter(({ p, i }) => p.kind === "frico" && world.pickups[i])
       const near = frico.sort((a, b) => dist2(a.p.at, me) - dist2(b.p.at, me))[0]
@@ -257,26 +257,26 @@ export class BotBrain {
         if (carrier) return [carrier.body.x, carrier.body.y, carrier.body.z]
       }
       if (mine._tag === "dropped") return [mine.x, mine.y, mine.z]
-      if (this.role === "difende") return FLAG_BASES[team]
+      if (this.role === "defend") return FLAG_BASES[team]
       if (theirs._tag === "dropped") return [theirs.x, theirs.y, theirs.z]
       return FLAG_BASES[enemyTeam]
     }
     if (mode === "culine") return HILL.at
-    // Il cjar: i Benandanti lo spingono, i Malandanti ci si piazzano davanti.
+    // The cjar: the Benandanti push it, the Malandanti stand in front of it.
     if (mode === "cjar" && world.cart) {
       const [x, y, z] = world.cart.at
       const ahead = team === "malandanti" ? 3 : -1.5
       return [x - Math.sin(world.cart.yaw) * ahead + ((this.roam % 5) - 2) * 0.6, y, z - Math.cos(world.cart.yaw) * ahead]
     }
-    // La tempesta: chi è fuori torna dentro, verso il centro.
+    // The storm: whoever is outside heads back in, towards the centre.
     if (mode === "tampieste" && world.storm && Math.hypot(me.body.x - world.storm.x, me.body.z - world.storm.z) > world.storm.radius * 0.8) {
       return [world.storm.x, me.body.y, world.storm.z]
     }
-    // Bataie: verso il nemico più vicino, o in giro per la mappa.
+    // Bataie: towards the nearest enemy, or roaming the map.
     const enemies = world.players.filter((p) => p.alive && p.session !== me.session && !allied(world.rules, team, p.team))
     if (enemies.length) {
       const pick = enemies[Math.abs(this.roam) % enemies.length]
-      // Cambia preda ogni tanto.
+      // Switch prey now and then.
       if (this.tick % 600 === 0) this.roam++
       return [pick.body.x, pick.body.y, pick.body.z]
     }

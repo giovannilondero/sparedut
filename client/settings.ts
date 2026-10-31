@@ -1,4 +1,4 @@
-/** Impostazioni del giocatore, salvate nel browser. */
+/** Player settings, saved in the browser. */
 import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId } from "../shared/map.ts"
 import { MAP_IDS } from "../shared/maps/index.ts"
@@ -7,7 +7,7 @@ import type { Lang } from "./i18n.ts"
 
 export interface Settings {
   name: string
-  /** Lingua dell'interfaccia: friulano o italiano. */
+  /** Interface language: Friulian or Italian. */
   lang: Lang
   sensitivity: number
   fov: number
@@ -16,12 +16,12 @@ export interface Settings {
   invertY: boolean
   primary: PrimaryId
   quality: "bassa" | "media" | "alta"
-  /** Pannello prestazioni (F3). */
+  /** Performance panel (F3). */
   showInfo: boolean
-  /** Risoluzione dinamica: abbassa la risoluzione quando gli FPS calano. */
+  /** Dynamic resolution: lowers the resolution when FPS drops. */
   autoRes: boolean
   lastMode: ModeId
-  /** L'ultima mappa scelta: è anche lo sfondo del menu. */
+  /** The last chosen map: it's also the menu background. */
   lastMap: MapId
   lastBots: number
   lastLevel: BotLevel
@@ -51,7 +51,7 @@ const DEFAULTS: Settings = {
 export function loadSettings(): Settings {
   try {
     const s: Settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") }
-    // Un valore salvato da una versione vecchia (o una mappa tolta) torna al predefinito.
+    // A value saved by an old version (or a removed map) falls back to the default.
     if (!MAP_IDS.includes(s.lastMap)) s.lastMap = DEFAULTS.lastMap
     return s
   } catch {

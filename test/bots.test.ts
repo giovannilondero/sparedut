@@ -4,7 +4,7 @@ import { Room } from "../server/room.ts"
 import { MODE_IDS } from "../shared/folklore.ts"
 
 for (const mode of MODE_IDS) {
-  test(`i bot giocano una partita: ${mode}`, async () => {
+  test(`bots play a match: ${mode}`, async () => {
     await initPhysics()
     const room = new Room("TEST", "nessuno", "Test", "lan", { mode, map: "glemone", minutes: 10, visibility: "code", level: "pari", ff: false })
     room.fillBots(6)
@@ -32,7 +32,7 @@ for (const mode of MODE_IDS) {
     expect(ms).toBeLessThan(8)
     if (mode === "cjar") expect(maxCart).toBeGreaterThan(0.05)
     if (mode === "tampieste") {
-      // Una vita sola: o è finita con un vincitore, o i vivi sono calati.
+      // A single life: either it ended with a winner, or the number alive has dropped.
       if (over && v.phase.tag === "Over") expect(v.phase.winner).not.toBe(null)
       else expect(alive).toBeLessThan(12)
     }

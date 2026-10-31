@@ -1,8 +1,8 @@
-# Controlla ogni pull request; su main fa anche il deploy su Cloudflare con Alchemy.
-# Il deploy vuole, nelle impostazioni del repository:
-#   secret CLOUDFLARE_API_TOKEN, variabile CLOUDFLARE_ACCOUNT_ID
-#   variabile DEPLOY_DOMAIN, il dominio (senza, niente deploy: i fork restano tranquilli)
-# e un primo `pnpm cf:deploy` dal proprio computer, che installa lo stato di Alchemy nell'account.
+# Checks every pull request; on main it also deploys to Cloudflare with Alchemy.
+# The deploy needs, in the repository settings:
+#   secret CLOUDFLARE_API_TOKEN, variable CLOUDFLARE_ACCOUNT_ID
+#   variable DEPLOY_DOMAIN, the domain (without it, no deploy: forks stay quiet)
+# and a first `pnpm cf:deploy` from your own computer, which installs Alchemy's state in the account.
 name: CI
 
 on:
@@ -16,7 +16,7 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # Un push nuovo su una pull request sostituisce il controllo; un deploy finisce sempre.
+  # A new push to a pull request replaces the check; a deploy always finishes.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -35,7 +35,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm build
-      - name: Deploy su Cloudflare
+      - name: Deploy to Cloudflare
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.DEPLOY_DOMAIN != ''
         run: pnpm cf:deploy --yes
         env:

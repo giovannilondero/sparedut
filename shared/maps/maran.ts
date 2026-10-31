@@ -1,22 +1,23 @@
 /**
- * Lagune di Maran: la riserve naturâl des Focis dal Stele, tra lis barenis e i canâi de
- * lagune di Maran.
+ * Lagune di Maran: the Focis dal Stele nature reserve, among the barene (salt marshes)
+ * and channels of the Maran lagoon.
  *
- * A nord, su la tiere sute, la foresterie de riserve: pian tiere cul salon, la cusine e
- * i bagns; prin plan cu lis grandis cameradis e i bagns; il tet plan si cjamine (e al à
- * une torete cu la mitraie). Une scjale dople e va sù dal pian tiere al prin plan e po
- * sul tet. Tal mieç l'arzin che al cor di nord a sud, cu lis passerelis di len che lu
- * leghin a lis barenis. A est il bosc, cun doi trois tra i arbui, e il puintut a schene di
- * mus che al passe il canâl fin su la isule dal casot di osservazion: la puarte e je
- * sierade e si à di sfondâle, dentri e je la discoteche dai fenicotars. A sud i casons
- * dai pescjadôrs. Dapardut la aghe e je basse: si va a vuat, ma plan (passerelis, trois e
- * puintut a son lis stradis sveltis).
+ * To the north, on dry land, the reserve's foresterie (guesthouse): ground floor with the
+ * hall, the kitchen and the bathrooms; first floor with the big dormitories and bathrooms;
+ * the flat roof is walkable (and has a small turret with the mitraie). A double staircase
+ * goes up from the ground floor to the first floor and then onto the roof. In the middle
+ * the arzin (embankment) running north to south, with the wooden boardwalks linking it to
+ * the barene. To the east the wood, with two paths among the trees, and the humpback
+ * footbridge crossing the channel to the island of the casot (observation hut): its door
+ * is shut and has to be broken down, inside is the flamingos' disco. To the south the
+ * fishermen's casons. The water is shallow everywhere: you can wade, but slowly (boardwalks,
+ * paths and the footbridge are the fast routes).
  *
- * Assi: x viers est, y in alt, z viers sud. Metris.
+ * Axes: x east, y up, z south. Metres.
  */
 import { defineMap, type Block, type Mat, type PickupSpot, type Spawn, type Team, type V3, type Wedge } from "../map.ts"
 
-/** Tiere sute, font de lagune (si cjamine a vuat), pel de aghe (dome par dissegnâ). */
+/** Dry land, lagoon floor (you wade on it), water surface (for drawing only). */
 export const LAND = 0
 export const SEA = -0.45
 export const WATER = -0.12
@@ -29,7 +30,7 @@ const box = (min: V3, max: V3, mat: Mat, look?: Block["look"]) => {
   blocks.push(look ? { min, max, mat, look } : { min, max, mat })
 }
 
-/** Un'apertura in un muro, lungo il lato lungo: da `a0` a `a1`, da `y0` a `y1`. */
+/** An opening in a wall, along its long side: from `a0` to `a1`, from `y0` to `y1`. */
 interface Hole {
   readonly a0: number
   readonly a1: number
@@ -37,12 +38,12 @@ interface Hole {
   readonly y1: number
 }
 
-/** Le aperture dei muri (porte e finestre), per le cornici che disegna il client. */
+/** The wall openings (doors and windows), for the frames the client draws. */
 export const OPENINGS: { readonly min: V3; readonly max: V3; readonly mat: Mat; readonly door: boolean; readonly alongX: boolean }[] = []
 
 /**
- * Un muro con porte e finestre: si spezza in blocchi pieni fra le aperture, più
- * davanzale e architrave sopra e sotto ognuna.
+ * A wall with doors and windows: it is split into solid blocks between the openings, plus
+ * sill and lintel below and above each one.
  */
 function wall(min: V3, max: V3, mat: Mat, holes: readonly Hole[] = []) {
   const alongX = max[0] - min[0] >= max[2] - min[2]
@@ -72,22 +73,22 @@ function wall(min: V3, max: V3, mat: Mat, holes: readonly Hole[] = []) {
   piece(at, hi, min[1], max[1])
 }
 
-// --- Tiere e aghe ----------------------------------------------------------------------
+// --- Land and water --------------------------------------------------------------------
 
 export type P2 = readonly [number, number]
 
-/** Une tiere sute: un poligon (x, z) cul ôr irregolâr, come lis barenis vêris. */
+/** A piece of dry land: a polygon (x, z) with an irregular edge, like real barene. */
 export interface Land {
   readonly name: string
   readonly poly: readonly P2[]
   readonly mat: Mat
-  /** Il colôr de cuvierte (il client le dissegne lisse; la fisiche le spartìs a strissis). */
+  /** The ground cover colour (the client draws it smooth; the physics splits it into strips). */
   readonly tint: string
 }
 
 /**
- * Lis tieris sutis. La tiere a nord e chê a sud e cjapin dut il lât de mape; l'arzin
- * al à i ôrs in comun cun lôr (cussì lis cuviertis no si sorepuedin).
+ * The dry lands. The northern and southern land span the whole width of the map; the arzin
+ * shares its edges with them (so the ground covers don't overlap).
  */
 export const LANDS: readonly Land[] = [
   {
@@ -134,7 +135,7 @@ export const LANDS: readonly Land[] = [
   }
 ]
 
-/** Il pont è dentri dal poligon? (regule pari-dispari) */
+/** Is the point inside the polygon? (even-odd rule) */
 export function insidePoly(poly: readonly P2[], x: number, z: number): boolean {
   let inside = false
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -145,7 +146,7 @@ export function insidePoly(poly: readonly P2[], x: number, z: number): boolean {
   return inside
 }
 
-/** Distance di un pont dal segment `a`–`b` (sul plan). */
+/** Distance of a point from the segment `a`–`b` (on the ground plane). */
 function segDist(x: number, z: number, a: P2, b: P2): number {
   const dx = b[0] - a[0]
   const dz = b[1] - a[1]
@@ -155,7 +156,7 @@ function segDist(x: number, z: number, a: P2, b: P2): number {
   return Math.sqrt(ex * ex + ez * ez)
 }
 
-/** Distance di un pont de spezade (vierte) o dal ôr dal poligon (sierât). */
+/** Distance of a point from the polyline (open) or from the polygon's edge (closed). */
 function lineDist(line: readonly P2[], x: number, z: number, closed: boolean): number {
   let d = Infinity
   const n = closed ? line.length : line.length - 1
@@ -164,8 +165,8 @@ function lineDist(line: readonly P2[], x: number, z: number, closed: boolean): n
 }
 
 /**
- * Une tiere tai blocs che a colidin: strissis di mieç metri lunc z, ognidune taiade dulà
- * che la linie di mieç e passe l'ôr. Lis strissis compagnis une daûr chê altre si unissin.
+ * A piece of land as colliding blocks: half-metre strips along z, each cut where its
+ * centre line crosses the edge. Identical consecutive strips are merged.
  */
 const ROW = 0.5
 function landBlocks(poly: readonly P2[], top: number): Block[] {
@@ -202,8 +203,8 @@ function landBlocks(poly: readonly P2[], top: number): Block[] {
   return out
 }
 /**
- * Il poligon slargjât di `d` in fûr (ogni vertiç al va su la bisetrice des normâls).
- * Al vâl par vie dai ôrs dolçs des barenis; i cjantons une vore spiçâts a vegnin cimâts.
+ * The polygon grown outwards by `d` (each vertex moves along the bisector of the normals).
+ * Good enough for the gentle edges of the barene; very sharp corners get clipped.
  */
 export function grow(poly: readonly P2[], d: number): P2[] {
   let area = 0
@@ -226,40 +227,40 @@ export function grow(poly: readonly P2[], d: number): P2[] {
 }
 
 /**
- * La rive: un scjalin sot de aghe a mieze altece, largj `SHELF`. Un scjalin unic di 45 cm
- * il character controller nol le passe simpri (a vuat si va plan); doi di 22 sì.
+ * The shore: an underwater step at half height, `SHELF` wide. A single 45 cm step
+ * the character controller doesn't always climb (wading is slow); two of 22 it does.
  */
 export const SHELF = 0.7
 const SHELF_Y = (LAND + SEA) / 2
 box([BOUNDS.minX, BOTTOM, BOUNDS.minZ], [BOUNDS.maxX, SEA, BOUNDS.maxZ], "terra", "terreno")
 for (const l of LANDS) blocks.push(...landBlocks(l.poly, LAND), ...landBlocks(grow(l.poly, SHELF), SHELF_Y))
 
-/** Lis passerelis di len sore la aghe, a râs de tiere, cun cualchi zirade tra lis cjanis. */
+/** The wooden boardwalks over the water, flush with the land, with a few turns among the reeds. */
 export const BOARDWALK_Y = LAND
 export const BOARDWALKS: readonly { readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number }[] = [
-  // arzin → barene a ovest
+  // arzin → west barene
   { minX: -16, maxX: -6.5, minZ: -6, maxZ: -3.6 },
   { minX: -18.4, maxX: -16, minZ: -9.4, maxZ: -3.6 },
   { minX: -26, maxX: -18.4, minZ: -9.4, maxZ: -7 },
-  // tiere a nord → barene a ovest
+  // northern land → west barene
   { minX: -42, maxX: -39.6, minZ: -46, maxZ: -31 },
-  // arzin → bosc
+  // arzin → wood
   { minX: 5, maxX: 13, minZ: -13, maxZ: -10.6 },
-  // tiere a nord → bosc, tra lis cjanis
+  // northern land → wood, among the reeds
   { minX: 39.6, maxX: 42, minZ: -46, maxZ: -23.6 },
   { minX: 34.5, maxX: 39.6, minZ: -26, maxZ: -23.6 },
-  // arzin → isule dal casot, cu la zirade
+  // arzin → casot island, with the turn
   { minX: 6, maxX: 16.4, minZ: 22, maxZ: 24.4 },
   { minX: 14, maxX: 16.4, minZ: 18, maxZ: 22 },
   { minX: 16.4, maxX: 28.5, minZ: 18, maxZ: 20.4 }
 ]
-// Lis breis dal paviment si dissegnin un fregul parsore: il bloc al è dome par cjaminâ.
+// The floor planks are drawn slightly higher: the block is only for walking on.
 for (const w of BOARDWALKS) {
   box([w.minX, SEA, w.minZ], [w.maxX, BOARDWALK_Y, w.maxZ], "invisibile")
   box([w.minX - SHELF, SEA, w.minZ - SHELF], [w.maxX + SHELF, SHELF_Y, w.maxZ + SHELF], "invisibile")
 }
 
-/** Un corimano di passerele: dal pont `a` al pont `b` (sul ôr), a l'altece dal paviment `y`. */
+/** A boardwalk handrail: from point `a` to point `b` (on the edge), at floor height `y`. */
 export interface Rail {
   readonly a: P2
   readonly b: P2
@@ -267,8 +268,8 @@ export interface Rail {
 }
 
 /**
- * I corimans des passerelis: dome dulà che di fûr e je aghe (no sui cjâfs che a poin su la
- * tiere, no tes ziradis dulà che une passerele e continue te altre). A colidin.
+ * The boardwalk handrails: only where there is water outside (not on the ends resting on
+ * land, not at the turns where one boardwalk continues into the next). They collide.
  */
 export const RAILS: readonly Rail[] = (() => {
   const onFoot = (x: number, z: number) =>
@@ -302,14 +303,14 @@ export const RAILS: readonly Rail[] = (() => {
   }
   return out
 })()
-/** Il corimano al sta sul ôr, alt un metri; il so collider al è grues 12 cm. */
+/** The handrail sits on the edge, one metre high; its collider is 12 cm thick. */
 export const RAIL_H = 1
 for (const r of RAILS) {
   const n = 0.06
   box([Math.min(r.a[0], r.b[0]) - (r.a[0] === r.b[0] ? n : 0), SEA, Math.min(r.a[1], r.b[1]) - (r.a[1] === r.b[1] ? n : 0)], [Math.max(r.a[0], r.b[0]) + (r.a[0] === r.b[0] ? n : 0), r.y + RAIL_H, Math.max(r.a[1], r.b[1]) + (r.a[1] === r.b[1] ? n : 0)], "invisibile")
 }
 
-/** Il puintut di len a schene di mus sul canâl fra il bosc e la isule dal casot (si passe ancje sot, a cuet). */
+/** The wooden humpback footbridge over the channel between the wood and the casot island (you can also go under it, crouching). */
 export const PONT = { x0: 28.6, x1: 31.4, z0: 2, up: 5, down: 11, z1: 14, deck: 0.95, under: 0.75, rail: 1 } as const
 const wedges: Wedge[] = [
   { x0: PONT.x0, x1: PONT.x1, z0: PONT.z0, z1: PONT.up, y0: LAND, y1: PONT.deck, mat: "legno" },
@@ -322,7 +323,7 @@ for (const [x0, x1] of [[PONT.x0 - 0.12, PONT.x0], [PONT.x1, PONT.x1 + 0.12]] as
   box([x0, SEA, PONT.down], [x1, PONT.deck + PONT.rail, PONT.z1], "invisibile")
 }
 
-/** I trois di tiere batude: tal bosc (doi) e su la isule fin te puarte dal casot. */
+/** The packed-earth paths: in the wood (two) and on the island up to the casot's door. */
 export const PATHS: readonly (readonly P2[])[] = [
   [[12, -11.8], [17, -13], [22, -19], [28, -20.5], [32, -14], [28, -7], [30, -1], [30, 2.5]],
   [[36, -24.8], [33.5, -19], [32, -14]],
@@ -330,11 +331,11 @@ export const PATHS: readonly (readonly P2[])[] = [
   [[28, 19.2], [32.5, 19.2]]
 ]
 
-// --- La foresterie --------------------------------------------------------------------
+// --- The foresterie -------------------------------------------------------------------
 
-/** La foresterie: muri esterni, solai (prin plan e tet), scjalis. */
+/** The foresterie: outer walls, floors (first floor and roof), stairs. */
 export const FORESTERIE = { minX: -20, maxX: 20, minZ: -82, maxZ: -64, t: 0.4, f1: 4, roof: 8, slab: 0.4, parapet: 1.1 } as const
-/** Lis dôs rampis de scjale: la prime dal pian tiere al prin plan, la seconde fin sul tet. */
+/** The two flights of the staircase: the first from the ground floor to the first floor, the second up to the roof. */
 export const STAIRS = {
   first: { x0: 16.6, x1: 19.6 },
   second: { x0: 13, x1: 16 },
@@ -352,7 +353,7 @@ wedges.push(
   const door = (a0: number, a1: number, y0 = 0): Hole => ({ a0, a1, y0, y1: y0 + 2.6 })
   const win = (a0: number, a1: number, y0: number, y1: number): Hole => ({ a0, a1, y0, y1 })
   const mat: Mat = "intonacoBianco"
-  // Muri esterni, a plomp fin sul tet.
+  // Outer walls, straight up to the roof.
   wall([minX, 0, maxZ - t], [maxX, roof, maxZ], mat, [
     win(-18, -16, 1, 2.4), door(-11, -8), win(-5, -3, 1, 2.4), win(4, 5.4, 1.6, 2.4), door(13.4, 15.6),
     win(-17, -15, 5, 6.6), win(-11, -9, 5, 6.6), win(-3, -1, 5, 6.6), win(3, 5, 5, 6.6), win(9, 11, 5.8, 6.6), win(17, 19, 5, 6.6)
@@ -364,23 +365,23 @@ wedges.push(
   wall([minX, 0, minZ + t], [minX + t, roof, maxZ - t], mat, [door(-74, -72), win(-79, -77, 1, 2.4), win(-75, -71, 5, 6.6)])
   wall([maxX - t, 0, minZ + t], [maxX, roof, maxZ - t], mat, [win(-80, -78, 1, 2.4), win(-74, -70, 5, 6.6)])
 
-  // Pian tiere: salon (ovest), cusine (nord-est), bagns (sud-est), la sale de scjale (est).
+  // Ground floor: hall (west), kitchen (north-east), bathrooms (south-east), the stairwell (east).
   wall([2, 0, minZ + t], [2.4, s1, maxZ - t], mat, [door(-79, -77.5), door(-70, -68.5)])
   wall([2.4, 0, -73.4], [12.6, s1, -73], mat)
   wall([12.6, 0, minZ + t], [13, s1, maxZ - t], mat, [door(-79, -77.5), door(-69, -67.5)])
-  // il mûr fra lis dôs rampis
+  // the wall between the two flights
   box([16, 0, STAIRS.z0], [16.6, f1 + 1.2, STAIRS.z1], mat)
-  // i cabinets dai bagns
+  // the bathroom stalls
   for (const x of [4.6, 6.6, 8.6, 10.6]) box([x, 0, -73], [x + 0.1, 2.1, -70.8], "legno")
-  // cusine: bancons tor dal mûr e la isule tal mieç
+  // kitchen: counters along the wall and the island in the middle
   box([3, 0, minZ + t], [12.2, 0.95, -80.9], "legno")
   box([6, 0, -77.4], [9.5, 0.95, -76.2], "legno")
-  // salon: dôs taulis lungjis e il fogolâr
+  // hall: two long tables and the fogolâr
   box([-16, 0, -80], [-15, 0.8, -74], "legno")
   box([-4, 0, -80], [-3, 0.8, -74], "legno")
   box([-19.6, 0, -69.5], [-18.6, 1.2, -67], "pietra")
 
-  // Prin plan: il solâr (cul bûs de scjale), il coridôr a nord, dôs cameradis e i bagns.
+  // First floor: the floor slab (with the stairwell opening), the north corridor, two dormitories and the bathrooms.
   box([minX + t, s1, minZ + t], [STAIRS.second.x0, f1, maxZ - t], "legno")
   box([STAIRS.second.x0, s1, minZ + t], [maxX - t, f1, STAIRS.z0], "legno")
   box([STAIRS.second.x0, s1, STAIRS.z1], [maxX - t, f1, maxZ - t], "legno")
@@ -389,17 +390,17 @@ wedges.push(
   wall([6, f1, -77.6], [6.4, s2, maxZ - t], mat)
   wall([12.6, f1, -77.6], [13, s2, maxZ - t], mat)
   for (const x of [8.6, 10.6]) box([x, f1, maxZ - t - 2.2], [x + 0.1, f1 + 2.1, maxZ - t], "legno")
-  // i jets a cjast, in file sui doi lâts lungs (la cuciete parsore le dissegne il client)
+  // the bunk beds, in rows along the two long sides (the client draws the upper bunk)
   for (const [x0, x1] of [[-19.6, -6], [-5.6, 6]] as const) {
     for (let x = x0 + 0.4; x + 0.9 <= x1 - 0.3; x += 1.9) {
       box([x, f1, maxZ - t - 2], [x + 0.9, f1 + 0.6, maxZ - t], "legno")
-      // a nord si lasse libare la puarte
+      // on the north side the door is left clear
       const doorX = x0 < -6 ? [-14, -12.5] : [-1, 0.5]
       if (x + 0.9 < doorX[0] - 0.6 || x > doorX[1] + 0.6) box([x, f1, -77.6], [x + 0.9, f1 + 0.6, -75.6], "legno")
     }
   }
 
-  // Il tet plan: si cjamine, cul parapet ator e la ringhiere tor dal bûs de seconde rampe.
+  // The flat roof: walkable, with the parapet around it and the railing around the second flight's opening.
   box([minX + t, s2, minZ + t], [STAIRS.second.x0, roof, maxZ - t], "pietra")
   box([STAIRS.second.x1, s2, minZ + t], [maxX - t, roof, maxZ - t], "pietra")
   box([STAIRS.second.x0, s2, minZ + t], [STAIRS.second.x1, roof, STAIRS.z0], "pietra")
@@ -414,17 +415,17 @@ wedges.push(
   box([STAIRS.second.x1, roof, STAIRS.z0], [STAIRS.second.x1 + 0.3, p, STAIRS.z1], "ferro", "parapetto")
 }
 
-// --- Il casot di osservazion ---------------------------------------------------------------
+// --- The observation casot --------------------------------------------------------------
 
-/** Il casot su la isule a est: si jentre dome sfondant la puarte a ovest. */
+/** The casot on the island to the east: the only way in is to break down the west door. */
 export const CASOT = { minX: 40, maxX: 52, minZ: 22, maxZ: 32, floor: LAND, top: 3.4, t: 0.3 } as const
-/** Il scjalin di len sot dai balcons (si cjale fûr pes fressuris); il cjoc al dûr cul cjâf parsore. */
+/** The wooden step under the viewing slits (you look out through the slits); the drunk keeps his head above them. */
 export const SCJALIN = { minX: 49.8, maxX: CASOT.maxX - CASOT.t, minZ: CASOT.minZ + CASOT.t, maxZ: CASOT.maxZ - CASOT.t, top: CASOT.floor + 0.35 } as const
-/** La pignate de bire. */
+/** The beer pot. */
 export const PIGNATE = { minX: 47.4, maxX: 48.4, minZ: 28.8, maxZ: 29.8, top: CASOT.floor + 0.65 } as const
-/** Dulà che e sune la musiche: la bale di spieli tal mieç dal casot. */
+/** Where the music plays: the mirror ball in the middle of the casot. */
 export const DISCO: V3 = [44, 2.7, 27]
-/** La fressure par cjalâ i ucei: strete, si spare ma no si passe. */
+/** The birdwatching slit: narrow, you can shoot through it but not pass. */
 const SLIT = { y0: 1.85, y1: 2.25 } as const
 const DOOR = { z0: 26.2, z1: 27.8, top: CASOT.floor + 2.1 } as const
 {
@@ -439,9 +440,9 @@ const DOOR = { z0: 26.2, z1: 27.8, top: CASOT.floor + 2.1 } as const
   box([PIGNATE.minX, floor, PIGNATE.minZ], [PIGNATE.maxX, PIGNATE.top, PIGNATE.maxZ], "invisibile")
 }
 
-// --- Casons dai pescjadôrs, ripars --------------------------------------------------------
+// --- Fishermen's casons, cover ------------------------------------------------------------
 
-/** I casons: mûrs di cane e tet di pae fin cuasi par tiere (il client ju dissegne). */
+/** The casons: reed walls and a thatched roof reaching almost to the ground (the client draws them). */
 export const CASONS: readonly { readonly minX: number; readonly maxX: number; readonly minZ: number; readonly maxZ: number }[] = [
   { minX: -34, maxX: -26, minZ: 70, maxZ: 76 },
   { minX: 24, maxX: 32, minZ: 74, maxZ: 80 },
@@ -452,13 +453,13 @@ export const CASONS: readonly { readonly minX: number; readonly maxX: number; re
 export const CASON_TOP = 3.8
 for (const c of CASONS) box([c.minX, LAND, c.minZ], [c.maxX, LAND + CASON_TOP, c.maxZ], "invisibile")
 
-// Ballis di cane su l'arzin (il cjar al passe tal mieç), cassis di pes, la cjarbonere.
+// Reed bales on the arzin (the cjar passes through the middle), fish crates, the charcoal pile.
 for (const [x, z] of [[-4, -20], [2.5, -30], [-4, 30], [2.5, 40], [2.5, 4], [-4, 14]] as const) box([x, LAND, z], [x + 1.5, LAND + 1.2, z + 1.5], "fen")
 for (const [x, z] of [[-40, -62], [36, -58], [-46, 6], [52, 40], [14, 70], [-40, 90], [55, 75]] as const) box([x, LAND, z], [x + 3, LAND + 1.3, z + 2.4], "legno", "cassa")
-// I sacs de torete dal borc.
+// The sandbags of the village turret.
 box([-19.5, LAND, 62.2], [-16.5, LAND + 0.9, 62.8], "sacs")
 
-// --- Zûc -------------------------------------------------------------------------------------
+// --- Game ------------------------------------------------------------------------------------
 
 const spawns: Record<Team, readonly Spawn[]> = {
   benandanti: [
@@ -496,69 +497,69 @@ const pickups: PickupSpot[] = [
   { kind: "munizions", at: [-10, LAND, 66] },
   { kind: "munizions", at: [-34, LAND, 8] },
   { kind: "munizions", at: [56, LAND, 16] },
-  // Il premi par cui che al sfonde la puarte dal casot.
+  // The prize for whoever breaks down the casot's door.
   { kind: "lanciafrico", at: [44.5, CASOT.floor, 27] }
 ]
 
 const F = FORESTERIE
 const B = BOARDWALK_Y
 const navPoints: V3[] = [
-  // Tiere a nord
+  // Northern land
   [-60, LAND, -95], [-35, LAND, -95], [-10, LAND, -95], [10, LAND, -95], [35, LAND, -95], [60, LAND, -95],
   [-60, LAND, -75], [-35, LAND, -75], [-24, LAND, -73], [24, LAND, -73], [35, LAND, -75], [60, LAND, -75],
   [-60, LAND, -55], [-35, LAND, -55], [-20, LAND, -58], [-9.5, LAND, -60], [0, LAND, -54], [14.5, LAND, -60], [24, LAND, -58], [35, LAND, -55], [60, LAND, -55],
   [-40.8, LAND, -51], [40.8, LAND, -51],
-  // Foresterie: pian tiere
+  // Foresterie: ground floor
   [-9.5, LAND, -66.5], [-9.5, LAND, -73], [-9.5, LAND, -79], [-17.6, LAND, -73], [-17.6, LAND, -79], [0, LAND, -78.2], [0, LAND, -69.2],
   [4, LAND, -78.3], [11, LAND, -78.3], [5, LAND, -69.2], [11, LAND, -68.2],
   [15, LAND, -78.3], [14.5, LAND, -70], [14.5, LAND, -65.3], [18.1, LAND, -65.3],
-  // scjalis e prin plan
+  // stairs and first floor
   [18.1, F.f1, -77.5], [14.5, F.f1, -77.5],
   [-16, F.f1, -79.6], [-5, F.f1, -79.6], [5, F.f1, -79.6], [10, F.f1, -79.6], [-13.25, F.f1, -79.6], [-0.25, F.f1, -79.6], [8.75, F.f1, -79.6],
   [-13.25, F.f1, -76.6], [-13, F.f1, -71], [-0.25, F.f1, -76.6], [0, F.f1, -71], [8.75, F.f1, -76.6], [9.5, F.f1, -71],
-  // tet
+  // roof
   [14.5, F.roof, -65.2], [5, F.roof, -66], [-10, F.roof, -66], [-10, F.roof, -78], [5, F.roof, -78], [18.2, F.roof, -65.2], [18.2, F.roof, -75],
-  // Arzin e passerelis
+  // Arzin and boardwalks
   [0, LAND, -46], [0, LAND, -30], [0, LAND, -14], [0, LAND, 0], [0, LAND, 14], [0, LAND, 30], [0, LAND, 46], [0, LAND, 60],
   [4.5, LAND, -24], [-4.5, LAND, 8], [4.5, LAND, 23.2], [-4.5, LAND, -4.8], [4.5, LAND, -11.8],
   [10, B, 23.2], [15.2, B, 23.2], [15.2, B, 19.2], [22, B, 19.2], [28, LAND, 19.2],
   [-10, B, -4.8], [-17.2, B, -4.8], [-17.2, B, -8.2], [-22, B, -8.2],
   [40.8, B, -44], [40.8, B, -35], [40.8, B, -27.5],
   [-40.8, B, -45], [-40.8, B, -35],
-  // Barene a ovest
+  // West barene
   [-28, LAND, -8.2], [-40.8, LAND, -29], [-35, LAND, -18], [-35, LAND, 5], [-50, LAND, 12], [-55, LAND, -20], [-46, LAND, -15], [-40, LAND, 15],
-  // Bosc: i doi trois e il puintut
+  // Wood: the two paths and the footbridge
   [9, B, -11.8], [13.5, LAND, -11.8], [17, LAND, -13], [22, LAND, -19], [28, LAND, -20.5], [32, LAND, -14], [28, LAND, -7], [30, LAND, -1], [30, LAND, 2.5],
   [30, PONT.deck, 6], [30, PONT.deck, 10], [30, LAND, 15],
   [38, B, -24.8], [36, LAND, -24.8], [33.5, LAND, -19],
-  // Isule dal casot (fûr)
+  // Casot island (outside)
   [32.5, LAND, 19.2], [36, LAND, 24], [34, LAND, 14], [42, LAND, 16], [34, LAND, 40], [37, LAND, 27], [46, LAND, 16], [46, LAND, 38], [57, LAND, 27], [57, LAND, 14], [57, LAND, 40], [30, LAND, 32],
-  // Isulute e aghe
+  // Islet and water
   [-35, LAND, 39],
   [-15, SEA, -30], [-15, SEA, 30], [10, SEA, -25], [15, SEA, 4], [20, SEA, 45], [-20, SEA, 50], [-45, SEA, 40], [-60, SEA, 30],
   [-62, SEA, -40], [55, SEA, -20], [62, SEA, 0], [50, SEA, 55], [-24, SEA, -40], [24, SEA, -42], [-48, SEA, 52], [45, SEA, -10],
-  // Borc dai casons a sud
+  // Village of casons to the south
   [-60, LAND, 70], [-45, LAND, 66], [-20, LAND, 68], [-4, LAND, 68], [0, LAND, 76], [16, LAND, 68], [36, LAND, 68], [60, LAND, 70],
   [-50, LAND, 85], [-30, LAND, 84], [-20, LAND, 96], [-4, LAND, 88], [10, LAND, 96], [20, LAND, 88], [36, LAND, 84], [55, LAND, 85],
   [60, LAND, 100], [-60, LAND, 100], [0, LAND, 98], [36, LAND, 100]
 ]
 
-// --- Arbui ---------------------------------------------------------------------------------
+// --- Trees ---------------------------------------------------------------------------------
 
-/** Un arbul: il tronc al colît (si si ripare e no si passe), la frasche e je alte. */
+/** A tree: the trunk collides (you can take cover and can't pass), the foliage is high up. */
 export interface Tree {
   readonly x: number
   readonly z: number
-  /** Grandece (1 = tronc di 3 m). */
+  /** Size (1 = 3 m trunk). */
   readonly s: number
 }
 
-/** I arbui: chei metûts a man su lis tieris e il bosc fis ator dai trois. */
+/** The trees: the hand-placed ones on the lands and the dense wood around the paths. */
 export const TREES: readonly Tree[] = (() => {
   const out: Tree[] = [
     [-50, -90], [-28, -100], [26, -100], [52, -88], [-56, -60], [56, -62], [-45, 14], [-52, -24], [54, 36], [-62, 96], [62, 92], [30, 100]
   ].map(([x, z], i) => ({ x, z, s: 0.95 + ((i * 37) % 10) / 20 }))
-  // caso deterministic, compagn su server e client
+  // deterministic randomness, identical on server and client
   let seed = 4242
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
   const clear = (x: number, z: number) =>
@@ -591,40 +592,40 @@ for (const t of TREES) {
   box([t.x - r, LAND, t.z - r], [t.x + r, LAND + 3 * t.s, t.z + r], "invisibile")
 }
 
-/** Lis briculis dai canâi: trê pâi leâts in alt; a colidin (si va ator). */
+/** The channel bricole: three poles tied together at the top; they collide (you go around). */
 export const BRICOLE: readonly P2[] = [[-15, -38], [15, -38], [-15, 0], [10, -20], [-15, 40], [15, 50], [-62, 10], [62, -8], [35, 56], [-40, 56]]
 for (const [x, z] of BRICOLE) box([x - 0.45, SEA, z - 0.45], [x + 0.45, WATER + 3.2, z + 0.45], "invisibile")
 
-// --- Ferâi (la mape e je di gnot) ------------------------------------------------------------
+// --- Lanterns (the map is at night) -----------------------------------------------------------
 
-/** I ferâi su pâl lunc i trois e lis passerelis: il pâl al colît; `real` = al fâs lûs vere. */
+/** The lanterns on poles along the paths and boardwalks: the pole collides; `real` = it casts real light. */
 export const LANTERNS: readonly { readonly x: number; readonly z: number; readonly y: number; readonly real: boolean }[] = (
   [
-    [-12.4, -62.6, LAND, true], // lis puartis de foresterie
+    [-12.4, -62.6, LAND, true], // the foresterie's doors
     [16.6, -62.6, LAND, false],
-    [-2, -49, LAND, false], // il cjâf dal arzin
-    [6.6, -10.2, B, true], // la passerele dal bosc
+    [-2, -49, LAND, false], // the head of the arzin
+    [6.6, -10.2, B, true], // the wood boardwalk
     [17, -11, LAND, false],
     [27, -18.4, LAND, false],
     [31.6, -4, LAND, false],
-    [27.6, 1.6, LAND, true], // il puintut
+    [27.6, 1.6, LAND, true], // the footbridge
     [32.4, 14.6, LAND, false],
     [34.6, 21.6, LAND, false],
-    [38, 24.4, LAND, true], // la puarte dal casot
-    [42.4, -40, B, false], // la passerele tra lis cjanis
+    [38, 24.4, LAND, true], // the casot's door
+    [42.4, -40, B, false], // the boardwalk among the reeds
     [42.4, -27, B, true],
-    [16.8, 24.8, B, true], // la zirade de passerele dal casot
+    [16.8, 24.8, B, true], // the turn of the casot boardwalk
     [7, 21.6, B, false],
-    [-18.8, -3.2, B, true], // la passerele de barene
+    [-18.8, -3.2, B, true], // the barene boardwalk
     [-39.2, -40, B, false],
-    [-2, 61, LAND, false], // il borc
+    [-2, 61, LAND, false], // the village
     [-16, 66, LAND, true],
     [20, 70, LAND, false]
   ] as const
 ).map(([x, z, y, real]) => ({ x, z, y, real }))
 for (const l of LANTERNS) box([l.x - 0.08, l.y, l.z - 0.08], [l.x + 0.08, l.y + 2.1, l.z + 0.08], "invisibile")
 
-/** Il cjar: de foresterie jù pal arzin fin tal borc dai casons. */
+/** The cjar: from the foresterie down the arzin to the village of casons. */
 const track: V3[] = [
   [0, LAND, -56],
   [0, LAND, -46],
@@ -641,9 +642,9 @@ export const MARAN = defineMap({
   walls: { bottom: BOTTOM, top: 40 },
   jumpPads: [],
   spawns,
-  /** Il frico dai Benandants tal salon de foresterie, chel dai Malandants dongje de cavane. */
+  /** The Benandanti's frico in the foresterie's hall, the Malandanti's next to the cavane. */
   flagBases: { benandanti: [-9.5, LAND, -70], malandanti: [0, LAND, 94] },
-  /** Il mieç dal arzin. */
+  /** The middle of the arzin. */
   hill: { at: [0, LAND, 8], radius: 7.5 },
   pickups,
   navPoints,

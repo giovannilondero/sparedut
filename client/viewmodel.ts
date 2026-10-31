@@ -1,7 +1,7 @@
 /**
- * L'arma in prima persona: scena e camera sue (FOV fisso), disegnate sopra il mondo.
- * Tutte le armi si costruiscono una volta; le animazioni sono funzioni del tempo
- * sommate su un unico "rig": respiro, passo, inerzia, rinculo, ricarica, cambio.
+ * The first-person weapon: its own scene and camera (fixed FOV), drawn over the world.
+ * All weapons are built once; animations are functions of time
+ * summed onto a single "rig": breathing, step, inertia, recoil, reload, switch.
  */
 import * as THREE from "three"
 import type { Viewmodel, ViewmodelFrame } from "./contracts.ts"
@@ -13,7 +13,7 @@ import { buildWeapon, type WeaponModel } from "./models/weapons.ts"
 interface Hold {
   readonly hip: readonly [number, number, number]
   readonly rot: readonly [number, number, number]
-  /** Posa di mira (null = centrata sulla linea di mira). */
+  /** Aim pose (null = centred on the line of sight). */
   readonly aim: readonly [number, number, number] | null
   readonly kickZ: number
   readonly kickR: number
@@ -30,7 +30,7 @@ const HOLD: Record<WeaponId, Hold> = {
   miedi: { hip: [0.15, -0.17, -0.36], rot: [0.03, 0.06, 0], aim: [0.1, -0.16, -0.34], kickZ: 0, kickR: 0, flash: 0 },
   gjalinis: { hip: [0.16, -0.19, -0.36], rot: [0.03, 0.07, 0], aim: [0.09, -0.19, -0.36], kickZ: 0.07, kickR: 0.16, flash: 0.22 },
   lanciafrico: { hip: [0.17, -0.21, -0.4], rot: [0.03, 0.06, 0], aim: null, kickZ: 0.08, kickR: 0.2, flash: 0.3 },
-  // alla torretta: l'arma sta davanti, centrata, tenuta con due mani
+  // at the turret: the gun sits in front, centred, held with both hands
   mitraie: { hip: [0.09, -0.25, -0.34], rot: [0, 0, 0], aim: null, kickZ: 0.008, kickR: 0.01, flash: 0.18 }
 }
 
@@ -38,7 +38,7 @@ const SWITCH_DOWN = 0.16
 const SWITCH_UP = 0.22
 const SWING = 0.42
 const TOSS = 0.6
-/** Di quanto il mirino resta sotto la linea di mira quando si mira (m). */
+/** How far the sight stays below the line of sight when aiming (m). */
 const AIM_DROP = 0.035
 const BOLT_CYCLE = 0.65
 const Y = new THREE.Vector3(0, 1, 0)
@@ -48,7 +48,7 @@ const skin = () => std("vm-skin", { color: 0xe3a985, roughness: 0.75 })
 const linen = () => std("vm-linen", { color: 0xe9e2d0, map: burlapTex(), roughness: 0.95 })
 const cuff = () => std("vm-cuff", { color: 0x6b4a2a, roughness: 0.9 })
 
-/** Mano + manica che esce dall'inquadratura nella direzione `dir` (spazio rig). */
+/** Hand + sleeve leaving the frame in direction `dir` (rig space). */
 function arm(parent: THREE.Object3D, at: THREE.Vector3, dir: THREE.Vector3, hold: Euler3): THREE.Group {
   const g = new THREE.Group()
   g.position.copy(at)
@@ -76,7 +76,7 @@ interface Slot {
   readonly hold: Hold
   readonly leftArm: THREE.Group
   readonly leftBase: THREE.Vector3
-  /** Trasformazioni di riposo delle parti mobili. */
+  /** Rest transforms of the moving parts. */
   readonly rest: { o: THREE.Object3D; p: THREE.Vector3; r: THREE.Euler; v: boolean }[]
 }
 
@@ -99,7 +99,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(60, worldCamera.aspect, 0.01, 10)
 
-  // luce calda di fine pomeriggio, sole basso da sinistra
+  // warm late-afternoon light, low sun from the left
   scene.add(new THREE.HemisphereLight(0xffe2b8, 0x4a3c30, 1.1))
   const sun = new THREE.DirectionalLight(0xffc27a, 2.4)
   sun.position.set(-1.2, 1.4, 0.6)
@@ -126,7 +126,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
   flash.visible = false
   flash.renderOrder = 10
 
-  // braccio sinistro per il lancio della boce di sgnape
+  // left arm for throwing the boce of sgnape
   const toss = new THREE.Group()
   scene.add(toss)
   arm(toss, new THREE.Vector3(), new THREE.Vector3(-0.2, -0.6, 0.75), [0, 0, 0])
@@ -139,7 +139,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
 
   let cur: Slot | null = null
   let pending: WeaponId | null = null
-  let switchT = -1 // <SWITCH_DOWN: abbassa; poi alza
+  let switchT = -1 // <SWITCH_DOWN: lower; then raise
   let reloadT = -1
   let reloadDur = 1
   let fireT = 9
@@ -180,7 +180,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     boltT = -1
   }
 
-  /** Riporta le parti mobili a riposo, prima di animarle. */
+  /** Resets the moving parts to rest before animating them. */
   function rest(s: Slot) {
     for (const r of s.rest) {
       r.o.position.copy(r.p)
@@ -189,7 +189,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     }
   }
 
-  /** Ricariche: muovono le parti e accumulano in A; restituiscono il peso della mano sinistra su `hand`. */
+  /** Reloads: move the parts and accumulate into A; return the left hand's weight on `hand`. */
   function animateReload(s: Slot, p: number): number {
     const P = s.model.parts
     switch (s.id) {
@@ -247,7 +247,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
           }
         })
         hand.set(0, 0.07 + 0.08 * (1 - ins), -0.06 + 0.14 * (1 - ins))
-        // la mano sinistra segue l'astina quando le canne si aprono
+        // the left hand follows the fore-end when the barrels open
         tmp.copy(s.leftBase).sub(b.position).applyAxisAngle(X, b.rotation.x).add(b.position)
         s.leftArm.position.copy(tmp)
         return ramp(p, 0.34, 0.45) - ramp(p, 0.74, 0.84)
@@ -281,7 +281,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
         return ramp(p, 0.1, 0.25) - ramp(p, 0.75, 0.88)
       }
       case "mulin": {
-        // si abbassa la cassa e si cambia il nastro
+        // the box is lowered and the belt changed
         const env = ramp(p, 0, 0.12) - ramp(p, 0.86, 1)
         A.rz -= 0.25 * env
         A.rx += 0.12 * env
@@ -294,7 +294,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
         return ramp(p, 0.1, 0.2) - ramp(p, 0.8, 0.9)
       }
       case "miedi": {
-        // si riempie il serbatoio e si pompa
+        // the tank is filled and pumped
         const env = ramp(p, 0, 0.12) - ramp(p, 0.88, 1)
         A.rx += 0.3 * env
         A.rz += 0.15 * env
@@ -316,7 +316,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
       camera.updateProjectionMatrix()
     }
 
-    // cambio arma: giù, scambio, su
+    // weapon switch: down, swap, up
     let sw = 0
     if (switchT >= 0) {
       switchT += dt
@@ -345,7 +345,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     speedB = damp(speedB, f.grounded ? clamp(f.speed / 6, 0, 1.4) : 0, 10, dt)
     bob += dt * f.speed * (f.grounded ? 3.9 : 0.5)
 
-    // passo e respiro
+    // step and breathing
     const still = 1 - aimB * 0.85
     const bAmp = speedB * (1 + sprintB * 0.8) * still
     A.px += Math.sin(bob) * 0.012 * bAmp
@@ -353,7 +353,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     A.rz += Math.sin(bob) * 0.02 * bAmp
     A.rx += Math.sin(t * 1.7 + 0.5) * 0.006 * (1 - aimB * 0.7)
 
-    // inerzia dello sguardo (lookDx/lookDy come il mouse: + a destra, + in basso): l'arma resta indietro
+    // look inertia (lookDx/lookDy like the mouse: + right, + down): the weapon lags behind
     swayX = damp(swayX, clamp(-f.lookDx * 1.2, -0.05, 0.05), 9, dt)
     swayY = damp(swayY, clamp(f.lookDy * 1.2, -0.05, 0.05), 9, dt)
     const sk = 1 - aimB * 0.6
@@ -362,7 +362,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     A.ry -= swayX * 1.4 * sk
     A.rx += swayY * 1.2 * sk
 
-    // salto, atterraggio, corsa, accovacciato
+    // jump, landing, sprint, crouch
     A.py += airB * 0.012 - land * 0.035
     A.rx += airB * 0.06 - land * 0.08
     A.px -= sprintB * 0.04
@@ -374,7 +374,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     A.py -= crouchB * 0.012
     A.rz += crouchB * 0.06
 
-    // sgnape: tutto ondeggia, con calma
+    // sgnape: everything sways, gently
     if (f.sgnape) {
       A.px += Math.sin(t * 1.3) * 0.016
       A.py += Math.sin(t * 1.9) * 0.009
@@ -382,7 +382,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
       A.ry += Math.sin(t * 0.8) * 0.05
     }
 
-    // rinculo
+    // recoil
     rec = damp(rec, 0, 13, dt)
     fireT += dt
     A.pz += rec * h.kickZ
@@ -391,9 +391,9 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     if (s.id === "mandi") s.model.parts.slide!.position.z += 0.03 * Math.max(0, 1 - fireT / 0.07)
     if (s.id === "cramar") s.model.parts.bolt!.position.z += 0.04 * Math.max(0, 1 - fireT / 0.05)
     if (s.id === "lanciafrico" && !reloading) s.model.parts.frico!.visible = loaded
-    // la prossima gallina torna in bocca al cannone un attimo dopo il colpo
+    // the next hen returns to the cannon's mouth a moment after the shot
     if (s.id === "gjalinis") s.model.parts.frico!.visible = fireT > 0.45
-    // le canne del Mulin girano con la rotazione; il miedi pompa mentre spruzza
+    // the Mulin's barrels turn with the spin; the miedi pumps while spraying
     if (s.id === "mulin") {
       spinA += f.spin * dt * 38
       s.model.parts.spinner!.rotation.z = spinA
@@ -401,7 +401,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     }
     if (s.id === "miedi" && fireT < 0.12) s.model.parts.pouch!.position.y += 0.012 * Math.sin(fireT * 50)
 
-    // fendente col mescul: carica a destra, spazza a sinistra
+    // mescul slash: wind up to the right, sweep to the left
     if (swingT >= 0) {
       swingT += dt
       const p = swingT / SWING
@@ -414,7 +414,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
       if (p >= 1) swingT = -1
     }
 
-    // otturatore del cjampanili dopo il colpo
+    // cjampanili bolt after the shot
     if (boltT >= 0 && !reloading) {
       boltT += dt
       const q = (boltT - 0.2) / BOLT_CYCLE
@@ -427,7 +427,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
       if (q >= 1) boltT = -1
     }
 
-    // ricarica
+    // reload
     let handW = 0
     if (reloading) {
       reloadT += dt
@@ -441,7 +441,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     if (handW > 0.001) s.leftArm.position.lerp(hand, handW)
     s.leftArm.visible = s.model.left !== null || handW > 0.01
 
-    // lancio della bomba con la sinistra
+    // throwing the bomb with the left hand
     if (tossT >= 0) {
       tossT += dt
       const p = tossT / TOSS
@@ -458,7 +458,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
       if (p >= 1) tossT = -1
     }
 
-    // pendolo del sacchetto del cramâr
+    // pendulum of the cramâr's pouch
     if (s.model.parts.pouch) {
       const x = rig.position.x
       const v = (x - prevX) / Math.max(dt, 1e-3)
@@ -471,10 +471,10 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
       s.model.parts.pouch.rotation.x = Math.sin(t * 2.1) * 0.05 + swayY * 3
     }
 
-    // composizione finale: anca ↔ mira, più tutte le aggiunte
+    // final composition: hip ↔ aim, plus all the additions
     const [hx, hy, hz] = h.hip
-    // Mirando l'arma sale al centro ma resta un filo sotto la linea di mira: la cima del
-    // mirino a ~3.5 cm sotto l'occhio, così il bersaglio al centro resta scoperto.
+    // When aiming the weapon rises to the centre but stays a hair below the line of sight: the top of the
+    // sight ~3.5 cm below the eye, so the target in the centre stays uncovered.
     const aim = h.aim ?? [0, -s.model.sightH - AIM_DROP, hz - 0.04]
     rig.position.set(
       hx + (aim[0] - hx) * aimB + A.px,
@@ -484,7 +484,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     const ka = 1 - aimB
     rig.rotation.set(h.rot[0] * ka + A.rx - sw * 0.9, h.rot[1] * ka + A.ry, h.rot[2] * ka + A.rz)
 
-    // lampo
+    // flash
     flash.visible = fireT < 0.05 && h.flash > 0
     if (flash.visible) flashMat.rotation = (t * 37) % 6.28
     muzzleLight.intensity = Math.max(0, 1 - fireT / 0.07) * 4 * (h.flash > 0 ? 1 : 0)
@@ -506,7 +506,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
       }
       pending = id
       reloadT = -1
-      // se si stava rialzando, si riabbassa dalla stessa altezza
+      // if it was being raised, lower it again from the same height
       if (switchT < 0) switchT = 0
       else if (switchT >= SWITCH_DOWN) switchT = SWITCH_DOWN * (1 - ramp(switchT, SWITCH_DOWN, SWITCH_DOWN + SWITCH_UP))
     },
@@ -539,7 +539,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
       if (!cur) return target.setFromMatrixPosition(worldCamera.matrixWorld)
       scene.updateMatrixWorld()
       cur.model.muzzle.getWorldPosition(target)
-      // stesso punto sullo schermo con il FOV del mondo
+      // same point on screen with the world's FOV
       const k = Math.tan(THREE.MathUtils.degToRad(worldCamera.fov) / 2) / worldCamera.zoom / Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)
       target.x *= k
       target.y *= k

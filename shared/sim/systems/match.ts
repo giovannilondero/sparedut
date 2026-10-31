@@ -1,6 +1,6 @@
 /**
- * Il flusso della partita: riscaldamento → in corso → finita → di nuovo in corso.
- * Ogni modalità decide quando finisce e chi vince.
+ * Match flow: warmup → live → over → live again.
+ * Each mode decides when it ends and who wins.
  */
 import { TEAMS } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
@@ -69,13 +69,13 @@ export const MatchFlow = Game.System(
       events.out.emit({ t: "match", a: "start", winner: null })
     }
 
-    /** Il vincitore se la partita è finita in questo tick, altrimenti null. */
+    /** The winner if the match ended this tick, otherwise null. */
     const verdict = (ends: number): Winner | null => {
       const timeUp = tick >= ends
       const score = resources.score.get()
       switch (rules.mode) {
         case "tampieste": {
-          // L'ultimo in piedi; servono almeno due partecipanti, se no si continua.
+          // Last one standing; at least two participants are needed, otherwise play goes on.
           const all = queries.players.each()
           const alive = all.filter((m) => m.data.life.get()._tag === "Alive")
           const last = (): Winner => {
@@ -92,7 +92,7 @@ export const MatchFlow = Game.System(
           return timeUp ? last() : null
         }
         case "cjar":
-          // I Benandanti vincono arrivando in fondo; allo scadere hanno tenuto i Malandanti.
+          // The Benandanti win by reaching the end; when time runs out, the Malandanti have held.
           if (score.benandanti >= rules.scoreLimit) return "benandanti"
           return timeUp ? "malandanti" : null
         default: {
@@ -105,7 +105,7 @@ export const MatchFlow = Game.System(
 
     switch (match._tag) {
       case "Warmup":
-        // Senza questo, se l'host non preme "parti" i punti non contano mai.
+        // Without this, if the host never presses "start" points never count.
         if (startRequested || tick >= WARMUP_TICKS) begin()
         return
       case "Live": {

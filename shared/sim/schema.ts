@@ -1,9 +1,9 @@
 /**
- * Lo schema della simulazione: componenti, risorse, eventi, servizi, macchina della partita.
+ * The simulation schema: components, resources, events, services, match state machine.
  *
- * La simulazione gira autoritativa sul server, una per stanza. Riceve intenti
- * (ingressi, entrate, uscite) come eventi dall'host e pubblica eventi di gioco
- * che l'host gira ai client. Fisica: il servizio `Physics` (Rapier).
+ * The simulation runs authoritatively on the server, one per room. It receives intents
+ * (inputs, joins, leaves) as events from the host and publishes game events
+ * that the host forwards to the clients. Physics: the `Physics` service (Rapier).
  */
 import { Descriptor, Random, Schema } from "@typeonce/ritmo"
 import { z } from "zod"
@@ -17,7 +17,7 @@ import type { GameEvent, KillCause } from "./events.ts"
 
 export const Root = Schema.defineRoot("Sparedut")
 
-// --- Componenti -------------------------------------------------------------
+// --- Components -------------------------------------------------------------
 
 export interface PlayerInfo {
   readonly session: string
@@ -35,36 +35,36 @@ export interface MotionValue {
 export const Motion = Descriptor.Component<MotionValue>()("Sparedut/Motion")
 
 export interface ControlsValue {
-  /** L'ultimo comando applicato: sguardo, pulsanti tenuti, arma, numero confermato. */
+  /** The last applied command: look direction, held buttons, weapon, acknowledged number. */
   readonly input: PlayerInput
-  /** Pulsanti alla fine del tick precedente, per riconoscere le pressioni. */
+  /** Buttons at the end of the previous tick, to detect presses. */
   readonly previous: number
-  /** Tutti i pulsanti comparsi nei comandi di questo tick (una pressione breve non si perde). */
+  /** All buttons seen in this tick's commands (a short press isn't lost). */
   readonly pressed: number
   /**
-   * I comandi arrivati in questo tick, in ordine: ognuno è un passo di movimento,
-   * esattamente come li ha già applicati la predizione del client.
+   * The commands that arrived this tick, in order: each one is a movement step,
+   * exactly as client prediction already applied them.
    */
   readonly steps: ReadonlyArray<PlayerInput>
   /**
-   * L'arma chiesta in questo tick, solo se il comando l'ha cambiata rispetto al
-   * precedente. Il server cambia arma sui cambi, non sul valore: così una raccolta o
-   * un'armeria che cambiano arma da sé non vengono annullate dai comandi già in viaggio.
+   * The weapon requested this tick, only if the command changed it from the
+   * previous one. The server switches weapons on changes, not on the value: that way a pickup or
+   * an armory that switches weapons by itself isn't undone by commands already in flight.
    */
   readonly switchTo: WeaponId | null
-  /** Tick di fila senza comandi (rete in ritardo o scheda in pausa). */
+  /** Consecutive ticks without commands (lagging network or paused tab). */
   readonly starved: number
 }
 export const Controls = Descriptor.Component<ControlsValue>()("Sparedut/Controls")
 
-/** Vivo o morto: i campi di ognuno esistono solo nel suo stato. */
+/** Alive or dead: each one's fields exist only in its own state. */
 export const Life = Descriptor.EntityState(
   "Sparedut/Life",
   {
     Alive: z.object({
       hp: z.number(),
       armor: z.number(),
-      /** Tick di protezione dopo la rinascita. */
+      /** Protection ticks after respawning. */
       shield: z.number().int()
     }),
     Dead: z.object({
@@ -89,19 +89,19 @@ export interface Ammo {
 export interface ArsenalValue {
   readonly current: WeaponId
   readonly primary: PrimaryId
-  /** L'arma principale scelta per la prossima rinascita. */
+  /** The primary weapon chosen for the next respawn. */
   readonly nextPrimary: PrimaryId
   readonly launcher: boolean
   readonly ammo: Readonly<Record<WeaponId, Ammo>>
   readonly action: WeaponAction
   readonly bombs: number
   readonly bombCooldown: number
-  /** Mine di Raibl ancora da piantare. */
+  /** Raibl mines still to plant. */
   readonly mines: number
   readonly mineCooldown: number
-  /** Tick di rotazione accumulati dal Mulin (0 per le altre armi). */
+  /** Spin ticks accumulated by the Mulin (0 for other weapons). */
   readonly spin: number
-  /** Tick rimasti di sgnape in corpo (corri più forte). */
+  /** Ticks of sgnape left in your system (you run faster). */
   readonly sgnape: number
 }
 export const Arsenal = Descriptor.Component<ArsenalValue>()("Sparedut/Arsenal")
@@ -119,7 +119,7 @@ export interface StatsValue {
 }
 export const Stats = Descriptor.Component<StatsValue>()("Sparedut/Stats")
 
-/** Chi ha fatto danno di recente (per gli assist). */
+/** Who dealt damage recently (for assists). */
 export const Attackers = Descriptor.Component<ReadonlyArray<{ readonly session: string; readonly tick: number }>>()("Sparedut/Attackers")
 
 export interface ProjectileValue {
@@ -138,7 +138,7 @@ export interface ProjectileValue {
 }
 export const Projectile = Descriptor.Component<ProjectileValue>()("Sparedut/Projectile")
 
-// --- Risorse ----------------------------------------------------------------
+// --- Resources --------------------------------------------------------------
 
 export interface RulesValue {
   readonly mode: ModeId
@@ -164,35 +164,35 @@ export interface HillValue {
 }
 export const Hill = Descriptor.Resource<HillValue>()("Sparedut/Hill")
 
-/** Il cjar da spingere (Spingi il Cjar): metri percorsi lungo `map.track`. */
+/** The cjar to push (Spingi il Cjar): metres travelled along `map.track`. */
 export interface CartValue {
   readonly d: number
-  /** Benandanti vivi attaccati al cjar (0 se conteso). */
+  /** Living Benandanti on the cjar (0 if contested). */
   readonly pushers: number
   readonly contested: boolean
-  /** Tick senza nessuno che spinge: dopo un po' il cjar torna indietro. */
+  /** Ticks with nobody pushing: after a while the cjar rolls back. */
   readonly idle: number
 }
 export const Cart = Descriptor.Resource<CartValue>()("Sparedut/Cart")
 
-/** Una torretta (una per `map.turrets`, stesso ordine). */
+/** A turret (one per `map.turrets`, same order). */
 export interface TurretState {
-  /** Chi la usa (sessione): sta fermo al posto dietro l'arma finché non smonta o muore. */
+  /** Who is using it (session): stays put behind the gun until they dismount or die. */
   readonly gunner: string | null
-  /** Calore da 0 a 1. */
+  /** Heat from 0 to 1. */
   readonly heat: number
-  /** Surriscaldata: non spara finché il calore non torna a 0. */
+  /** Overheated: won't fire until heat is back to 0. */
   readonly jammed: boolean
-  /** Tick al prossimo colpo. */
+  /** Ticks until the next shot. */
   readonly cooldown: number
 }
 export const Turrets = Descriptor.Resource<ReadonlyArray<TurretState>>()("Sparedut/Turrets")
 
-/** Salute delle porte da sfondare (una per `map.doors`): 0 vuol dire sfondata. */
+/** Health of the breakable doors (one per `map.doors`): 0 means broken down. */
 export const Doors = Descriptor.Resource<ReadonlyArray<number>>()("Sparedut/Doors")
 
 export type PickupState = { readonly _tag: "up" } | { readonly _tag: "down"; readonly ticks: number }
-/** Uno per ogni punto di `PICKUPS`, nello stesso ordine. */
+/** One per `PICKUPS` point, in the same order. */
 export const Pickups = Descriptor.Resource<ReadonlyArray<PickupState>>()("Sparedut/Pickups")
 
 export interface PoseRecord {
@@ -202,20 +202,20 @@ export interface PoseRecord {
   readonly z: number
   readonly crouch: boolean
 }
-/** Le pose degli ultimi tick, per colpire dove il tiratore vedeva il bersaglio. */
+/** Poses from the last ticks, to hit where the shooter saw the target. */
 export const History = Descriptor.TransientResource<ReadonlyArray<{ readonly tick: number; readonly poses: ReadonlyArray<PoseRecord> }>>()("Sparedut/History")
 
 export const Rng = Descriptor.ConstructedResource(Random.codec)("Sparedut/Rng")
 
-// --- Eventi -----------------------------------------------------------------
+// --- Events -----------------------------------------------------------------
 
-/** Dall'host: arriva un giocatore (persona o bot). */
+/** From the host: a player arrives (human or bot). */
 export const Join = Descriptor.Event<{ readonly session: string; readonly name: string; readonly team: Team; readonly bot: boolean; readonly primary: PrimaryId }>()("Sparedut/Join")
 export const Leave = Descriptor.Event<{ readonly session: string }>()("Sparedut/Leave")
 export const InputArrived = Descriptor.Event<{ readonly session: string; readonly input: PlayerInput }>()("Sparedut/InputArrived")
 export const ChangeTeam = Descriptor.Event<{ readonly session: string; readonly team: Team }>()("Sparedut/ChangeTeam")
 export const ChangePrimary = Descriptor.Event<{ readonly session: string; readonly primary: PrimaryId }>()("Sparedut/ChangePrimary")
-/** L'host fa partire (o ripartire) la partita. */
+/** The host starts (or restarts) the match. */
 export const StartMatch = Descriptor.Event<{}>()("Sparedut/StartMatch")
 
 export interface DamageValue {
@@ -224,25 +224,25 @@ export interface DamageValue {
   readonly amount: number
   readonly weapon: KillCause
   readonly head: boolean
-  /** Spinta (esplosioni). */
+  /** Knockback (explosions). */
   readonly push: { readonly x: number; readonly y: number; readonly z: number } | null
 }
 export const Damage = Descriptor.Event<DamageValue>()("Sparedut/Damage")
 
-/** Cura (la Cassele dal Miedi e il medico vicino): la applica `ApplyDamage`, padrona della salute. */
+/** Healing (the Cassele dal Miedi and a nearby medic): applied by `ApplyDamage`, which owns health. */
 export const Heal = Descriptor.Event<{ readonly target: string; readonly healer: string; readonly amount: number }>()("Sparedut/Heal")
 
-/** Un colpo a una porta (spari, mescul, esplosioni): la applica `BreakDoors`. */
+/** A hit on a door (shots, mescul, explosions): applied by `BreakDoors`. */
 export const DoorHit = Descriptor.Event<{ readonly door: number; readonly amount: number; readonly by: string }>()("Sparedut/DoorHit")
 
-/** Verso l'host e i client. */
+/** To the host and the clients. */
 export const Out = Descriptor.Event<GameEvent>()("Sparedut/Out")
 
-// --- Servizi ----------------------------------------------------------------
+// --- Services ---------------------------------------------------------------
 
 export const Physics = Descriptor.Service<PhysicsWorld>()("Sparedut/Physics")
 
-// --- Gioco ------------------------------------------------------------------
+// --- Game -------------------------------------------------------------------
 
 export const Game = Schema.bind(
   Schema.fragment({
@@ -254,11 +254,11 @@ export const Game = Schema.bind(
   Root
 )
 
-/** La partita: riscaldamento, in corso (fino al tick `ends`), finita. */
+/** The match: warmup, live (until tick `ends`), over. */
 export const Match = Game.StateMachine("Sparedut/Match", {
   Warmup: {},
   Live: z.object({ ends: z.number().int() }),
-  /** Il vincitore: una squadra, nessuno, o (La Tampieste) l'ultimo in piedi. */
+  /** The winner: a team, nobody, or (La Tampieste) the last one standing. */
   Over: z.object({
     winner: z.union([z.enum(["benandanti", "malandanti", "pari"]), z.object({ player: z.string(), name: z.string() })]),
     restarts: z.number().int()

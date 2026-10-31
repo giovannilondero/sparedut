@@ -1,6 +1,6 @@
 /**
- * Il primo import di `main.ts`, prima che qualcuno costruisca uno schema: la CSP (`public/_headers`)
- * non ammette eval, e zod altrimenti lo prova per compilare i suoi controlli.
+ * The first import of `main.ts`, before anyone builds a schema: the CSP (`public/_headers`)
+ * doesn't allow eval, and zod would otherwise try it to compile its checks.
  */
 import { config } from "zod"
 

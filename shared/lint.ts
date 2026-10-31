@@ -1,15 +1,15 @@
-/** Ingresso per `ritmo-devtools lint`: il runtime della stanza e il suo schedule. */
+/** Entry point for `ritmo-devtools lint`: the room's runtime and its schedule. */
 import { HostClock } from "@typeonce/ritmo"
 import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Out, StartMatch } from "./sim/schema.ts"
 import { makeRuntime, simulate } from "./sim/index.ts"
 
-/** L'host legge gli eventi `Out` (con l'inspector `ReadOutbox`) e li gira ai client. */
+/** The host reads `Out` events (with the `ReadOutbox` inspector) and forwards them to clients. */
 const HostReadsOut = Game.System("Sparedut/HostReadsOut", { events: { out: Game.System.readEvent(Out) } }, ({ events }) => {
   events.out.all()
 })
 
 export const lintTarget = async () => {
-  // La fisica è un servizio dell'host: si carica qui dentro.
+  // Physics is a host service: it's loaded in here.
   const { createPhysicsWorld, initPhysics } = await import("./physics.ts")
   const { GLEMONE } = await import("./maps/glemone.ts")
   await initPhysics()

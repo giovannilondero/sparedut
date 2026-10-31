@@ -1,15 +1,15 @@
 /**
- * Applica cure e danni del tick: è l'unico sistema che tocca la salute dei vivi
- * dopo la rinascita. Corazza, morti, uccisioni, assist, serie, punti.
+ * Applies the tick's heals and damage: it's the only system that touches the health of the living
+ * after respawn. Armor, deaths, kills, assists, streaks, points.
  */
 import { STREAK_AT } from "../../folklore.ts"
 import type { KillCause } from "../events.ts"
 import { absorb, ASSIST_WINDOW_TICKS, hostile, MAX_HP, RESPAWN_TICKS } from "../rules.ts"
 import { Attackers, Damage, Game, Heal, Life, Match, Motion, Out, Player, Rules, Score, Stats, TeamOf, Tick } from "../schema.ts"
 
-/** Le cause che possono colpire anche chi le ha lanciate (le altre, su sé stessi, sono una caduta). */
+/** Causes that can also hit whoever launched them (the others, on oneself, count as a fall). */
 const SELF_HARM: ReadonlySet<KillCause> = new Set(["sgnape", "lanciafrico", "mine", "tampieste"])
-/** Punti al medico per ogni punto di salute ridato a un compagno. */
+/** Points to the medic for each health point restored to a teammate. */
 const HEAL_SCORE = 0.25
 
 export const ApplyDamage = Game.System(
@@ -112,7 +112,7 @@ export const ApplyDamage = Game.System(
         }
         if (STREAK_AT.has(streak)) events.out.emit({ t: "streak", s: hit.attacker ?? "", n: streak })
       } else if (live && rules.mode === "bataie" && (self || hit.weapon === "fall")) {
-        // Suicidio: il punto va agli altri. Lo sbilf ride.
+        // Suicide: the point goes to the other team. The sbilf laughs.
         const other = victimTeam === "benandanti" ? "malandanti" : "benandanti"
         resources.score.update((s) => ({ ...s, [other]: s[other] + 1 }))
       }

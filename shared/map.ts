@@ -1,9 +1,9 @@
 /**
- * La forma di una mappa di gioco, come dati. Ogni mappa (`shared/maps/`) è una sola
- * fonte per collisioni (Rapier, server e client), rendering (Three.js), spawn,
- * obiettivi, percorso del carrello e grafo di navigazione dei bot.
+ * The shape of a game map, as data. Each map (`shared/maps/`) is the single
+ * source for collisions (Rapier, server and client), rendering (Three.js), spawns,
+ * objectives, the cart's path and the bots' navigation graph.
  *
- * Assi: x verso est, y in alto, z verso sud. Metri.
+ * Axes: x east, y up, z south. Metres.
  */
 import { Ops } from "@typeonce/ritmo"
 import { TURRET } from "./weapons.ts"
@@ -16,47 +16,47 @@ export const TEAMS = ["benandanti", "malandanti"] as const satisfies readonly Te
 export type MapId = "glemone" | "osoppo" | "trincee" | "venzone" | "predil" | "maran"
 
 export type Mat =
-  | "pietra" // pietra grigia del Duomo
+  | "pietra" // grey stone of the Duomo
   | "pietraChiara"
   | "intonacoOcra"
   | "intonacoRosa"
   | "intonacoBianco"
   | "intonacoGiallo"
-  | "porfido" // selciato
+  | "porfido" // cobblestones
   | "legno"
-  | "fen" // fieno
+  | "fen" // hay
   | "coppi"
   | "erba"
   | "marmo"
   | "ferro"
-  | "terra" // terra battuta: trincee, sentieri, gallerie
-  | "roccia" // roccia viva delle montagne e della miniera
-  | "sacs" // sacchetti di sabbia
+  | "terra" // packed earth: trenches, paths, tunnels
+  | "roccia" // bare rock of the mountains and the mine
+  | "sacs" // sandbags
   | "invisibile"
 
-/** Un parallelepipedo allineato agli assi: collide e si vede. */
+/** An axis-aligned box: it collides and is drawn. */
 export interface Block {
   readonly min: V3
   readonly max: V3
   readonly mat: Mat
-  /** Come lo disegna il client: un "muro" ha finestre, un "pilastro" no, ... */
+  /** How the client draws it: a "muro" has windows, a "pilastro" doesn't, ... */
   readonly look?: "muro" | "pilastro" | "terreno" | "copertura" | "cassa" | "fontana" | "bancarele" | "parapetto"
 }
 
-/** Una rampa: piano inclinato lungo z, pieno sotto (niente buchi). */
+/** A ramp: a plane sloping along z, solid underneath (no gaps). */
 export interface Wedge {
   readonly x0: number
   readonly x1: number
   readonly z0: number
   readonly z1: number
-  /** Quota della superficie a z0 e a z1. */
+  /** Surface height at z0 and at z1. */
   readonly y0: number
   readonly y1: number
   readonly mat: Mat
 }
 
 export interface Portico {
-  /** Il lato aperto sulla strada. */
+  /** The side open onto the street. */
   readonly side: "east" | "west" | "north" | "south"
   readonly depth: number
   readonly height: number
@@ -76,7 +76,7 @@ export interface JumpPad {
   readonly name: string
   readonly at: V3
   readonly radius: number
-  /** Velocità impressa (m/s). */
+  /** Velocity imparted (m/s). */
   readonly launch: V3
 }
 
@@ -87,13 +87,13 @@ export interface PickupSpot {
   readonly at: V3
 }
 
-/** Una torretta con la mitraie: `at` è il piede dell'arma, `yaw` dove guarda a riposo. */
+/** A turret with the mitraie: `at` is the foot of the gun, `yaw` where it faces at rest. */
 export interface TurretSpot {
   readonly at: V3
   readonly yaw: number
 }
 
-/** Una porta che si sfonda: collide finché ha salute, poi non c'è più. */
+/** A breakable door: it collides while it has health, then it's gone. */
 export interface DoorDef {
   readonly name: string
   readonly min: V3
@@ -116,36 +116,36 @@ export interface Bounds {
 export interface MapDef {
   readonly id: MapId
   readonly bounds: Bounds
-  /** Tutto ciò che collide come scatola: terreno, muri, ripari, edifici scomposti, bordi del mondo. */
+  /** Everything that collides as a box: ground, walls, cover, decomposed buildings, world edges. */
   readonly blocks: readonly Block[]
   readonly wedges: readonly Wedge[]
-  /** Gli edifici interi (il client li disegna con finestre e tetti; i blocchi sono già in `blocks`). */
+  /** Whole buildings (the client draws them with windows and roofs; their blocks are already in `blocks`). */
   readonly buildings: readonly Building[]
   readonly jumpPads: readonly JumpPad[]
   readonly spawns: Readonly<Record<Team, readonly Spawn[]>>
-  /** Dove sta il frico di ogni squadra (Cjape il Frico). */
+  /** Where each team's frico sits (Cjape il Frico). */
   readonly flagBases: Readonly<Record<Team, V3>>
-  /** La zona da tenere (Re de Culine). */
+  /** The zone to hold (Re de Culine). */
   readonly hill: { readonly at: V3; readonly radius: number }
   readonly pickups: readonly PickupSpot[]
-  /** Punti di passaggio per i bot; gli archi li calcola `server/nav.ts` con la fisica. */
+  /** Waypoints for the bots; `server/nav.ts` computes the edges with the physics. */
   readonly navPoints: readonly V3[]
   /**
-   * Il percorso del carrello (Spingi il Cjar): spezzata sul pavimento, dal primo punto
-   * (vicino alla base dei Benandanti, che spingono) all'ultimo (dove arriva).
+   * The cart's path (Spingi il Cjar): a polyline on the floor, from the first point
+   * (near the base of the Benandanti, who push) to the last (where it arrives).
    */
   readonly track: readonly V3[]
-  /** Sotto questa quota si è caduti fuori dal mondo. */
+  /** Below this height you've fallen out of the world. */
   readonly killY: number
-  /** Acqua bassa da guadare: con i piedi sotto `level` si va a `speed` della velocità. */
+  /** Shallow water to wade: with your feet below `level` you move at `speed` of normal speed. */
   readonly wade?: { readonly level: number; readonly speed: number }
-  /** Le torrette con la mitraie. */
+  /** The turrets with the mitraie. */
   readonly turrets: readonly TurretSpot[]
-  /** Le porte da sfondare (non stanno in `blocks`: la fisica le toglie quando cedono). */
+  /** The doors to break down (not in `blocks`: the physics removes them when they give way). */
   readonly doors: readonly DoorDef[]
 }
 
-/** Scompone un edificio (anche con portici) nei blocchi che collidono. */
+/** Breaks a building (porticoes included) down into the blocks that collide. */
 export function buildingBlocks(b: Building): Block[] {
   const out: Block[] = []
   const [x0, y0, z0] = b.min
@@ -184,13 +184,13 @@ export function buildingBlocks(b: Building): Block[] {
 }
 
 export interface MapInput extends Omit<MapDef, "blocks"> {
-  /** Terreno, muri e ripari; edifici e bordi del mondo li aggiunge `defineMap`. */
+  /** Ground, walls and cover; `defineMap` adds buildings and world edges. */
   readonly blocks: readonly Block[]
-  /** Fondo e cielo dei muri invisibili di bordo. */
+  /** Bottom and top of the invisible edge walls. */
   readonly walls: { readonly bottom: number; readonly top: number }
 }
 
-/** Completa una mappa: blocchi degli edifici e muri invisibili attorno ai `bounds`. */
+/** Completes a map: building blocks and invisible walls around the `bounds`. */
 export function defineMap(input: MapInput): MapDef {
   const { walls, blocks, ...rest } = input
   const { minX, maxX, minZ, maxZ } = input.bounds
@@ -205,12 +205,12 @@ export function defineMap(input: MapInput): MapDef {
   return { ...rest, blocks: [...blocks, ...edge, ...input.buildings.flatMap(buildingBlocks)] }
 }
 
-/** Dove sta chi usa una torretta: dietro l'arma, sullo stesso piano. */
+/** Where a turret's user stands: behind the gun, on the same level. */
 export function turretSeat(t: TurretSpot): V3 {
   return [t.at[0] + Ops.sin(t.yaw) * TURRET.seat, t.at[1], t.at[2] + Ops.cos(t.yaw) * TURRET.seat]
 }
 
-/** Lo sguardo di chi usa la torretta, dentro l'arco in cui l'arma gira. */
+/** The turret user's aim, clamped to the arc the gun turns through. */
 export function turretAim(t: TurretSpot, yaw: number, pitch: number): { readonly yaw: number; readonly pitch: number } {
   let d = yaw - t.yaw
   d -= Math.round(d / (2 * Math.PI)) * 2 * Math.PI
@@ -219,14 +219,14 @@ export function turretAim(t: TurretSpot, yaw: number, pitch: number): { readonly
 
 const dist3 = (a: V3, b: V3) => Math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2 + (b[2] - a[2]) ** 2)
 
-/** Lunghezza di una spezzata (orizzontale e verticale). */
+/** Length of a polyline (horizontal and vertical). */
 export function trackLength(track: readonly V3[]): number {
   let n = 0
   for (let i = 1; i < track.length; i++) n += dist3(track[i - 1], track[i])
   return n
 }
 
-/** Il punto a distanza `d` lungo la spezzata, e la direzione (imbardata) del tratto. */
+/** The point at distance `d` along the polyline, and the heading (yaw) of that segment. */
 export function trackPoint(track: readonly V3[], d: number): { readonly at: V3; readonly yaw: number } {
   let left = Math.max(0, d)
   for (let i = 1; i < track.length; i++) {

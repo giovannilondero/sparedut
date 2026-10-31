@@ -1,6 +1,6 @@
 /**
- * Movimento dei vivi con la fisica condivisa, e memoria delle pose per la
- * compensazione della latenza.
+ * Movement of the living with the shared physics, and pose memory for
+ * lag compensation.
  */
 import { BUTTON, type PlayerInput } from "../../input.ts"
 import { turretAim, turretSeat } from "../../map.ts"
@@ -11,7 +11,7 @@ import { owned, SGNAPE_SPEED, turretOf } from "../rules.ts"
 import { Arsenal, Controls, Damage, Flags, Game, History, Life, Match, Motion, Out, Physics, Player, Rules, Tick, Turrets, type PoseRecord } from "../schema.ts"
 
 const HISTORY_TICKS = 40
-/** Dopo questi tick senza comandi il corpo riprende a cadere da solo. */
+/** After this many ticks without commands the body starts falling on its own again. */
 const STARVED_TICKS = 8
 
 export const MovePlayers = Game.System(
@@ -44,7 +44,7 @@ export const MovePlayers = Game.System(
       if (m.data.life.get()._tag !== "Alive") continue
       const session = m.data.player.get().session
       const controls = m.data.controls.get()
-      // Alla torretta si sta fermi al posto, e lo sguardo gira solo dentro l'arco dell'arma.
+      // On a turret you stay put in the seat, and the view turns only within the gun's arc.
       const mounted = turretOf(turrets, session)
       if (mounted >= 0) {
         const spot = spots[mounted]
@@ -55,10 +55,10 @@ export const MovePlayers = Game.System(
       }
       const arsenal = m.data.arsenal.get()
       const buff = (arsenal.sgnape > 0 ? SGNAPE_SPEED : 1) * (carriers.has(session) ? 0.9 : 1)
-      // Il peso dell'arma è quello chiesta nel comando (se la possiedi): come lo calcola la predizione.
+      // Weapon weight is that of the one requested in the command (if you own it): the way prediction computes it.
       const scaleFor = (input: PlayerInput) => WEAPONS[owned(arsenal, input.weapon) ? input.weapon : arsenal.current].moveScale * buff
-      // Un passo per comando arrivato. Senza comandi per un po' (rete ferma), si cade
-      // comunque: un passo da fermo, senza salto.
+      // One step per arrived command. Without commands for a while (stalled network), you fall
+      // anyway: a standing step, no jump.
       const steps =
         controls.steps.length > 0 ? controls.steps
         : controls.starved > STARVED_TICKS ? [{ ...controls.input, mx: 0, mz: 0, buttons: controls.input.buttons & ~BUTTON.jump }]

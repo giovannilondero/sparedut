@@ -1,6 +1,6 @@
 /**
- * Attrezzi geometrici del mondo: un "cesto" che fonde le primitive per materiale,
- * un raccoglitore di istanze, archi, volte, quadrilateri e un PRNG deterministico.
+ * The world's geometry tools: a "basket" that merges primitives by material,
+ * an instance collector, arches, vaults, quads and a deterministic PRNG.
  */
 import * as THREE from "three"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
@@ -15,7 +15,7 @@ export const rng = (seed: number) => () => {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296
 }
 
-/** UV proiettate in coordinate mondo (metri / scala): le texture restano a misura d'uomo. */
+/** UVs projected in world coordinates (metres / scale): textures stay at human scale. */
 export function worldUV(g: THREE.BufferGeometry, scale: number): THREE.BufferGeometry {
   const p = g.getAttribute("position")
   const n = g.getAttribute("normal")
@@ -36,13 +36,13 @@ export function worldUV(g: THREE.BufferGeometry, scale: number): THREE.BufferGeo
 
 const WHITE = new THREE.Color(1, 1, 1)
 
-/** Raccoglie geometrie per chiave di materiale e alla fine le fonde in una mesh ciascuna. */
+/** Collects geometries by material key and finally merges them into one mesh each. */
 export class Batch<K extends string> {
   private parts = new Map<K, THREE.BufferGeometry[]>()
-  /** `ownKeys`: materiali che tengono sempre le UV proprie (atlante). */
+  /** `ownKeys`: materials that always keep their own UVs (atlas). */
   constructor(private readonly scales: Record<K, number>, private readonly ownKeys: readonly K[] = []) {}
 
-  /** `ownUV`: tiene le UV della primitiva invece di proiettarle in mondo. */
+  /** `ownUV`: keeps the primitive's UVs instead of projecting them in world space. */
   add(key: K, g: THREE.BufferGeometry, color: THREE.Color = WHITE, ownUV = false): void {
     if (this.ownKeys.includes(key)) ownUV = true
     if (!ownUV || !g.getAttribute("uv")) worldUV(g, this.scales[key])
@@ -79,7 +79,7 @@ export class Batch<K extends string> {
   }
 }
 
-/** Raccoglie matrici (e colori) per una InstancedMesh. */
+/** Collects matrices (and colours) for an InstancedMesh. */
 export class Inst {
   readonly mats: THREE.Matrix4[] = []
   readonly cols: THREE.Color[] = []
@@ -100,7 +100,7 @@ export class Inst {
   }
 }
 
-// --- primitive -------------------------------------------------------------------------
+// --- primitives -----------------------------------------------------------------------
 
 export function boxAt(min: V, max: V): THREE.BufferGeometry {
   const g = new THREE.BoxGeometry(max[0] - min[0], max[1] - min[1], max[2] - min[2])
@@ -108,7 +108,7 @@ export function boxAt(min: V, max: V): THREE.BufferGeometry {
   return g
 }
 
-/** Quadrilatero a-b-c-d (antiorario visto dal davanti), UV 0..su lungo a→b, 0..sv lungo a→d. */
+/** Quad a-b-c-d (counter-clockwise seen from the front), UV 0..su along a→b, 0..sv along a→d. */
 export function quad(a: V, b: V, c: V, d: V, su = 1, sv = 1): THREE.BufferGeometry {
   const g = new THREE.BufferGeometry()
   g.setAttribute("position", new THREE.Float32BufferAttribute([...a, ...b, ...c, ...d], 3))
@@ -125,7 +125,7 @@ export function tri(a: V, b: V, c: V): THREE.BufferGeometry {
   return g
 }
 
-/** Punti di un arco (tondo con c=0, acuto con c>0) da (-a,0) all'imposta destra (a,0). */
+/** Points of an arch (round with c=0, pointed with c>0) from (-a,0) to the right springer (a,0). */
 export function archPoints(a: number, c: number, n = 10): [number, number][] {
   const R = a + c
   const tEnd = Math.acos(-c / R)
@@ -138,7 +138,7 @@ export function archPoints(a: number, c: number, n = 10): [number, number][] {
   return [...left, ...right]
 }
 
-/** Pennacchi: rettangolo largo 2a e alto h con un arco ritagliato dal basso. Estruso lungo z per `d`. */
+/** Spandrels: rectangle 2a wide and h tall with an arch cut out from below. Extruded along z by `d`. */
 export function spandrel(a: number, h: number, d: number, c = 0): THREE.BufferGeometry {
   const s = new THREE.Shape()
   s.moveTo(-a, 0)
@@ -153,7 +153,7 @@ export function spandrel(a: number, h: number, d: number, c = 0): THREE.BufferGe
   return g
 }
 
-/** Ghiera d'arco (archivolto) fra raggio interno `a1` e esterno `a2`, estrusa per `d`. */
+/** Arch ring (archivolt) between inner radius `a1` and outer `a2`, extruded by `d`. */
 export function archRing(a1: number, a2: number, d: number, c = 0, n = 14): THREE.BufferGeometry {
   const s = new THREE.Shape()
   const outer = archPoints(a2, c * (a2 / a1), n)
@@ -167,7 +167,7 @@ export function archRing(a1: number, a2: number, d: number, c = 0, n = 14): THRE
   return g
 }
 
-/** Superficie piana a forma d'arco (riempimento di finestre, lunette). */
+/** Flat arch-shaped surface (window infill, lunettes). */
 export function archPanel(a: number, hRect: number, c = 0): THREE.BufferGeometry {
   const s = new THREE.Shape()
   s.moveTo(-a, -hRect)
@@ -177,7 +177,7 @@ export function archPanel(a: number, hRect: number, c = 0): THREE.BufferGeometry
   return new THREE.ShapeGeometry(s)
 }
 
-/** Volta a botte ribassata: asse lungo z (0..L), corda 2a lungo x, freccia `rise`; si vede da sotto. */
+/** Segmental barrel vault: axis along z (0..L), chord 2a along x, rise `rise`; seen from below. */
 export function vault(a: number, rise: number, L: number, n = 10): THREE.BufferGeometry {
   const R = (a * a + rise * rise) / (2 * rise)
   const pos: number[] = []
@@ -201,7 +201,7 @@ export function vault(a: number, rise: number, L: number, n = 10): THREE.BufferG
   return g
 }
 
-/** Matrice di una facciata: x lungo il muro, y in alto, z uscente (normale `n`), origine `p`. */
+/** Façade matrix: x along the wall, y up, z outward (normal `n`), origin `p`. */
 export function faceMatrix(n: V, p: V, out = new THREE.Matrix4()): THREE.Matrix4 {
   const nz = new THREE.Vector3(...n)
   const up = new THREE.Vector3(0, 1, 0)

@@ -1,6 +1,6 @@
 /**
- * Oggetti di scena condivisi fra viewmodel ed effetti: la boce di sgnape con la miccia
- * e la forma di frico. Geometrie in cache: ogni chiamata crea solo le mesh.
+ * Props shared between the viewmodel and effects: the boce of sgnape with its fuse
+ * and the frico wheel. Geometries are cached: each call only creates the meshes.
  */
 import * as THREE from "three"
 import { canvasTexture, fricoTex, std } from "./kit.ts"
@@ -31,7 +31,7 @@ const bottleMats = () => ({
   rag: std("p-rag", { color: 0xe8dcc0, roughness: 1, emissive: 0x401000 })
 })
 
-/** Bottiglia di grappa alta ~22 cm, base a y=0. */
+/** A grappa bottle ~22 cm tall, base at y=0. */
 export function sgnapeBottle(): THREE.Group {
   if (!bottleGeo) {
     const prof = [
@@ -66,7 +66,7 @@ export function sgnapeBottle(): THREE.Group {
 
 let fricoGeo: { disc: THREE.BufferGeometry; rim: THREE.BufferGeometry } | null = null
 
-/** Forma di frico, diametro ~32 cm, faccia verso ±y. */
+/** A frico wheel, ~32 cm across, faces towards ±y. */
 export function fricoDisc(): THREE.Group {
   if (!fricoGeo) fricoGeo = { disc: new THREE.CylinderGeometry(0.16, 0.16, 0.035, 18), rim: new THREE.TorusGeometry(0.155, 0.018, 6, 18).rotateX(Math.PI / 2) }
   const mat = std("p-frico", { color: 0xf0b850, map: fricoTex(), roughness: 0.7, emissive: 0x5a2400 })
@@ -79,8 +79,8 @@ export function fricoDisc(): THREE.Group {
 let henGeo: { body: THREE.BufferGeometry; head: THREE.BufferGeometry; beak: THREE.BufferGeometry; comb: THREE.BufferGeometry; wattle: THREE.BufferGeometry; tail: THREE.BufferGeometry; wing: THREE.BufferGeometry; eye: THREE.BufferGeometry; leg: THREE.BufferGeometry } | null = null
 
 /**
- * La gjaline: gallina bianca lunga ~40 cm che guarda verso +z, coi piedi a y≈-0.15.
- * Le ali (`wings`, sinistra e destra) girano attorno all'asse z per sbattere.
+ * The gjaline: a white hen ~40 cm long facing +z, with its feet at y≈-0.15.
+ * The wings (`wings`, left and right) rotate around the z axis to flap.
  */
 export function gjaline(): { g: THREE.Group; wings: THREE.Object3D[] } {
   if (!henGeo) {

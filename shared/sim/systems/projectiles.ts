@@ -1,6 +1,6 @@
 /**
- * Forme di frico, bombe di sgnape, mine di Raibl e galline: volano, rimbalzano, si
- * piantano, puntano il nemico, scoppiano. Le esplosioni scheggiano le porte vicine.
+ * Frico wheels, sgnape bombs, Raibl mines and hens: they fly, bounce,
+ * stick, home in on the enemy, burst. Explosions splinter nearby doors.
  */
 import { bodyCenter } from "../../hitbox.ts"
 import { MAPS } from "../../maps/index.ts"
@@ -18,7 +18,7 @@ const BLAST = {
   mine: { radius: RAIBL_MINE.radius, damage: RAIBL_MINE.damage, cause: "mine" },
   gjaline: { radius: GJALINE.radius, damage: WEAPONS.gjalinis.damage, cause: "gjalinis" }
 } as const satisfies Record<ProjectileKind, { radius: number; damage: number; cause: KillCause }>
-/** Scoppiano addosso a chi toccano in volo. */
+/** They burst on whoever they touch in flight. */
 const CONTACT: ReadonlySet<ProjectileKind> = new Set(["frico", "gjaline"])
 
 export const FlyProjectiles = Game.System(
@@ -69,10 +69,10 @@ export const FlyProjectiles = Game.System(
           head: false,
           push: { x: dx * inv * push, y: 4 + 6 * falloff, z: dz * inv * push }
         })
-        // Le piume della gjaline: chi è preso non vede niente per un po'.
+        // The gjaline's feathers: whoever is hit can't see anything for a while.
         if (p.kind === "gjaline") events.out.emit({ t: "plumis", v: target.session, n: Math.round(GJALINE.blindTicks * (0.5 + 0.5 * falloff)) })
       }
-      // Le porte vicine: si misura dal punto della porta più vicino allo scoppio.
+      // Nearby doors: measured from the door's point closest to the blast.
       doors.forEach((door, i) => {
         const cx = Math.max(door.min[0], Math.min(door.max[0], at.x))
         const cy = Math.max(door.min[1], Math.min(door.max[1], at.y))
@@ -84,7 +84,7 @@ export const FlyProjectiles = Game.System(
 
     for (const m of queries.projectiles.each()) {
       const p = m.data.projectile.get()
-      // Una mine piantata non si muove: aspetta che si armi, poi chi le passa vicino.
+      // A planted mine doesn't move: it waits to arm, then for someone to pass nearby.
       if (p.kind === "mine" && p.vx === 0 && p.vy === 0 && p.vz === 0) {
         const fuse = p.fuse - 1
         const victim =
@@ -105,7 +105,7 @@ export const FlyProjectiles = Game.System(
       let vy = p.vy - GRAVITY[p.kind] * DT
       let vz = p.vz
       if (p.kind === "gjaline") {
-        // La gjaline punta il nemico più vicino che ha davanti, girando piano.
+        // The gjaline homes in on the nearest enemy ahead of it, turning slowly.
         const sp = Math.sqrt(vx ** 2 + vy ** 2 + vz ** 2)
         if (sp > 1e-6) {
           let best: { x: number; y: number; z: number } | null = null
@@ -142,7 +142,7 @@ export const FlyProjectiles = Game.System(
       if (step > 1e-6) {
         const dir = { x: vx / speed, y: vy / speed, z: vz / speed }
         const wall = physics.raycast({ x, y, z }, dir, step + 0.12)
-        // Contro un giocatore: frico e gjaline scoppiano addosso.
+        // Against a player: frico and gjaline burst on contact.
         if (CONTACT.has(p.kind)) {
           for (const t of living) {
             if (t.session === p.owner && p.age < 12) continue
@@ -163,7 +163,7 @@ export const FlyProjectiles = Game.System(
         if (!exploded && wall) {
           const at = { x: x + dir.x * Math.max(0, wall.dist - 0.1), y: y + dir.y * Math.max(0, wall.dist - 0.1), z: z + dir.z * Math.max(0, wall.dist - 0.1) }
           if (p.kind === "mine") {
-            // Sul pavimento si pianta; contro un muro scivola giù.
+            // On the floor it sticks; against a wall it slides down.
             x = at.x
             y = at.y
             z = at.z

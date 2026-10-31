@@ -1,4 +1,4 @@
-// Anteprima del mondo: mappa con ?map=osoppo, camera del menu (o fissa con ?cam=x,y,z,lx,ly,lz), modalità con ?mode=frico|culine|cjar|tampieste.
+// World preview: map with ?map=osoppo, menu camera (or fixed with ?cam=x,y,z,lx,ly,lz), mode with ?mode=frico|culine|cjar|tampieste.
 import * as THREE from "three"
 import { trackLength, trackPoint, type MapId } from "../../shared/map.ts"
 import { MAP_IDS, MAPS } from "../../shared/maps/index.ts"
@@ -35,11 +35,11 @@ resize()
 
 const cam = q.get("cam")?.split(",").map(Number)
 const mode = q.get("mode")
-/** Il cjar che va avanti e indietro sul binario, la tempesta che si stringe. */
+/** The cjar going back and forth along the track, the storm closing in. */
 const extras = (t: number): Pick<WorldFrame, "cart" | "storm" | "turrets" | "doors"> => {
   const len = trackLength(map.track)
   const p = trackPoint(map.track, ((Math.sin(t * 0.05) + 1) / 2) * len)
-  // le torrette girano e scaldano, le porte si rompono e tornano
+  // the turrets turn and heat up, the doors break and come back
   const heat = (Math.sin(t * 0.4) + 1) / 2
   return {
     turrets: map.turrets.map((s, i) => ({ yaw: s.yaw + Math.sin(t * 0.7 + i) * 0.8, pitch: Math.sin(t * 0.5) * 0.15, heat, jammed: heat > 0.95, manned: true, mine: false })),
@@ -83,7 +83,7 @@ const loop = (now: number) => {
 }
 requestAnimationFrame(loop)
 
-// Per gli strumenti: fotografa un'inquadratura (jpeg ridotto) senza aspettare il ciclo.
+// For tooling: snapshots a framing (downscaled jpeg) without waiting for the loop.
 ;(globalThis as Record<string, unknown>).__shot = (c: number[] | null, t = 5, w = 960) => {
   if (c) {
     camera.position.set(c[0], c[1], c[2])

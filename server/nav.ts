@@ -1,6 +1,6 @@
 /**
- * Grafo di navigazione dei bot: i punti di `NAV_POINTS`, collegati solo dove
- * si arriva davvero camminando (lo verifica la fisica, rampe e salti compresi).
+ * The bots' navigation graph: the points of `NAV_POINTS`, linked only where
+ * you can really get by walking (checked by the physics, ramps and jumps included).
  */
 import { IDLE_INPUT } from "../shared/input.ts"
 import type { MapId, V3 } from "../shared/map.ts"
@@ -18,7 +18,7 @@ const MAX_EDGE = 26
 function walkable(physics: PhysicsWorld, a: V3, b: V3): boolean {
   let body: Body = { x: a[0], y: a[1] + 0.05, z: a[2], vx: 0, vy: 0, vz: 0, grounded: true, crouch: false }
   const dist = Math.hypot(b[0] - a[0], b[2] - a[2])
-  // nell'acqua bassa si va più piano
+  // shallow water is slower
   const ticks = Math.ceil((dist / (6.4 * (physics.map.wade?.speed ?? 1))) * 60 * 1.6) + 20
   let best = Infinity
   let since = 0
@@ -27,7 +27,7 @@ function walkable(physics: PhysicsWorld, a: V3, b: V3): boolean {
     const dz = b[2] - body.z
     const d2 = dx * dx + dz * dz
     if (d2 < 0.6 * 0.6) return Math.abs(body.y - b[1]) < 0.8
-    // fermo contro un muro (o un tronco) da mezzo secondo: di lì non si passa
+    // stuck against a wall (or a log) for half a second: no way through
     if (d2 < best - 0.01) {
       best = d2
       since = 0
@@ -40,14 +40,14 @@ function walkable(physics: PhysicsWorld, a: V3, b: V3): boolean {
   return false
 }
 
-/** Un grafo per mappa: la fisica è statica, si calcola una volta per processo. */
+/** One graph per map: the physics is static, so it's computed once per process. */
 const cached = new Map<MapId, NavGraph>()
-/** Le mappe di cui abbiamo già guardato il grafo precalcolato, buono o no. */
+/** Maps whose precomputed graph we've already checked, good or not. */
 const checked = new Set<MapId>()
-/** I grafi a metà: gli archi dei primi `next` punti, e il tempo speso finora. */
+/** Half-built graphs: the edges of the first `next` points, and the time spent so far. */
 const partial = new Map<MapId, { edges: number[][]; next: number; ms: number }>()
 
-/** Gli archi che partono dal punto `i`. */
+/** The edges leaving point `i`. */
 function rowOf(physics: PhysicsWorld, i: number): number[] {
   const points = physics.map.navPoints
   const out: number[] = []
@@ -61,7 +61,7 @@ function rowOf(physics: PhysicsWorld, i: number): number[] {
   return out
 }
 
-/** Avanza il grafo di una mappa di `rows` punti; restituisce il grafo quando è finito. */
+/** Advances a map's graph by `rows` points; returns the graph once it's finished. */
 function advance(physics: PhysicsWorld, rows: number): NavGraph | null {
   const id = physics.map.id
   const hit = cached.get(id)
@@ -75,7 +75,7 @@ function advance(physics: PhysicsWorld, rows: number): NavGraph | null {
       cached.set(id, graph)
       return graph
     }
-    console.warn(`🧭 Grafo dei bot (${id}) da rifare: la mappa è cambiata, lancia \`pnpm nav\``)
+    console.warn(`🧭 Bot graph (${id}) needs rebuilding: the map has changed, run \`pnpm nav\``)
   }
   const state = partial.get(id) ?? { edges: [], next: 0, ms: 0 }
   partial.set(id, state)
@@ -87,27 +87,27 @@ function advance(physics: PhysicsWorld, rows: number): NavGraph | null {
   cached.set(id, graph)
   partial.delete(id)
   const count = graph.edges.reduce((n, e) => n + e.length, 0)
-  console.log(`🧭 Grafo dei bot (${id}): ${points.length} punti, ${count} archi (${Math.round(state.ms)} ms)`)
+  console.log(`🧭 Bot graph (${id}): ${points.length} points, ${count} edges (${Math.round(state.ms)} ms)`)
   return graph
 }
 
 /**
- * Il grafo di una mappa: quello precalcolato in `nav-graphs.ts` se la mappa non è cambiata,
- * se no calcolato qui (secondi di CPU, decine per la Laguna).
+ * A map's graph: the one precomputed in `nav-graphs.ts` if the map hasn't changed,
+ * otherwise computed here (seconds of CPU, tens for the Laguna).
  */
 export function navGraph(physics: PhysicsWorld): NavGraph {
   return advance(physics, Infinity)!
 }
 
-/** Calcola il grafo da capo, senza guardare quello precalcolato: per `pnpm nav` e i test. */
+/** Computes the graph from scratch, ignoring the precomputed one: for `pnpm nav` and the tests. */
 export function computeNavGraph(physics: PhysicsWorld): NavGraph {
   const points = physics.map.navPoints
   return { points, edges: points.map((_, i) => rowOf(physics, i)) }
 }
 
 /**
- * L'impronta dei dati di una mappa (FNV-1a): il grafo precalcolato vale finché non cambia.
- * Cambiare il movimento o la fisica non la tocca: lì se ne accorge `nav.test.ts`.
+ * The fingerprint of a map's data (FNV-1a): the precomputed graph holds as long as it doesn't change.
+ * Changing movement or physics doesn't affect it: `nav.test.ts` catches that.
  */
 export function mapFingerprint(map: PhysicsWorld["map"]): string {
   const text = JSON.stringify(map)
@@ -117,8 +117,8 @@ export function mapFingerprint(map: PhysicsWorld["map"]): string {
 }
 
 /**
- * Un pezzetto del grafo (un punto di partenza), per scaldarlo senza fermare il server:
- * `true` quando è pronto. Se una partita lo chiede prima, `navGraph` finisce il resto.
+ * A small piece of the graph (one starting point), to warm it up without stalling the server:
+ * `true` once it's ready. If a match asks for it sooner, `navGraph` finishes the rest.
  */
 export function warmNavGraph(physics: PhysicsWorld): boolean {
   return advance(physics, 1) !== null
@@ -137,7 +137,7 @@ export function nearestNode(graph: NavGraph, p: { x: number; y: number; z: numbe
   return best
 }
 
-/** Percorso più corto (Dijkstra, grafo piccolo) da un nodo all'altro, nodi esclusa la partenza. */
+/** Shortest path (Dijkstra, small graph) from one node to another, excluding the start node. */
 export function route(graph: NavGraph, from: number, to: number): number[] {
   const n = graph.points.length
   const dist = Array.from({ length: n }, () => Infinity)

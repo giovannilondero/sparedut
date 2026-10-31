@@ -1,5 +1,5 @@
 /**
- * Obiettivi: Cjape il Frico (bandiera), Re de Plaçute (collina), Spingi il Cjar (carrello).
+ * Objectives: Cjape il Frico (flag), Re de Plaçute (hill), Spingi il Cjar (cart).
  */
 import { TEAMS, trackLength, trackPoint, type Team } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
@@ -147,7 +147,7 @@ export const PlayObjectives = Game.System(
       const now = cartMotion(next)
       if (d >= length) events.out.emit({ t: "cart", a: "arrived" })
       else if (now !== was && now !== "still") events.out.emit({ t: "cart", a: now })
-      // Chi spinge prende punti: due al secondo.
+      // Pushers earn points: two per second.
       if (!contested && idle === 0 && Math.floor(d / (CART.speed / 2)) !== Math.floor(cart.d / (CART.speed / 2))) {
         for (const p of pushers) p.m.data.stats.update((s) => ({ ...s, score: s.score + 1 }))
       }

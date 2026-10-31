@@ -1,6 +1,6 @@
 /**
- * La partita in corso sul client: ingressi a tick fissi, predizione del proprio
- * corpo, interpolazione degli altri, eventi → suoni ed effetti, HUD e overlay.
+ * The match in progress on the client: fixed-tick inputs, prediction of our own
+ * body, interpolation of the others, events → sounds and effects, HUD and overlays.
  */
 import * as THREE from "three"
 import { BOT_LEVEL_IDS, QUICK_CHAT, TEAM_INFO, type BotLevel } from "../shared/folklore.ts"
@@ -46,7 +46,7 @@ export interface GameDeps {
   readonly renderer: THREE.WebGLRenderer
   readonly scene: THREE.Scene
   readonly camera: THREE.PerspectiveCamera
-  /** Il mondo visibile e la fisica di una mappa (il mondo si ricostruisce solo se cambia). */
+  /** The visible world and physics of a map (the world is rebuilt only if it changes). */
   readonly loadMap: (id: MapId) => { readonly world: WorldScene; readonly physics: PhysicsWorld }
   readonly audio: GameAudio
   readonly fx: Fx
@@ -57,7 +57,7 @@ export interface GameDeps {
   readonly createAvatar: (team: Team, name: string) => Avatar
   readonly saveSettings: () => void
   readonly onLeave: () => void
-  /** Origine e percorso per i link d'invito (l'indirizzo pubblico se si gioca da localhost). */
+  /** Origin and path for invite links (the public address when playing from localhost). */
   readonly inviteBase: () => string
 }
 
@@ -87,7 +87,7 @@ export class Game {
   private seq = 0
   private wanted: WeaponId = "cramar"
   private lastWeapon: WeaponId = "mandi"
-  /** Primo comando che porta l'arma scelta: finché il server non l'ha visto, il cambio è in viaggio. */
+  /** First command carrying the chosen weapon: until the server has seen it, the switch is in flight. */
   private wantedSeq = 0
   private shownWeapon: WeaponId | null = null
   private localCooldown = 0
@@ -96,14 +96,14 @@ export class Game {
   private prevFire = false
   private prevBomb = false
   private prevMine = false
-  /** Rotazione predetta del Mulin (tick), come la conta il server. */
+  /** Predicted Mulin spin-up (ticks), counted as the server does. */
   private localSpin = 0
-  /** Tick al prossimo colpo predetto della mitraie, alla torretta. */
+  /** Ticks until the next predicted mitraie shot, at the turret. */
   private turretCooldown = 0
-  /** Ultima volta (s) che ho suonato la cura, per non farne una raffica. */
+  /** Last time (s) the heal sound played, so it doesn't turn into a barrage. */
   private healSoundAt = 0
   private avatars = new Map<string, { avatar: Avatar; blob: THREE.Mesh; team: Team; stepAcc: number; last: { x: number; z: number } | null }>()
-  /** Ombre vere dei giocatori solo in qualità alta; altrimenti un disco scuro ai piedi. */
+  /** Real player shadows only on high quality; otherwise a dark disc at their feet. */
   private dynamicShadows = false
   private snapArrivals: number[] = []
   private names = new Map<string, string>()
@@ -113,9 +113,9 @@ export class Game {
   private chatting = false
   private quickOpen = false
   private overlay: "none" | "pause" | "loadout" | "settings" = "none"
-  /** Da dove si è aperta l'armeria: Esc ci torna. */
+  /** Where the armoury was opened from: Esc goes back there. */
   private loadoutFrom: "none" | "pause" = "none"
-  /** Quando il browser ha tolto il blocco del mouse: lo stesso Esc non deve anche chiudere la pausa. */
+  /** When the browser released the pointer lock: the same Esc must not also close the pause menu. */
   private unlockedAt = 0
   private eye = EYE_STAND
   private stepAcc = 0
@@ -167,11 +167,11 @@ export class Game {
       if (e.key === "Escape") this.closeChat()
     })
     d.net.on((msg) => this.running && this.message(msg))
-    // Solo in sviluppo: i test automatici pilotano il giocatore senza pointer lock.
+    // Development only: automated tests drive the player without pointer lock.
     if (import.meta.env.DEV) Object.assign(window, { __sparedut: { controls: this.controls, game: this } })
   }
 
-  // ---------------------------------------------------------------- ciclo di vita
+  // ---------------------------------------------------------------- lifecycle
 
   start(room: RoomInfo, me: string) {
     this.running = true
@@ -249,7 +249,7 @@ export class Game {
     this.controls.invertY = s.invertY
   }
 
-  // ---------------------------------------------------------------- rete
+  // ---------------------------------------------------------------- network
 
   private message(msg: ServerMessage) {
     switch (msg.t) {
@@ -299,8 +299,8 @@ export class Game {
     const now = performance.now() / 1000
     const target = s.tick - now * 60
     if (this.offset === null || Math.abs(target - this.offset) > 30) this.offset = target
-    // L'orologio degli altri si sposta piano: un'istantanea in anticipo o in ritardo
-    // non deve accelerare o frenare tutti i giocatori disegnati.
+    // The others' clock drifts slowly: an early or late snapshot
+    // must not speed up or slow down every drawn player.
     else this.offset += (target - this.offset) * (target > this.offset ? 0.05 : 0.01)
     const players = new Map(s.players.map((p) => [p.id, p]))
     this.frames.push({ tick: s.tick, players })
@@ -308,13 +308,13 @@ export class Game {
 
     const prev = this.snap
     this.snap = s
-    // Le porte sfondate non fermano più né i passi predetti né i colpi.
+    // Broken-down doors no longer stop predicted movement or shots.
     this.physics.setDoors(s.doors.map((hp) => hp > 0))
     const you = s.you
     if (you) {
       const mine = players.get(this.me)
       if (you.alive && !this.wasAlive) {
-        // Rinascita: corpo e sguardo dal server.
+        // Respawn: body and view from the server.
         this.predictor.reset()
         this.predictor.body = you.body
         if (mine) {
@@ -329,8 +329,8 @@ export class Game {
         else this.predictor.reconcile(you.body, you.seq, true)
       }
       this.wasAlive = you.alive
-      // Il server ha già visto il mio ultimo cambio d'arma e ne impugna un'altra: l'ha
-      // cambiata lui (raccolta del lanciafrico, armeria, rinascita) o ha rifiutato il cambio. Lo seguo.
+      // The server has already seen my last weapon switch and holds a different one: it
+      // switched it itself (lanciafrico pickup, armoury, respawn) or rejected the switch. Follow it.
       const server = you.arsenal.current
       if (server !== this.wanted && you.seq >= this.wantedSeq) this.wanted = server
       this.shots = this.shots.filter((q) => q > you.seq)
@@ -354,7 +354,7 @@ export class Game {
     }
   }
 
-  // ---------------------------------------------------------------- eventi
+  // ---------------------------------------------------------------- events
 
   private posOf(id: string): P3 | null {
     if (id === this.me && this.predictor.body) {
@@ -554,13 +554,13 @@ export class Game {
     }
   }
 
-  // ---------------------------------------------------------------- armi
+  // ---------------------------------------------------------------- weapons
 
   private you() {
     return this.snap?.you ?? null
   }
 
-  /** La torretta che uso io, o -1. */
+  /** The turret I'm using, or -1. */
   private mounted() {
     return this.snap?.turrets.findIndex((t) => t.gunner === this.me) ?? -1
   }
@@ -592,7 +592,7 @@ export class Game {
     this.selectWeapon(order[(i + dir + order.length) % order.length])
   }
 
-  // ---------------------------------------------------------------- tasti e overlay
+  // ---------------------------------------------------------------- keys and overlays
 
   private key(code: string, down: boolean) {
     if (!this.running || this.chatting) return
@@ -615,7 +615,7 @@ export class Game {
     if (code === "KeyB") this.openOverlay(this.overlay === "loadout" ? "none" : "loadout")
   }
 
-  /** Options sul pad: apre il menu di partita, o lo chiude (un passo alla volta come Esc). */
+  /** Options on the gamepad: opens the match menu, or closes it (one step at a time, like Esc). */
   private padPause() {
     if (!this.running || this.chatting) return
     if (this.overlay === "none") {
@@ -625,7 +625,7 @@ export class Game {
     else this.escape()
   }
 
-  /** Esc chiude quel che è aperto, un passo alla volta. Il blocco del mouse lo ridà solo un clic. */
+  /** Esc closes whatever is open, one step at a time. Only a click gives back the pointer lock. */
   private escape() {
     if (this.quickOpen) this.toggleQuick(false)
     else if (this.overlay === "loadout") this.openOverlay(this.loadoutFrom)
@@ -660,7 +660,7 @@ export class Game {
     if (!this.controls.active) this.controls.lock()
   }
 
-  /** Il modulo delle impostazioni torna nel menu principale. */
+  /** The settings form goes back into the main menu. */
   private restoreSettings() {
     const form = $("settings-form")
     if (form.parentElement?.id !== "settings-home") $("settings-home").append(form)
@@ -671,7 +671,7 @@ export class Game {
     this.overlay = which
     $("settings-ingame").classList.toggle("hidden", which !== "settings")
     if (which === "settings") {
-      // Lo stesso modulo del menu principale: stessi controlli, salvati e applicati subito.
+      // The same form as the main menu: same controls, saved and applied immediately.
       const el = $("settings-ingame")
       el.innerHTML = `<h2>${t().static.settings}</h2><div id="settings-slot"></div><div class="row"><button id="st-back">${t().static.back}</button></div>`
       $("settings-slot").append($("settings-form"))
@@ -687,7 +687,7 @@ export class Game {
       el.innerHTML = `<h2>${lo.title}</h2><p class="muted">${lo.note}</p><div class="weapons" id="loadout-list"></div><div class="row"><button id="lo-close" class="primary">${lo.resume}</button></div>`
       this.d.menu.buildArmarie($("loadout-list"), (p) => {
         this.d.net.send({ t: "primary", p })
-        // Se avevo in mano la vecchia principale, impugno subito la nuova.
+        // If I was holding the old primary, switch to the new one right away.
         const you = this.you()
         if (you?.alive && this.wanted === you.arsenal.primary && p !== this.wanted) {
           this.lastWeapon = this.wanted
@@ -768,7 +768,7 @@ export class Game {
     }
   }
 
-  /** Ho vinto io (la mia squadra, o io da solo nella Tampieste)? */
+  /** Did I win (my team, or me alone in Tampieste)? */
   private won(winner: Winner) {
     return typeof winner === "object" ? winner.player === this.me : winner === this.teams.get(this.me)
   }
@@ -814,7 +814,7 @@ export class Game {
     if (again) again.onclick = () => this.d.net.send({ t: "start" })
   }
 
-  // ---------------------------------------------------------------- tick fisso
+  // ---------------------------------------------------------------- fixed tick
 
   private speedScale() {
     const you = this.you()
@@ -830,7 +830,7 @@ export class Game {
     const you = this.you()
     const over = this.snap?.phase.tag === "Over"
     if (over || this.overlay !== "none") buttons = 0
-    // Alla torretta lo sguardo resta dentro l'arco in cui gira l'arma.
+    // At the turret the view stays within the arc the gun can turn through.
     const turret = you?.alive ? this.mounted() : -1
     if (turret >= 0) {
       const aim = turretAim(this.physics.map.turrets[turret], c.yaw, c.pitch)
@@ -851,7 +851,7 @@ export class Game {
     if (!you || !you.alive || over) return
 
     if (turret >= 0) {
-      // Fermo al posto (lo dice il server); i colpi della mitraie si predicono come gli altri.
+      // Held in place (the server says so); mitraie shots are predicted like any other.
       if (this.turretCooldown > 0) this.turretCooldown--
       const gun = this.snap?.turrets[turret]
       if ((buttons & BUTTON.fire) !== 0 && gun && !gun.jammed && this.turretCooldown === 0) {
@@ -878,7 +878,7 @@ export class Game {
       }
     }
 
-    // Spari predetti: effetti subito, il danno lo decide il server (con le stesse regole).
+    // Predicted shots: effects right away, the server decides the damage (with the same rules).
     if (this.localCooldown > 0) this.localCooldown--
     const def = WEAPONS[this.wanted]
     const fire = (buttons & BUTTON.fire) !== 0
@@ -886,7 +886,7 @@ export class Game {
     this.prevFire = fire
     const action = you.arsenal.action._tag
     const busy = action === "reload" || (action === "switch" && you.arsenal.current === this.wanted)
-    // Di corsa l'arma è abbassata: come sul server, e poi ci vuole un attimo per rialzarla.
+    // While sprinting the weapon is lowered: as on the server, and it then takes a moment to raise it.
     const running = sprinting(input, after?.crouch ?? false)
     if (running) this.localCooldown = Math.max(this.localCooldown, RAISE_TICKS)
     if (def.spinTicks > 0) {
@@ -936,7 +936,7 @@ export class Game {
       return
     }
     if (def.mode === "beam") {
-      // il getto: dalla lancia fino al primo corpo o muro entro la portata
+      // the jet: from the nozzle to the first body or wall within range
       audio.play("beam_miedi")
       const b = this.predictor.body
       if (!b) return
@@ -977,7 +977,7 @@ export class Game {
     fx.muzzle([muzzle.x, muzzle.y, muzzle.z])
   }
 
-  // ---------------------------------------------------------------- interpolazione
+  // ---------------------------------------------------------------- interpolation
 
   private interpolated(id: string): SnapOther | null {
     const frames = this.frames
@@ -997,7 +997,7 @@ export class Game {
     if (!pa || !pb) return pb ?? pa ?? null
     if (a === b || !(pa.f & FLAG_BIT.alive) !== !(pb.f & FLAG_BIT.alive)) return pb
     const k = Math.max(0, Math.min(1, (t - a.tick) / Math.max(1, b.tick - a.tick)))
-    // Un salto grande (rinascita, cjar di fen) non si interpola.
+    // A big jump (respawn, hay cart) is not interpolated.
     if (Math.hypot(pb.x - pa.x, pb.z - pa.z) > 6) return pb
     return {
       ...pb,
@@ -1031,7 +1031,7 @@ export class Game {
     const you = s?.you ?? null
     const myTeam = this.teams.get(this.me)
 
-    // Avatar degli altri.
+    // The others' avatars.
     if (s) {
       for (const p of s.players) {
         if (p.id === this.me) continue
@@ -1067,7 +1067,7 @@ export class Game {
         })
         entry.blob.visible = !this.dynamicShadows && (q.f & FLAG_BIT.alive) !== 0
         if (entry.blob.visible) {
-          // Il disco sta sul terreno sotto i piedi: in aria si rimpicciolisce.
+          // The disc sits on the ground under the feet: it shrinks while airborne.
           const ground = this.physics.raycast({ x: q.x, y: q.y + 0.3, z: q.z }, { x: 0, y: -1, z: 0 }, 12)
           const gy = ground ? q.y + 0.3 - ground.dist : q.y
           const h = Math.max(0, q.y - gy)
@@ -1117,7 +1117,7 @@ export class Game {
       const roll = you.arsenal.sgnape > 0 ? Math.sin(t * 1.7) * 0.06 : 0
       camera.rotation.set(c.pitch + this.kickPitch, c.yaw, roll, "YXZ")
     } else if (you && b) {
-      // Da morto: la camera sale e guarda chi ti ha fatto frico.
+      // When dead: the camera rises and looks at whoever made frico of you.
       const killer = you.killer ? this.interpolated(you.killer) : null
       this.deathLook.set(killer?.x ?? b.x, (killer?.y ?? b.y) + 1.2, killer?.z ?? b.z - 1)
       camera.position.lerp(this.deathCam.set(b.x, b.y + 4.5, b.z), Math.min(1, dt * 2))
@@ -1147,7 +1147,7 @@ export class Game {
       })
     }
 
-    // Mondo, effetti, audio.
+    // World, effects, audio.
     if (s) {
       const mode = this.room?.mode
       const bases = this.physics.map.flagBases
@@ -1179,7 +1179,7 @@ export class Game {
         doors: s.doors.map((hp, i) => hp / (this.physics.map.doors[i]?.hp ?? 1)),
         camera
       })
-      // La discoteca del casot: si sente solo vicino, e attutita finché la porta è chiusa.
+      // The casot's disco: audible only nearby, and muffled while the door is closed.
       audio.disco(this.room?.map === "maran" ? DISCO : null, (s.doors[0] ?? 1) <= 0)
       fx.projectiles(s.proj)
       const outside = !!s.storm && !!you?.alive && !!b && outsideStorm(s.storm, b)
@@ -1193,7 +1193,7 @@ export class Game {
 
     if (you) {
       this.hud.vitals(you, { owned: (id) => owned(you.arsenal, id) }, this.wanted === you.arsenal.current ? this.localMag : null, turret >= 0)
-      // Alla torretta: il calore. Vicino a una libera: il tasto per montarla.
+      // At the turret: the heat. Near a free one: the key to mount it.
       const gun = turret >= 0 ? s?.turrets[turret] ?? null : null
       const near =
         turret < 0 && you.alive && !!b && !!s &&

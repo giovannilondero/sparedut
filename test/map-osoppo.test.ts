@@ -15,7 +15,7 @@ beforeAll(async () => {
 const at = (x: number, y: number, z: number): Body => ({ x, y: y + 0.05, z, vx: 0, vy: 0, vz: 0, grounded: true, crouch: false })
 
 describe("Fuart di Osôf", () => {
-  test("il cjar si spinge lungo tutto il percorso: si cammina sui suoi punti senza staccarsi", () => {
+  test("the cjar can be pushed along the whole route: you walk its points without straying", () => {
     const track = OSOPPO.track
     let b = at(...track[0])
     let worst = 0
@@ -26,7 +26,7 @@ describe("Fuart di Osôf", () => {
         const dz = tz - b.z
         if (Math.hypot(dx, dz) < 0.5) break
         b = stepBody(b, { ...IDLE_INPUT, mz: 1, yaw: Math.atan2(-dx, -dz) }, physics, 1).body
-        // Distanza dal tratto corrente (in pianta) e quota rispetto alla spezzata.
+        // Distance from the current segment (in plan) and height relative to the polyline.
         const [ax, ay, az] = track[i - 1]
         const len = Math.hypot(tx - ax, tz - az)
         const u = Math.max(0, Math.min(1, ((b.x - ax) * (tx - ax) + (b.z - az) * (tz - az)) / (len * len)))
@@ -40,7 +40,7 @@ describe("Fuart di Osôf", () => {
     expect(worst).toBeLessThan(1)
   })
 
-  test("i cjars di fen tirano sulla cima dei bastioni", () => {
+  test("the cjars di fen launch you onto the top of the ramparts", () => {
     for (const pad of OSOPPO.jumpPads) {
       let b = at(...pad.at)
       for (let i = 0; i < 60 * 4; i++) b = stepBody(b, IDLE_INPUT, physics, 1).body
@@ -49,7 +49,7 @@ describe("Fuart di Osôf", () => {
     }
   })
 
-  test("si rinasce in piedi sul terreno, non dentro un muro", () => {
+  test("you respawn standing on the ground, not inside a wall", () => {
     for (const team of ["benandanti", "malandanti"] as const) {
       for (const s of OSOPPO.spawns[team]) {
         let b = at(...s.at)
@@ -63,7 +63,7 @@ describe("Fuart di Osôf", () => {
 })
 
 for (const mode of MODE_IDS) {
-  test(`i bot giocano una partita al Fuart di Osôf: ${mode}`, () => {
+  test(`bots play a match at Fuart di Osôf: ${mode}`, () => {
     const { kills, view: v } = playBots("osoppo", mode)
     console.log("osoppo", mode, { score: v.score, kills, hill: v.hill })
     expect(kills).toBeGreaterThan(3)

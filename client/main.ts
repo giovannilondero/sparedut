@@ -1,5 +1,5 @@
 /**
- * Avvio del client: renderer, mondo, audio, menu, connessione, partita.
+ * Client startup: renderer, world, audio, menu, connection, match.
  */
 import "./zod-config.ts"
 import * as THREE from "three"
@@ -28,11 +28,11 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: settings.quality !
 renderer.outputColorSpace = THREE.SRGBColorSpace
 renderer.toneMapping = THREE.ACESFilmicToneMapping
 renderer.toneMappingExposure = 1.05
-// Il conteggio di draw call e triangoli copre mondo e arma: lo azzera il frame.
+// The draw call and triangle count covers world and weapon: the frame resets it.
 renderer.info.autoReset = false
 const perf = new PerfMonitor(renderer)
 
-/** Il pixel ratio massimo per qualità; la risoluzione dinamica scende fino a `minRatio`. */
+/** The maximum pixel ratio per quality; dynamic resolution goes down to `minRatio`. */
 const maxRatio = () => Math.min(devicePixelRatio, settings.quality === "alta" ? 2 : settings.quality === "media" ? 1.5 : 1)
 const minRatio = () => Math.min(maxRatio(), settings.quality === "bassa" ? 0.6 : 0.75)
 const pixelRatio = () => (settings.autoRes ? Math.min(perf.scale, maxRatio()) : maxRatio())
@@ -52,10 +52,10 @@ const resize = () => {
   viewmodel.camera.updateProjectionMatrix()
 }
 
-/** Il mondo visibile della mappa corrente: lo sfondo del menu è l'ultima mappa scelta. */
+/** The visible world of the current map: the menu background is the last chosen map. */
 let worldMap: MapId = settings.lastMap
 let world: WorldScene = createWorld(scene, renderer, MAPS[worldMap])
-/** Una fisica per mappa, costruita la prima volta che serve (il WASM deve essere pronto). */
+/** One physics world per map, built the first time it's needed (the WASM must be ready). */
 const physicsOf = new Map<MapId, PhysicsWorld>()
 const loadMap = (id: MapId) => {
   if (id !== worldMap) {
@@ -127,11 +127,11 @@ const menu = new Menu(settings, audio, {
   settingsChanged: persist
 })
 
-/** Indirizzo pubblico annunciato dal server: serve ai link d'invito quando si gioca da localhost. */
+/** Public address announced by the server: used for invite links when playing from localhost. */
 let publicUrl: string | null = null
 const inviteBase = () => `${publicUrl && isLocalHost(location.hostname) ? publicUrl : location.origin}${location.pathname}`
 
-/** La partita veloce contro i bot parte subito, senza riscaldamento. */
+/** A quick match against bots starts right away, without warmup. */
 let autostart = false
 const physicsReady = initPhysics().then(() => {
   game = new Game({
@@ -231,7 +231,7 @@ net.onClose = () => {
 void connect()
 setInterval(() => net.open && !game?.active && net.send({ t: "list" }), 3000)
 
-// La musica parte al primo gesto (i browser bloccano l'audio prima).
+// Music starts on the first gesture (browsers block audio before that).
 addEventListener("pointerdown", () => {
   audio.unlock()
   if (!game?.active) audio.menuMusic(true)
@@ -242,8 +242,8 @@ const loop = (now: number) => {
   const dt = Math.min(0.1, (now - last) / 1000)
   last = now
   const time = now / 1000
-  // La risoluzione dinamica cambia la misura del canvas, e cambiarla lo svuota: va fatto
-  // prima di disegnare, mai dopo (altrimenti il frame arriva a schermo nero: i lampi neri).
+  // Dynamic resolution changes the canvas size, and changing it clears it: it must happen
+  // before drawing, never after (otherwise the frame reaches the screen black: the black flashes).
   if (settings.autoRes && !document.hidden && perf.adapt(now, minRatio(), maxRatio())) resize()
   const cpuStart = performance.now()
   if (game?.active) {
@@ -264,7 +264,7 @@ const loop = (now: number) => {
 }
 requestAnimationFrame(loop)
 
-// Il primo frame è disegnato e il menu tradotto: via la schermata di caricamento.
+// The first frame is drawn and the menu translated: remove the loading screen.
 requestAnimationFrame(() =>
   requestAnimationFrame(() => {
     document.documentElement.classList.remove("booting")

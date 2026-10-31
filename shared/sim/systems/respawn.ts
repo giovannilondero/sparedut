@@ -1,6 +1,6 @@
 /**
- * I morti contano i tick e rinascono nel punto più sicuro della loro squadra.
- * Nella Tampieste in corso non si rinasce: una vita sola.
+ * The dead count down ticks and respawn at their team's safest point.
+ * In a live Tampieste there's no respawning: one life only.
  */
 import { Random } from "@typeonce/ritmo"
 import { IDLE_INPUT } from "../../input.ts"
@@ -32,7 +32,7 @@ export const Respawn = Game.System(
     const match = machines.match.get()
     const rules = resources.rules.get()
     const map = MAPS[rules.map]
-    // L'inizio della partita fa rinascere tutti (anche nella Tampieste); poi chi muore resta a guardare.
+    // Match start respawns everyone (Tampieste included); after that, whoever dies stays to watch.
     const started = match._tag === "Live" && resources.tick.get() - (match.ends - rules.timeLimitTicks) > START_GRACE_TICKS
     const hold = match._tag === "Over" || (started && everyoneAlone(rules))
     const all = queries.players.each()

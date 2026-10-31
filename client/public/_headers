@@ -1,5 +1,5 @@
-# Header di sicurezza: li applica Cloudflare agli asset statici, e `server/index.ts` li legge da qui.
-# 'wasm-unsafe-eval' serve a Rapier, che compila il suo WASM nel browser; blob: all'audio sintetizzato.
+# Security headers: Cloudflare applies them to static assets, and `server/index.ts` reads them from here.
+# 'wasm-unsafe-eval' is for Rapier, which compiles its WASM in the browser; blob: for the synthesized audio.
 /*
   Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff

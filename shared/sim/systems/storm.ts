@@ -1,6 +1,6 @@
 /**
- * La Tampieste: fuori dal cerchio sicuro la grandine fa male. Il cerchio è ricavato
- * dal tempo di partita (`stormAt`), non si salva.
+ * La Tampieste: outside the safe circle the hail hurts. The circle is derived
+ * from match time (`stormAt`), it isn't saved.
  */
 import { MAPS } from "../../maps/index.ts"
 import { outsideStorm, STORM_DAMAGE, STORM_EVERY, stormAt } from "../rules.ts"

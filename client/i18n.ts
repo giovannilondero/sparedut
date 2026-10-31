@@ -1,10 +1,10 @@
 /**
- * Lis lenghis: furlan e talian. Ogni test che si viôt al ven di chi.
+ * The languages: Friulian and Italian. Every visible text comes from here.
  *
- * Il furlan al è la lenghe di base: il talian al à di vê la stesse forme
- * (`satisfies Strings`). I nons propris (armis, modalitâts, bravure) a restin
- * par furlan in dutis dôs lis lenghis: a son il savôr dal zûc.
- * Lis frasis sveltis de chat a van ai altris zuiadôrs come test, e a restin par furlan.
+ * Friulian is the base language: Italian must have the same shape
+ * (`satisfies Strings`). Proper names (weapons, modes, feats) stay
+ * in Friulian in both languages: they are the flavour of the game.
+ * Quick chat phrases go to the other players as text, and stay in Friulian.
  */
 import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId, Team } from "../shared/map.ts"
@@ -15,7 +15,7 @@ export type Lang = "fur" | "it"
 
 type Fn<A extends unknown[] = [string]> = (...args: A) => string
 
-/** Testi statici dell'HTML: `data-t="chiave"` (innerHTML) e `data-t-ph="chiave"` (placeholder). */
+/** Static HTML texts: `data-t="key"` (innerHTML) and `data-t-ph="key"` (placeholder). */
 type StaticKey =
   | "title" | "kicker" | "sub" | "nameLabel" | "namePh" | "quick" | "quickSub" | "create" | "createSub" | "join" | "joinSub"
   | "lanTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "visLabel" | "visLan" | "visCode"
@@ -79,18 +79,18 @@ export interface Strings {
     }
     readonly deathLines: readonly string[]
     readonly streaks: Record<number, string>
-    /** Spingi il Cjar: la strada fatta. */
+    /** Push the Cjar: the distance covered. */
     readonly cart: Fn<[number]>
     readonly cartPush: Fn<[number]>
     readonly cartStop: string
     readonly cartBack: string
     readonly cartIdle: string
-    /** La Tampieste: quanti sono ancora in piedi. */
+    /** The Tampieste: how many are still standing. */
     readonly alive: Fn<[number]>
     readonly stormOutside: string
     readonly spectate: string
     readonly healed: Fn<[string, number]>
-    /** Le torrette: il tasto per montare, per smontare, il calore. */
+    /** Turrets: the key to mount, to dismount, the heat. */
     readonly turretUse: string
     readonly turretLeave: string
     readonly turretHeat: string
@@ -108,12 +108,12 @@ export interface Strings {
     readonly cartSub: Fn<[boolean]>
     readonly stormStart: string
     readonly stormStartSub: string
-    /** Traduzione delle frasi sveltis, se la lenghe no je il furlan. */
+    /** Translation of the quick phrases, if the language isn't Friulian. */
     readonly quickGloss: readonly string[] | null
-    /** La porta di una mappa sfondata: chi l'ha sfondata. */
+    /** A map's door broken down: who broke it. */
     readonly doorBroken: Fn<[string]>
     readonly doorSub: string
-    /** Le piume della gjaline negli occhi. */
+    /** The gjaline's feathers in the eyes. */
     readonly plumis: string
   }
   readonly loadout: { readonly title: string; readonly note: string; readonly resume: string }
@@ -136,7 +136,7 @@ export interface Strings {
     readonly lose: string
     readonly drawSub: string
     readonly winSub: Fn<[string, string]>
-    /** La Tampieste: vince una persona. */
+    /** The Tampieste: one person wins. */
     readonly lastStanding: Fn
     readonly lastStandingSub: string
     readonly mvp: Record<Team, string>
@@ -193,7 +193,7 @@ const KEYS_IT = [
 
 const keysHtml = (rows: string[][]) => rows.map(([k, d]) => `<div><kbd>${k}</kbd> ${d}</div>`).join("")
 
-/** Il vocabolari al è furlan → talian in dutis dôs lis lenghis: al è fat par chel. */
+/** The glossary is Friulian → Italian in both languages: that's what it's for. */
 const VOCAB: readonly (readonly [string, string])[] = [
   ["Sparedût", "sparatoria, scaramuccia (gioco di parole su 'sparâ', sparare)"],
   ["Glemone", "Gemona, in friulano"],
@@ -890,7 +890,7 @@ const STRINGS: Record<Lang, Strings> = { fur, it }
 let current: Lang = "fur"
 const listeners = new Set<() => void>()
 
-/** Il dizionario della lingua attiva. */
+/** The dictionary of the active language. */
 export const t = (): Strings => STRINGS[current]
 export const lang = () => current
 
@@ -901,10 +901,10 @@ export function setLang(next: Lang) {
   for (const fn of listeners) fn()
 }
 
-/** Da richiamare quando cambia la lingua (per rifare i pezzi costruiti in JS). */
+/** Call again when the language changes (to rebuild the pieces built in JS). */
 export const onLangChange = (fn: () => void) => listeners.add(fn)
 
-/** Traduce l'HTML statico: `data-t` riempie il contenuto, `data-t-ph` il placeholder. */
+/** Translates the static HTML: `data-t` fills the content, `data-t-ph` the placeholder. */
 export function applyStatic(root: ParentNode = document) {
   const s = t().static
   document.title = s.title

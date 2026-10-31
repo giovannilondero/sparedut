@@ -1,4 +1,4 @@
-/** Vettori 3D come dati semplici, senza dipendenze dal renderer. */
+/** 3D vectors as plain data, with no renderer dependencies. */
 export interface Vec3 {
   readonly x: number
   readonly y: number

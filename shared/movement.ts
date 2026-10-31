@@ -1,6 +1,6 @@
 /**
- * Il movimento in prima persona, funzione pura sullo stato del corpo.
- * La usa la simulazione sul server e, identica, la predizione del client.
+ * First-person movement, a pure function of the body state.
+ * Used by the server simulation and, identically, by client prediction.
  */
 import { Ops } from "@typeonce/ritmo"
 import type { PlayerInput } from "./input.ts"
@@ -38,15 +38,15 @@ export interface Body {
 
 export interface StepResult {
   readonly body: Body
-  /** Il nome del cjar di fen che ha lanciato il giocatore in questo tick. */
+  /** The name of the cjar di fen that launched the player this tick. */
   readonly launchedBy: string | null
   readonly fellOut: boolean
 }
 
-/** Il vettore "avanti" sull'orizzontale per un'imbardata. */
+/** The horizontal "forward" vector for a yaw. */
 export const forward = (yaw: number) => ({ x: -Ops.sin(yaw), z: -Ops.cos(yaw) })
 
-/** Direzione di sguardo completa. */
+/** Full look direction. */
 export const lookDir = (yaw: number, pitch: number) => {
   const cp = Ops.cos(pitch)
   return { x: -Ops.sin(yaw) * cp, y: Ops.sin(pitch), z: -Ops.cos(yaw) * cp }
@@ -54,11 +54,11 @@ export const lookDir = (yaw: number, pitch: number) => {
 
 export const eyeHeight = (body: Body) => (body.crouch ? EYE_CROUCH : EYE_STAND)
 
-/** Si corre: Shift, avanti, né accucciati né mirando. Chi corre tiene l'arma abbassata e non spara. */
+/** Sprinting: Shift, moving forward, neither crouching nor aiming. Sprinters hold the weapon lowered and can't fire. */
 export const sprinting = (input: PlayerInput, crouch: boolean) => pressed(input, "sprint") && !crouch && !pressed(input, "aim") && input.mz > 0
 
 /**
- * Un tick di movimento. `speedScale` porta il peso dell'arma e la sgnape.
+ * One movement tick. `speedScale` carries the weapon weight and the sgnape.
  */
 export function stepBody(body: Body, input: PlayerInput, physics: PhysicsWorld, speedScale: number): StepResult {
   const wantsCrouch = pressed(input, "crouch")
@@ -69,7 +69,7 @@ export function stepBody(body: Body, input: PlayerInput, physics: PhysicsWorld, 
   const speed = (crouch ? MOVE.crouch : aiming ? MOVE.aim : sprinting(input, crouch) ? MOVE.sprint : MOVE.walk) * speedScale * (wet ? wade.speed : 1)
 
   const f = forward(input.yaw)
-  // destra = avanti ruotato di 90° in senso orario visto dall'alto
+  // right = forward rotated 90° clockwise seen from above
   const r = { x: -f.z, z: f.x }
   let wx = f.x * input.mz + r.x * input.mx
   let wz = f.z * input.mz + r.z * input.mx
@@ -84,7 +84,7 @@ export function stepBody(body: Body, input: PlayerInput, physics: PhysicsWorld, 
   const k = Math.min(1, accel * DT)
   let vx = body.vx + (tx - body.vx) * k
   let vz = body.vz + (tz - body.vz) * k
-  // In aria si mantiene lo slancio: l'input aggiunge, non frena sotto la velocità attuale.
+  // In the air momentum is kept: input adds to it, it doesn't brake below the current speed.
   if (!body.grounded && wl < 0.01) {
     vx = body.vx
     vz = body.vz
@@ -109,7 +109,7 @@ export function stepBody(body: Body, input: PlayerInput, physics: PhysicsWorld, 
   const grounded = moved.grounded && vy <= 0.01
   if (grounded) vy = 0
   if (moved.hitCeiling && vy > 0) vy = 0
-  // La velocità orizzontale segue lo spostamento reale (niente spinta contro i muri).
+  // Horizontal velocity follows the actual displacement (no pushing against walls).
   const realVx = (moved.x - body.x) / DT
   const realVz = (moved.z - body.z) / DT
   if (Math.abs(realVx) < Math.abs(vx)) vx = realVx

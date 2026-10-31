@@ -1,14 +1,14 @@
 /**
- * Strumenti della banda di paese: fisarmonica (tre ance, "musette"), clarinetto,
- * basso della fisarmonica, ottone per le fanfare. Ognuno somma una nota in `out`.
+ * Village band instruments: accordion (three reeds, "musette"), clarinet,
+ * accordion bass, brass for fanfares. Each one adds a note into `out`.
  */
 import { midi, voice } from "./dsp.ts"
 
-/** Inviluppo attacco / sostegno / rilascio lineare. */
+/** Linear attack / sustain / release envelope. */
 const asr = (a: number, hold: number, rel: number) => (t: number) =>
   t < a ? t / a : t < hold ? 1 : Math.max(0, 1 - (t - hold) / rel)
 
-/** Fisarmonica: tre denti di sega leggermente scordati, tremolo del mantice. */
+/** Accordion: three slightly detuned saws, bellows tremolo. */
 export function accordion(out: Float32Array, at: number, note: number, dur: number, amp = 0.2, bright = 2600) {
   const f = midi(note)
   const env = asr(0.025, dur, 0.07)
@@ -16,7 +16,7 @@ export function accordion(out: Float32Array, at: number, note: number, dur: numb
   voice(out, { at, dur: dur + 0.08, wave: "saw", f, detune: [0, 9, -7], amp: trem, env, lp: bright, q: 0.9 })
 }
 
-/** Clarinetto: quadra (armoniche dispari), vibrato che arriva dopo l'attacco. */
+/** Clarinet: square (odd harmonics), vibrato that arrives after the attack. */
 export function clarinet(out: Float32Array, at: number, note: number, dur: number, amp = 0.25) {
   const f0 = midi(note)
   const f = (t: number) => f0 * (1 + 0.005 * Math.min(1, t / 0.25) * Math.sin(2 * Math.PI * 5.2 * t))
@@ -25,14 +25,14 @@ export function clarinet(out: Float32Array, at: number, note: number, dur: numbe
   voice(out, { at, dur: dur + 0.07, wave: "sin", f, amp: amp * 0.5, env })
 }
 
-/** Basso: "oom", corto e rotondo. */
+/** Bass: "oom", short and round. */
 export function bass(out: Float32Array, at: number, note: number, dur: number, amp = 0.35) {
   const f = midi(note)
   voice(out, { at, dur, wave: "saw", f, amp: amp * 0.6, a: 0.01, d: dur * 0.6, lp: 420 })
   voice(out, { at, dur, wave: "sin", f, amp, a: 0.006, d: dur * 0.7 })
 }
 
-/** Ottone: dente di sega con filtro che si apre sull'attacco. */
+/** Brass: saw with a filter that opens on the attack. */
 export function brass(out: Float32Array, at: number, note: number, dur: number, amp = 0.25) {
   const f = midi(note)
   const env = asr(0.03, dur, 0.1)
@@ -40,7 +40,7 @@ export function brass(out: Float32Array, at: number, note: number, dur: number, 
   voice(out, { at, dur: dur + 0.1, wave: "saw", f, detune: [0, 6], amp, env, lp, q: 1.1 })
 }
 
-/** Scala di sol maggiore (classi di altezza), per armonizzare a terze. */
+/** G major scale (pitch classes), for harmonizing in thirds. */
 const SCALE = [7, 9, 11, 0, 2, 4, 6]
 export function thirdBelow(note: number, scale = SCALE) {
   const pc = ((note % 12) + 12) % 12
@@ -52,10 +52,10 @@ export function thirdBelow(note: number, scale = SCALE) {
   return note - d
 }
 
-/** Nota di una melodia: altezza MIDI (null = pausa) e durata in battiti. */
+/** A melody note: MIDI pitch (null = rest) and duration in beats. */
 export type Note = readonly [number | null, number]
 
-/** Suona una melodia a partire da `at`, `beat` secondi per battito. Ritorna la fine. */
+/** Plays a melody starting at `at`, `beat` seconds per beat. Returns the end time. */
 export function melody(
   notes: readonly Note[],
   at: number,
@@ -70,7 +70,7 @@ export function melody(
   return t
 }
 
-/** Accordi del valzer: basso (fondamentale, quinta) e voci della mano destra. */
+/** Waltz chords: bass (root, fifth) and right-hand voicings. */
 export const CHORDS = {
   G: { root: 43, fifth: 38, voices: [55, 59, 62] },
   C: { root: 48, fifth: 43, voices: [55, 60, 64] },
@@ -82,7 +82,7 @@ export const CHORDS = {
 } as const
 export type Chord = keyof typeof CHORDS
 
-/** Una battuta di "oom-pah-pah": basso sul primo, accordo corto sul secondo e terzo. */
+/** One bar of "oom-pah-pah": bass on the first beat, short chord on the second and third. */
 export function oomPahPah(out: Float32Array, at: number, beat: number, chord: Chord, alt: boolean, amp = 1) {
   const c = CHORDS[chord]
   bass(out, at, alt ? c.fifth : c.root, beat * 0.9, 0.4 * amp)

@@ -16,14 +16,14 @@ function connect(hub: Hub, network = "1.2.3.4") {
 
 const create = { t: "create", mode: "bataie", map: "glemone", minutes: 10, visibility: "code", bots: 0, level: "pari", ff: false, primary: "cramar" }
 
-test("nomi e chat perdono i caratteri invisibili e quelli che rigirano il testo", () => {
+test("names and chat lose invisible characters and the ones that flip text direction", () => {
   const hello = ClientMessage.parse({ t: "hello", name: "‮Toni\u0007", version: 1 })
   expect(hello).toEqual({ t: "hello", name: "Toni", version: 1 })
   expect(ClientMessage.safeParse({ t: "hello", name: "‮‏", version: 1 }).success).toBe(false)
   expect(ClientMessage.safeParse({ t: "chat", text: "x".repeat(1000) }).success).toBe(false)
 })
 
-test("un messaggio troppo lungo non viene neanche letto", () => {
+test("a message that is too long is not even read", () => {
   const hub = new Hub()
   const { got, say } = connect(hub)
   got.length = 0
@@ -31,18 +31,18 @@ test("un messaggio troppo lungo non viene neanche letto", () => {
   expect(got).toEqual([])
 })
 
-test("chi manda troppi comandi perde quelli in più, l'input passa", () => {
+test("whoever sends too many commands loses the extra ones, input gets through", () => {
   const hub = new Hub()
   const { got, say } = connect(hub)
   got.length = 0
   for (let i = 0; i < 30; i++) say({ t: "list" })
-  // 8 di scorta meno l'hello
+  // 8 in reserve minus the hello
   expect(got.filter((m) => m.t === "rooms").length).toBe(7)
   for (let i = 0; i < 30; i++) say({ t: "ping", c: i })
   expect(got.filter((m) => m.t === "pong").length).toBe(30)
 })
 
-test("una rete non apre più di sei stanze", () => {
+test("a network opens no more than six rooms", () => {
   const hub = new Hub()
   const peers = Array.from({ length: 7 }, () => connect(hub))
   for (const p of peers) p.say(create)

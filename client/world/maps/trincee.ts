@@ -1,8 +1,8 @@
 /**
- * Lo scenario des Trinceis dal Pal Piçul: breis su lis parêts e sul font des trinceis,
- * la ferade Decauville, il fîl spinât, lis busis des granadis, la cjasute sdrumade, il
- * canon te caverne, la stue dal ricovar e lis Alps Cjargnelis ator.
- * Dut decor sutîl: ce che al ripare al è za tai blocs de mape.
+ * The scenery of the Trinceis dal Pal Piçul: planks on the trench walls and floors,
+ * the Decauville railway, the barbed wire, the shell craters, the wrecked hut, the
+ * cannon in the cave, the dugout stove and the Carnic Alps all around.
+ * All thin decoration: whatever gives cover is already in the map blocks.
  */
 import * as THREE from "three"
 import { trackPoint, trackLength } from "../../../shared/map.ts"
@@ -14,7 +14,7 @@ import type { Scenery, SceneryKit } from "../scenery.ts"
 const RUST = "#6e3a22"
 const WOOD = "#8a6846"
 
-/** Breis orizontâls e pâi su ogni parêt di trincee (dulà che la tiere di flanc e je plui basse). */
+/** Horizontal planks and posts on every trench wall (where the ground beside it is lower). */
 function revetments({ map, B, C, groundAt }: SceneryKit, r: () => number) {
   const { minX, maxX, minZ, maxZ } = map.bounds
   const inside = (x: number, z: number) => x > minX && x < maxX && z > minZ && z < maxZ
@@ -28,7 +28,7 @@ function revetments({ map, B, C, groundAt }: SceneryKit, r: () => number) {
       const out = side === "east" || side === "south" ? 1 : -1
       const a0 = alongX ? x0 : z0
       const a1 = alongX ? x1 : z1
-      // La parêt e va dividude dulà che il vueit di flanc al finìs (un flanc al pò tocjâ trinceis e tiere).
+      // Split the wall where the gap beside it ends (one side can touch both trenches and earth).
       const step = 0.5
       let runStart: number | null = null
       const flush = (end: number) => {
@@ -43,9 +43,9 @@ function revetments({ map, B, C, groundAt }: SceneryKit, r: () => number) {
           const p = P(a, y0, d0), q = P(c, y1, d1)
           return boxAt([Math.min(p[0], q[0]), p[1], Math.min(p[2], q[2])], [Math.max(p[0], q[0]), q[1], Math.max(p[2], q[2])])
         }
-        // breis
+        // planks
         for (let y = 0.05; y < T_TOP - 0.1; y += 0.36) B.add("legno", box(s0, s1, y, y + 0.3, 0, 0.04), C(WOOD).offsetHSL(0, 0, (r() - 0.5) * 0.12))
-        // pâi
+        // posts
         for (let a = s0 + 0.15; a < s1 - 0.1; a += 1.7) B.add("legno", box(a, a + 0.12, 0, T_TOP + 0.15, 0.03, 0.13), C("#5c4430"))
       }
       for (let a = a0 + step / 2; a < a1; a += step) {
@@ -59,11 +59,11 @@ function revetments({ map, B, C, groundAt }: SceneryKit, r: () => number) {
   }
 }
 
-/** Breis di len sul font des trinceis strentis. */
+/** Wooden duckboards on the floor of the narrow trenches. */
 function duckboards({ B, C }: SceneryKit, r: () => number) {
   for (const [x0, z0, x1, z1] of NARROW_CUTS) {
     const alongX = x1 - x0 > z1 - z0
-    // In prime linie lis breis a stan sul passaç di daûr (il graduin al è denant).
+    // On the front line the boards sit on the rear walkway (the fire step is in front).
     const frontLine = alongX && Math.abs(z0) + Math.abs(z1) === 79
     const c = frontLine ? Math.sign(z0) * 40.3 : alongX ? (z0 + z1) / 2 : (x0 + x1) / 2
     const a0 = alongX ? x0 : z0
@@ -74,7 +74,7 @@ function duckboards({ B, C }: SceneryKit, r: () => number) {
       const g = alongX ? boxAt([a, T_FLOOR, c - w], [a + 0.24, T_FLOOR + 0.05, c + w]) : boxAt([c - w, T_FLOOR, a], [c + w, T_FLOOR + 0.05, a + 0.24])
       B.add("legno", g, tint.clone().offsetHSL(0, 0, (r() - 0.5) * 0.14))
     }
-    // i doi lunghers sot des breis
+    // the two stringers under the boards
     for (const s of [-0.3, 0.3]) {
       const g = alongX ? boxAt([a0 + 0.2, T_FLOOR, c + s - 0.04], [a1 - 0.2, T_FLOOR + 0.03, c + s + 0.04]) : boxAt([c + s - 0.04, T_FLOOR, a0 + 0.2], [c + s + 0.04, T_FLOOR + 0.03, a1 - 0.2])
       B.add("legno", g, C("#5a4030"))
@@ -82,7 +82,7 @@ function duckboards({ B, C }: SceneryKit, r: () => number) {
   }
 }
 
-/** La ferade Decauville (scartament di 60 cm): rotais di fier e traviersis di len. */
+/** The Decauville railway (60 cm gauge): iron rails and wooden sleepers. */
 function railway({ map, B, C, cylBetween }: SceneryKit) {
   const track = map.track
   const gauge = 0.3
@@ -106,12 +106,12 @@ function railway({ map, B, C, cylBetween }: SceneryKit) {
     B.add("legno", g, C("#6a4a34"))
   }
   sleeper.dispose()
-  // Un vagonut ribaltât e un mucj di rotais di ricambi te buse taliane.
+  // An overturned wagon and a pile of spare rails in the Italian dugout.
   B.add("ferro", boxAt([-9, T_FLOOR, 77], [-6.5, T_FLOOR + 0.12, 82]), C(RUST))
   B.add("ferro", boxAt([-9, T_FLOOR + 0.12, 77.3], [-6.5, T_FLOOR + 0.2, 81.7]), C("#5a3a26"))
 }
 
-/** Fîl spinât: pâi di fier stuarts e trê fîi che a pendin, cun vierturis pai passaçs. */
+/** Barbed wire: crooked iron posts and three sagging strands, with gaps for the passages. */
 function barbedWire({ B, C, cylBetween }: SceneryKit, r: () => number) {
   const gaps: [number, number][] = [[-36, -28], [-4, 4], [28, 36]]
   for (const z of [33.5, 24, -24, -33.5]) {
@@ -137,14 +137,14 @@ function barbedWire({ B, C, cylBetween }: SceneryKit, r: () => number) {
         B.add("ferro", cylBetween([a[0], T_TOP + h, a[2]], m, 0.008, 0.008, 3), C("#3a3430"))
         B.add("ferro", cylBetween(m, [b[0], T_TOP + h, b[2]], 0.008, 0.008, 3), C("#3a3430"))
       }
-      // il rodul di fîl par tiere
+      // the coil of wire on the ground
       if (i % 3 === 0) B.add("ferro", new THREE.TorusGeometry(0.35, 0.012, 3, 10).rotateY(r() * 3).translate(m3(a, b, 0.5)[0], T_TOP + 0.3, m3(a, b, 0.5)[2]), C("#3a3430"))
     }
   }
 }
 const m3 = (a: V, b: V, k: number): V => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k]
 
-/** Busis di granade: un disc scûr e un ôr di tiere voltade (dome decor, si cjamine parsore). */
+/** Shell craters: a dark disc and a rim of upturned earth (decor only, you walk over it). */
 function craters({ B, C, sphere }: SceneryKit, r: () => number) {
   for (let i = 0; i < 26; i++) {
     const x = -40 + r() * 80
@@ -160,7 +160,7 @@ function craters({ B, C, sphere }: SceneryKit, r: () => number) {
   }
 }
 
-/** La cjasute sdrumade: maserie par tiere e travs dal cuviert colâts. */
+/** The wrecked hut: rubble on the ground and fallen roof beams. */
 function ruin({ B, C, cylBetween, sphere }: SceneryKit, r: () => number) {
   for (let i = 0; i < 18; i++) B.add("pietra", sphere([-10.5 + r() * 5.2, T_TOP + 0.05, -3.6 + r() * 5], 0.15 + r() * 0.22, 0.7, 5), C("#b8b0a4"))
   B.add("legno", cylBetween([-10.6, T_TOP + 2.1, -3.7], [-6.2, T_TOP + 0.1, 1.2], 0.11, 0.1, 6), C("#4a3624"))
@@ -168,7 +168,7 @@ function ruin({ B, C, cylBetween, sphere }: SceneryKit, r: () => number) {
   B.add("legno", cylBetween([-10.7, T_TOP + 2.15, 1.7], [-10.7, T_TOP + 0.6, -3.0], 0.09, 0.09, 6), C("#3a2a1c"))
 }
 
-/** Il canon (un 305 austriac in piçul) te caverne e la stue dal ricovar talian. */
+/** The cannon (a small Austrian 305) in the cave and the stove in the Italian dugout. */
 function guns({ B, C, cylBetween }: SceneryKit) {
   B.add("ferro", cylBetween([13, 1.45, -96.4], [13, 1.75, -90.6], 0.26, 0.17, 12), C("#4c5040"))
   B.add("ferro", cylBetween([13, 1.4, -97.2], [13, 1.45, -96.3], 0.38, 0.36, 12), C("#3c4034"))
@@ -176,21 +176,21 @@ function guns({ B, C, cylBetween }: SceneryKit) {
     B.add("legno", new THREE.CylinderGeometry(0.7, 0.7, 0.14, 16).rotateZ(Math.PI / 2).translate(x, 0.7, -96), C("#5a3e28"))
     B.add("ferro", new THREE.TorusGeometry(0.7, 0.04, 4, 18).rotateY(Math.PI / 2).translate(x, 0.7, -96), C("#2a2622"))
   }
-  // Munizions dal canon.
+  // The cannon's ammunition.
   for (let i = 0; i < 5; i++) B.add("ferro", cylBetween([9.3 + i * 0.28, 0.9, -97.8], [9.3 + i * 0.28, 1.5, -97.8], 0.11, 0.08, 8), C("#8a7040"))
-  // Stue e tubo che al salte fûr dal cuviert dal ricovar.
+  // Stove and pipe poking out of the dugout roof.
   B.add("ferro", cylBetween([-4.6, 0, 94], [-4.6, 0.8, 94], 0.3, 0.3, 10), C("#2e2a26"))
   B.add("ferro", cylBetween([-4.6, 0.8, 94], [-4.6, 4.6, 94], 0.07, 0.07, 6), C(RUST))
-  // Cussins di len e un mapamont sul taulîr.
+  // Wooden cushions and a map on the table.
   B.add("stoffa", boxAt([-5.4, 0.9, 97.2], [-3.6, 0.92, 98.4]), C("#d8cfae"))
-  // Pâl cu la bandiere taliane e chê austriache sui comants (tele fine).
+  // Poles with the Italian and Austrian flags on the command posts (thin cloth).
   for (const [x, z, cols] of [[16.5, 85, ["#2e8b3a", "#f2efe6", "#c8302c"]], [-16.5, -85, ["#d02a2a", "#f2efe6", "#d02a2a"]]] as const) {
     B.add("legno", cylBetween([x, 3.6, z], [x, 7.6, z], 0.05, 0.04, 6), C("#5a4030"))
     cols.forEach((c, i) => B.add("stoffa", boxAt([x + 0.05 + i * 0.5, 6.6, z - 0.01], [x + 0.55 + i * 0.5, 7.5, z + 0.01]), C(c)))
   }
 }
 
-/** Il prât ator de mape, a la stesse quote de tiere: il rilêf al cres plui in là. */
+/** The meadow around the map, at ground level: the relief rises further out. */
 function nearGround({ map, B, C, face }: SceneryKit) {
   const { minX, maxX, minZ, maxZ } = map.bounds
   const R = 70
@@ -204,7 +204,7 @@ function nearGround({ map, B, C, face }: SceneryKit) {
     B.add("erba", face(a, b, "top"), C("#a8b088"))
     for (const s of ["east", "west", "south", "north"] as const) B.add("roccia", face(a, b, s), C("#b0aaa0"))
   }
-  // cret a nord e a sud, sore il prât: la creste e cole
+  // rocks to the north and south, on the meadow: the ridge crumbles
   const r = rng(515)
   for (let i = 0; i < 40; i++) {
     const side = i % 4
@@ -226,7 +226,7 @@ export const scenery: Scenery = {
     ruin(kit, r)
     guns(kit)
     nearGround(kit)
-    // Lûs: la lampe dal ricovar e il fûc te caverne.
+    // Lights: the dugout lamp and the fire in the cave.
     const lamp = new THREE.PointLight("#ffb46a", 18, 9, 1.5)
     lamp.position.set(0, 2.3, 96)
     const cave = new THREE.PointLight("#ffa858", 26, 12, 1.5)
@@ -245,7 +245,7 @@ export const scenery: Scenery = {
   backdrop({ map }) {
     const { minX, maxX, minZ, maxZ } = map.bounds
     const out = (x: number, z: number) => Math.hypot(Math.max(minX - x, x - maxX, 0), Math.max(minZ - z, z - maxZ, 0))
-    // Lis Alps Cjargnelis: creste lungje a est e ovest (la linie dal front), pichs plui alts a nord.
+    // The Carnic Alps: a long ridge east and west (the front line), higher peaks to the north.
     const height = (x: number, z: number) => {
       const d = out(x, z)
       const ridge = 1 - smooth(0, 900, Math.abs(z)) * 0.3

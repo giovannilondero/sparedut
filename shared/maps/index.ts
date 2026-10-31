@@ -1,5 +1,5 @@
 /**
- * Le mappe di gioco: un insieme chiuso, scelto da chi crea la partita.
+ * The game maps: a closed set, chosen by whoever creates the match.
  */
 import type { MapDef, MapId } from "../map.ts"
 import { GLEMONE } from "./glemone.ts"

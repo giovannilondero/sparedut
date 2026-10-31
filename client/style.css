@@ -58,7 +58,7 @@ button.big small { opacity: 0.75; font-size: 13px; }
 .field input { background: rgba(0, 0, 0, 0.35); border: 1px solid var(--stone-line); border-radius: 8px; padding: 8px 10px; color: var(--ink); font-size: 15px; }
 .field input[type="range"] { padding: 0; accent-color: var(--gold); }
 
-/* Le select: tendina scura come il resto, freccia d'oro, testo lungo troncato. */
+/* Selects: dark dropdown like the rest, gold arrow, long text truncated. */
 :root { color-scheme: dark; }
 select { appearance: none; min-inline-size: 0; max-inline-size: 100%; text-overflow: ellipsis; white-space: nowrap; overflow: clip; cursor: pointer;
   background: rgba(0, 0, 0, 0.35) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23e8b64c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center / 12px 8px;
@@ -70,10 +70,10 @@ select:focus-visible, button:focus-visible, input:focus-visible { outline: 2px s
 .inline-field { display: inline-flex; align-items: center; gap: 6px; }
 .inline-field select { padding-block: 5px; font-size: 13px; }
 
-/* Bravura dei bot: tre schede invece di una tendina con testi lunghi. */
+/* Bot skill: three cards instead of a dropdown with long texts. */
 .levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; color: var(--ink); }
 
-/* Lingua: interruttore in alto a destra. */
+/* Language: toggle in the top right. */
 .lang { position: absolute; inset-block-start: 0; inset-inline-end: 0; display: flex; align-items: center; gap: 4px; padding: 4px 4px 4px 12px; border-radius: 999px;
   background: var(--stone); border: 1px solid var(--stone-line); backdrop-filter: blur(6px); font-size: 12px; color: var(--muted); }
 .lang span { margin-inline-end: 4px; letter-spacing: 0.12em; text-transform: uppercase; }
@@ -267,7 +267,7 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
   .cards { grid-template-columns: 1fr; }
 }
 
-/* ---------------- PANNELLO PRESTAZIONI (F3) ---------------- */
+/* ---------------- PERFORMANCE PANEL (F3) ---------------- */
 #perf { position: fixed; top: 10px; left: 10px; z-index: 20; pointer-events: none; display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 8px;
   background: rgba(10, 8, 6, 0.78); border: 1px solid var(--stone-line); font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); min-width: 220px; }
 #perf b { font-size: 16px; }

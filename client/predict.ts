@@ -1,6 +1,6 @@
 /**
- * Predizione del proprio movimento: applico subito i miei comandi con la stessa
- * fisica del server, e quando arriva l'istantanea rigioco quelli non ancora confermati.
+ * Prediction of our own movement: my inputs are applied immediately with the same
+ * physics as the server, and when a snapshot arrives the unconfirmed ones are replayed.
  */
 import type { PlayerInput } from "../shared/input.ts"
 import { stepBody, type Body } from "../shared/movement.ts"
@@ -8,13 +8,13 @@ import type { PhysicsWorld } from "../shared/physics.ts"
 
 export class Predictor {
   body: Body | null = null
-  /** Il corpo al tick precedente: la camera disegna fra i due, non a scatti di 60 Hz. */
+  /** The body at the previous tick: the camera draws between the two, not in 60 Hz steps. */
   prev: Body | null = null
   private pending: { input: PlayerInput; scale: number }[] = []
-  /** Scarto visivo dopo una correzione, assorbito piano piano. */
+  /** Visual offset after a correction, absorbed gradually. */
   readonly smooth = { x: 0, y: 0, z: 0 }
   launched = false
-  /** Diagnostica: le correzioni recenti (metri), per il pannello F3. */
+  /** Diagnostics: recent corrections (metres), for the F3 panel. */
   corrections: number[] = []
 
   constructor(private readonly physics: PhysicsWorld) {}
@@ -46,19 +46,19 @@ export class Predictor {
       const err = Math.hypot(dx, dy, dz)
       this.corrections.push(err)
       if (this.corrections.length > 60) this.corrections.shift()
-      // Piccoli errori si smussano, i grandi (teletrasporto, rinascita) no.
+      // Small errors get smoothed, large ones (teleport, respawn) don't.
       if (err < 2) {
         this.smooth.x += dx
         this.smooth.y += dy
         this.smooth.z += dz
-        // Anche il tick precedente si sposta della correzione: l'interpolazione resta continua.
+        // The previous tick is shifted by the correction too: interpolation stays continuous.
         if (this.prev) this.prev = { ...this.prev, x: this.prev.x - dx, y: this.prev.y - dy, z: this.prev.z - dz }
       } else this.prev = body
     }
     this.body = body
   }
 
-  /** Fermo dove dice il server (alla torretta): niente da predire né da rigiocare. */
+  /** Pinned where the server says (on the turret): nothing to predict or replay. */
   pin(server: Body) {
     this.body = server
     this.prev = server
@@ -72,12 +72,12 @@ export class Predictor {
     this.smooth.z *= k
   }
 
-  /** Posizione da disegnare: fra il tick precedente e l'ultimo, `alpha` in [0, 1]. */
+  /** Position to draw: between the previous and the latest tick, `alpha` in [0, 1]. */
   render(alpha: number) {
     const b = this.body
     const p = this.prev ?? b
     if (!b || !p) return null
-    // Un salto grande (rinascita, correzione forte) non si interpola.
+    // A big jump (respawn, strong correction) isn't interpolated.
     if (Math.abs(b.x - p.x) + Math.abs(b.y - p.y) + Math.abs(b.z - p.z) > 3) return { x: b.x, y: b.y, z: b.z }
     return { x: p.x + (b.x - p.x) * alpha, y: p.y + (b.y - p.y) * alpha, z: p.z + (b.z - p.z) * alpha }
   }

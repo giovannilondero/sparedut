@@ -1,5 +1,5 @@
 /**
- * Il menu principale: nome, lingua, partite, armeria, impostazioni, vocabolario.
+ * The main menu: name, language, matches, armoury, settings, glossary.
  */
 import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "../shared/folklore.ts"
 import type { MapId } from "../shared/map.ts"
@@ -26,7 +26,7 @@ export interface CreateOptions {
 export interface MenuHandlers {
   readonly create: (o: CreateOptions, quick?: boolean) => void
   readonly join: (code: string) => void
-  /** La mappa scelta nel menu: diventa lo sfondo. */
+  /** The map chosen in the menu: it becomes the background. */
   readonly mapChanged: (id: MapId) => void
   readonly settingsChanged: () => void
 }
@@ -67,7 +67,7 @@ export class Menu {
     document.addEventListener("mouseover", (e) => {
       if ((e.target as HTMLElement).closest?.("#menu button")) audio.play("ui_hover", { volume: 0.4 })
     })
-    // Esc: dai sottomenu si torna alla schermata principale.
+    // Esc: from submenus, go back to the main screen.
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape" || $("menu").classList.contains("hidden")) return
       if (this.screen !== "home") {
@@ -91,7 +91,7 @@ export class Menu {
     setInterval(() => this.showTip(), 9000)
   }
 
-  /** Tutto quello che il menu scrive da JS, nella lingua attiva. */
+  /** Everything the menu writes from JS, in the active language. */
   private renderTexts() {
     for (const el of document.querySelectorAll<HTMLButtonElement>("[data-lang]")) {
       el.classList.toggle("selected", el.dataset.lang === this.settings.lang)
@@ -114,7 +114,7 @@ export class Menu {
     }, 400)
   }
 
-  /** Allinea le caselle alle impostazioni cambiate da fuori (F3). */
+  /** Syncs the checkboxes with settings changed from outside (F3). */
   syncSettings() {
     $<HTMLInputElement>("s-info").checked = this.settings.showInfo
   }
@@ -170,9 +170,9 @@ export class Menu {
     for (const b of ul.querySelectorAll<HTMLButtonElement>("button")) b.addEventListener("click", () => !this.needName() && this.handlers.join(b.dataset.code!))
   }
 
-  // ---------------------------------------------------------------- crea partita
+  // ---------------------------------------------------------------- create match
 
-  /** Ascoltatori una volta sola: le schede si ridisegnano a ogni scelta e a ogni cambio di lingua. */
+  /** Listeners only once: the cards are redrawn on every choice and every language change. */
   private bindCreate() {
     $("mode-cards").addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-mode]")
@@ -228,7 +228,7 @@ export class Menu {
       (l) =>
         `<button class="card${l === this.level ? " selected" : ""}" data-level="${l}" role="radio" aria-checked="${l === this.level}"><b>${s.levels[l].name}</b><small>${s.levels[l].sub}</small></button>`
     ).join("")
-    // Le select si riscrivono tenendo il valore scelto.
+    // The selects are rewritten keeping the chosen value.
     const minutes = $<HTMLSelectElement>("c-minutes")
     const keepMinutes = minutes.value || String(this.settings.lastMinutes)
     minutes.innerHTML = MINUTES.map((m) => `<option value="${m}">${s.menu.minutes(m)}</option>`).join("")
@@ -239,13 +239,13 @@ export class Menu {
     bots.value = keepBots
   }
 
-  // ---------------------------------------------------------------- armeria
+  // ---------------------------------------------------------------- armoury
 
   buildArmarie(target: HTMLElement = $("armarie"), onPick?: (p: PrimaryId) => void) {
     const max = { damage: 110, rate: 10, range: 400, mag: 30 }
     const render = () => {
       const s = t()
-      // La mitraie non si porta: sta sulle torrette.
+      // The mitraie can't be carried: it stays on the turrets.
       target.innerHTML = WEAPON_IDS.filter((id) => id !== "mitraie").map((id) => {
         const w = WEAPONS[id]
         const text = s.weapons[id]
@@ -271,7 +271,7 @@ export class Menu {
     render()
   }
 
-  // ---------------------------------------------------------------- impostazioni
+  // ---------------------------------------------------------------- settings
 
   private bindSettings() {
     const s = this.settings

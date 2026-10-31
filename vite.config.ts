@@ -1,6 +1,6 @@
 import { defineConfig } from "vite"
 
-/** Con PUBLIC_URL (tunnel o dominio) Vite accetta anche quell'host. */
+/** With PUBLIC_URL (tunnel or domain) Vite also accepts that host. */
 const publicHost = process.env.PUBLIC_URL ? new URL(process.env.PUBLIC_URL).hostname : null
 
 export default defineConfig({
