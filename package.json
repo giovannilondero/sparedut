@@ -13,12 +13,18 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@alchemy.run/cloudflare": "2.0.0-beta.84",
+    "@cloudflare/workers-types": "^5.20261030.1",
+    "@effect/platform-bun": "~4.0.7",
+    "@effect/platform-node": "~4.0.7",
     "@typeonce/oxlint-plugin-ritmo": "^0.18.0",
     "@typeonce/ritmo-devtools": "^0.18.0",
     "@types/bun": "^1.4.4",
     "@types/howler": "^2.2.13",
     "@types/three": "^0.186.0",
+    "alchemy": "2.0.0-beta.84",
     "concurrently": "^10.0.6",
+    "effect": "~4.0.7",
     "oxlint": "^1.90.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
@@ -28,9 +34,13 @@
     "dev": "concurrently -k -n server,client -c yellow,cyan \"bun --watch server/index.ts\" \"vite\"",
     "build": "vite build",
     "start": "bun server/index.ts",
-    "typecheck": "tsc --noEmit -p .",
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.worker.json",
     "lint": "oxlint && ritmo-devtools lint shared/lint.ts",
     "test": "bun test",
-    "check": "pnpm typecheck && pnpm lint && pnpm test"
+    "check": "pnpm typecheck && pnpm lint && pnpm test",
+    "nav": "bun scripts/nav-graphs.ts",
+    "cf:dev": "alchemy dev",
+    "cf:deploy": "alchemy deploy --stage prod",
+    "cf:destroy": "alchemy destroy --stage prod"
   }
 }

@@ -169,6 +169,11 @@ export class Hub {
     return [...this.rooms.values()].filter((r) => r.settings.visibility === "lan" && r.networkKey === peer.network.key).map((r) => r.summary())
   }
 
+  /** Nessuno connesso e nessuna stanza: il loop si può fermare (su Cloudflare l'oggetto va a dormire). */
+  get idle() {
+    return this.peers.size === 0 && this.rooms.size === 0
+  }
+
   /** Da chiamare spesso: avanza le stanze di quanti tick sono maturati. */
   update() {
     const now = performance.now()
