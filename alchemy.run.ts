@@ -9,31 +9,32 @@
 import * as Alchemy from "alchemy"
 import * as Cloudflare from "@alchemy.run/cloudflare"
 import * as Effect from "effect/Effect"
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 /**
  * Rapier "compat" ships its WASM as base64 and compiles it at runtime, which Workers don't
  * allow. Here the base64 gives way to the package's `.wasm` file (the same bytes),
  * which the bundler loads as a precompiled module: `RAPIER.init()` stays as it is.
  *
- * A class instance, not an object literal: when planning an update Alchemy copies the props
- * as plain data and drops functions, which left the hook without its handler. An instance is
- * dropped whole, so the plan bundles without the plugin and the deploy with it.
+ * A file written here and an alias to it, not a bundler plugin: Alchemy copies the props as
+ * plain data, and a plugin's functions don't survive the copy (with a plugin, a deploy
+ * shipped the base64 and every connection failed). Strings do.
  */
-class RapierWasm {
-  readonly name = "sparedut:rapier-wasm"
-  readonly transform = {
-    filter: { id: /rapier3d-compat[\\/]dist[\\/]rapier\.mjs$/ },
-    handler(code: string, id: string) {
-      const inline = /[\w$]+\.toByteArray\("[A-Za-z0-9+/=]+"\)(\.buffer)?/g
-      const found = code.match(inline)?.length ?? 0
-      if (found !== 1) throw new Error(`Rapier: expected a single inline WASM in ${id}, found ${found}`)
-      const wasm = JSON.stringify(join(dirname(id), "rapier_wasm3d_bg.wasm"))
-      return `import rapierWasm from ${wasm};\n${code.replace(inline, "rapierWasm")}`
-    }
-  }
+const rapierWorker = () => {
+  const source = fileURLToPath(import.meta.resolve("@dimforge/rapier3d-compat"))
+  const code = readFileSync(source, "utf8")
+  const inline = /[\w$]+\.toByteArray\("[A-Za-z0-9+/=]+"\)(\.buffer)?/g
+  const found = code.match(inline)?.length ?? 0
+  if (found !== 1) throw new Error(`Rapier: expected a single inline WASM in ${source}, found ${found}`)
+  const wasm = JSON.stringify(join(dirname(source), "rapier_wasm3d_bg.wasm"))
+  const out = join(import.meta.dirname, "node_modules", ".cache", "sparedut", "rapier.mjs")
+  mkdirSync(dirname(out), { recursive: true })
+  const patched = code.replace(inline, "rapierWasm").replace(/\n\/\/# sourceMappingURL=.*$/, "")
+  writeFileSync(out, `import rapierWasm from ${wasm};\n${patched}`)
+  return out
 }
-const rapierWasm = new RapierWasm()
 
 export default Alchemy.Stack(
   "Sparedut",
@@ -54,7 +55,7 @@ export default Alchemy.Stack(
         runWorkerFirst: ["/ws"]
       },
       env: { PARTIDIS: Cloudflare.DurableObject("PARTIDIS", { className: "Partidis" }) },
-      build: { input: { plugins: [rapierWasm] } },
+      build: { input: { resolve: { alias: { "@dimforge/rapier3d-compat": rapierWorker() } } } },
       domain: process.env.DEPLOY_DOMAIN || undefined,
       observability: { enabled: true }
     })
