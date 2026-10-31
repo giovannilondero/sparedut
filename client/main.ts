@@ -1,6 +1,7 @@
 /**
  * Avvio del client: renderer, mondo, audio, menu, connessione, partita.
  */
+import "./zod-config.ts"
 import * as THREE from "three"
 import type { MapId } from "../shared/map.ts"
 import { MAPS } from "../shared/maps/index.ts"

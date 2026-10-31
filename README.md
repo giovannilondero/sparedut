@@ -132,7 +132,7 @@ interpola gli altri giocatori 100 ms nel passato, e il server colpisce dove il t
 pnpm check   # tipi, oxlint + ritmo-devtools lint, test
 ```
 
-Dietro un reverse proxy imposta `TRUST_PROXY=1`, così il server legge l'IP reale da `X-Forwarded-For`.
+Dietro un proxy sulla stessa macchina (il tunnel `cloudflared`, Vite) il server legge da solo l'IP reale da `CF-Connecting-IP` o `X-Forwarded-For`; dietro un reverse proxy su un'altra macchina imposta `TRUST_PROXY=1`.
 
 Link d'invito: se giochi da `localhost` il link usa l'indirizzo pubblico del gioco. Il server lo impara dal primo client che entra da un tunnel o da un dominio, oppure lo prende da `PUBLIC_URL=https://…` (che Vite aggiunge anche agli host accettati).
 

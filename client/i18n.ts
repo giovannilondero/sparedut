@@ -365,7 +365,8 @@ const fur: Strings = {
     version: "Version diferente dal server: torne a cjariâ la pagjine.",
     notFound: "Nissune partide cun chest codiç. Controle, o domande al host.",
     lanOnly: "Cheste partide e je dome pe rêt locâl di cui che le à creade.",
-    full: "Partide plene: o sin za in sedis, come a une sagre."
+    full: "Partide plene: o sin za in sedis, come a une sagre.",
+    busy: "Masse partidis viertis sul server: torne a provâ ca di un pôc."
   },
   menu: {
     needName: "Prime il non!",
@@ -681,7 +682,8 @@ const it: Strings = {
     version: "Versione diversa dal server: ricarica la pagina.",
     notFound: "Nessuna partita con questo codice. Controlla, o chiedi all'host.",
     lanOnly: "Questa partita è solo per la rete locale di chi l'ha creata.",
-    full: "Partita piena: siamo già in sedici, come a una sagra."
+    full: "Partita piena: siamo già in sedici, come a una sagra.",
+    busy: "Troppe partite aperte sul server: riprova tra poco."
   },
   menu: {
     needName: "Prima il nome!",

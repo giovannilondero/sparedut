@@ -16,7 +16,7 @@ const SILENT_MS = 90_000
 /** Tutte le stanze stanno in un oggetto solo: oltre questo numero di connessioni rifiutiamo. */
 const MAX_CONNECTIONS = 300
 /** Una LAN party dietro lo stesso router riempie una stanza; uno script che apre socket no. */
-const MAX_CONNECTIONS_PER_ADDRESS = 20
+const MAX_CONNECTIONS_PER_NETWORK = 20
 /** Come `setInterval(update, 2)` del server Bun, ma ogni risveglio qui costa di più. */
 const LOOP_MS = 4
 
@@ -33,7 +33,6 @@ export interface Env {
 
 interface Connection {
   readonly peer: Peer
-  readonly address: string
   /** Quando ha parlato l'ultima volta, input o ping. */
   seen: number
 }
@@ -50,8 +49,12 @@ export class Partidis extends DurableObject<Env> {
 
   override async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected a WebSocket", { status: 426 })
-    const address = request.headers.get("CF-Connecting-IP") ?? ""
-    if (this.sockets.size >= MAX_CONNECTIONS || this.connectionsFrom(address) >= MAX_CONNECTIONS_PER_ADDRESS) {
+    // Il gioco si apre solo dalla sua pagina: un altro sito non usa questo server dal browser di chi lo visita.
+    const origin = request.headers.get("Origin")
+    if (origin && URL.parse(origin)?.host !== new URL(request.url).host) return new Response("Forbidden", { status: 403 })
+    // Per rete, non per indirizzo: con IPv6 ogni casa ha milioni di indirizzi (`networkOf` guarda il /64).
+    const network = networkOf(request.headers.get("CF-Connecting-IP") ?? undefined)
+    if (this.sockets.size >= MAX_CONNECTIONS || this.connectionsFrom(network.key) >= MAX_CONNECTIONS_PER_NETWORK) {
       return new Response("Too many connections", { status: 429 })
     }
     await initPhysics()
@@ -60,7 +63,7 @@ export class Partidis extends DurableObject<Env> {
     const { 0: client, 1: socket } = new WebSocketPair()
     socket.accept()
     const peer: Peer = {
-      network: networkOf(address || undefined),
+      network,
       send: (data) => {
         if (socket.readyState === WebSocket.OPEN) socket.send(data)
       },
@@ -68,7 +71,7 @@ export class Partidis extends DurableObject<Env> {
       name: "",
       room: null
     }
-    const connection: Connection = { peer, address, seen: performance.now() }
+    const connection: Connection = { peer, seen: performance.now() }
     this.sockets.set(socket, connection)
     this.hub.open(peer)
     socket.addEventListener("message", (event) => {
@@ -89,9 +92,9 @@ export class Partidis extends DurableObject<Env> {
     return new Response(null, { status: 101, webSocket: client })
   }
 
-  private connectionsFrom(address: string) {
+  private connectionsFrom(network: string) {
     let count = 0
-    for (const connection of this.sockets.values()) if (connection.address === address) count++
+    for (const connection of this.sockets.values()) if (connection.peer.network.key === network) count++
     return count
   }
 
