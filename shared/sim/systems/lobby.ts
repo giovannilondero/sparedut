@@ -1,5 +1,5 @@
 /**
- * Entrate, uscite, cambi di squadra e di arma principale.
+ * Joins, leaves, team and primary weapon changes.
  */
 import { IDLE_INPUT } from "../../input.ts"
 import { MAPS } from "../../maps/index.ts"
@@ -92,12 +92,12 @@ export const HandleTeamChanges = Game.System(
       if (team && team !== m.data.team.get()) {
         m.data.team.set(team)
         const life = m.data.life.get()
-        // Cambiare squadra da vivo costa la vita (niente punti a nessuno).
+        // Switching team while alive costs your life (no points to anyone).
         if (life._tag === "Alive") m.data.life.transition({ from: "Alive", to: "Dead", data: { respawn: 60, killer: null } })
       }
       const primary = primaries.get(session)
-      // La nuova arma principale arriva subito; se si aveva in mano la vecchia, si impugna la nuova.
-      // Le munizioni restano quelle di ogni arma: cambiare avanti e indietro non ricarica niente.
+      // The new primary arrives immediately; if you were holding the old one, you switch to the new one.
+      // Each weapon keeps its own ammo: switching back and forth reloads nothing.
       if (primary)
         m.data.arsenal.update((a) =>
           a.primary === primary

@@ -1,5 +1,5 @@
 /**
- * L'intento del giocatore per un tick: lo mandano client e bot, uguale.
+ * The player's intent for one tick: clients and bots send it the same way.
  */
 import { z } from "zod"
 import { WEAPON_IDS, type WeaponId } from "./weapons.ts"
@@ -13,24 +13,24 @@ export const BUTTON = {
   reload: 32,
   bomb: 64,
   mine: 128,
-  /** Monta o smonta una torretta. */
+  /** Mounts or dismounts a turret. */
   use: 256
 } as const
 
 export type ButtonName = keyof typeof BUTTON
 
 export interface PlayerInput {
-  /** Numero progressivo del client: il server conferma l'ultimo applicato. */
+  /** Client sequence number: the server acknowledges the last one applied. */
   readonly seq: number
-  /** Laterale (-1 sinistra, 1 destra) e avanti (1) / indietro (-1). */
+  /** Strafe (-1 left, 1 right) and forward (1) / back (-1). */
   readonly mx: number
   readonly mz: number
-  /** Imbardata (0 guarda verso nord, -z) e beccheggio (positivo in su), radianti. */
+  /** Yaw (0 faces north, -z) and pitch (positive is up), in radians. */
   readonly yaw: number
   readonly pitch: number
   readonly buttons: number
   readonly weapon: WeaponId
-  /** Il tick del server che il client stava mostrando: serve a compensare la latenza. */
+  /** The server tick the client was showing: used for lag compensation. */
   readonly view: number
 }
 

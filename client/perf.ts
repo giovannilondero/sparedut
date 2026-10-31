@@ -1,10 +1,10 @@
 /**
- * Pannello prestazioni (F3) e risoluzione dinamica.
+ * Performance panel (F3) and dynamic resolution.
  *
- * Il pannello mostra FPS, tempi di frame (medio e 1% peggiore), tempo CPU,
- * draw call, triangoli, risoluzione, ping e ritmo delle istantanee.
- * La risoluzione dinamica abbassa il pixel ratio quando i frame non stanno nel
- * budget, e lo rialza piano quando c'è margine.
+ * The panel shows FPS, frame times (average and worst 1%), CPU time,
+ * draw calls, triangles, resolution, ping and snapshot rate.
+ * Dynamic resolution lowers the pixel ratio when frames don't fit the
+ * budget, and slowly raises it again when there's headroom.
  */
 import type * as THREE from "three"
 import { t } from "./i18n.ts"
@@ -12,11 +12,11 @@ import { t } from "./i18n.ts"
 export interface NetStats {
   readonly ping: number
   readonly tick: number
-  /** Millisecondi fra due istantanee: media e scarto. */
+  /** Milliseconds between two snapshots: mean and deviation. */
   readonly snapEvery: number
   readonly snapJitter: number
   readonly players: number
-  /** Correzioni della predizione oltre 1 cm nelle ultime 60 istantanee, e la peggiore (m). */
+  /** Prediction corrections over 1 cm in the last 60 snapshots, and the worst one (m). */
   readonly corrections: number
   readonly worstCorrection: number
 }
@@ -31,7 +31,7 @@ export class PerfMonitor {
   private calls = 0
   private triangles = 0
   private el: HTMLElement
-  /** Pixel ratio scelto dalla risoluzione dinamica, entro [min, max]. */
+  /** Pixel ratio chosen by dynamic resolution, within [min, max]. */
   scale = 1
   visible = false
 
@@ -47,7 +47,7 @@ export class PerfMonitor {
     this.el.classList.toggle("hidden", !on)
   }
 
-  /** Da chiamare dopo aver disegnato: `renderer.info` con autoReset spento conta tutte le passate. */
+  /** Call after drawing: `renderer.info` with autoReset off counts all passes. */
   sample(frameMs: number, cpuMs: number) {
     this.frames.push(frameMs)
     this.cpu.push(cpuMs)
@@ -68,8 +68,8 @@ export class PerfMonitor {
   }
 
   /**
-   * Risoluzione dinamica: sotto ~55 fps scende di un gradino; sopra ~70 fps
-   * stabili per qualche secondo risale. Restituisce true se ha cambiato scala.
+   * Dynamic resolution: below ~55 fps it steps down; above a steady ~70 fps
+   * for a few seconds it steps back up. Returns true if it changed the scale.
    */
   adapt(now: number, min: number, max: number): boolean {
     if (now - this.lastAdjust < 1500 || this.frames.length < WINDOW) return false

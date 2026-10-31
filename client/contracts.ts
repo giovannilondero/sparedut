@@ -1,7 +1,7 @@
 /**
- * I contratti fra il nucleo del client (rete, predizione, loop, HUD) e i moduli
- * di presentazione: mondo, avatar, arma in prima persona, effetti, audio.
- * Ogni modulo di presentazione esporta la sua funzione `create*` con queste firme.
+ * The contracts between the client core (network, prediction, loop, HUD) and the
+ * presentation modules: world, avatars, first-person weapon, effects, audio.
+ * Each presentation module exports its `create*` function with these signatures.
  */
 import type * as THREE from "three"
 import type { PickupKind, Team } from "../shared/map.ts"
@@ -10,9 +10,9 @@ import type { ProjectileKind, WeaponId } from "../shared/weapons.ts"
 export type P3 = readonly [number, number, number]
 
 /**
- * Qualità grafica. "alta": ombre dinamiche rifatte a ogni frame (anche dei giocatori).
- * "media": ombre del paese calcolate una volta sola, i giocatori hanno un'ombra a disco.
- * "bassa": niente ombre, meno luci, risoluzione piena al massimo 1x.
+ * Graphics quality. "alta" (high): dynamic shadows redrawn every frame (players' too).
+ * "media" (medium): town shadows computed once, players get a disc shadow.
+ * "bassa" (low): no shadows, fewer lights, full resolution capped at 1x.
  */
 export type Quality = "bassa" | "media" | "alta"
 
@@ -22,19 +22,19 @@ export interface FlagVisual {
   readonly state: "base" | "carried" | "dropped"
 }
 export interface WorldFrame {
-  /** Uno per punto di `PICKUPS`, stesso ordine: true se raccoglibile. */
+  /** One per `PICKUPS` point, same order: true if it can be picked up. */
   readonly pickups: readonly boolean[]
-  /** Solo in modalità "frico". */
+  /** Only in "frico" mode. */
   readonly flags: Readonly<Record<Team, FlagVisual>> | null
-  /** Solo in modalità "culine". */
+  /** Only in "culine" mode. */
   readonly hill: { readonly owner: Team | null; readonly contested: boolean } | null
-  /** Solo in modalità "cjar": il carro sul binario. */
+  /** Only in "cjar" mode: the cart on the track. */
   readonly cart: { readonly at: P3; readonly yaw: number; readonly contested: boolean; readonly pushers: number } | null
-  /** Solo nella Tampieste in corso: il cerchio sicuro. */
+  /** Only during an ongoing Tampieste: the safe circle. */
   readonly storm: { readonly x: number; readonly z: number; readonly radius: number } | null
-  /** Una per torretta della mappa: dove guarda l'arma, quanto è calda, se qualcuno la usa. */
+  /** One per map turret: where the gun points, how hot it is, whether someone is using it. */
   readonly turrets: readonly TurretVisual[]
-  /** Salute di ogni porta da sfondare, da 0 (sfondata) a 1 (intera). */
+  /** Health of each breakable door, from 0 (broken) to 1 (intact). */
   readonly doors: readonly number[]
   readonly camera: THREE.PerspectiveCamera
 }
@@ -44,17 +44,17 @@ export interface TurretVisual {
   readonly heat: number
   readonly jammed: boolean
   readonly manned: boolean
-  /** Chi la usa sono io: l'arma la disegna il viewmodel. */
+  /** I'm the one using it: the viewmodel draws the gun. */
   readonly mine: boolean
 }
 export interface WorldScene {
-  /** Da chiamare ogni frame. `t` in secondi dall'avvio. */
+  /** Call every frame. `t` in seconds since startup. */
   update(dt: number, t: number, frame: WorldFrame): void
-  /** Ombre e luci secondo la qualità; si può richiamare a partita in corso. */
+  /** Shadows and lights according to quality; can be called again mid-match. */
   setQuality(q: Quality): void
-  /** Inquadratura per lo sfondo dei menu: la camera gira lenta attorno alla mappa. */
+  /** Framing for the menu background: the camera slowly circles the map. */
   menuCamera(t: number, camera: THREE.PerspectiveCamera): void
-  /** Toglie la mappa dalla scena e libera geometrie, materiali e texture. */
+  /** Removes the map from the scene and frees geometries, materials and textures. */
   dispose(): void
 }
 
@@ -79,29 +79,29 @@ export interface AvatarPose {
 export interface Avatar {
   readonly object: THREE.Object3D
   update(dt: number, pose: AvatarPose): void
-  /** Lampo dell'arma (il nucleo lo chiama sui colpi degli altri). */
+  /** Muzzle flash (the core calls it on other players' shots). */
   flash(): void
   setTeam(team: Team): void
-  /** Etichetta col nome sopra la testa (solo compagni o mirati). */
+  /** Name label above the head (only teammates or aimed-at players). */
   setLabelVisible(visible: boolean): void
   dispose(): void
 }
 
 // --- client/viewmodel.ts: export function createViewmodel(worldCamera): Viewmodel --------
-// L'arma vive in una scena sua, disegnata dopo il mondo con il depth buffer pulito
-// (così non entra nei muri). Il nucleo fa: renderer.render(world); renderer.clearDepth();
-// renderer.render(viewmodel.scene, viewmodel.camera). La camera dell'arma ha FOV fisso.
+// The weapon lives in its own scene, drawn after the world with a cleared depth buffer
+// (so it doesn't clip into walls). The core does: renderer.render(world); renderer.clearDepth();
+// renderer.render(viewmodel.scene, viewmodel.camera). The weapon camera has a fixed FOV.
 export interface ViewmodelFrame {
   readonly speed: number
   readonly grounded: boolean
   readonly aiming: boolean
   readonly sprinting: boolean
   readonly crouch: boolean
-  /** Variazione dello sguardo in questo frame (radianti), per l'inerzia dell'arma. */
+  /** Look change this frame (radians), for weapon inertia. */
   readonly lookDx: number
   readonly lookDy: number
   readonly sgnape: boolean
-  /** Rotazione del Mulin, da 0 a 1. */
+  /** Mulin spin, from 0 to 1. */
   readonly spin: number
 }
 export interface Viewmodel {
@@ -109,12 +109,12 @@ export interface Viewmodel {
   readonly camera: THREE.PerspectiveCamera
   setWeapon(id: WeaponId): void
   fire(): void
-  /** Durata della ricarica in secondi. */
+  /** Reload duration in seconds. */
   reload(seconds: number): void
   throwBomb(): void
   update(dt: number, frame: ViewmodelFrame): void
   setVisible(visible: boolean): void
-  /** Punto della volata nel mondo (per scie e lampi), dato `worldCamera` aggiornata. */
+  /** Muzzle point in the world (for tracers and flashes), given an up-to-date `worldCamera`. */
   muzzleWorld(target: THREE.Vector3): THREE.Vector3
 }
 
@@ -122,20 +122,20 @@ export interface Viewmodel {
 export interface Fx {
   tracer(from: P3, to: P3, weapon: WeaponId): void
   impact(at: P3): void
-  /** Colpo a segno: briciole di polenta (niente sangue). */
+  /** A hit: polenta crumbs (no blood). */
   hitPuff(at: P3, head: boolean): void
   muzzle(at: P3): void
-  /** Esplosione: palla di fuoco, schegge, onda d'urto. Con `ground` (y del pavimento sotto) lascia fuoco e bruciatura. */
+  /** Explosion: fireball, shrapnel, shockwave. With `ground` (y of the floor below) it leaves fire and a scorch mark. */
   explosion(at: P3, kind: ProjectileKind, ground: number | null): void
-  /** Proiettili in volo e mine piantate: forme di frico che girano, bottiglie di sgnape, mine che lampeggiano. Chiamare a ogni frame con la lista corrente. */
+  /** Projectiles in flight and planted mines: spinning frico wheels, sgnape bottles, blinking mines. Call every frame with the current list. */
   projectiles(list: readonly (readonly [ProjectileKind, number, number, number])[]): void
-  /** Schegge di legno: una porta colpita, o (`big`) sfondata. */
+  /** Wood splinters: a door hit, or (`big`) broken down. */
   splinters(at: P3, big: boolean): void
-  /** Anelli/sbuffi di fieno quando qualcuno usa un cjar di fen. */
+  /** Rings/puffs of hay when someone uses a cjar di fen. */
   padBurst(at: P3): void
   pickupBurst(at: P3, kind: PickupKind): void
   update(dt: number, camera: THREE.Camera): void
-  /** Quante luci puntiformi usano i lampi (ognuna costa su ogni pixel del mondo). */
+  /** How many point lights the flashes use (each one costs on every pixel of the world). */
   setQuality(q: Quality): void
 }
 
@@ -192,17 +192,17 @@ export type SoundName =
   | "defeat"
 
 export interface GameAudio {
-  /** Sblocca l'audio (da chiamare al primo gesto dell'utente). */
+  /** Unlocks audio (call on the user's first gesture). */
   unlock(): void
-  /** `at` assente: suono non posizionale (UI, i tuoi spari). */
+  /** No `at`: non-positional sound (UI, your own shots). */
   play(name: SoundName, opts?: { readonly at?: P3; readonly volume?: number; readonly rate?: number }): void
   setListener(pos: P3, yaw: number): void
-  /** Musica del menu (villotta) accesa o spenta. */
+  /** Menu music (villotta) on or off. */
   menuMusic(on: boolean): void
   setVolumes(master: number, music: number): void
   /**
-   * La musica da discoteca di una mappa (il casot di Maran): suona in loop nel punto `at`,
-   * attutita se la porta è chiusa. `null` la spegne.
+   * A map's disco music (the casot in Maran): loops at point `at`,
+   * muffled if the door is closed. `null` turns it off.
    */
   disco(at: P3 | null, open: boolean): void
 }

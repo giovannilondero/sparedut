@@ -1,7 +1,7 @@
 /**
- * Le porte da sfondare: spari, pedate col mescul ed esplosioni le scheggiano
- * (`DoorHit`), a salute zero cedono. Il mondo fisico segue lo stato salvato a ogni
- * tick: dopo un ripristino o una partita nuova le porte tornano da sé.
+ * Breakable doors: shots, mescul kicks and explosions splinter them
+ * (`DoorHit`), and at zero health they give way. The physics world follows the saved state every
+ * tick: after a restore or a new match the doors come back by themselves.
  */
 import { DoorHit, Doors, Game, Out, Physics } from "../schema.ts"
 

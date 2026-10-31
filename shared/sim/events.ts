@@ -1,6 +1,6 @@
 /**
- * Ciò che succede in un tick, come dati semplici: l'host lo gira ai client
- * (suoni, scie, kill feed, annunci).
+ * What happens in a tick, as plain data: the host forwards it to the clients
+ * (sounds, tracers, kill feed, announcements).
  */
 import type { PickupKind, Team } from "../map.ts"
 import type { ProjectileKind, WeaponId } from "../weapons.ts"
@@ -9,7 +9,7 @@ export type P3 = readonly [number, number, number]
 
 export type KillCause = WeaponId | "sgnape" | "mine" | "tampieste" | "fall"
 
-/** Chi ha vinto: una squadra, nessuno, o l'ultimo in piedi della Tampieste. */
+/** Who won: a team, nobody, or the last one standing in the Tampieste. */
 export type Winner = Team | "pari" | { readonly player: string; readonly name: string }
 
 export type GameEvent =
@@ -29,10 +29,10 @@ export type GameEvent =
   | { readonly t: "streak"; readonly s: string; readonly n: number }
   | { readonly t: "cart"; readonly a: "push" | "stop" | "back" | "arrived" }
   | { readonly t: "heal"; readonly s: string; readonly v: string; readonly n: number }
-  /** Una torretta: montata, smontata, surriscaldata, di nuovo fredda. */
+  /** A turret: mounted, dismounted, overheated, cool again. */
   | { readonly t: "turret"; readonly i: number; readonly s: string | null; readonly a: "on" | "off" | "hot" | "cool" }
-  /** Una porta presa (scheggia) o sfondata. */
+  /** A door hit (splinters) or broken down. */
   | { readonly t: "door"; readonly i: number; readonly s: string; readonly a: "hit" | "broken" }
-  /** Le piume di una gjaline scoppiata addosso: non si vede niente per un po'. */
+  /** Feathers from a gjaline that burst on you: you can't see anything for a while. */
   | { readonly t: "plumis"; readonly v: string; readonly n: number }
   | { readonly t: "match"; readonly a: "start" | "end"; readonly winner: Winner | null }

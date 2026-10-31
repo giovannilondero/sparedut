@@ -1,6 +1,6 @@
 /**
- * Indirizzi raggiungibili solo da questo computer o dalla rete di casa:
- * un link d'invito con uno di questi non funziona per chi sta fuori.
+ * Addresses reachable only from this computer or the home network:
+ * an invite link with one of these won't work for anyone outside.
  */
 export function isLocalHost(hostname: string): boolean {
   const h = hostname.replace(/^\[|\]$/g, "").toLowerCase()

@@ -5,15 +5,15 @@ import { NAV_GRAPHS } from "../server/nav-graphs.ts"
 import { MAP_IDS, MAPS } from "../shared/maps/index.ts"
 
 for (const id of MAP_IDS) {
-  test(`il grafo dei bot collega ogni punto di ${id} in entrambi i sensi`, async () => {
+  test(`the bot graph links every point of ${id} in both directions`, async () => {
     await initPhysics()
     const map = MAPS[id]
-    // Da capo, non quello precalcolato: così si vede anche se il precalcolato è vecchio.
+    // From scratch, not the precomputed one: this way we also see whether the precomputed one is stale.
     const g = computeNavGraph(createPhysicsWorld(map))
     const points = map.navPoints
     const isolated = g.edges.map((e, i) => (e.length === 0 ? i : -1)).filter((i) => i >= 0)
-    if (isolated.length) console.log(id, "isolati", isolated.map((i) => points[i]))
-    // Ogni nodo deve raggiungere ogni altro: basta che tutti vadano e tornino dal primo.
+    if (isolated.length) console.log(id, "isolated", isolated.map((i) => points[i]))
+    // Every node must reach every other: it's enough that all go to and come back from the first.
     const unreachable: string[] = []
     for (let i = 1; i < points.length; i++) {
       if (route(g, 0, i).length === 0) unreachable.push(`${points[0]}→${points[i]}`)
@@ -21,12 +21,12 @@ for (const id of MAP_IDS) {
     }
     if (unreachable.length) console.log(id, unreachable)
     expect(unreachable).toEqual([])
-    // Il server usa quello di `nav-graphs.ts`: se la mappa, il movimento o la fisica cambiano, `pnpm nav`.
+    // The server uses the one in `nav-graphs.ts`: if the map, movement or physics change, `pnpm nav`.
     expect(NAV_GRAPHS[id]).toEqual({ map: mapFingerprint(map), edges: g.edges as number[][] })
   }, 60000)
 }
 
-test("a Gemona il grafo porta dal Duomo in piazza", async () => {
+test("at Gemona the graph leads from the Duomo to the piazza", async () => {
   await initPhysics()
   const map = MAPS.glemone
   const g = navGraph(createPhysicsWorld(map))

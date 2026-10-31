@@ -1,4 +1,4 @@
-/** La connessione al server: messaggi tipati in entrambe le direzioni. */
+/** The connection to the server: typed messages in both directions. */
 import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage } from "../shared/protocol.ts"
 
 export type Listener = (msg: ServerMessage) => void
@@ -22,7 +22,7 @@ export class Net {
         this.pingTimer = window.setInterval(() => this.send({ t: "ping", c: performance.now(), rtt: this.rtt }), 1000)
         resolve()
       }
-      ws.onerror = () => reject(new Error("Server non raggiungibile."))
+      ws.onerror = () => reject(new Error("Server unreachable."))
       ws.onclose = () => {
         this.open = false
         clearInterval(this.pingTimer)

@@ -2,5 +2,5 @@ allowBuilds:
   esbuild: true
   workerd: true
 overrides:
-  # alchemy 2.0.0-beta.84 importa moduli di effect 4.0 (`effect/Crypto`) che la 4.1 ha spostato
+  # alchemy 2.0.0-beta.84 imports effect 4.0 modules (`effect/Crypto`) that 4.1 moved
   '@effect/platform-node-shared': ~4.0.7

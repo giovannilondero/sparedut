@@ -15,7 +15,7 @@ beforeAll(async () => {
   physics = createPhysicsWorld(GLEMONE)
 })
 
-/** Una partita già in corso, coi giocatori nati e fuori dalla protezione. */
+/** A match already under way, with players spawned and past their spawn protection. */
 function match(mode: ModeId, players: [id: string, team: "benandanti" | "malandanti", primary: PrimaryId][], o: { minutes?: number; ff?: boolean } = {}) {
   const sim = createSim({ mode, minutes: o.minutes ?? 5, seed: 11, physics, friendlyFire: o.ff ?? false })
   for (const [id, team, primary] of players) sim.join(id, id, team, false, primary)
@@ -26,7 +26,7 @@ function match(mode: ModeId, players: [id: string, team: "benandanti" | "malanda
 
 const seqs = new Map<string, number>()
 const me = (sim: Sim, id: string) => sim.view().players.find((p) => p.session === id)!
-/** Comando che va verso (x, z) con i pulsanti dati; fermo se già lì. */
+/** A command heading towards (x, z) with the given buttons; standing still if already there. */
 function toward(sim: Sim, id: string, x: number, z: number, extra: Partial<PlayerInput> = {}): PlayerInput {
   const p = me(sim, id)
   const seq = (seqs.get(id) ?? 0) + 1
@@ -34,18 +34,18 @@ function toward(sim: Sim, id: string, x: number, z: number, extra: Partial<Playe
   const close = Math.hypot(x - p.body.x, z - p.body.z) < 0.6
   return { ...IDLE_INPUT, seq, mz: close ? 0 : 1, yaw: Math.atan2(-(x - p.body.x), -(z - p.body.z)), weapon: p.arsenal.primary, view: sim.view().tick, ...extra }
 }
-/** Segue una lista di punti (si toglie il primo quando lo raggiunge). */
+/** Follows a list of points (dropping the first one once reached). */
 function follow(sim: Sim, id: string, route: [number, number][], extra: Partial<PlayerInput> = {}) {
   const p = me(sim, id)
   while (route.length > 1 && Math.hypot(route[0][0] - p.body.x, route[0][1] - p.body.z) < 1) route.shift()
   return toward(sim, id, route[0][0], route[0][1], extra)
 }
-/** Il percorso per (x, z) sul sagrato: esce dal Duomo se ci è nato dentro. */
+/** The route to (x, z) on the sagrato: leaves the Duomo if spawned inside it. */
 const fromSagrato = (sim: Sim, id: string, x: number, z: number): [number, number][] => {
   const b = me(sim, id).body
   return b.z < -62 && Math.abs(b.x) < 14 ? [[0, -70], [0, -58], [x, z]] : [[x, z]]
 }
-/** Da dove si è fino in piazza, giù per Vie Bini attorno alla fontana. */
+/** From wherever you are down to the piazza, along Vie Bini around the fountain. */
 const toPiazza = (sim: Sim, id: string, x: number, z: number): [number, number][] => [
   ...fromSagrato(sim, id, 0, -40).slice(0, -1),
   [0, -32],
@@ -63,8 +63,8 @@ const aimAt = (sim: Sim, from: string, to: string) => {
   return { yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(b.y + 1.1 - (a.y + 1.6), Math.hypot(dx, dz)) }
 }
 
-describe("armi", () => {
-  test("di corsa non si spara; finita la corsa l'arma torna su e spara", () => {
+describe("weapons", () => {
+  test("no firing while sprinting; once the sprint ends the weapon comes back up and fires", () => {
     const sim = match("bataie", [["a", "benandanti", "cramar"]])
     const route = fromSagrato(sim, "a", 0, -40)
     for (let i = 0; i < 240; i++) {
@@ -73,13 +73,13 @@ describe("armi", () => {
     }
     const shots: number[] = []
     let i = 0
-    // Corre con il grilletto tenuto: niente colpi.
+    // Sprints with the trigger held: no shots.
     for (; i < 90; i++) {
       sim.input("a", { ...IDLE_INPUT, seq: 1000 + i, mz: 1, yaw: Math.PI, weapon: "cramar", buttons: BUTTON.sprint | BUTTON.fire, view: sim.view().tick })
       if (sim.step().some((e) => e.t === "shot")) shots.push(i)
     }
     expect(shots).toEqual([])
-    // Molla la corsa e tiene il grilletto: il primo colpo arriva dopo che l'arma si rialza.
+    // Releases sprint and holds the trigger: the first shot comes after the weapon is raised again.
     const released = i
     for (; i < 150; i++) {
       sim.input("a", { ...IDLE_INPUT, seq: 1000 + i, mz: 1, yaw: Math.PI, weapon: "cramar", buttons: BUTTON.fire, view: sim.view().tick })
@@ -89,7 +89,7 @@ describe("armi", () => {
     expect(shots[0] - released).toBeGreaterThanOrEqual(RAISE_TICKS - 1)
   })
 
-  test("il Mulin spara solo dopo aver girato", () => {
+  test("the Mulin fires only after spinning up", () => {
     const sim = match("bataie", [["a", "benandanti", "mulin"]])
     const shots: number[] = []
     for (let i = 0; i < 120; i++) {
@@ -97,13 +97,13 @@ describe("armi", () => {
       if (sim.step().some((e) => e.t === "shot")) shots.push(i)
     }
     expect(shots[0]).toBeGreaterThanOrEqual(WEAPONS.mulin.spinTicks - 1)
-    // Poi va a raffica: un colpo ogni `cooldownTicks`.
+    // Then it fires in bursts: one shot every `cooldownTicks`.
     expect(shots.length).toBeGreaterThan(((120 - WEAPONS.mulin.spinTicks) / WEAPONS.mulin.cooldownTicks) * 0.8)
   })
 
-  test("il miedi cura un compagno col getto e, vicino, anche senza sparare", () => {
+  test("the miedi heals a teammate with the stream and, when close, even without firing", () => {
     const sim = match("bataie", [["medi", "benandanti", "miedi"], ["feri", "benandanti", "cramar"]])
-    // Il ferito si butta una bombe di sgnape ai piedi.
+    // The wounded one drops a bombe di sgnape at their own feet.
     for (let i = 0; i < 200; i++) {
       const bomb = i === 0 ? BUTTON.bomb : 0
       sim.input("feri", { ...toward(sim, "feri", me(sim, "feri").body.x, me(sim, "feri").body.z), pitch: -1.5, buttons: bomb })
@@ -113,7 +113,7 @@ describe("armi", () => {
     const hurt = me(sim, "feri")
     expect(hurt.alive).toBe(true)
     expect(hurt.hp).toBeLessThan(MAX_HP - 20)
-    // Il medico va vicino al ferito (passiva).
+    // The medic goes next to the wounded one (passive).
     const target = hurt.body
     const medRoute = fromSagrato(sim, "medi", target.x, target.z)
     for (let i = 0; i < 600 && Math.hypot(me(sim, "medi").body.x - target.x, me(sim, "medi").body.z - target.z) > 3; i++) {
@@ -129,7 +129,7 @@ describe("armi", () => {
     }
     const passive = me(sim, "feri").hp - before
     expect(passive).toBeGreaterThan(1)
-    // Col getto si cura molto di più.
+    // The stream heals much more.
     const events: GameEvent[] = []
     for (let i = 0; i < 120; i++) {
       sim.input("medi", { ...toward(sim, "medi", me(sim, "medi").body.x, me(sim, "medi").body.z), ...aimAt(sim, "medi", "feri"), buttons: BUTTON.fire })
@@ -141,10 +141,10 @@ describe("armi", () => {
   })
 
   for (const ff of [false, true]) {
-    test(`una mine di Raibl ${ff ? "salta sotto un compagno col fuoco amico" : "non salta sotto un compagno"}`, () => {
+    test(`a mine di Raibl ${ff ? "goes off under a teammate with friendly fire" : "doesn't go off under a teammate"}`, () => {
       const sim = match("bataie", [["a", "benandanti", "cramar"], ["b", "benandanti", "cramar"]], { ff })
       const spot: [number, number] = [0, -44]
-      // A va sul punto, guarda in giù e pianta la mine; poi si sposta.
+      // A goes to the spot, looks down and plants the mine; then moves away.
       const routeA = fromSagrato(sim, "a", spot[0], spot[1])
       for (let i = 0; i < 700 && Math.hypot(me(sim, "a").body.x - spot[0], me(sim, "a").body.z - spot[1]) > 0.8; i++) {
         sim.input("a", follow(sim, "a", routeA))
@@ -161,7 +161,7 @@ describe("armi", () => {
         events.push(...sim.step())
       }
       expect(sim.view().projectiles.filter((p) => p.kind === "mine").length).toBe(1)
-      // B ci passa sopra.
+      // B walks over it.
       const routeB = fromSagrato(sim, "b", spot[0], spot[1] + 6)
       for (let i = 0; i < 900; i++) {
         const done = Math.hypot(me(sim, "b").body.x - spot[0], me(sim, "b").body.z - (spot[1] + 6)) < 1
@@ -175,8 +175,8 @@ describe("armi", () => {
   }
 })
 
-describe("modalitâts", () => {
-  test("La Tampieste: chi resta fuori dalla tempesta muore e non rinasce, l'ultimo in piedi vince", () => {
+describe("modes", () => {
+  test("La Tampieste: whoever stays outside the storm dies and doesn't respawn, the last one standing wins", () => {
     const sim = match("tampieste", [["a", "benandanti", "cramar"], ["b", "malandanti", "cramar"], ["c", "benandanti", "cramar"]], { minutes: 1 })
     const kills: GameEvent[] = []
     let deadSeen = new Set<string>()
@@ -186,7 +186,7 @@ describe("modalitâts", () => {
       const v = sim.view()
       for (const p of v.players) {
         if (!p.alive) deadSeen.add(p.session)
-        // Chi è morto resta morto finché la partita è in corso.
+        // Whoever has died stays dead while the match is under way.
         else if (v.phase.tag === "Live") expect(deadSeen.has(p.session)).toBe(false)
       }
     }
@@ -198,10 +198,10 @@ describe("modalitâts", () => {
     void deadSeen
   }, 30000)
 
-  test("La Tampieste: i compagni di squadra si fanno male", () => {
+  test("La Tampieste: teammates hurt each other", () => {
     const sim = match("tampieste", [["a", "benandanti", "cramar"], ["b", "benandanti", "cramar"]])
     const events: GameEvent[] = []
-    // A raggiunge B e gli spara.
+    // A reaches B and shoots them.
     const b0 = me(sim, "b").body
     const routeA = b0.z > 10 ? toPiazza(sim, "a", b0.x, b0.z - 4) : fromSagrato(sim, "a", b0.x, b0.z - 4)
     for (let i = 0; i < 3000 && !events.some((e) => e.t === "hit" && e.v === "b"); i++) {
@@ -214,7 +214,7 @@ describe("modalitâts", () => {
     expect(events.some((e) => e.t === "hit" && e.a === "a" && e.v === "b")).toBe(true)
   })
 
-  /** Il punto del binario poco davanti al cjar. */
+  /** The point on the track just ahead of the cjar. */
   const ahead = (sim: Sim, by: number): [number, number] => {
     const c = sim.view().cart!
     const d = c.progress * trackLength(GLEMONE.track) + by
@@ -222,7 +222,7 @@ describe("modalitâts", () => {
     return [p[0], p[2]]
   }
 
-  test("Spingi il Cjar: il Benandant lo spinge fino in fondo e vince", () => {
+  test("Spingi il Cjar: the Benandant pushes it all the way and wins", () => {
     const sim = match("cjar", [["a", "benandanti", "cramar"]], { minutes: 10 })
     const start = GLEMONE.track[0]
     const route = fromSagrato(sim, "a", start[0], start[2])
@@ -242,7 +242,7 @@ describe("modalitâts", () => {
     expect(phase.tag === "Over" && phase.winner).toBe("benandanti")
   }, 60000)
 
-  test("Spingi il Cjar: lasciato solo torna indietro, conteso si ferma", () => {
+  test("Spingi il Cjar: left alone it rolls back, when contested it stops", () => {
     const sim = match("cjar", [["a", "benandanti", "cramar"], ["b", "malandanti", "cramar"]], { minutes: 10 })
     const start = GLEMONE.track[0]
     const route = fromSagrato(sim, "a", start[0], start[2])
@@ -261,14 +261,14 @@ describe("modalitâts", () => {
     }
     const pushed = sim.view().cart!.progress
     expect(pushed).toBeGreaterThan(0)
-    // A se ne va: dopo il tempo d'attesa il cjar torna indietro.
+    // A walks away: after the idle time the cjar rolls back.
     for (let i = 0; i < CART.idleTicks + 240; i++) {
       sim.input("a", toward(sim, "a", 25, -45))
       hold()
       sim.step()
     }
     expect(sim.view().cart!.progress).toBeLessThan(pushed)
-    // Entrambi al cjar: conteso, fermo.
+    // Both at the cjar: contested, stopped.
     for (let i = 0; i < 900 && !sim.view().cart!.contested; i++) {
       const c = sim.view().cart!.at
       sim.input("a", toward(sim, "a", c[0], c[2] - 1))
@@ -286,7 +286,7 @@ describe("modalitâts", () => {
     expect(sim.view().cart!.progress).toBeCloseTo(stuck, 5)
   }, 60000)
 
-  test("Spingi il Cjar: allo scadere vincono i Malandants", () => {
+  test("Spingi il Cjar: when time runs out the Malandants win", () => {
     const sim = match("cjar", [["a", "benandanti", "cramar"], ["b", "malandanti", "cramar"]], { minutes: 0.1 })
     for (let i = 0; i < 60 * 8 && sim.view().phase.tag === "Live"; i++) sim.step()
     const phase = sim.view().phase

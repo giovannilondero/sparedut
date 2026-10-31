@@ -1,5 +1,5 @@
 /**
- * Le proiezioni del mondo in dati semplici: l'unica lettura che fa l'host.
+ * Projections of the world into plain data: the only read the host does.
  */
 import { trackLength, trackPoint, type V3 } from "../map.ts"
 import { MAPS } from "../maps/index.ts"
@@ -53,7 +53,7 @@ export interface PlayerView {
   readonly pitch: number
   readonly arsenal: ArsenalValue
   readonly stats: StatsValue
-  /** Ultimo ingresso applicato e i pulsanti tenuti. */
+  /** Last applied input and the held buttons. */
   readonly seq: number
   readonly buttons: number
 }
@@ -63,11 +63,11 @@ export type PhaseView =
   | { readonly tag: "Live"; readonly ends: number }
   | { readonly tag: "Over"; readonly winner: Winner; readonly restarts: number }
 
-/** Il cjar (Spingi il Cjar): dove sta, quanta strada ha fatto, chi lo spinge. */
+/** The cjar (Spingi il Cjar): where it is, how far it has gone, who is pushing it. */
 export interface CartView {
   readonly at: V3
   readonly yaw: number
-  /** Da 0 (partenza) a 1 (arrivato). */
+  /** From 0 (start) to 1 (arrived). */
   readonly progress: number
   readonly pushers: number
   readonly contested: boolean
@@ -81,14 +81,14 @@ export interface WorldView {
   readonly score: Readonly<Record<Team, number>>
   readonly flags: Readonly<Record<Team, FlagState>>
   readonly hill: HillValue
-  /** Solo in Spingi il Cjar. */
+  /** Only in Spingi il Cjar. */
   readonly cart: CartView | null
-  /** Solo nella Tampieste in corso: il cerchio sicuro. */
+  /** Only in a live Tampieste: the safe circle. */
   readonly storm: StormValue | null
   readonly pickups: readonly boolean[]
-  /** Una per `map.turrets`. */
+  /** One per `map.turrets`. */
   readonly turrets: ReadonlyArray<TurretState>
-  /** Salute di ogni porta da sfondare (0 = sfondata). */
+  /** Health of each breakable door (0 = broken down). */
   readonly doors: readonly number[]
   readonly projectiles: readonly ProjectileValue[]
   readonly players: readonly PlayerView[]
@@ -189,7 +189,7 @@ export const ViewWorld = Game.Inspector(
   }
 )
 
-/** Gli eventi di gioco pubblicati dall'ultima lettura. */
+/** Game events published since the last read. */
 export const ReadOutbox = Game.Inspector(
   "Sparedut/ReadOutbox",
   { events: { out: Game.System.readEvent(Out) } },

@@ -23,33 +23,33 @@ const run = (body: Body, input: PlayerInput, ticks: number) => {
   return { b, maxY }
 }
 
-describe("movimento", () => {
-  test("si sta in piedi sul sagrato", () => {
+describe("movement", () => {
+  test("you can stand on the sagrato", () => {
     const { b } = run(at(0, 6.5, -45), IDLE_INPUT, 60)
     expect(b.y).toBeCloseTo(6, 1)
     expect(b.grounded).toBe(true)
   })
 
-  test("si scende la rampa di Via Bini fino in piazza", () => {
-    // yaw π guarda verso sud (+z)
+  test("you can walk down the Via Bini ramp to the piazza", () => {
+    // yaw π faces south (+z)
     const { b } = run(at(3, 6, -32), { ...IDLE_INPUT, mz: 1, yaw: Math.PI }, 60 * 14)
     expect(b.z).toBeGreaterThan(30)
     expect(b.y).toBeCloseTo(0, 0)
   })
 
-  test("si risale la rampa", () => {
+  test("you can walk back up the ramp", () => {
     const { b } = run(at(3, 0, 25), { ...IDLE_INPUT, mz: 1, yaw: 0 }, 60 * 14)
     expect(b.y).toBeCloseTo(6, 0)
   })
 
-  test("il cjar di fen del campanile porta sul ballatoio", () => {
+  test("the campanile cjar di fen takes you onto the balcony", () => {
     const pad = GLEMONE.jumpPads[0]
     const { b, maxY } = run(at(pad.at[0], pad.at[1] + 0.1, pad.at[2]), IDLE_INPUT, 60 * 4)
     console.log("campanile", b, maxY)
     expect(b.y).toBeCloseTo(CAMPANILE.balcony, 0)
   })
 
-  test("il cjar di fen del Comun porta sul tetto", () => {
+  test("the Comun cjar di fen takes you onto the roof", () => {
     const pad = GLEMONE.jumpPads[1]
     const { b, maxY } = run(at(pad.at[0], pad.at[1] + 0.1, pad.at[2]), IDLE_INPUT, 60 * 4)
     console.log("comun", b, maxY)
@@ -57,8 +57,8 @@ describe("movimento", () => {
   })
 })
 
-describe("simulazione", () => {
-  test("ogni comando è un passo: due in un tick, zero nel successivo, stesso risultato", () => {
+describe("simulation", () => {
+  test("each command is one step: two in one tick, zero in the next, same result", () => {
     const run = (deliver: (send: () => void, i: number) => void) => {
       const sim = createSim({ mode: "bataie", minutes: 5, seed: 3, physics })
       sim.join("a", "Toni", "benandanti", false, "cramar")
@@ -70,7 +70,7 @@ describe("simulazione", () => {
         deliver(send, i)
         sim.step()
       }
-      // Gli ultimi comandi in ritardo arrivano dopo.
+      // The last delayed commands arrive later.
       sim.step()
       return sim.view().players[0].body
     }
@@ -85,7 +85,7 @@ describe("simulazione", () => {
     expect(bursty.x).toBeCloseTo(steady.x, 3)
   })
 
-  test("un benandant colpisce e abbatte un malandant", () => {
+  test("a benandant hits and takes down a malandant", () => {
     const sim = createSim({ mode: "bataie", minutes: 5, seed: 7, physics })
     sim.join("a", "Toni", "benandanti", false, "cramar")
     sim.join("b", "Strie", "malandanti", false, "cramar")
@@ -109,7 +109,7 @@ describe("simulazione", () => {
     let v = sim.view()
     const a = v.players.find((p) => p.session === "a")!
     const b = v.players.find((p) => p.session === "b")!
-    // Il percorso si ferma entro 0.8 m dal punto, poi il corpo frena: qualche decimetro di margine.
+    // The route stops within 0.8 m of the point, then the body brakes: a few decimetres of slack.
     expect(Math.abs(a.body.z - 22)).toBeLessThan(1.5)
     expect(Math.abs(b.body.z - 48)).toBeLessThan(1.5)
     const dx = b.body.x - a.body.x
@@ -128,7 +128,7 @@ describe("simulazione", () => {
     expect(v.score.benandanti).toBeGreaterThan(0)
   })
 
-  test("il lanciafrico raccolto resta in mano anche con i comandi già in viaggio", () => {
+  test("a picked-up lanciafrico stays in hand even with commands already in flight", () => {
     const sim = createSim({ mode: "bataie", minutes: 5, seed: 5, physics })
     sim.join("a", "Toni", "benandanti", false, "cramar")
     sim.start()
@@ -140,7 +140,7 @@ describe("simulazione", () => {
       const p = sim.view().players[0]
       while (route.length > 1 && Math.hypot(route[0][0] - p.body.x, route[0][1] - p.body.z) < 0.8) route.shift()
       const [tx, tz] = route[0]
-      // Il client chiede sempre il mitra: è il comando che era già partito prima della raccolta.
+      // The client keeps asking for the rifle: that's the command already sent before the pickup.
       sim.input("a", { ...IDLE_INPUT, seq: seq++, mz: 1, yaw: Math.atan2(-(tx - p.body.x), -(tz - p.body.z)), weapon: "cramar", view: sim.view().tick })
       if (sim.step().some((e) => e.t === "pick" && e.k === "lanciafrico")) picked = i
     }
@@ -150,13 +150,13 @@ describe("simulazione", () => {
       sim.step()
     }
     expect(sim.view().players[0].arsenal.current).toBe("lanciafrico")
-    // Un cambio vero, invece, passa.
+    // A real switch, on the other hand, goes through.
     sim.input("a", { ...IDLE_INPUT, seq: seq++, weapon: "mandi", view: sim.view().tick })
     sim.step()
     expect(sim.view().players[0].arsenal.current).toBe("mandi")
   })
 
-  test("la nuova arma principale dall'armeria arriva subito", () => {
+  test("a new primary weapon from the armoury arrives immediately", () => {
     const sim = createSim({ mode: "bataie", minutes: 5, seed: 5, physics })
     sim.join("a", "Toni", "benandanti", false, "cramar")
     sim.start()
@@ -169,7 +169,7 @@ describe("simulazione", () => {
     expect(a.current).toBe("doplete")
   })
 
-  test("il riscaldamento finisce da solo e poi i punti contano", () => {
+  test("the warmup ends on its own and then points count", () => {
     const sim = createSim({ mode: "bataie", minutes: 5, seed: 2, physics })
     sim.join("a", "Toni", "benandanti", false, "cramar")
     for (let i = 0; i < WARMUP_TICKS - 5; i++) sim.step()

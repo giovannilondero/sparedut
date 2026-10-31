@@ -1,7 +1,7 @@
 /**
- * Cave dal Predil: binaris e traversis, la galarie cu lis armaduris di len e i ferâi,
- * il castelut di aciâr dal Poç Clara cu lis ruedis che a zirin, i carei, la vele de
- * glesie di Sante Barbare; tor ator i crets des Alps Juliis e, a sud, il lât dal Predil.
+ * Cave dal Predil: rails and sleepers, the galarie (mine tunnel) with its timber supports and lamps,
+ * the steel headframe of the Poç Clara with its turning wheels, the carei (mine carts), the bell
+ * gable of the Sante Barbare church; all around the crags of the Julian Alps and, to the south, Lake Predil.
  */
 import * as THREE from "three"
 import { CAREI, GALARIE, MONT, P_LOW, P_MID, P_UP, POC, TRAMOGGE } from "../../../shared/maps/predil.ts"
@@ -9,7 +9,7 @@ import { fbm, makeHeightfield, smooth } from "../backdrop.ts"
 import { boxAt, type V } from "../geo.ts"
 import type { Scenery, SceneryKit } from "../scenery.ts"
 
-/** Binaris decoratîfs, in plui di chei dal cjar: dentri te galarie, sot la tramoggia, viers il poç e la laverie. */
+/** Decorative rails, besides the cjar's: inside the galarie, under the hopper, towards the shaft and the washery. */
 const SIDINGS: readonly (readonly (readonly [number, number])[])[] = [
   [[-27, -64], [-27, -70], [-16, -70], [-16, -82], [-12, -82], [-5, -82]],
   [[-27, -70], [-38, -70], [-38, -92], [-16, -92], [-16, -82]],
@@ -29,7 +29,7 @@ function rails(kit: SceneryKit, pts: readonly V[]) {
     if (len < 0.01) continue
     const ux = (b[0] - a[0]) / len, uz = (b[2] - a[2]) / len
     const yaw = Math.atan2(ux, uz)
-    // a lis traviersis ogni 0.8 m, i binaris a tocs fra une e chê dopo
+    // sleepers every 0.8 m, rails in pieces from one to the next
     const n = Math.max(1, Math.ceil(len / 0.8))
     for (let k = 0; k <= n; k++) {
       const s = k * (len / n)
@@ -47,7 +47,7 @@ function rails(kit: SceneryKit, pts: readonly V[]) {
   }
 }
 
-/** Un carel di miniere dentri te scjatule che e tocje. */
+/** A mine cart inside its collision box. */
 function cart(kit: SceneryKit, min: V, max: V, root: THREE.Group, rust: THREE.Material) {
   const { B, C, cylBetween } = kit
   const alongZ = max[2] - min[2] >= max[0] - min[0]
@@ -56,7 +56,7 @@ function cart(kit: SceneryKit, min: V, max: V, root: THREE.Group, rust: THREE.Ma
   const W = (alongZ ? max[0] - min[0] : max[2] - min[2]) / 2
   const y0 = min[1], y1 = max[1]
   const g = new THREE.Group()
-  // la vascje: plui largje in alt
+  // the tub: wider at the top
   const tub = new THREE.CylinderGeometry(1, 0.82, y1 - y0 - 0.38, 4, 1, false, Math.PI / 4)
   tub.scale(W * 1.35, 1, L * 1.35)
   tub.translate(0, (y1 - y0 - 0.38) / 2 + 0.38, 0)
@@ -68,7 +68,7 @@ function cart(kit: SceneryKit, min: V, max: V, root: THREE.Group, rust: THREE.Ma
     o.receiveShadow = true
   })
   root.add(g)
-  // il minerâl dentri, il telâr e lis ruedis
+  // the ore inside, the frame and the wheels
   const P = (u: number, y: number, w: number): V => (alongZ ? [cx + w, y, cz + u] : [cx + u, y, cz + w])
   B.add("roccia", kit.sphere(P(0, y1 - 0.15, 0), Math.min(L, W) * 0.85, 0.35, 8), C("#6a6460"))
   B.add("ferro", boxAt(alongZ ? [cx - W * 0.7, y0 + 0.2, cz - L] : [cx - L, y0 + 0.2, cz - W * 0.7], alongZ ? [cx + W * 0.7, y0 + 0.38, cz + L] : [cx + L, y0 + 0.38, cz + W * 0.7]), C("#2a2622"))
@@ -84,11 +84,11 @@ export const scenery: Scenery = {
     const rust = new THREE.MeshStandardMaterial({ color: "#7a3a24", roughness: 0.85, metalness: 0.35 })
     const red = new THREE.MeshStandardMaterial({ color: "#8a2e22", roughness: 0.6, metalness: 0.5 })
 
-    // --- binaris ---
+    // --- rails ---
     rails(kit, map.track)
     for (const s of SIDINGS) rails(kit, s.map(([x, z]) => [x, kit.groundAt(x, z), z] as V))
 
-    // --- galarie: armaduris di len, ferâi, travis ---
+    // --- galarie: timber supports, lamps, beams ---
     const timber = C("#7a5a3a")
     const lampCol = new THREE.Color(2.6, 1.7, 0.8)
     const { floor, ceiling } = MONT
@@ -98,7 +98,7 @@ export const scenery: Scenery = {
       const w0 = alongZ ? g.x0 : g.z0, w1 = alongZ ? g.x1 : g.z1
       const P = (a: number, y: number, w: number): V => (alongZ ? [w, y, a] : [a, y, w])
       for (let a = a0 + 1.5; a < a1 - 0.5; a += 3.5) {
-        // pâi tal mur (dentri te roccie) e trâf sot de volte
+        // posts in the wall (inside the rock) and a beam under the vault
         for (const [w, d] of [[w0, 1], [w1, -1]] as const) {
           const p0 = P(a - 0.13, floor, w - d * 0.1), p1 = P(a + 0.13, ceiling - 0.2, w + d * 0.14)
           B.add("legno", boxAt([Math.min(p0[0], p1[0]), p0[1], Math.min(p0[2], p1[2])], [Math.max(p0[0], p1[0]), p1[1], Math.max(p0[2], p1[2])]), timber)
@@ -121,7 +121,7 @@ export const scenery: Scenery = {
       root.add(l)
       return l
     })
-    // Lis jessudis: telâr di len e cornîs di piere sul cret.
+    // The exits: timber frame and stone cornice on the rock face.
     const portal = (n: V, c: V, w: number) => {
       const t = Math.abs(n[0]) > 0 ? "x" : "z"
       const along = (u: number, y: number, out: number): V => (t === "x" ? [c[0] + n[0] * out, y, c[2] + u] : [c[0] + u, y, c[2] + n[2] * out])
@@ -139,7 +139,7 @@ export const scenery: Scenery = {
     portal([1, 0, 0], [MONT.maxX, floor, -82], 4)
     portal([0, 0, 1], [-27, floor, MONT.maxZ], 4)
 
-    // --- Poç Clara: la sale dai argagns e il castelut ---
+    // --- Poç Clara: the hoist house and the headframe ---
     const wheels: THREE.Group[] = []
     {
       const { minX, maxX, minZ, maxZ, floor: f, height, tower } = POC
@@ -153,7 +153,7 @@ export const scenery: Scenery = {
         kit.win([1, 0, 0], [maxX, f + 3.4, z], 1.1, 2, null, false)
         kit.win([-1, 0, 0], [minX, f + 3.4, z], 1.1, 2, null, false)
       }
-      // il traliç: cuatri gjambis che si strenzin, anei e crôs di Sant Andree
+      // the lattice: four tapering legs, rings and St Andrew's crosses
       const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2
       const yt = top + tower
       const foot = (sx: number, sz: number): V => [cx + sx * 3.4, top, cz + sz * 3.4]
@@ -177,11 +177,11 @@ export const scenery: Scenery = {
           }
         }
       }
-      // gjambis inclinadis di sostegn, viers nord sul tet de sale
+      // slanted support legs, towards the north on the hoist house roof
       for (const sx of [-1, 1]) B.add("ferro", cylBetween([cx + sx * 2.6, top, minZ + 0.4], head(sx, -1), 0.13, 0.1, 6), steel)
       B.add("ferro", boxAt([cx - 2.1, yt, cz - 2.1], [cx + 2.1, yt + 0.25, cz + 2.1]), C("#3a2a24"))
       for (const [sx, sz] of corners) B.add("ferro", cylBetween([cx + sx * 2, yt + 0.25, cz + sz * 2], [cx + sx * 2, yt + 1.3, cz + sz * 2], 0.03), C("#3a2a24"))
-      // lis ruedis (zirin), i cjavîs che a van jù tal poç
+      // the wheels (they turn), the cables going down the shaft
       for (const dz of [-0.75, 0.75]) {
         const w = new THREE.Group()
         const rim = new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.09, 6, 28), red)
@@ -201,10 +201,10 @@ export const scenery: Scenery = {
       }
       for (const sx of [-1, 1]) B.add("ferro", cylBetween([cx + sx * 0.6, yt + 0.25, cz], [cx + sx * 0.6, yt + 2, cz], 0.1, 0.1, 6), steel)
 
-      // --- carei ---
+      // --- carei (mine carts) ---
       for (const c of CAREI) cart(kit, c.min, c.max, root, rust)
 
-      // --- tramoggia: bordis di len e minerâl in alt ---
+      // --- hopper: timber edges and ore on top ---
       {
         const t = TRAMOGGE
         const y = t.floor + t.top
@@ -214,7 +214,7 @@ export const scenery: Scenery = {
         for (const x of [t.minX + 0.4, t.maxX - 0.4]) B.add("legno", cylBetween([x, t.floor + t.under, t.minZ + 0.2], [x, t.floor, t.maxZ - 0.2], 0.08), timber)
       }
 
-      // --- la vele de glesie di Sante Barbare ---
+      // --- the bell gable of the Sante Barbare church ---
       {
         const zf = 100
         const stone = C("#d8d0c4")
@@ -228,7 +228,7 @@ export const scenery: Scenery = {
       }
     }
 
-    // --- claps in alt su la mont e sul cret ---
+    // --- boulders up on the mountain and the crag ---
     for (let i = 0; i < 26; i++) {
       const x = MONT.minX + 2 + R() * (MONT.maxX - MONT.minX - 4)
       const z = MONT.minZ + 2 + R() * (MONT.maxZ - MONT.minZ - 4)
@@ -238,7 +238,7 @@ export const scenery: Scenery = {
       const x = map.bounds.minX + R() * (map.bounds.maxX - map.bounds.minX)
       B.add("roccia", sphere([x, P_UP + 24, -101.5], 2 + R() * 3, 0.8 + R() * 0.8, 7), C("#ffffff").offsetHSL(0, 0, (R() - 0.5) * 0.12))
     }
-    // pins tra il borc e lis laveriis, dongje dai bords
+    // pines between the village and the washeries, near the edges
     for (const [x, z] of [[-43, 30.5], [43, 31], [-43, 104], [43, 106], [24, 104]] as const) {
       const y = kit.groundAt(x, z)
       B.add("legno", cylBetween([x, y, z], [x, y + 2, z], 0.18, 0.14, 6), C("#5a3a22"))
@@ -247,7 +247,7 @@ export const scenery: Scenery = {
 
     return {
       update(t) {
-        // lis dôs ruedis a zirin in sens contrari: une e tire sù la gabie, chê altre le cale
+        // the two wheels turn in opposite directions: one hoists the cage, the other lowers it
         for (const [i, w] of wheels.entries()) w.rotation.x = t * (i % 2 ? -0.9 : 0.9)
       },
       setQuality(q) {
@@ -263,10 +263,10 @@ export const scenery: Scenery = {
       const dx = Math.max(minX - x, x - maxX, 0)
       const dn = Math.max(minZ - z, 0)
       const ds = Math.max(z - maxZ, 0)
-      // valade strete: crets ripits a est e a ovest, la mont sore la galarie a nord
+      // narrow valley: steep crags east and west, the mountain above the galarie to the north
       const walls = smooth(0, 150, dx) ** 0.7 * (320 + 280 * fbm(x / 210 + 5, z / 210 + 2))
       const north = smooth(0, 220, dn) ** 0.8 * (420 + 220 * fbm(x / 180, z / 180 + 9))
-      // a sud la valade e cale planc fin al lât
+      // to the south the valley slopes gently down to the lake
       const valley = -smooth(80, 420, ds) * 12
       return ground(Math.max(minZ, Math.min(maxZ, z))) + Math.max(walls, north) + valley
     }

@@ -1,5 +1,5 @@
 /**
- * L'HUD in DOM: legge solo dati semplici che gli passa il loop di gioco.
+ * The DOM HUD: it only reads plain data handed to it by the game loop.
  */
 import { MODES, pick, TEAM_INFO, type ModeId } from "../shared/folklore.ts"
 import type { Team } from "../shared/map.ts"
@@ -21,10 +21,10 @@ export const fmtClock = (ticks: number) => {
 
 export class Hud {
   private announceTimer = 0
-  /** Nella Tampieste in corso chi muore non rinasce: il pannello della morte lo dice. */
+  /** During an ongoing Tampieste the dead don't respawn: the death panel says so. */
   spectating = false
   private chatTimer = 0
-  /** Ultimo valore scritto per elemento e proprietà: il DOM si tocca solo se cambia. */
+  /** Last value written per element and property: the DOM is touched only on change. */
   private written = new Map<string, string | boolean>()
 
   private text(id: string, value: string) {
@@ -61,7 +61,7 @@ export class Hud {
     this.toggle("hud", "hidden", !on)
   }
 
-  /** `turret`: sono alla torretta, l'arma in mano è la mitraie (colpi infiniti). */
+  /** `turret`: I'm on the turret, the weapon in hand is the mitraie (infinite ammo). */
   vitals(you: SnapSelf | null, slot: { owned: (id: WeaponId) => boolean }, localMag: number | null, turret = false) {
     if (!you) return
     const hp = Math.max(0, you.hp)
@@ -90,7 +90,7 @@ export class Hud {
     this.toggle("sgnape-fx", "on", a.sgnape > 0)
   }
 
-  /** Alla torretta: il calore della mitraie. Vicino a una libera: il tasto per usarla. */
+  /** On the turret: the mitraie's heat. Near a free one: the key to use it. */
   turret(gun: { readonly heat: number; readonly jammed: boolean } | null, prompt: boolean) {
     this.toggle("turret-hud", "hidden", !gun)
     this.toggle("turret-prompt", "hidden", !prompt && !gun)
@@ -102,7 +102,7 @@ export class Hud {
     this.text("turret-label", gun.jammed ? t().hud.turretHot : t().hud.turretHeat)
   }
 
-  /** Piume negli occhi (la gjaline): la vista si copre per `seconds` e poi si libera piano. */
+  /** Feathers in the eyes (the gjaline): vision is covered for `seconds` and then slowly clears. */
   feathers(seconds: number) {
     const el = $("plumis")
     el.innerHTML = Array.from({ length: 34 }, (_, i) => {
@@ -147,12 +147,12 @@ export class Hud {
     }
   }
 
-  /** `outside`: sono vivo e fuori dal cerchio della Tampieste. */
+  /** `outside`: I'm alive and outside the Tampieste circle. */
   top(snap: Snapshot, mode: ModeId, names: Map<string, string>, outside = false) {
     const s = t()
     const alone = mode === "tampieste"
     const alive = snap.players.filter((p) => p.f & FLAG_BIT.alive).length
-    // Nella Tampieste non ci sono squadre: al posto dei punti, quanti sono in piedi.
+    // In the Tampieste there are no teams: instead of the score, how many are still standing.
     this.text("name-ben", alone ? s.hud.alive(alive) : s.teams.benandanti.name)
     this.text("name-mal", alone ? "" : s.teams.malandanti.name)
     this.text("score-ben", alone ? "" : mode === "cjar" ? `${snap.score.benandanti}%` : String(snap.score.benandanti))

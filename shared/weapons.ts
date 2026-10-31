@@ -1,46 +1,46 @@
 /**
- * L'armeria furlana. Ogni arma è dati: la simulazione, l'HUD, il viewmodel,
- * i suoni e il menu di equipaggiamento leggono tutti da qui (nomi e descrizioni
- * stanno in `client/i18n.ts`).
+ * The Friulian armoury. Every weapon is data: the simulation, the HUD, the viewmodel,
+ * the sounds and the loadout menu all read from here (names and descriptions
+ * live in `client/i18n.ts`).
  */
 
 export type WeaponId = "mescul" | "mandi" | "cramar" | "doplete" | "cjampanili" | "mulin" | "miedi" | "gjalinis" | "lanciafrico" | "mitraie"
 
 /**
- * "beam": getto a corto raggio, automatico. Sui compagni cura (`damage` è la cura per
- * colpo), sui nemici fa `beamDamage`.
+ * "beam": short-range automatic stream. It heals teammates (`damage` is the heal per
+ * hit) and deals `beamDamage` to enemies.
  */
 export type FireMode = "melee" | "semi" | "auto" | "projectile" | "beam"
 
 export interface WeaponDef {
   readonly id: WeaponId
   readonly mode: FireMode
-  /** Danno per colpo (per pallino con la doppietta). */
+  /** Damage per hit (per pellet for the shotgun). */
   readonly damage: number
   readonly headMultiplier: number
   readonly pellets: number
-  /** Dispersione in radianti: da fermo, in movimento, mirando. */
+  /** Spread in radians: standing still, moving, aiming. */
   readonly spread: { readonly still: number; readonly moving: number; readonly aimed: number }
-  /** Tick (60/s) tra due colpi. */
+  /** Ticks (60/s) between two shots. */
   readonly cooldownTicks: number
   readonly reloadTicks: number
   readonly magazine: number
-  /** Munizioni di scorta con cui si rinasce. */
+  /** Reserve ammo you respawn with. */
   readonly reserve: number
   readonly range: number
-  /** Danno a fine portata, in proporzione (decadimento lineare dalla metà). */
+  /** Damage at max range, as a fraction (linear falloff from halfway). */
   readonly falloff: number
-  /** Campo visivo quando si mira (gradi). */
+  /** Field of view when aiming (degrees). */
   readonly aimFov: number
-  /** Rinculo verticale della visuale per colpo (radianti). */
+  /** Vertical view kick per shot (radians). */
   readonly kick: number
-  /** Moltiplicatore della velocità di corsa con l'arma in mano. */
+  /** Movement speed multiplier with the weapon in hand. */
   readonly moveScale: number
-  /** Tasto numerico. */
+  /** Number key. */
   readonly slot: 1 | 2 | 3 | 4
-  /** Tick di rotazione prima del primo colpo (il Mulin); 0 = spara subito. */
+  /** Spin-up ticks before the first shot (the Mulin); 0 = fires immediately. */
   readonly spinTicks: number
-  /** Cosa lancia un'arma "projectile"; null per le altre. */
+  /** What a "projectile" weapon launches; null for the others. */
   readonly shell: ShellKind | null
 }
 
@@ -205,7 +205,7 @@ export const WEAPONS = {
     spinTicks: 0,
     shell: "frico"
   },
-  /** Il cjanon des gjalinis: un tubo di ottone legato al braccio che spara galline. */
+  /** The cjanon des gjalinis: a brass tube strapped to the arm that shoots chickens. */
   gjalinis: {
     id: "gjalinis",
     mode: "projectile",
@@ -227,8 +227,8 @@ export const WEAPONS = {
     shell: "gjaline"
   },
   /**
-   * La mitraie de postazion: non si porta, si usa stando dietro a una torretta
-   * (`TURRET`). Colpi infiniti, ma scalda.
+   * The mitraie de postazion: not carried, used by standing behind a turret
+   * (`TURRET`). Infinite ammo, but it overheats.
    */
   mitraie: {
     id: "mitraie",
@@ -254,24 +254,24 @@ export const WEAPONS = {
 
 export const WEAPON_IDS = Object.keys(WEAPONS) as WeaponId[]
 
-/** L'arma principale si sceglie prima di rinascere. */
+/** The primary weapon is chosen before respawning. */
 export type PrimaryId = "cramar" | "doplete" | "cjampanili" | "mulin" | "miedi" | "gjalinis"
 export const PRIMARIES = ["cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis"] as const satisfies readonly PrimaryId[]
 
-/** La Cassele dal Miedi sui nemici: danno per colpo (la cura sui compagni è `damage`). */
+/** The Cassele dal Miedi on enemies: damage per hit (the heal on teammates is `damage`). */
 export const BEAM_DAMAGE = 5
 
-/** Chi ha il miedi come arma principale è il medico: cura sé e i compagni vicini. */
+/** Whoever has the miedi as primary is the medic: heals themselves and nearby teammates. */
 export const MEDIC_AURA = {
-  /** Raggio (m) della cura passiva. */
+  /** Radius (m) of the passive heal. */
   radius: 6,
-  /** Ogni quanti tick cura. */
+  /** How many ticks between heals. */
   everyTicks: 30,
-  /** Salute per impulso (2 al secondo). */
+  /** Health per pulse (2 per second). */
   amount: 1
 } as const
 
-/** La granata: una boce di sgnape (grappa) con la miccia. */
+/** The grenade: a boce of sgnape (grappa) with a fuse. */
 export const SGNAPE_BOMB = {
   perLife: 2,
   fuseTicks: 130,
@@ -281,27 +281,27 @@ export const SGNAPE_BOMB = {
   cooldownTicks: 40
 } as const
 
-/** La mine di Raibl: si butte a pît, si plante tal teren e e salte al passaç dai nemîs. */
+/** The Raibl mine: dropped at your feet, it plants itself in the ground and blows up when enemies pass. */
 export const RAIBL_MINE = {
   perLife: 2,
   speed: 6,
-  /** Tick prima che si armi. */
+  /** Ticks before it arms. */
   armTicks: 60,
-  /** Raggio di innesco (orizzontale, m). */
+  /** Trigger radius (horizontal, m). */
   trigger: 2,
   radius: 4.5,
   damage: 120,
-  /** Dopo questi tick si spegne da sola (scoppia). */
+  /** After these ticks it goes off by itself (explodes). */
   lifeTicks: 90 * 60,
-  /** Mine attive per giocatore. */
+  /** Active mines per player. */
   maxActive: 3,
   cooldownTicks: 30
 } as const
 
-/** Ciò che vola o sta piantato: forme di frico, bombe di sgnape, mine, galline. */
+/** What flies or sits planted: frico wheels, sgnape bombs, mines, chickens. */
 export type ProjectileKind = "frico" | "sgnape" | "mine" | "gjaline"
 
-/** Ciò che si spara con un'arma (le bombe e le mine si lanciano coi loro tasti). */
+/** What a weapon fires (bombs and mines are thrown with their own keys). */
 export type ShellKind = Extract<ProjectileKind, "frico" | "gjaline">
 
 export const FRICO_SHELL = {
@@ -313,45 +313,45 @@ export const FRICO_SHELL = {
 } as const
 
 /**
- * La gjaline: vola sbattendo le ali (poca gravità), punta piano verso il nemico più
- * vicino davanti a sé e gli scoppia addosso in una nuvola di piume che acceca.
+ * The gjaline: flies flapping its wings (low gravity), slowly homes on the nearest
+ * enemy ahead and bursts on them in a blinding cloud of feathers.
  */
 export const GJALINE = {
   speed: 21,
   lift: 2.5,
   gravity: 5,
   fuseTicks: 150,
-  /** Vede i nemici entro questa distanza e questo cono (coseno del mezzo angolo). */
+  /** Sees enemies within this distance and this cone (cosine of the half angle). */
   sight: 30,
   cone: 0.5,
-  /** Quanto gira verso il bersaglio per tick (rad). */
+  /** How much it turns towards the target per tick (rad). */
   turn: 0.045,
   radius: 3.2,
-  /** Tick di vista coperta dalle piume per chi è preso nello scoppio. */
+  /** Ticks of feather-blocked view for anyone caught in the burst. */
   blindTicks: 100
 } as const
 
-/** Le torrette con la mitraie: si montano col tasto "usa", e scaldano. */
+/** Turrets with the mitraie: mounted with the "use" key, and they overheat. */
 export const TURRET = {
-  /** Da quanto lontano (m, in orizzontale dal posto) si monta. */
+  /** How far away (m, horizontally from the seat) you can mount it. */
   reach: 1.6,
-  /** Il posto di chi spara è dietro l'arma, a questa distanza. */
+  /** The gunner's seat is behind the gun, at this distance. */
   seat: 1.0,
-  /** Quanto gira a destra e a sinistra dalla sua direzione (rad), e su e giù. */
+  /** How far it turns left and right from its facing (rad), and up and down. */
   arc: 1.35,
   pitchUp: 0.55,
   pitchDown: 0.45,
   /**
-   * Calore (0..1) per colpo, al netto del raffreddamento fra un colpo e l'altro:
-   * circa 3 secondi di fuoco continuo prima di surriscaldarsi.
+   * Heat (0..1) per shot, net of cooling between shots:
+   * about 3 seconds of continuous fire before overheating.
    */
   heatPerShot: 0.038,
-  /** Raffreddamento per tick (sempre), e quando è surriscaldata (ferma finché torna a 0). */
+  /** Cooling per tick (always), and when overheated (locked until it's back to 0). */
   cool: 0.004,
   jamCool: 0.005
 } as const
 
-/** Come esce dalla canna ogni cosa che si spara. */
+/** How each fired thing leaves the barrel. */
 export const SHELLS = {
   frico: { speed: FRICO_SHELL.speed, lift: 1.5, fuseTicks: FRICO_SHELL.fuseTicks, bounces: FRICO_SHELL.bounces },
   gjaline: { speed: GJALINE.speed, lift: GJALINE.lift, fuseTicks: GJALINE.fuseTicks, bounces: 0 }

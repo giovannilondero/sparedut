@@ -1,5 +1,5 @@
 /**
- * Gli scenari delle mappe diverse da Gemona (che `world.ts` disegna da sé).
+ * The sceneries of the maps other than Gemona (which `world.ts` draws itself).
  */
 import type { MapId } from "../../../shared/map.ts"
 import type { Scenery } from "../scenery.ts"

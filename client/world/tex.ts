@@ -1,6 +1,6 @@
 /**
- * Texture procedurali su canvas: pietra romanica, intonaci, porfido, coppi, legno,
- * fieno, marmo, e un atlante con insegne, rosone, quadrante dell'orologio e stendardi.
+ * Procedural canvas textures: Romanesque stone, plaster, porphyry, roof tiles, wood,
+ * hay, marble, and an atlas with shop signs, rose window, clock face and banners.
  */
 import * as THREE from "three"
 import { rng } from "./geo.ts"
@@ -27,7 +27,7 @@ function toTex(c: HTMLCanvasElement, repeat = true): THREE.CanvasTexture {
   return t
 }
 
-/** Rumore fine su tutti i pixel (±amt). */
+/** Fine noise on every pixel (±amt). */
 function grain(g: Ctx, w: number, h: number, amt: number, seed: number) {
   const r = rng(seed)
   const d = g.getImageData(0, 0, w, h)
@@ -40,7 +40,7 @@ function grain(g: Ctx, w: number, h: number, amt: number, seed: number) {
   g.putImageData(d, 0, 0)
 }
 
-/** Macchie morbide (velature) che si ripetono senza cuciture. */
+/** Soft blotches (glazes) that tile seamlessly. */
 function blotches(g: Ctx, w: number, h: number, n: number, color: string, maxR: number, seed: number) {
   const r = rng(seed)
   for (let i = 0; i < n; i++) {
@@ -55,7 +55,7 @@ function blotches(g: Ctx, w: number, h: number, n: number, color: string, maxR: 
   }
 }
 
-/** Disegna un rettangolo ripetendolo oltre i bordi (tiling). */
+/** Draws a rectangle, repeating it across the edges (tiling). */
 function wrapRect(g: Ctx, w: number, h: number, x: number, y: number, rw: number, rh: number, draw: (x: number, y: number) => void) {
   for (const ox of [0, -w, w]) for (const oy of [0, -h, h]) {
     if (x + ox + rw < 0 || x + ox > w || y + oy + rh < 0 || y + oy > h) continue
@@ -68,7 +68,7 @@ function roundRect(g: Ctx, x: number, y: number, w: number, h: number, r: number
   g.roundRect(x, y, w, h, r)
 }
 
-/** Corsi di conci: righe di altezza variabile, conci di lunghezza variabile. */
+/** Courses of ashlar: rows of varying height, blocks of varying length. */
 function masonry(size: number, seed: number, o: {
   mortar: string
   rows: number[]
@@ -95,7 +95,7 @@ function masonry(size: number, seed: number, o: {
         g.fillStyle = col
         roundRect(g, px + j, py + j, len - j * 2, rh - j * 2, o.radius)
         g.fill()
-        // luce in alto, ombra in basso: un filo di rilievo
+        // light on top, shadow below: a hint of relief
         g.fillStyle = "rgba(255,255,255,0.10)"
         g.fillRect(px + j + 2, py + j, len - j * 2 - 4, 2)
         g.fillStyle = "rgba(0,0,0,0.16)"
@@ -130,7 +130,7 @@ export interface WorldTextures {
 }
 
 export function makeTextures(): WorldTextures {
-  // Pietra grigia del Duomo: corsi irregolari, conci grigio-beige.
+  // Grey stone of the Duomo: irregular courses, grey-beige blocks.
   const pietra = masonry(512, 11, {
     mortar: "#a9a296",
     rows: [9, 6, 8, 5, 10, 7, 6, 9, 7, 8, 6, 9],
@@ -139,7 +139,7 @@ export function makeTextures(): WorldTextures {
     radius: 5,
     stone: (r) => `hsl(${30 + r() * 15}, ${6 + r() * 8}%, ${50 + r() * 16}%)`
   })
-  // Pietra chiara squadrata (colonne, cornici, loggia).
+  // Light dressed stone (columns, cornices, loggia).
   const pietraChiara = masonry(512, 12, {
     mortar: "#c9c0ae",
     rows: [1, 1, 1, 1, 1, 1, 1, 1],
@@ -149,7 +149,7 @@ export function makeTextures(): WorldTextures {
     stone: (r) => `hsl(${38 + r() * 8}, ${14 + r() * 8}%, ${78 + r() * 8}%)`
   })
 
-  // Intonaco quasi bianco (il colore lo danno i vertici): velature, colature, cadute.
+  // Near-white plaster (vertices give the colour): glazes, drips, flaking.
   const intonaco = (() => {
     const s = 512
     const [c, g] = canvas(s)
@@ -158,7 +158,7 @@ export function makeTextures(): WorldTextures {
     g.fillRect(0, 0, s, s)
     blotches(g, s, s, 26, "rgba(120,100,80,0.06)", 120, 22)
     blotches(g, s, s, 18, "rgba(255,255,255,0.22)", 90, 23)
-    // colature verticali
+    // vertical drips
     for (let i = 0; i < 40; i++) {
       const x = r() * s, y = r() * s, l = 40 + r() * 160
       const gr = g.createLinearGradient(0, y, 0, y + l)
@@ -167,7 +167,7 @@ export function makeTextures(): WorldTextures {
       g.fillStyle = gr
       wrapRect(g, s, s, x, y, 3, l, (px, py) => g.fillRect(px, py, 2 + r() * 3, l))
     }
-    // intonaco caduto: si vede la pietra sotto
+    // fallen plaster: the stone shows underneath
     for (let i = 0; i < 4; i++) {
       const x = r() * s, y = r() * s, w = 20 + r() * 40, h = 14 + r() * 24
       wrapRect(g, s, s, x, y, w, h, (px, py) => {
@@ -188,7 +188,7 @@ export function makeTextures(): WorldTextures {
     return c
   })()
 
-  // Porfido a cubetti, file sfalsate, toni viola-rossicci.
+  // Porphyry setts, staggered rows, purplish-red tones.
   const porfido = (() => {
     const s = 512
     const [c, g] = canvas(s)
@@ -248,7 +248,7 @@ export function makeTextures(): WorldTextures {
   }
   const legno = planks(41, [30, 36, 46], false)
   const dipinto = (() => {
-    // persiane: listelli orizzontali chiari (il colore lo dà l'istanza)
+    // shutters: light horizontal slats (the instance gives the colour)
     const s = 128
     const [c, g] = canvas(s)
     g.fillStyle = "#e8e8e4"
@@ -302,7 +302,7 @@ export function makeTextures(): WorldTextures {
     return c
   })()
 
-  // Coppi: canali lungo u, corsi lungo v.
+  // Roof tiles: channels along u, courses along v.
   const coppi = (() => {
     const s = 256
     const [c, g] = canvas(s)
@@ -344,7 +344,7 @@ export function makeTextures(): WorldTextures {
     return c
   })()
 
-  // Terra battuta: fango secco, sassolini, impronte di scarponi.
+  // Packed earth: dry mud, pebbles, boot prints.
   const terra = (() => {
     const s = 256
     const [c, g] = canvas(s)
@@ -362,7 +362,7 @@ export function makeTextures(): WorldTextures {
     return c
   })()
 
-  // Roccia viva: calcare grigio con fratture e venature (Carso, Predil, colle di Osoppo).
+  // Bare rock: grey limestone with cracks and veins (Carso, Predil, Osoppo hill).
   const roccia = (() => {
     const s = 512
     const [c, g] = canvas(s)
@@ -389,7 +389,7 @@ export function makeTextures(): WorldTextures {
     return c
   })()
 
-  // Sacchetti di sabbia: file sfalsate di cuscini di juta.
+  // Sandbags: staggered rows of jute pillows.
   const sacs = (() => {
     const s = 256
     const [c, g] = canvas(s)
@@ -410,7 +410,7 @@ export function makeTextures(): WorldTextures {
         g.fillStyle = grd
         roundRect(g, px, py, cw - 4, rh - 4, 18)
         g.fill()
-        // legatura e trama della juta
+        // tie and jute weave
         g.strokeStyle = "rgba(60,44,28,0.5)"
         g.lineWidth = 2
         g.beginPath()
@@ -447,7 +447,7 @@ export function makeTextures(): WorldTextures {
     return c
   })()
 
-  // Pavimento della navata: rombi di marmo bianco e rosso di Verona.
+  // Nave floor: diamonds of white marble and Verona red.
   const pavimento = (() => {
     const s = 256
     const [c, g] = canvas(s)
@@ -470,7 +470,7 @@ export function makeTextures(): WorldTextures {
     return c
   })()
 
-  // Facciate lontane: intonaco con 3×3 finestre e scuri verdi.
+  // Distant façades: plaster with 3×3 windows and green shutters.
   const facciata = (() => {
     const s = 256
     const [c, g] = canvas(s)
@@ -513,9 +513,9 @@ export function makeTextures(): WorldTextures {
   }
 }
 
-// --- atlante -------------------------------------------------------------------------------
+// --- atlas ---------------------------------------------------------------------------------
 
-/** Rettangolo UV nell'atlante, con le proporzioni originali (larghezza/altezza). */
+/** UV rectangle in the atlas, with the original proportions (width/height). */
 export interface Region {
   readonly u0: number
   readonly v0: number
@@ -541,13 +541,13 @@ export function makeAtlas(): Atlas {
   const region = (x: number, y: number, w: number, h: number): Region => ({
     u0: x / S,
     u1: (x + w) / S,
-    // canvas y in basso = v alto (flipY)
+    // canvas y down = v up (flipY)
     v0: 1 - (y + h) / S,
     v1: 1 - y / S,
     aspect: w / h
   })
 
-  // Insegne: impacchettate a righe nella metà alta.
+  // Signs: packed in rows in the top half.
   const specs: [SignId, string, string, string, string][] = [
     ["ostarie", "Ostarie", "#3a2616", "#f1c96a", "italic bold 46px Georgia, serif"],
     ["latarie", "Latarie", "#e9e0c8", "#2c4a7a", "bold 46px Georgia, serif"],
@@ -585,7 +585,7 @@ export function makeAtlas(): Atlas {
     x += w + 4
   }
 
-  // Rosone: vetri colorati e trafori di pietra (in basso a sinistra, 512²).
+  // Rose window: stained glass and stone tracery (bottom left, 512²).
   const rose = (() => {
     const ox = 0, oy = 512, R = 250, cx = ox + 256, cy = oy + 256
     g.save()
@@ -607,13 +607,13 @@ export function makeAtlas(): Atlas {
         g.fill()
       }
     }
-    // luce attraverso il vetro
+    // light through the glass
     const gl = g.createRadialGradient(cx - 60, cy - 60, 10, cx, cy, R)
     gl.addColorStop(0, "rgba(255,240,200,0.35)")
     gl.addColorStop(1, "rgba(0,0,0,0.25)")
     g.fillStyle = gl
     g.fillRect(ox, oy, 512, 512)
-    // trafori
+    // tracery
     g.strokeStyle = "#ddd3bd"
     g.lineCap = "round"
     for (let i = 0; i < n; i++) {
@@ -623,7 +623,7 @@ export function makeAtlas(): Atlas {
       g.moveTo(cx + Math.cos(a) * R * 0.3, cy + Math.sin(a) * R * 0.3)
       g.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R)
       g.stroke()
-      // archetti trilobati alla corona
+      // trefoil arches around the rim
       const am = a + Math.PI / n
       g.lineWidth = 6
       g.beginPath()
@@ -648,7 +648,7 @@ export function makeAtlas(): Atlas {
     return region(ox, oy, 512, 512)
   })()
 
-  // Quadrante dell'orologio con numeri romani.
+  // Clock face with Roman numerals.
   const clock = (() => {
     const ox = 512, oy = 512, cx = ox + 128, cy = oy + 128, R = 124
     g.fillStyle = "#f3ecd8"
@@ -678,7 +678,7 @@ export function makeAtlas(): Atlas {
     return region(ox, oy, 256, 256)
   })()
 
-  // Stendardi: finocchio (benandanti) e sorgo (malandanti), coda a punte.
+  // Banners: fennel (benandanti) and sorghum (malandanti), with a pointed tail.
   const banner = (ox: number, color: string, edge: string, emblem: (cx: number, cy: number) => void) => {
     const oy = 512, w = 128, h = 512
     g.fillStyle = color
@@ -701,7 +701,7 @@ export function makeAtlas(): Atlas {
     return region(ox, oy, w, h)
   }
   const bannerB = banner(768, "#4f9a3e", "#e9f2c8", (cx, cy) => {
-    // finocchio: gambo e ombrelle
+    // fennel: stalk and umbels
     g.strokeStyle = "#f4f0c0"
     g.lineWidth = 5
     g.beginPath()
@@ -725,7 +725,7 @@ export function makeAtlas(): Atlas {
     }
   })
   const bannerM = banner(896, "#b8324a", "#f2d27a", (cx, cy) => {
-    // scopa di sorgo
+    // sorghum broom
     g.strokeStyle = "#f2d27a"
     g.lineWidth = 7
     g.beginPath()
@@ -747,7 +747,7 @@ export function makeAtlas(): Atlas {
   return { texture, signs, rose, clock, bannerB, bannerM }
 }
 
-/** Quadrilatero verticale che mostra una regione dell'atlante, centrato, in xy, verso +z. */
+/** Vertical quad showing an atlas region, centred, in xy, facing +z. */
 export function atlasQuad(r: Region, h: number, w = h * r.aspect): THREE.BufferGeometry {
   const g = new THREE.PlaneGeometry(w, h)
   const uv = g.getAttribute("uv")
@@ -755,7 +755,7 @@ export function atlasQuad(r: Region, h: number, w = h * r.aspect): THREE.BufferG
   return g
 }
 
-/** Disco che mostra una regione quadrata dell'atlante (rosone, orologio). */
+/** Disc showing a square atlas region (rose window, clock). */
 export function atlasDisc(r: Region, radius: number, seg = 32): THREE.BufferGeometry {
   const g = new THREE.CircleGeometry(radius, seg)
   const uv = g.getAttribute("uv")

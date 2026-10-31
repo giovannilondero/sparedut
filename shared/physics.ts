@@ -1,23 +1,23 @@
 /**
- * Il mondo fisico statico di Gemona in Rapier 3D: muri, terreno, rampe.
- * Lo costruiscono sia il server (simulazione autoritativa) sia il client
- * (predizione del proprio movimento), dagli stessi dati della mappa.
+ * Gemona's static physics world in Rapier 3D: walls, terrain, ramps.
+ * Both the server (authoritative simulation) and the client (prediction of
+ * its own movement) build it from the same map data.
  *
- * I giocatori non collidono fra loro (stile arena): ognuno è una capsula che il
- * character controller muove contro il solo mondo statico.
+ * Players don't collide with each other (arena style): each is a capsule the
+ * character controller moves against the static world only.
  */
 import RAPIER from "@dimforge/rapier3d-compat"
 import type { MapDef } from "./map.ts"
 import type { Vec3 } from "./vec.ts"
 
 export const CAPSULE_RADIUS = 0.4
-/** Mezza altezza del cilindro centrale: in piedi 1.8 m, accucciato 1.1 m. */
+/** Half height of the central cylinder: 1.8 m standing, 1.1 m crouched. */
 const HALF_STAND = 0.5
 const HALF_CROUCH = 0.15
 export const STAND_HEIGHT = 2 * (HALF_STAND + CAPSULE_RADIUS)
 export const CROUCH_HEIGHT = 2 * (HALF_CROUCH + CAPSULE_RADIUS)
 
-// Gruppi: il mondo è il gruppo 1, i personaggi il 2 (vedono solo il mondo), i raggi il 3.
+// Groups: the world is group 1, characters 2 (they only see the world), rays 3.
 const groups = (membership: number, filter: number) => (membership << 16) | filter
 const WORLD_GROUPS = groups(0b001, 0xffff)
 const CHARACTER_GROUPS = groups(0b010, 0b001)
@@ -34,33 +34,33 @@ export interface MoveResult {
 export interface RayHit {
   readonly dist: number
   readonly normal: Vec3
-  /** L'indice della porta colpita (in `map.doors`), o null per un muro. */
+  /** The index of the door hit (in `map.doors`), or null for a wall. */
   readonly door: number | null
 }
 
-/** Ciò che la simulazione chiede alla fisica. */
+/** What the simulation asks of physics. */
 export interface PhysicsWorld {
-  /** La mappa da cui è costruito il mondo (cjars di fen, quota di caduta). */
+  /** The map the world is built from (cjars di fen, fall-out height). */
   readonly map: MapDef
-  /** Sposta un personaggio coi piedi in `feet` di `delta`, scivolando sui muri. */
+  /** Moves a character with feet at `feet` by `delta`, sliding along walls. */
   readonly moveCharacter: (feet: Vec3, delta: Vec3, crouch: boolean) => MoveResult
-  /** C'è spazio per alzarsi in piedi? */
+  /** Is there room to stand up? */
   readonly canStand: (feet: Vec3) => boolean
-  /** Primo muro lungo il raggio (dir normalizzata), entro `maxDist`. */
+  /** First wall along the ray (normalized dir), within `maxDist`. */
   readonly raycast: (origin: Vec3, dir: Vec3, maxDist: number) => RayHit | null
   readonly lineOfSight: (a: Vec3, b: Vec3) => boolean
   /**
-   * Porte in piedi (true) o sfondate, nell'ordine di `map.doors`. Idempotente: la
-   * simulazione lo chiama a ogni tick con lo stato salvato, il client a ogni istantanea.
+   * Doors standing (true) or broken down, in `map.doors` order. Idempotent: the
+   * simulation calls it every tick with the saved state, the client on every snapshot.
    */
   readonly setDoors: (standing: readonly boolean[]) => void
 }
 
 let ready: Promise<void> | null = null
-/** Carica il WASM di Rapier una volta per processo. */
+/** Loads Rapier's WASM once per process. */
 export const initPhysics = () => (ready ??= RAPIER.init())
 
-/** Parametri del character controller (sovrascrivibili nei test). */
+/** Character controller parameters (overridable in tests). */
 export const KCC = { offset: 0.02, autostep: true, snap: 0.35, split: true }
 
 export function createPhysicsWorld(map: MapDef, tuning: Partial<typeof KCC> = {}): PhysicsWorld {
@@ -134,8 +134,8 @@ export function createPhysicsWorld(map: MapDef, tuning: Partial<typeof KCC> = {}
           hitCeiling: delta.y > 0.001 && m.y < delta.y * 0.5
         }
       }
-      // Prima l'orizzontale (con gradini), poi la verticale: un corpo appoggiato
-      // non si incastra nel pavimento mentre cammina.
+      // Horizontal first (with steps), then vertical: a body resting on the ground
+      // doesn't get stuck in the floor while walking.
       controller.computeColliderMovement(collider, { x: delta.x, y: 0, z: delta.z }, undefined, CHARACTER_GROUPS)
       const h = controller.computedMovement()
       const mid = { x: feet.x + h.x, y: feet.y + h.y, z: feet.z + h.z }
@@ -177,7 +177,7 @@ export function createPhysicsWorld(map: MapDef, tuning: Partial<typeof KCC> = {}
           changed = true
         }
       })
-      // Le interrogazioni (raggi, character controller) vedono il cambio dopo un passo.
+      // Queries (rays, character controller) see the change after one step.
       if (changed) world.step()
     }
   }

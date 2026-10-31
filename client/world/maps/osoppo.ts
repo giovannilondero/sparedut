@@ -1,10 +1,10 @@
 /**
- * Lo scenario del Fuart di Osôf: il colle di roccia con le scarpate murate, il campanile
- * di San Pieri, i bastioni con gallerie e garitte, la polveriera, i pini sul pendio e,
- * oltre, la pianura del Tagliamento con le Prealpi a nord.
+ * The scenery of the Fuart di Osôf: the rocky hill with walled escarpments, the bell tower
+ * of San Pieri, the bastions with tunnels and sentry boxes, the powder magazine, pines on the
+ * slope and, beyond, the Tagliamento plain with the Prealps to the north.
  *
- * Tutto ciò che si tocca sta nei dati (`shared/maps/osoppo.ts`): qui solo decori sottili
- * e ciò che sta fuori dai bordi.
+ * Everything you can touch lives in the data (`shared/maps/osoppo.ts`): here only thin
+ * decorations and what lies beyond the edges.
  */
 import * as THREE from "three"
 import { FORT, O_BASTION, O_LOW, O_RAMPART, O_TOP } from "../../../shared/maps/osoppo.ts"
@@ -14,15 +14,15 @@ import type { K, Scenery, SceneryKit } from "../scenery.ts"
 
 const E = FORT.edge
 
-/** Distanza in pianta dal rettangolo giocabile. */
+/** Plan distance from the playable rectangle. */
 function outside(b: SceneryKit["map"]["bounds"], x: number, z: number) {
   return Math.hypot(Math.max(b.minX - x, x - b.maxX, 0), Math.max(b.minZ - z, z - b.maxZ, 0))
 }
 
 /**
- * Il rilievo attorno al forte: al bordo vale la quota del ripiano (altopiano o piazzali),
- * poi il colle scende ripido fino alla pianura (~44 m più in basso); a nord le Prealpi,
- * a est le colline verso Gemona.
+ * The relief around the fort: at the edge it matches the terrace height (plateau or yards),
+ * then the hill drops steeply to the plain (~44 m lower); to the north the Prealps,
+ * to the east the hills towards Gemona.
  */
 function heightOf(b: SceneryKit["map"]["bounds"]) {
   return (x: number, z: number) => {
@@ -38,7 +38,7 @@ function heightOf(b: SceneryKit["map"]["bounds"]) {
   }
 }
 
-/** Distanze dal bordo delle righe della scarpata vicina (fitte vicino al muro). */
+/** Distances from the edge of the near escarpment's rows (dense near the wall). */
 const RINGS = [0, 0.8, 3, 6, 10, 15, 21, 28, 36, 45, 55, 66, 78, 90]
 const NEAR = RINGS[RINGS.length - 1]
 
@@ -49,7 +49,7 @@ export const scenery: Scenery = {
     const height = heightOf(bounds)
     const R = rng(4242)
 
-    // --- il colle vicino: scarpata murata al bordo, roccia sui pendii, prato e pini -----------
+    // --- the near hill: walled escarpment at the edge, rock on the slopes, grass and pines ---
     {
       const inner = (a0: number, a1: number) => {
         const out: number[] = []
@@ -72,7 +72,7 @@ export const scenery: Scenery = {
         let key: K = "erba"
         let col = grass[Math.floor(R() * grass.length)].clone().offsetHSL(0, 0, (R() - 0.5) * 0.05)
         if (o < 0.8) {
-          // la scarpata del forte, in conci
+          // the fort's escarpment, in ashlar
           key = "pietra"
           col = C("#cfc6b6")
         } else if (slope > 0.9) {
@@ -81,7 +81,7 @@ export const scenery: Scenery = {
         }
         B.add(key, g, col)
       }
-      // Pini e qualche latifoglia sul pendio.
+      // Pines and a few broadleaf trees on the slope.
       for (let n = 0; n < 220; n++) {
         const side = R()
         const t = R()
@@ -105,7 +105,7 @@ export const scenery: Scenery = {
       }
     }
 
-    // --- pareti di roccia fra le rampe della strada militare ----------------------------------
+    // --- rock walls between the ramps of the military road ---------------------------------
     {
       const gaps: [number, number][] = []
       let a = bounds.minX
@@ -117,7 +117,7 @@ export const scenery: Scenery = {
       for (const s of [-1, 1]) for (const [x0, x1] of gaps) {
         const z = s * (E + 0.03)
         B.add("roccia", orient(quad([x0, O_LOW, z], [x1, O_LOW, z], [x1, O_TOP, z], [x0, O_TOP, z]), [0, 0, s]), C("#bdb6aa"))
-        // massi piccoli ai piedi (troppo bassi per ripararsi)
+        // small boulders at the foot (too low for cover)
         for (let k = 0; k < (x1 - x0) / 3; k++) {
           const g = new THREE.DodecahedronGeometry(0.25 + R() * 0.25).scale(1, 0.6, 1)
           B.add("roccia", g.translate(x0 + R() * (x1 - x0), O_LOW + 0.1, s * (E + 0.4 + R() * 1.2)), C("#a8a294"))
@@ -125,13 +125,13 @@ export const scenery: Scenery = {
       }
     }
 
-    // --- bastioni trasversali: cordone, cornici delle gallerie, lapidi, garitte ---------------
-    const garitta = (p: V) => {
+    // --- cross bastions: cordon, tunnel frames, plaques, sentry boxes -------------------------
+    const sentryBox = (p: V) => {
       const [x, y, z] = p
       B.add("pietra", new THREE.CylinderGeometry(0.75, 0.35, 0.8, 10).translate(x, y - 0.4, z), C("#d6cdbd"))
       B.add("pietraChiara", new THREE.CylinderGeometry(0.8, 0.8, 2.2, 10).translate(x, y + 1.1, z))
       B.add("coppi", new THREE.ConeGeometry(1.05, 1.1, 10).translate(x, y + 2.75, z), C("#b88a72"))
-      // feritoie
+      // loopholes
       for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) B.add("pietra", boxAt([-0.08, 0, -0.04], [0.08, 0.6, 0.04]).translate(0, y + 1.2, 0.79).rotateY(a).translate(x, 0, z), C("#2a2622"))
     }
     for (const s of [-1, 1]) {
@@ -141,7 +141,7 @@ export const scenery: Scenery = {
         B.add("pietraChiara", cylBetween([x0, O_TOP + 3.7, zo + s * 0.12], [x1, O_TOP + 3.7, zo + s * 0.12], 0.2, 0.2, 8), C("#efe7d8"))
         B.add("pietraChiara", cylBetween([x0, O_TOP + 3.7, zi - s * 0.12], [x1, O_TOP + 3.7, zi - s * 0.12], 0.2, 0.2, 8), C("#efe7d8"))
       }
-      // gallerie: stipiti e architrave in pietra chiara su entrambe le facce
+      // tunnels: light-stone jambs and lintel on both faces
       for (const [t0, t1] of FORT.tunnels) for (const zf of [zo, zi]) {
         const out = zf === zo ? s : -s
         const f0 = zf, f1 = zf + out * 0.12
@@ -149,10 +149,10 @@ export const scenery: Scenery = {
         B.add("pietraChiara", boxAt([t0 - 0.5, O_TOP, lo], [t0, O_TOP + 3, hi]), C("#e8dfcf"))
         B.add("pietraChiara", boxAt([t1, O_TOP, lo], [t1 + 0.5, O_TOP + 3, hi]), C("#e8dfcf"))
         B.add("pietraChiara", boxAt([t0 - 0.5, O_TOP + 3, lo], [t1 + 0.5, O_TOP + 3.45, hi]), C("#efe7d8"))
-        // la lapide col leone sopra la galleria
+        // the plaque with the lion above the tunnel
         B.add("marmo", boxAt([(t0 + t1) / 2 - 1, O_TOP + 3.6, lo], [(t0 + t1) / 2 + 1, O_TOP + 4.6, hi]), C("#f2ece0"))
       }
-      // pilastri della porta, a filo del muro
+      // gate pillars, flush with the wall
       for (const x of [FORT.gate[0], FORT.gate[1]]) {
         const d = x < 0 ? -1 : 1
         for (const zf of [zo, zi]) {
@@ -161,18 +161,18 @@ export const scenery: Scenery = {
         }
         B.add("pietraChiara", sphere([x + d * 0.35, O_RAMPART + 0.75, s * (FORT.rampart.z0 + FORT.rampart.z1) / 2], 0.35, 1, 10), C("#efe7d8"))
       }
-      // garitte agli spigoli, sporgenti oltre il bordo
-      for (const x of [bounds.minX - 1.1, bounds.maxX + 1.1]) garitta([x, O_RAMPART, s * (FORT.rampart.z1 - 0.8)])
+      // sentry boxes at the corners, jutting past the edge
+      for (const x of [bounds.minX - 1.1, bounds.maxX + 1.1]) sentryBox([x, O_RAMPART, s * (FORT.rampart.z1 - 0.8)])
     }
-    for (const z of [FORT.bastion.minZ + 0.9, FORT.bastion.maxZ - 0.9]) garitta([bounds.maxX + 1.1, O_BASTION, z])
-    for (const z of [bounds.minZ + 1.5, bounds.maxZ - 1.5]) for (const x of [bounds.minX - 1.1, bounds.maxX + 1.1]) garitta([x, O_LOW + 1.2, z])
+    for (const z of [FORT.bastion.minZ + 0.9, FORT.bastion.maxZ - 0.9]) sentryBox([bounds.maxX + 1.1, O_BASTION, z])
+    for (const z of [bounds.minZ + 1.5, bounds.maxZ - 1.5]) for (const x of [bounds.minX - 1.1, bounds.maxX + 1.1]) sentryBox([x, O_LOW + 1.2, z])
 
-    // --- campanile di San Pieri: cella campanaria, cornici, cuspide ---------------------------
+    // --- San Pieri bell tower: belfry, cornices, spire ----------------------------------------
     {
       const { minX, maxX, minZ, maxZ, top } = FORT.tower
       const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2
       for (const y of [O_TOP + 8, top - 5.2, top]) B.add("pietraChiara", boxAt([minX - 0.15, y - 0.3, minZ - 0.15], [maxX + 0.15, y, maxZ + 0.15]), C("#ece4d4"))
-      // bifore della cella: vani scuri con l'arco, su ogni faccia
+      // belfry mullioned windows: dark arched openings, on every face
       const faces: [V, number, number, number][] = [
         [[0, 0, 1], maxZ + 0.02, minX, maxX],
         [[0, 0, -1], minZ - 0.02, minX, maxX],
@@ -191,16 +191,16 @@ export const scenery: Scenery = {
           B.add("pietra", orient(arc, n), C("#1e1a16"))
         }
       }
-      // cuspide a piramide e croce
+      // pyramid spire and cross
       B.add("coppi", new THREE.ConeGeometry(Math.SQRT1_2 * (maxX - minX) + 0.3, 4.2, 4).rotateY(Math.PI / 4).translate(cx, top + 2.1, cz), C("#a87866"))
       B.add("ferro", cylBetween([cx, top + 4.1, cz], [cx, top + 5.6, cz], 0.05), C("#2a2622"))
       B.add("ferro", cylBetween([cx - 0.45, top + 5.1, cz], [cx + 0.45, top + 5.1, cz], 0.04), C("#2a2622"))
-      // la campana, appena visibile dentro la cella
+      // the bell, just visible inside the belfry
       const bell = new THREE.LatheGeometry([[0, 0], [0.55, 0], [0.5, 0.15], [0.35, 0.6], [0.25, 0.85], [0, 0.9]].map(([x, y]) => new THREE.Vector2(x, y)), 12)
       B.add("ferro", bell.translate(cx, top - 4.2, cz), C("#9a7a3a"))
     }
 
-    // --- rovine di San Pieri: stipiti del portale, macerie minute, ciuffi d'erba sui muri ------
+    // --- San Pieri ruins: portal jambs, small rubble, tufts of grass on the walls -------------
     {
       const { minX, maxX, minZ, maxZ } = FORT.church
       for (const z of [-3.35, 3]) B.add("pietraChiara", boxAt([maxX, O_TOP, z], [maxX + 0.12, O_TOP + 4.2, z + 0.35]), C("#e8dfcf"))
@@ -211,7 +211,7 @@ export const scenery: Scenery = {
         const g = new THREE.DodecahedronGeometry(0.12 + R() * 0.2).scale(1, 0.55, 1)
         B.add("pietra", g.translate(x, O_TOP + 0.06, z), C("#cfc6b6"))
       }
-      // erba e cespugli in cima ai muri crollati (sottili: non riparano)
+      // grass and bushes atop the collapsed walls (thin: no cover)
       const tops = map.blocks.filter((b) => b.mat === "pietra" && b.look === "muro" && b.min[0] >= minX && b.max[0] <= maxX && b.min[2] >= minZ && b.max[2] <= maxZ)
       for (const b of tops) {
         const len = Math.max(b.max[0] - b.min[0], b.max[2] - b.min[2])
@@ -223,7 +223,7 @@ export const scenery: Scenery = {
       }
     }
 
-    // --- polveriere: volta a capanna, porta di ferro, feritoie ---------------------------------
+    // --- powder magazines: gabled vault, iron door, loopholes ---------------------------------
     {
       const { minX, maxX, minZ, maxZ, top } = FORT.powder
       for (const s of [1, -1]) {
@@ -237,7 +237,7 @@ export const scenery: Scenery = {
       }
     }
 
-    // --- la bandiera del Friûl sul bastione est -----------------------------------------------
+    // --- the Friûl flag on the east bastion ---------------------------------------------------
     {
       const x = FORT.bastion.maxX - 1.2, z = 0
       B.add("ferro", cylBetween([x, O_BASTION, z], [x, O_BASTION + 9, z], 0.07, 0.05), C("#3a3632"))
@@ -248,7 +248,7 @@ export const scenery: Scenery = {
 
   backdrop({ map }) {
     const height = heightOf(map.bounds)
-    // Vicino al forte il rilievo lo disegna la scarpata fine di `build`: qui si abbassa sotto.
+    // Near the fort the fine escarpment from `build` draws the relief: here it sinks below it.
     const far = (x: number, z: number) => height(x, z) - 6 * (1 - smooth(NEAR - 20, NEAR, outside(map.bounds, x, z)))
     return [makeHeightfield(far, map.bounds, 911)]
   },

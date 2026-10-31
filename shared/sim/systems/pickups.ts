@@ -1,5 +1,5 @@
 /**
- * Raccolte: frico (salute), gubane (corazza), sgnape (velocità), munizions, lanciafrico.
+ * Pickups: frico (health), gubane (armor), sgnape (speed), munizions, lanciafrico.
  */
 import type { PickupKind } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"

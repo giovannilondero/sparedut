@@ -1,13 +1,13 @@
 /**
- * Lagune di Maran: la aghe basse cu lis barenis e lis cjanis, lis briculis dai canâi, i
- * casons di pae, la foresterie de riserve (cun dentri jets a cjast, cusine, fogolâr e
- * bagns) e il casot di osservazion: la bale di spieli che e zire, lis lûs coloradis, il
- * paviment che al cambie colôr a timp, i fenicotars che a balin, il cjoc distirât cul cjâf
- * sul scjalin (al sta ben, al duar) e la pignate de bire. Fûr, altris fenicotars te aghe;
- * tal fonts lis Alps e il cjampanili di Maran.
+ * Lagune di Maran: the shallow water with its mudflats (barenis) and reeds, the bricole marking the
+ * channels, the thatched casons, the reserve's guesthouse (foresterie: bunk beds, kitchen, hearth
+ * and bathrooms inside) and the casot (observation hut): the spinning mirror ball, the coloured
+ * lights, the floor that changes colour to the beat, the dancing flamingos, the drunk sprawled
+ * with his head on the scjalin (step) (he's fine, he's asleep) and the pignate of beer. Outside,
+ * more flamingos in the water; in the background the Alps and Maran's bell tower.
  *
- * Dut ce che si tocje al sta tai dâts (`shared/maps/maran.ts`): culì dome decors e il
- * fonts.
+ * Everything you can touch lives in the data (`shared/maps/maran.ts`): here only decorations
+ * and the backdrop.
  */
 import * as THREE from "three"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
@@ -43,7 +43,7 @@ import type { Scenery, SceneryKit } from "../scenery.ts"
 
 const BPM = 124
 
-/** Una scritta su tela, per insegne e cartelli. */
+/** Lettering on a canvas, for signs and boards. */
 function sign(lines: readonly string[], w: number, h: number, bg: string, ink: string, font = "Georgia, serif"): THREE.Mesh {
   const c = document.createElement("canvas")
   c.width = 512
@@ -67,7 +67,7 @@ function sign(lines: readonly string[], w: number, h: number, bg: string, ink: s
   return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ map: tex }))
 }
 
-/** Il fenicotar: corpo rosa, cuel a S, bec plegât cu la ponte nere, gjambis lungjis. */
+/** The flamingo: pink body, S-shaped neck, bent beak with a black tip, long legs. */
 function flamingo() {
   const pink = new THREE.MeshLambertMaterial({ color: "#f28aa2" })
   const deep = new THREE.MeshLambertMaterial({ color: "#d9506e" })
@@ -91,7 +91,7 @@ function flamingo() {
     body.add(p)
     return p
   })
-  // il cuel: un tubo a S che va sù e indenant, il cjâf su la ponte
+  // the neck: an S-shaped tube going up and forward, the head at the tip
   const neck = new THREE.Group()
   neck.position.set(0, 0.08, 0.2)
   body.add(neck)
@@ -115,7 +115,7 @@ function flamingo() {
     head.add(eye)
   }
   head.add(beak, beakTip)
-  // gjambis: anche, zenoli che si plee indaûr, pît
+  // legs: hip, knee that bends backwards, foot
   const legs = [-1, 1].map((sx) => {
     const hip = new THREE.Group()
     hip.position.set(sx * 0.06, 0.8, -0.02)
@@ -135,7 +135,7 @@ function flamingo() {
   return { g, body, neck, head, wings, legs }
 }
 
-/** Il cjoc: distirât par tiere, il cjâf sul scjalin, la bocje vierte. Al respire. */
+/** The drunk: sprawled on the floor, head on the scjalin, mouth open. He breathes. */
 function sleeper() {
   const g = new THREE.Group()
   const skin = new THREE.MeshLambertMaterial({ color: "#e0a888" })
@@ -151,7 +151,7 @@ function sleeper() {
     g.add(o)
     return o
   }
-  // Il cuarp al va lunc l'ass x: i pîts a x=0, il cjâf viers +x (sul scjalin).
+  // The body runs along the x axis: feet at x=0, head towards +x (on the scjalin).
   const chest = new THREE.Group()
   chest.position.set(1.35, 0.14, 0)
   chest.rotation.z = 0.2
@@ -168,19 +168,19 @@ function sleeper() {
   belly.position.set(-0.12, 0.06, 0)
   chest.add(belly)
   box(0.56, 0.16, 0.18, pants, 0.75, 0.09, -0.11, 0, 0, 0.05)
-  box(0.3, 0.15, 0.17, pants, 0.62, 0.22, 0.12, 0, 0, -0.6) // une gjambe plegade
+  box(0.3, 0.15, 0.17, pants, 0.62, 0.22, 0.12, 0, 0, -0.6) // one leg bent
   box(0.32, 0.14, 0.16, pants, 0.36, 0.2, 0.12, 0, 0, 0.6)
   box(0.12, 0.1, 0.22, shoe, 0.2, 0.06, 0.12)
   box(0.5, 0.15, 0.17, pants, 0.25, 0.08, -0.11)
   box(0.1, 0.18, 0.12, shoe, -0.02, 0.1, -0.11)
-  // braçs: un sul pet, chel altri distirât cu la butilie
+  // arms: one on the chest, the other stretched out with the bottle
   box(0.4, 0.1, 0.1, shirt, 1.42, 0.3, 0.06, 0, 0.5, 0.2)
   box(0.42, 0.09, 0.1, shirt, 1.3, 0.06, -0.42, 0, -0.7, 0)
   box(0.1, 0.07, 0.1, skin, 1.08, 0.05, -0.62)
   const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.24, 8).rotateZ(Math.PI / 2 - 0.2), new THREE.MeshStandardMaterial({ color: "#3a6a2a", roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.85 }))
   bottle.position.set(0.92, 0.04, -0.68)
   g.add(bottle)
-  // cjâf sul scjalin, cul nâs ros
+  // head on the scjalin, with a red nose
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 10), skin)
   head.position.set(1.83, 0.36, 0)
   g.add(head)
@@ -193,7 +193,7 @@ function sleeper() {
   const hair = new THREE.Mesh(new THREE.SphereGeometry(0.125, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).rotateZ(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: "#6a6060" }))
   hair.position.set(1.85, 0.36, 0)
   g.add(hair)
-  // il cjapiel colât
+  // the fallen hat
   const hat = new THREE.Group()
   hat.add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.02, 14), new THREE.MeshLambertMaterial({ color: "#3a4a2a" })))
   const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.12, 12), new THREE.MeshLambertMaterial({ color: "#3a4a2a" }))
@@ -206,7 +206,7 @@ function sleeper() {
   hat.position.set(1.65, 0.02, 0.55)
   hat.rotation.set(0.3, 0.6, 0.2)
   g.add(hat)
-  // "Zzz": letaris che a van sù e a sparissin
+  // "Zzz": letters that rise and fade away
   const zMat = (() => {
     const c = document.createElement("canvas")
     c.width = c.height = 64
@@ -227,7 +227,7 @@ function sleeper() {
   return {
     g,
     update(t: number) {
-      // respir lunc, cul russâ
+      // long breaths, snoring
       const breath = Math.sin(t * 1.4)
       chest.scale.set(1, 1 + 0.06 * breath, 1 + 0.03 * breath)
       belly.scale.setScalar(1 + 0.05 * breath)
@@ -241,7 +241,7 @@ function sleeper() {
   }
 }
 
-/** Une bricule: trê pâi tal ploc leâts insiemi in alt, a segnâ il canâl. */
+/** A bricola: three poles in the mud tied together at the top, marking the channel. */
 function bricola(kit: SceneryKit, x: number, z: number, lean: number) {
   const { B, C, cylBetween } = kit
   const top: V = [x + lean * 0.1, WATER + 3.2, z]
@@ -252,16 +252,16 @@ function bricola(kit: SceneryKit, x: number, z: number, lean: number) {
   B.add("ferro", new THREE.TorusGeometry(0.16, 0.03, 4, 10).rotateX(Math.PI / 2).translate(top[0], top[1] - 0.4, top[2]), C("#3a3430"))
 }
 
-/** Un cason di pescjadôrs: mûrs di cane e tet di pae fin cuasi par tiere, la puarte nere. */
+/** A fishermen's cason: reed walls and a thatched roof down almost to the ground, the black door. */
 function cason(kit: SceneryKit, c: (typeof CASONS)[number]) {
   const { B, C } = kit
   const alongX = c.maxX - c.minX >= c.maxZ - c.minZ
   const y0 = LAND
   const wallTop = y0 + 1.1
   const ridge = y0 + CASON_TOP + 0.7
-  // mûrs bas di cane
+  // low reed walls
   B.add("fen", boxAt([c.minX + 0.2, y0, c.minZ + 0.2], [c.maxX - 0.2, wallTop, c.maxZ - 0.2]), C("#b8a070"))
-  // tet a dôs aghis fin a 30 cm di tiere, cul colm lunc il lât lunc
+  // gable roof down to 30 cm from the ground, ridge along the long side
   const shape = new THREE.Shape()
   const half = alongX ? (c.maxZ - c.minZ) / 2 + 0.4 : (c.maxX - c.minX) / 2 + 0.4
   shape.moveTo(-half, 0)
@@ -274,12 +274,12 @@ function cason(kit: SceneryKit, c: (typeof CASONS)[number]) {
   if (alongX) roof.rotateY(Math.PI / 2)
   roof.translate((c.minX + c.maxX) / 2, y0 + 0.3, (c.minZ + c.maxZ) / 2)
   B.add("fen", roof, C("#a08a5a"))
-  // la puarte su la tieste
+  // the door on the short end
   const cx = (c.minX + c.maxX) / 2
   const cz = (c.minZ + c.maxZ) / 2
   const d = alongX ? boxAt([c.maxX + 0.25, y0, cz - 0.45], [c.maxX + 0.3, y0 + 1.9, cz + 0.45]) : boxAt([cx - 0.45, y0, c.maxZ + 0.25], [cx + 0.45, y0 + 1.9, c.maxZ + 0.3])
   B.add("legno", d, C("#2a2018"))
-  // il fum dal cjamin: un pâl di len cul cjapiel
+  // the chimney: a wooden pole with a cap
   B.add("legno", kit.cylBetween([cx, ridge - 0.6, cz], [cx, ridge + 0.5, cz], 0.12), C("#5a4a3a"))
 }
 
@@ -288,10 +288,10 @@ export const scenery: Scenery = {
     const { B, C, root, R, cylBetween, sphere, map } = kit
     const quality = { lights: [] as THREE.Light[] }
 
-    // --- aghe e rivis -----------------------------------------------------------------------
+    // --- water and banks --------------------------------------------------------------------
     const { minX, maxX, minZ, maxZ } = map.bounds
     B.add("acqua", kit.face([minX, WATER - 0.01, minZ], [maxX, WATER, maxZ], "top"), C("#b8e0d8"))
-    /** La normâl in fûr dal ôr `i` (il poligon al pues jessi zirât in ducj i doi sens). */
+    /** The outward normal of edge `i` (the polygon may wind either way). */
     const outward = (l: Land) => {
       let area = 0
       for (let i = 0; i < l.poly.length; i++) {
@@ -307,10 +307,10 @@ export const scenery: Scenery = {
         return [(sg * (b[1] - a[1])) / len, (sg * -(b[0] - a[0])) / len, len]
       }
     }
-    /** Un ôr al è sul confin de mape (là no si viôt e no si met nuie). */
+    /** Whether an edge is on the map border (it can't be seen there, so nothing goes there). */
     const onBorder = (a: readonly [number, number], b: readonly [number, number]) =>
       (Math.abs(a[0] - b[0]) < 1e-6 && (Math.abs(Math.abs(a[0]) - maxX) < 1e-6)) || (Math.abs(a[1] - b[1]) < 1e-6 && Math.abs(Math.abs(a[1]) - maxZ) < 1e-6)
-    /** Lis tieris sutis come lis à la fisiche: cuvierte lisse e la rive di fanc che e cale te aghe. */
+    /** The dry land as the physics has it: a smooth top and the mud bank sloping into the water. */
     for (const l of LANDS) {
       const shape = new THREE.Shape(l.poly.map(([x, z]) => new THREE.Vector2(x, -z)))
       B.add(l.mat === "terra" ? "terra" : "erba", new THREE.ShapeGeometry(shape).rotateX(-Math.PI / 2).translate(0, LAND, 0), C(l.tint))
@@ -324,7 +324,7 @@ export const scenery: Scenery = {
         B.add("terra", kit.orient(quad([a[0], LAND, a[1]], [b[0], LAND, b[1]], [b[0] + nx * w, SEA, b[1] + nz * w], [a[0] + nx * w, SEA, a[1] + nz * w]), [nx, 1, nz]), C("#8a7a5a"))
       }
     }
-    // i trois di tiere batude, un fregul parsore la cuvierte
+    // the packed-earth paths, slightly above the top surface
     for (const path of PATHS) {
       for (let i = 0; i + 1 < path.length; i++) {
         const [ax, az] = path[i]
@@ -337,15 +337,15 @@ export const scenery: Scenery = {
       }
     }
 
-    // --- cjanis tal ôr des tieris, dulà che no si rive cu lis passerelis ---------------------
+    // --- reeds along the land's edge, where the boardwalks don't land --------------------------
     const reedCol = [C("#d8dca0"), C("#e8d890"), C("#c0cc88")]
     const landing = (x: number, z: number) =>
       BOARDWALKS.some((w) => x > w.minX - 1.5 && x < w.maxX + 1.5 && z > w.minZ - 1.5 && z < w.maxZ + 1.5) ||
       (x > PONT.x0 - 2 && x < PONT.x1 + 2 && z > PONT.z0 - 2 && z < PONT.z1 + 2)
     let reedN = 0
-    // Lis cjanis a stan dulà che si jes de aghe e no colidin: a pocjis spanis de cjamare un stec
-    // al taponave mieç schermi par un moment (i "lamps neris"). A van in une mesh a part che
-    // e sparìs dongje dal voli.
+    // The reeds stand where you climb out of the water and have no collision: a few spans from the
+    // camera a stalk would cover half the screen for a moment (the "black flashes"). They go in a
+    // separate mesh that disappears near the eye.
     const reedParts: THREE.BufferGeometry[] = []
     const reedAdd = (g: THREE.BufferGeometry, col: THREE.Color) => {
       const ng = g.index ? g.toNonIndexed() : g.clone()
@@ -392,7 +392,7 @@ export const scenery: Scenery = {
       root.add(reeds)
     }
 
-    // --- briculis e barcjis ---------------------------------------------------------------
+    // --- bricole and boats ----------------------------------------------------------------
     for (const [x, z] of BRICOLE) bricola(kit, x, z, R() * 3)
     const hull = (x: number, z: number, yaw: number, col: string) => {
       const s = new THREE.Shape()
@@ -408,8 +408,8 @@ export const scenery: Scenery = {
     hull(-20, 52, -0.2, "#7a3a2a")
     hull(-44, 47, 1.2, "#e8e0d0")
 
-    // --- passerelis: breis e pâi -----------------------------------------------------------
-    /** Une trâf di len fra doi ponts (ancje inclinade). */
+    // --- boardwalks: planks and posts ------------------------------------------------------
+    /** A wooden beam between two points (sloped too). */
     const beam = (a: V, b: V, w: number, h: number, col: THREE.Color) => {
       const dx = b[0] - a[0]
       const dy = b[1] - a[1]
@@ -418,7 +418,7 @@ export const scenery: Scenery = {
       g.rotateZ(Math.atan2(dy, Math.hypot(dx, dz))).rotateY(Math.atan2(-dz, dx))
       B.add("legno", g.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), col)
     }
-    /** Un corimano lunc une linie di ponts al nivel dal paviment: pâi, trâf in alt e une a mieç. */
+    /** A handrail along a line of points at floor level: posts, a top rail and a middle one. */
     const railing = (pts: readonly V[]) => {
       const post = C("#5a4430")
       for (const [x, y, z] of pts) B.add("legno", boxAt([x - 0.05, y - 0.08, z - 0.05], [x + 0.05, y + RAIL_H + 0.04, z + 0.05]), post)
@@ -428,7 +428,7 @@ export const scenery: Scenery = {
         beam([a[0], a[1] + RAIL_H * 0.5, a[2]], [b[0], b[1] + RAIL_H * 0.5, b[2]], 0.06, 0.05, C("#76583c"))
       }
     }
-    // i corimans des passerelis: i stes de fisiche, un pâl ogni metri e mieç
+    // the boardwalk handrails: the same as the physics, a post every metre and a half
     for (const r of RAILS) {
       const len = Math.hypot(r.b[0] - r.a[0], r.b[1] - r.a[1])
       const n = Math.max(1, Math.round(len / 1.5))
@@ -438,7 +438,7 @@ export const scenery: Scenery = {
     for (const w of BOARDWALKS) {
       const alongX = w.maxX - w.minX > w.maxZ - w.minZ
       const len = alongX ? w.maxX - w.minX : w.maxZ - w.minZ
-      // lis breis (un fregul parsore la tiere dulà che si poin) e i trâfs disot
+      // the planks (slightly above the ground where they rest) and the beams underneath
       const y = BOARDWALK_Y + 0.03
       for (let a = 0; a < len; a += 0.35) {
         const g = alongX ? boxAt([w.minX + a, y - 0.06, w.minZ], [w.minX + a + 0.3, y, w.maxZ]) : boxAt([w.minX, y - 0.06, w.minZ + a], [w.maxX, y, w.minZ + a + 0.3])
@@ -452,21 +452,21 @@ export const scenery: Scenery = {
       }
     }
 
-    // --- il puintut a schene di mus ------------------------------------------------------------
+    // --- the little humpback bridge ------------------------------------------------------------
     {
       const P = PONT
       const yAt = (z: number) => (z < P.up ? LAND + ((P.deck - LAND) * (z - P.z0)) / (P.up - P.z0) : z > P.down ? P.deck - ((P.deck - LAND) * (z - P.down)) / (P.z1 - P.down) : P.deck)
       for (let z = P.z0 + 0.2; z < P.z1 - 0.1; z += 0.34) B.add("legno", boxAt([P.x0 - 0.05, yAt(z) - 0.02, z - 0.15], [P.x1 + 0.05, yAt(z) + 0.03, z + 0.15]), C("#ffffff").offsetHSL(0, 0, (R() - 0.5) * 0.12))
-      // il corimano: su la linie dal collider, che al seguìs la schene (pâi tai ponts di plee)
+      // the handrail: on the collider's line, following the hump (posts at the bend points)
       const zs = [P.z0 + 0.15, (P.z0 + P.up) / 2, P.up, P.up + (P.down - P.up) / 4, (P.up + P.down) / 2, P.down - (P.down - P.up) / 4, P.down, (P.down + P.z1) / 2, P.z1 - 0.15]
       for (const x of [P.x0 - 0.06, P.x1 + 0.06]) railing(zs.map((z): V => [x, yAt(z), z]))
-      // i pâi tal ploc sot dal plan
+      // the posts in the mud under the deck
       for (const z of [P.up + 0.3, (P.up + P.down) / 2, P.down - 0.3]) {
         for (const x of [P.x0 + 0.3, P.x1 - 0.3]) B.add("legno", cylBetween([x, -1.5, z], [x, P.under, z], 0.12, 0.12, 6), C("#5a4434"))
       }
     }
 
-    // --- arbui: i stes de fisiche (il tronc al colît), la frasche alte -------------------------
+    // --- trees: the same as the physics (the trunk collides), the foliage up high --------------
     for (const t of TREES) {
       const s = t.s
       const h = 3 * s
@@ -486,7 +486,7 @@ export const scenery: Scenery = {
 
     // --- foresterie ----------------------------------------------------------------------------
     const F = FORESTERIE
-    // cornîs ator di puartis e balcons, su dutis dôs lis musis dal mûr
+    // frames around doors and windows, on both faces of the wall
     for (const o of OPENINGS) {
       if (o.mat !== "intonacoBianco") continue
       const fr = 0.08
@@ -494,8 +494,8 @@ export const scenery: Scenery = {
       const [x0, y0, z0] = o.min
       const [x1, y1, z1] = o.max
       const col = C(o.door ? "#5a3a24" : "#4a6a4a")
-      // la cornîs e sta su lis musis dal mûr, no dentri te vierzidure (li e tremave cul intonac);
-      // il bancâl al sta un fregul parsore il mûr
+      // the frame sits on the wall faces, not inside the opening (there it z-fought with the plaster);
+      // the sill sits slightly proud of the wall
       if (o.alongX) {
         for (const [za, zb] of [[z0 - out, z0], [z1, z1 + out]] as const) {
           B.add("legno", boxAt([x0 - fr, y0, za], [x0, y1 + fr, zb]), col)
@@ -512,7 +512,7 @@ export const scenery: Scenery = {
         if (!o.door) B.add("pietraChiara", boxAt([x0 - out - 0.04, y0 - 0.06, z0 - fr], [x1 + out + 0.04, y0 + 0.04, z1 + fr]), C("#e8e0d0"))
       }
     }
-    // zocul di piere su la façade, interot dulà che a son lis puartis
+    // stone plinth along the façade, broken where the doors are
     {
       const doors = OPENINGS.filter((o) => o.door && o.alongX && o.min[2] >= F.maxZ - F.t - 0.01).map((o) => [o.min[0], o.max[0]] as const).sort((a, b) => a[0] - b[0])
       let at = F.minX - 0.06
@@ -521,28 +521,28 @@ export const scenery: Scenery = {
         at = d1
       }
     }
-    // la cornîs dal tet: dome ator dai mûrs, di fûr (sore il tet e taponave il bûs de scjale)
+    // the roof cornice: only around the walls, outside (on top of the roof it covered the stairwell)
     for (const [a, b] of [
       [[F.minX - 0.1, F.roof - 0.2, F.minZ - 0.1], [F.maxX + 0.1, F.roof, F.minZ]],
       [[F.minX - 0.1, F.roof - 0.2, F.maxZ], [F.maxX + 0.1, F.roof, F.maxZ + 0.1]],
       [[F.minX - 0.1, F.roof - 0.2, F.minZ], [F.minX, F.roof, F.maxZ]],
       [[F.maxX, F.roof - 0.2, F.minZ], [F.maxX + 0.1, F.roof, F.maxZ]]
     ] as [V, V][]) B.add("pietraChiara", boxAt(a, b), C("#ece6da"))
-    // pavimenti di dentri: cotto in salon, piastrelis in cusine, bagns e te sale de scjale
+    // indoor floors: terracotta in the lounge, tiles in the kitchen, bathrooms and stair hall
     B.add("porfido", boxAt([F.minX + F.t, 0, F.minZ + F.t], [2, 0.04, F.maxZ - F.t]), C("#c88a5a"))
     B.add("marmo", boxAt([2.4, 0, F.minZ + F.t], [F.maxX - F.t, 0.04, F.maxZ - F.t]), C("#d8dcd8"))
-    // insegne su la façade
+    // sign on the façade
     const plaque = sign(["Foresterie", "Riserve naturâl des Focis dal Stele"], 5, 1.1, "#f4ecd8", "#3a4a2a")
     plaque.position.set(-1, 3.0, F.maxZ + 0.06)
     root.add(plaque)
-    // la bandiere dal Friûl sul tet
+    // the Friûl flag on the roof
     B.add("ferro", cylBetween([-18, F.roof, -80], [-18, F.roof + 6, -80], 0.05), C("#c8c8c8"))
     const flag = sign(["🦅"], 1.8, 1.2, "#2a5aa8", "#e8c040", "serif")
     flag.position.set(-17.05, F.roof + 5.35, -80)
     ;(flag.material as THREE.MeshLambertMaterial).side = THREE.DoubleSide
     root.add(flag)
 
-    // salon: bancjis, fogolâr cu la nape, cuadris
+    // lounge: benches, fogolâr (hearth) with its hood, pictures
     for (const x of [-16.55, -14.45, -4.55, -2.45]) B.add("legno", boxAt([x - 0.2, 0, -79.8], [x + 0.2, 0.45, -74.2]), C("#9a6a40"))
     B.add("pietra", boxAt([-19.6, 1.2, -69.7], [-18.4, 3.6, -66.8]), C("#d8d0c4"))
     B.add("pietraChiara", boxAt([-19.6, 1.15, -69.8], [-18.3, 1.3, -66.7]), C("#a89a88"))
@@ -553,17 +553,17 @@ export const scenery: Scenery = {
     const map1 = sign(["Lagune di Maran", "Focis dal Stele · Val Cjanâl Gnûf"], 3, 1.6, "#e8dcc0", "#2a4a6a")
     map1.position.set(-8, 2.2, F.minZ + F.t + 0.04)
     root.add(map1)
-    // cusine: plan di açâl, fornei, pignatis
+    // kitchen: steel worktop, stoves, pots
     B.add("ferro", boxAt([3, 0.95, F.minZ + 0.4], [12.2, 1.0, -80.9]), C("#b8bcc0"))
     B.add("ferro", boxAt([6, 0.95, -77.4], [9.5, 1.0, -76.2]), C("#b8bcc0"))
     for (const [x, r] of [[4.2, 0.18], [5.2, 0.22], [10.5, 0.16]] as const) {
       B.add("ferro", cylBetween([x, 1.0, -81.2], [x, 1.0 + r * 1.4, -81.2], r, r, 12), C("#9a9ea4"))
     }
-    // bagns: cessos e lavandins
+    // bathrooms: toilets and sinks
     for (const x of [3.6, 5.6, 7.6, 9.6, 11.6]) B.add("marmo", boxAt([x - 0.2, 0, -72.9], [x + 0.2, 0.42, -72.3]), C("#f4f4f0"))
     for (const x of [4, 6, 8]) B.add("marmo", boxAt([x - 0.3, 0.8, F.maxZ - 0.75], [x + 0.3, 0.9, F.maxZ - 0.4]), C("#f4f4f0"))
     for (const x of [7.4, 11.4]) B.add("marmo", boxAt([x - 0.2, F.f1, F.maxZ - 1.4], [x + 0.2, F.f1 + 0.42, F.maxZ - 0.8]), C("#f4f4f0"))
-    // cameradis: jets a cjast (il jet disot al è tai dâts; culì materas, cussins, il jet disore)
+    // dormitories: bunk beds (the lower bunk is in the data; here mattresses, pillows, the upper bunk)
     for (const [x0, x1] of [[-19.6, -6], [-5.6, 6]] as const) {
       for (let x = x0 + 0.4; x + 0.9 <= x1 - 0.3; x += 1.9) {
         const doorX = x0 < -6 ? [-14, -12.5] : [-1, 0.5]
@@ -579,7 +579,7 @@ export const scenery: Scenery = {
         }
       }
     }
-    // scjalis: scjalins sui plans inclinâts e il corimano
+    // stairs: steps on the ramps and the handrail
     for (const st of [STAIRS.first, STAIRS.second]) {
       const up = st === STAIRS.second
       for (let k = 0; k < 20; k++) {
@@ -588,7 +588,7 @@ export const scenery: Scenery = {
         B.add("legno", boxAt([st.x0, y, z - 0.04], [st.x1, y + 0.03, z + 0.04]), C("#5a3a20"))
       }
     }
-    // lûs di dentri
+    // indoor lights
     for (const [x, y, z] of [[-9, 3.3, -73], [7, 3.3, -77], [7, 3.3, -68], [-12, 7.2, -71], [0, 7.2, -71], [9.5, 7.2, -71], [16, 7.2, -79], [16, 3.3, -79]] as const) {
       const l = new THREE.PointLight("#ffe0b0", 9, 10, 1.4)
       l.position.set(x, y, z)
@@ -597,7 +597,7 @@ export const scenery: Scenery = {
       B.add("luce", sphere([x, y + 0.15, z], 0.14, 0.6, 8), new THREE.Color(2.4, 2.1, 1.6))
     }
 
-    // --- tiere a nord: bancjis e la tabele ----------------------------------------------------
+    // --- land to the north: benches and the notice board --------------------------------------
     for (const [x, z] of [[-8, -58], [8, -58]] as const) {
       B.add("legno", boxAt([x - 1, LAND + 0.42, z - 0.25], [x + 1, LAND + 0.48, z + 0.25]), C("#8a6040"))
       for (const dx of [-0.8, 0.8]) B.add("ferro", boxAt([x + dx - 0.05, LAND, z - 0.2], [x + dx + 0.05, LAND + 0.42, z + 0.2]), C("#3a3a3a"))
@@ -608,19 +608,19 @@ export const scenery: Scenery = {
     B.add("legno", cylBetween([-5.5, LAND, -48], [-5.5, LAND + 2.3, -48], 0.06), C("#5a3a24"))
     B.add("legno", cylBetween([-3.5, LAND, -48], [-3.5, LAND + 2.3, -48], 0.06), C("#5a3a24"))
 
-    // --- il casot di osservazion -----------------------------------------------------------
+    // --- the casot (observation hut) -------------------------------------------------------
     const K = CASOT
-    // il tet: pae parsore lis breis, e la insegne su la puarte
+    // the roof: thatch over the planks, and the sign over the door
     B.add("fen", boxAt([K.minX - 0.5, K.top + 0.3, K.minZ - 0.5], [K.maxX + 0.5, K.top + 0.55, K.maxZ + 0.5]), C("#a89060"))
     const casotSign = sign(["Casot di osservazion", "No sta disturbâ i fenicotars"], 2.6, 0.8, "#e8dcc0", "#3a2a1a")
     casotSign.position.set(K.minX - 0.02, 2.7, 27)
     casotSign.rotation.y = -Math.PI / 2
     root.add(casotSign)
-    // paviment di breis e il scjalin
+    // plank floor and the scjalin
     B.add("legno", boxAt([K.minX + K.t, LAND, K.minZ + K.t], [K.maxX - K.t, LAND + 0.04, K.maxZ - K.t]), C("#a07a50"))
     B.add("legno", boxAt([SCJALIN.minX - 0.04, SCJALIN.top - 0.04, SCJALIN.minZ], [SCJALIN.minX + 0.06, SCJALIN.top + 0.01, SCJALIN.maxZ]), C("#6a4a2a"))
 
-    // la pignate de bire, cul mescul e la sbrume
+    // the pignate of beer, with the mescul and the foam
     {
       const cx = (PIGNATE.minX + PIGNATE.maxX) / 2
       const cz = (PIGNATE.minZ + PIGNATE.maxZ) / 2
@@ -639,7 +639,7 @@ export const scenery: Scenery = {
         B.add("stoffa", sphere([cx + Math.cos(a) * r, PIGNATE.top - 0.08, cz + Math.sin(a) * r], 0.08 + R() * 0.06, 0.35, 8), C("#fff8e8"))
       }
       B.add("legno", cylBetween([cx + 0.1, PIGNATE.top - 0.3, cz], [cx + 0.45, PIGNATE.top + 0.5, cz - 0.2], 0.025), C("#b08a5a"))
-      // tacis sparniçadis
+      // scattered glasses
       for (const [x, z, tip] of [[48.9, 28.4, 0], [47.1, 30.4, 1], [49.3, 30.6, 0]] as const) {
         const g = new THREE.CylinderGeometry(0.05, 0.04, 0.14, 10)
         if (tip) g.rotateZ(Math.PI / 2)
@@ -648,12 +648,12 @@ export const scenery: Scenery = {
       }
     }
 
-    // il cjoc, cul cjâf sul scjalin
+    // the drunk, with his head on the scjalin
     const drunk = sleeper()
     drunk.g.position.set(SCJALIN.minX - 1.85, LAND + 0.04, 24.4)
     root.add(drunk.g)
 
-    // il paviment de discoteche: piastrelis che a cambin colôr a timp
+    // the disco floor: tiles that change colour to the beat
     const tiles: THREE.MeshBasicMaterial[] = []
     const floor = { x0: 41.5, z0: 24.5, n: 4, m: 4, s: 1.25 }
     for (let i = 0; i < floor.n; i++) {
@@ -667,14 +667,14 @@ export const scenery: Scenery = {
     }
     const PALETTE = ["#ff2a8a", "#2ae8ff", "#ffe02a", "#8a2aff", "#2aff6a", "#ff7a2a"].map((c) => new THREE.Color(c))
 
-    // la bale di spieli, cu la cjadene
+    // the mirror ball, with its chain
     const [bx, by, bz] = DISCO
     B.add("ferro", cylBetween([bx, by + 0.35, bz], [bx, K.top, bz], 0.01), C("#c0c0c0"))
     const ballMat = new THREE.MeshStandardMaterial({ color: "#e8e8f0", metalness: 1, roughness: 0.3, flatShading: true, envMap: (kit.MATS.ferro as THREE.MeshStandardMaterial).envMap ?? null, emissive: "#202030" })
     const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.35, 2), ballMat)
     ball.position.set(bx, by, bz)
     root.add(ball)
-    // i spots di lûs su mûrs e sofit: ognidun al cor lunc il so cercli
+    // the light spots on walls and ceiling: each runs along its own circle
     const spotMat = new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })
     const inner = { x0: K.minX + K.t + 0.02, x1: K.maxX - K.t - 0.02, y0: LAND + 0.1, y1: K.top - 0.02, z0: K.minZ + K.t + 0.02, z1: K.maxZ - K.t - 0.02 }
     const spots = Array.from({ length: 46 }, (_, i) => {
@@ -692,7 +692,7 @@ export const scenery: Scenery = {
       return { l, i }
     })
 
-    // i fenicotars che a balin
+    // the dancing flamingos
     const dancers = [[42.6, 25.6], [45.2, 25.2], [42.8, 28.6], [45.6, 28.8], [44, 30.6]].map(([x, z], i) => {
       const f = flamingo()
       f.g.position.set(x, LAND + 0.08, z)
@@ -700,7 +700,7 @@ export const scenery: Scenery = {
       root.add(f.g)
       return { ...f, i, base: f.g.rotation.y }
     })
-    // e chei fûr, te aghe, che no balin
+    // and the ones outside, in the water, that don't dance
     const waders = [[-20, -30], [-24, -25], [-18, -22], [20, 4], [24, 8], [-50, 36], [-46, 40], [52, 52], [56, 54], [60, -30], [-30, 52]].map(([x, z], i) => {
       const f = flamingo()
       f.g.position.set(x, SEA, z)
@@ -711,11 +711,11 @@ export const scenery: Scenery = {
       return { ...f, i }
     })
 
-    // --- di gnot: ferâi lunc i trois e lis passerelis, lis lusignis tal bosc ------------------
-    /** Un ferâl su pâl: la lûs vere dome dulà che e covente, i altris a lusin e vonde. */
+    // --- at night: lanterns along the paths and boardwalks, fireflies in the wood -------------
+    /** A lantern on a pole: a real light only where needed, the others just glow. */
     const lantern = (x: number, z: number, y0: number, real: boolean) => {
       const top = y0 + 2.1
-      // il pâl al rive fin tal font (chei des passerelis a stan te aghe)
+      // the pole reaches down to the bottom (the boardwalk ones stand in the water)
       B.add("legno", cylBetween([x, SEA - 0.1, z], [x, top, z], 0.06, 0.05, 6), C("#4a3a2a"))
       B.add("legno", cylBetween([x, top - 0.05, z], [x + 0.35, top - 0.05, z], 0.03, 0.03, 4), C("#4a3a2a"))
       B.add("ferro", boxAt([x + 0.22, top - 0.42, z - 0.13], [x + 0.48, top - 0.36, z + 0.13]), C("#2a2a2a"))
@@ -728,7 +728,7 @@ export const scenery: Scenery = {
       quality.lights.push(l)
     }
     for (const l of LANTERNS) lantern(l.x, l.z, l.y, l.real)
-    // lis lusignis: pons che a svolin plan tal bosc e tes cjanis, e si piain e distudin
+    // the fireflies: points drifting slowly in the wood and the reeds, switching on and off
     const flies = 140
     const flyBase = new Float32Array(flies * 3)
     const flyPos = new Float32Array(flies * 3)
@@ -741,7 +741,7 @@ export const scenery: Scenery = {
     const flyGeo = new THREE.BufferGeometry()
     flyGeo.setAttribute("position", new THREE.BufferAttribute(flyPos, 3))
     const flyMat = new THREE.PointsMaterial({ color: new THREE.Color(2.2, 2.6, 0.8), size: 0.09, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })
-    // une lusigne tal voli e deventave un lamp grant mieç schermi: dongje de cjamare no si viôt
+    // a firefly in the eye became a flash covering half the screen: hidden near the camera
     flyMat.onBeforeCompile = (sh) => {
       sh.vertexShader = sh.vertexShader.replace("#include <fog_vertex>", "#include <fog_vertex>\n\tif (-mvPosition.z < 1.5) gl_PointSize = 0.0;")
     }
@@ -753,7 +753,7 @@ export const scenery: Scenery = {
       update(t) {
         for (let i = 0; i < flies; i++) {
           const k = i * 3
-          // chê che e je distudade e va sot tiere
+          // an unlit one goes underground
           const on = Math.sin(t * (0.7 + (i % 7) * 0.13) + i * 2.3) > -0.2 ? 0 : -50
           flyPos[k] = flyBase[k] + Math.sin(t * 0.31 + i) * 1.4
           flyPos[k + 1] = flyBase[k + 1] + Math.sin(t * 0.53 + i * 1.7) * 0.4 + on
@@ -763,7 +763,7 @@ export const scenery: Scenery = {
         const beat = (t * BPM) / 60
         const kick = Math.max(0, 1 - (beat % 1) * 3)
         const bar = Math.floor(beat)
-        // paviment: ogni bot une gnove combinazion
+        // floor: a new pattern on every beat
         tiles.forEach((m, i) => {
           const on = (i * 7 + bar * 3) % 5 < 3
           m.color.copy(PALETTE[(i + bar) % PALETTE.length]).multiplyScalar(on ? 0.6 + kick * 0.8 : 0.08)
@@ -772,7 +772,7 @@ export const scenery: Scenery = {
         for (const s of spots) {
           const az = s.az + t * 0.6
           ray.set(Math.cos(s.el) * Math.cos(az), Math.sin(s.el), Math.cos(s.el) * Math.sin(az))
-          // il prin mûr che al tocje il rai de bale
+          // the first wall hit by the ball's ray
           let k = Infinity
           for (const [d, lo, hi, o] of [[ray.x, inner.x0, inner.x1, bx], [ray.y, inner.y0, inner.y1, by], [ray.z, inner.z0, inner.z1, bz]] as const) {
             if (Math.abs(d) < 1e-5) continue
@@ -797,7 +797,7 @@ export const scenery: Scenery = {
           const flap = 0.2 + Math.max(0, Math.sin(ph * 0.5)) * 0.9
           d.wings[0].rotation.z = flap
           d.wings[1].rotation.z = -flap
-          // une gjambe sù e jù: a bots alternâts
+          // one leg up and down: on alternate beats
           const lift = Math.max(0, Math.sin(ph * 0.5 + (d.i % 2) * Math.PI))
           d.legs[0].hip.rotation.x = 0.9 * lift
           d.legs[0].knee.rotation.x = -2 * lift
@@ -817,7 +817,7 @@ export const scenery: Scenery = {
 
   backdrop({ map }) {
     const { minX, maxX, minZ, maxZ } = map.bounds
-    // Dut ator la lagune (sot de aghe), a nord la planure e lis Alps tal fonts.
+    // The lagoon all around (under the water), to the north the plain and the Alps in the background.
     const height = (x: number, z: number) => {
       const dx = Math.max(minX - x, x - maxX, 0)
       const dz = Math.max(minZ - z, z - maxZ, 0)
@@ -829,13 +829,13 @@ export const scenery: Scenery = {
       return Math.max(lagoon, plain - 0.2) + alps
     }
     const terrain = makeHeightfield(height, map.bounds, 707)
-    // il mâr di fûr al à il bûs de mape: dentri e je za la aghe (dôs a 2 cm a tremavin)
+    // the outer sea has a hole for the map: the water is already there (two 2 cm apart z-fought)
     const ring = new THREE.Shape([new THREE.Vector2(-1300, -1300), new THREE.Vector2(1300, -1300), new THREE.Vector2(1300, 1300), new THREE.Vector2(-1300, 1300)])
     ring.holes.push(new THREE.Path([new THREE.Vector2(minX, -minZ), new THREE.Vector2(minX, -maxZ), new THREE.Vector2(maxX, -maxZ), new THREE.Vector2(maxX, -minZ)]))
     const sea = new THREE.Mesh(new THREE.ShapeGeometry(ring).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: "#4a8088", roughness: 0.22, metalness: 0.25, transparent: true, opacity: 0.9 }))
     sea.position.y = WATER
     sea.receiveShadow = true
-    // Maran a nord-ovest: lis cjasis e la tor milenarie
+    // Maran to the north-west: the houses and the thousand-year-old tower
     const town = new THREE.Group()
     const r = (() => {
       let a = 11
@@ -854,7 +854,7 @@ export const scenery: Scenery = {
       roof.position.set(x, h + 1.5, z)
       town.add(house, roof)
     }
-    // lis cjasis di Maran di gnot: cualchi barcon impiât
+    // Maran's houses at night: a few lit windows
     const lit: number[] = []
     for (let i = 0; i < 90; i++) lit.push(-320 + r() * 360, 2 + r() * 9, -326 + r() * 2 - (r() < 0.5 ? 0 : 20))
     const windows = new THREE.Points(new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(lit, 3)), new THREE.PointsMaterial({ color: new THREE.Color(2.4, 1.6, 0.7), size: 1.6, sizeAttenuation: true, toneMapped: false, fog: false }))
@@ -887,7 +887,7 @@ export const scenery: Scenery = {
       [0, 6, -72]
     ]
   },
-  // di gnot: la lune alte a sud-est, une fumate sutile e blu
+  // at night: the moon high in the south-east, a thin blue haze
   light: { sun: [0.45, 0.5, 0.75], fog: 0.002, sky: "gnot" }
 }
 

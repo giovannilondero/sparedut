@@ -1,5 +1,5 @@
 /**
- * Il server di gioco, indipendente dal trasporto: sessioni, stanze, il loop a tick fissi.
+ * The game server, transport-agnostic: sessions, rooms, the fixed-tick loop.
  */
 import { ClientMessage, PROTOCOL_VERSION, type ServerMessage } from "../shared/protocol.ts"
 import { TICK_RATE } from "../shared/movement.ts"
@@ -17,17 +17,17 @@ export interface Peer {
 const STEP_MS = 1000 / TICK_RATE
 let sessionCounter = 0
 
-/** Il messaggio più lungo del client (un `create`) sta ben sotto: oltre è spazzatura o un attacco. */
+/** The client's longest message (a `create`) fits well below this: anything longer is garbage or an attack. */
 const MESSAGE_MAX = 2048
-/** Messaggi al secondo per connessione: l'input a 60 Hz e il ping, con margine. */
+/** Messages per second per connection: 60 Hz input plus ping, with headroom. */
 const MESSAGES = { perSecond: 90, burst: 180 }
-/** I comandi (creare, entrare, chat, squadra, bot…): a un umano ne bastano pochi; a chi prova i codici no. */
+/** Commands (create, join, chat, team, bots…): a human needs few; someone guessing codes needs many. */
 const COMMANDS = { perSecond: 2, burst: 8 }
-/** Ogni stanza ha il suo mondo fisico e fino a 14 bot: un tetto, in tutto e per rete. */
+/** Each room has its own physics world and up to 14 bots: a cap, overall and per network. */
 const MAX_ROOMS = 40
 const MAX_ROOMS_PER_NETWORK = 6
 
-/** Un secchio di gettoni: si riempie a `perSecond`, fino a `burst`. */
+/** A token bucket: refills at `perSecond`, up to `burst`. */
 class Bucket {
   private tokens: number
   private last = performance.now()
@@ -48,13 +48,13 @@ export class Hub {
   readonly rooms = new Map<string, Room>()
   private readonly peers = new Set<Peer>()
   private readonly limits = new Map<Peer, { messages: Bucket; commands: Bucket }>()
-  /** Indirizzo pubblico per i link d'invito: da PUBLIC_URL o dal primo client arrivato da fuori. */
+  /** Public address for invite links: from PUBLIC_URL or from the first client that came from outside. */
   private publicUrl: string | null = null
 
   setPublicUrl(url: string) {
     if (url === this.publicUrl) return
     this.publicUrl = url
-    console.log(`🌍 Indirizzo pubblico: ${url}`)
+    console.log(`🌍 Public address: ${url}`)
     for (const peer of this.peers) this.send(peer, { t: "public", url })
   }
   private last = performance.now()
@@ -71,7 +71,7 @@ export class Hub {
   }
 
   message(peer: Peer, raw: string) {
-    // Chi esagera perde i messaggi in più, prima di spendere CPU a leggerli.
+    // Whoever overdoes it loses the extra messages, before we spend CPU reading them.
     const limits = this.limits.get(peer)
     if (!limits || raw.length > MESSAGE_MAX || !limits.messages.take()) return
     let parsed: ReturnType<typeof ClientMessage.safeParse>
@@ -114,7 +114,7 @@ export class Hub {
         this.enter(peer, created, msg.primary)
         created.fillBots(msg.bots)
         this.roomChanged(created)
-        console.log(`🏰 Stanza ${code} (${msg.mode} a ${msg.map}, ${msg.visibility}) di ${peer.name}`)
+        console.log(`🏰 Room ${code} (${msg.mode} on ${msg.map}, ${msg.visibility}) by ${peer.name}`)
         return
       }
       case "join": {
@@ -193,7 +193,7 @@ export class Hub {
     room.removeMember(peer.id!)
     if (room.humans.length === 0) {
       this.rooms.delete(room.code)
-      console.log(`🕯️  Stanza ${room.code} chiusa`)
+      console.log(`🕯️  Room ${room.code} closed`)
     } else this.roomChanged(room)
   }
 
@@ -205,12 +205,12 @@ export class Hub {
     return [...this.rooms.values()].filter((r) => r.settings.visibility === "lan" && r.networkKey === peer.network.key).map((r) => r.summary())
   }
 
-  /** Nessuno connesso e nessuna stanza: il loop si può fermare (su Cloudflare l'oggetto va a dormire). */
+  /** Nobody connected and no rooms: the loop can stop (on Cloudflare the object goes to sleep). */
   get idle() {
     return this.peers.size === 0 && this.rooms.size === 0
   }
 
-  /** Da chiamare spesso: avanza le stanze di quanti tick sono maturati. */
+  /** Call often: advances the rooms by as many ticks as have elapsed. */
   update() {
     const now = performance.now()
     this.acc += Math.min(250, now - this.last)
@@ -223,7 +223,7 @@ export class Hub {
         try {
           room.step()
         } catch (error) {
-          console.error(`Stanza ${room.code}:`, error)
+          console.error(`Room ${room.code}:`, error)
         }
       }
     }

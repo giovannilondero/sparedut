@@ -1,4 +1,4 @@
-/** Un tick della simulazione, nell'ordine in cui le cose succedono. */
+/** One simulation tick, in the order things happen. */
 import { ApplyDamage } from "./systems/damage.ts"
 import { BreakDoors } from "./systems/doors.ts"
 import { ApplyInputs } from "./systems/input.ts"

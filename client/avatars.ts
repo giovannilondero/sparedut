@@ -1,7 +1,7 @@
 /**
- * Gli altri giocatori: benandanti contadini e malandanti stregoni, low-poly.
- * Ogni parte mobile è una geometria cotta a colori per vertice, condivisa per squadra:
- * un avatar costa ~14 draw call e un solo materiale suo (per la dissolvenza).
+ * The other players: peasant benandanti and sorcerer malandanti, low-poly.
+ * Each moving part is a geometry baked with vertex colours, shared per team:
+ * an avatar costs ~14 draw calls and a single material of its own (for fading).
  */
 import * as THREE from "three"
 import type { Avatar, AvatarPose } from "./contracts.ts"
@@ -26,7 +26,7 @@ const box = (w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d)
 const cyl = (rt: number, rb: number, h: number, s = 7) => new THREE.CylinderGeometry(rt, rb, h, s)
 const ball = (r: number, w = 7, h = 5) => new THREE.SphereGeometry(r, w, h)
 
-/** Le parti di una squadra, costruite una volta sola. */
+/** A team's parts, built only once. */
 function teamParts(team: Team): TeamParts {
   const ben = team === "benandanti"
   const col = new THREE.Color(TEAM_INFO[team].color)
@@ -38,7 +38,7 @@ function teamParts(team: Team): TeamParts {
 
   const pelvis = new Baker().add(box(0.34, 0.16, 0.2), trousers, 0, 0.02, 0).add(box(0.36, 0.05, 0.22), ben ? 0x4a3420 : 0x5a1a26, 0, 0.1, 0)
 
-  // coscia e stinco: perno in alto, la geometria scende lungo -y
+  // thigh and shin: pivot at the top, the geometry hangs down along -y
   const thigh = new Baker().add(cyl(0.085, 0.07, THIGH), trousers, 0, -THIGH / 2, 0)
   if (!ben) thigh.add(cyl(0.11, 0.1, 0.2, 7), main, 0, -0.08, 0)
   const shin = new Baker()
@@ -46,18 +46,18 @@ function teamParts(team: Team): TeamParts {
     .add(box(0.11, 0.07, 0.24), ben ? 0x4a3020 : 0x2a1a12, 0, -SHIN - 0.02, -0.05)
   if (ben) shin.add(cyl(0.075, 0.075, 0.04), trousers, 0, -0.04, 0)
 
-  // busto: perno nel bacino
+  // torso: pivot in the pelvis
   const torso = new Baker()
   if (ben) {
     torso
       .add(cyl(0.2, 0.17, 0.52, 8), shirt, 0, 0.27, 0)
-      .add(box(0.36, 0.4, 0.22), main, 0, 0.24, 0.02) // gilè verde
-      .add(box(0.08, 0.38, 0.02), shirt, 0, 0.26, -0.105) // apertura del gilè sulla camicia
-      .add(box(0.4, 0.06, 0.24), 0x4a3420, 0, 0.04, 0) // cintura
+      .add(box(0.36, 0.4, 0.22), main, 0, 0.24, 0.02) // green waistcoat
+      .add(box(0.08, 0.38, 0.02), shirt, 0, 0.26, -0.105) // waistcoat opening over the shirt
+      .add(box(0.4, 0.06, 0.24), 0x4a3420, 0, 0.04, 0) // belt
       .add(box(0.05, 0.05, 0.02), 0xc9a043, 0, 0.04, -0.125)
-      .add(box(0.44, 0.48, 0.03), col, 0, 0.2, 0.15, -0.1) // mantellina
+      .add(box(0.44, 0.48, 0.03), col, 0, 0.2, 0.15, -0.1) // short cape
       .add(cyl(0.16, 0.2, 0.06, 8), col, 0, 0.5, 0.02)
-    // fascio di fusti di finocchio sulla schiena, con le ombrelle gialle
+    // bundle of fennel stalks on the back, with yellow umbels
     for (let i = 0; i < 7; i++) {
       const x = (r() - 0.5) * 0.14
       const z = 0.2 + (r() - 0.5) * 0.04
@@ -66,40 +66,40 @@ function teamParts(team: Team): TeamParts {
       torso.add(new THREE.ConeGeometry(0.06, 0.05, 6), 0xe8d24a, x - tilt * 0.47, 0.8, z + 0.02, Math.PI)
     }
     torso.add(cyl(0.06, 0.06, 0.04, 8), 0xb59a6a, 0, 0.3, 0.2)
-    torso.add(box(0.03, 0.62, 0.02), 0x6b4a2a, -0.06, 0.28, -0.11, 0, 0, 0.55) // cinghia
+    torso.add(box(0.03, 0.62, 0.02), 0x6b4a2a, -0.06, 0.28, -0.11, 0, 0, 0.55) // strap
   } else {
     torso
       .add(cyl(0.2, 0.19, 0.52, 8), shirt, 0, 0.27, 0)
-      .add(cyl(0.22, 0.3, 0.6, 8), main, 0, 0.22, 0.015) // mantello
-      .add(cyl(0.3, 0.33, 0.28, 8), main.clone().multiplyScalar(0.8), 0, -0.18, 0.02) // gonna del mantello
-      .add(box(0.06, 0.5, 0.02), col, 0, 0.24, -0.215) // orlo cremisi
+      .add(cyl(0.22, 0.3, 0.6, 8), main, 0, 0.22, 0.015) // cloak
+      .add(cyl(0.3, 0.33, 0.28, 8), main.clone().multiplyScalar(0.8), 0, -0.18, 0.02) // cloak skirt
+      .add(box(0.06, 0.5, 0.02), col, 0, 0.24, -0.215) // crimson hem
       .add(cyl(0.21, 0.23, 0.05, 8), col, 0, 0.05, 0)
       .add(ball(0.03), 0xc9a043, 0, 0.5, -0.19)
-    // scopa di saggina sulla schiena
+    // broomcorn broom on the back
     torso.add(cyl(0.016, 0.016, 1.15, 5), 0x7a5a32, 0, 0.3, 0.25, 0.08, 0, 0.5)
     torso.add(new THREE.ConeGeometry(0.11, 0.38, 7), 0xd8b45a, -0.27, -0.14, 0.27, Math.PI + 0.08, 0, 0.5)
     torso.add(cyl(0.035, 0.035, 0.04, 7), 0x8a2a2a, -0.18, 0.02, 0.265, 0.08, 0, 0.5)
   }
 
-  // testa: perno al collo
+  // head: pivot at the neck
   const head = new Baker()
     .add(cyl(0.06, 0.07, 0.08, 6), SKIN, 0, 0.02, 0)
     .add(box(0.24, 0.27, 0.25), SKIN, 0, 0.14, 0)
-    .add(box(0.04, 0.06, 0.05), 0xc98d6a, 0, 0.12, -0.14) // naso
+    .add(box(0.04, 0.06, 0.05), 0xc98d6a, 0, 0.12, -0.14) // nose
     .add(box(0.04, 0.03, 0.01), 0x1a1410, -0.06, 0.17, -0.126)
     .add(box(0.04, 0.03, 0.01), 0x1a1410, 0.06, 0.17, -0.126)
   if (ben) {
     head
-      .add(box(0.2, 0.04, 0.01), 0x6b4a2a, 0, 0.06, -0.126) // baffi
-      .add(cyl(0.25, 0.25, 0.03, 10), 0x5a4030, 0, 0.29, 0) // tesa del cappello di feltro
+      .add(box(0.2, 0.04, 0.01), 0x6b4a2a, 0, 0.06, -0.126) // moustache
+      .add(cyl(0.25, 0.25, 0.03, 10), 0x5a4030, 0, 0.29, 0) // felt hat brim
       .add(cyl(0.14, 0.16, 0.14, 8), 0x5a4030, 0, 0.36, 0)
       .add(cyl(0.162, 0.162, 0.03, 8), col.clone().multiplyScalar(0.6), 0, 0.31, 0)
-      .add(box(0.02, 0.1, 0.02), 0xe8d24a, 0.12, 0.38, 0.04, 0, 0, -0.4) // rametto di finocchio
+      .add(box(0.02, 0.1, 0.02), 0xe8d24a, 0.12, 0.38, 0.04, 0, 0, -0.4) // fennel sprig
   } else {
     head
-      .add(cyl(0.18, 0.2, 0.32, 8), main, 0, 0.15, 0.04) // cappuccio
+      .add(cyl(0.18, 0.2, 0.32, 8), main, 0, 0.15, 0.04) // hood
       .add(box(0.2, 0.22, 0.02), SKIN, 0, 0.13, -0.13)
-      .add(box(0.05, 0.03, 0.01), 0xffd060, -0.06, 0.17, -0.142) // occhi luminosi
+      .add(box(0.05, 0.03, 0.01), 0xffd060, -0.06, 0.17, -0.142) // glowing eyes
       .add(box(0.05, 0.03, 0.01), 0xffd060, 0.06, 0.17, -0.142)
       .add(cyl(0.3, 0.3, 0.025, 10), 0x1a0c10, 0, 0.32, 0)
       .add(new THREE.ConeGeometry(0.16, 0.36, 8), 0x1a0c10, 0, 0.5, 0.02, -0.12)
@@ -107,7 +107,7 @@ function teamParts(team: Team): TeamParts {
       .add(cyl(0.165, 0.165, 0.035, 8), col, 0, 0.35, 0)
   }
 
-  // braccio unitario lungo -z (si scala sulla distanza spalla→mano)
+  // unit-length arm along -z (scaled to the shoulder→hand distance)
   const arm = new Baker()
     .add(cyl(0.07, 0.055, 1, 6), ben ? shirt : main, 0, 0, -0.5, Math.PI / 2)
     .add(cyl(0.075, 0.075, 0.12, 6), ben ? main : col, 0, 0, -0.06, Math.PI / 2)
@@ -131,7 +131,7 @@ const partsOf = (team: Team) => {
   return p
 }
 
-// --- pezzi condivisi fra tutte le squadre -----------------------------------------------
+// --- pieces shared across all teams -----------------------------------------------------
 let shared: { cheeks: THREE.BufferGeometry; frico: THREE.BufferGeometry; aura: THREE.BufferGeometry; auraMat: THREE.MeshBasicMaterial; flashTex: THREE.Texture } | null = null
 
 function sharedParts() {
@@ -141,7 +141,7 @@ function sharedParts() {
     .add(box(0.05, 0.035, 0.01), 0xff6a7a, 0.085, 0.1, -0.128)
     .add(box(0.04, 0.03, 0.01), 0xd8505a, 0, 0.115, -0.168)
     .build()
-  // la forma di frico rubata, legata sulla schiena con due cinghie
+  // the stolen frico wheel, strapped to the back with two straps
   const fb = new Baker()
     .add(cyl(0.32, 0.32, 0.08, 14), 0xf0b850, 0, 0, 0, Math.PI / 2)
     .add(new THREE.TorusGeometry(0.31, 0.03, 5, 14), 0xc98a2e, 0, 0, 0)
@@ -180,7 +180,7 @@ function sharedParts() {
   return shared
 }
 
-/** Come si tiene ogni arma in terza persona (spazio "aim", davanti al petto). */
+/** How each weapon is held in third person ("aim" space, in front of the chest). */
 const GRIP: Record<WeaponId, { p: [number, number, number]; r: [number, number, number] }> = {
   mescul: { p: [0.16, -0.12, -0.28], r: [0.9, 0.15, 0.2] },
   mandi: { p: [0.14, -0.02, -0.42], r: [0, 0, 0] },
@@ -222,7 +222,7 @@ export function createAvatar(team: Team, name: string): Avatar {
   let p = partsOf(team)
 
   const object = new THREE.Group()
-  const body = new THREE.Group() // perno ai piedi: caduta e barcollamento
+  const body = new THREE.Group() // pivot at the feet: falling and staggering
   object.add(body)
   const mesh = (geo: THREE.BufferGeometry, parent: THREE.Object3D, m: THREE.Material = mat) => {
     const x = new THREE.Mesh(geo, m)
@@ -305,7 +305,7 @@ export function createAvatar(team: Team, name: string): Avatar {
     curWeapon = id
     const b = bakedWeapon(id)
     weapon.geometry = b.geometry
-    // alla torretta l'arma è quella della torretta, disegnata dal mondo
+    // at the turret the weapon is the turret's own, drawn by the world
     weapon.visible = id !== "mitraie"
     muzzleFlash.position.copy(b.muzzle)
     muzzleFlash.scale.setScalar(id === "lanciafrico" ? 0.6 : id === "doplete" ? 0.5 : 0.35)
@@ -326,7 +326,7 @@ export function createAvatar(team: Team, name: string): Avatar {
     mat.opacity = o
   }
 
-  /** Orienta un braccio dalla spalla al punto `to` (spazio busto). */
+  /** Points an arm from the shoulder to the point `to` (torso space). */
   function reach(a: THREE.Mesh, h: THREE.Mesh, to: THREE.Vector3) {
     tmpW.copy(to).sub(a.position)
     const d = tmpW.length()
@@ -344,7 +344,7 @@ export function createAvatar(team: Team, name: string): Avatar {
       if (pose.weapon !== curWeapon) setWeapon(pose.weapon)
       object.position.set(pose.x, pose.y, pose.z)
 
-      // morte: si ribalta, poi sprofonda e svanisce
+      // death: topples over, then sinks and fades
       if (!pose.alive) {
         if (deadT < 0) {
           deadT = 0
@@ -374,14 +374,14 @@ export function createAvatar(team: Team, name: string): Avatar {
         setFade(1)
       }
 
-      // corpo verso lo sguardo, con la via più breve
+      // body turns towards the view, the shortest way round
       let dy = pose.yaw - yaw
       dy = Math.atan2(Math.sin(dy), Math.cos(dy))
       yaw += dy * (1 - Math.exp(-14 * dt))
       object.rotation.y = yaw
       pitch = damp(pitch, clamp(pose.pitch, -1.3, 1.3), 18, dt)
 
-      // camminata dalla velocità orizzontale, scomposta in avanti e di lato
+      // walk from horizontal velocity, split into forward and sideways
       const speed = Math.hypot(pose.vx, pose.vz)
       const sy = Math.sin(yaw)
       const cy = Math.cos(yaw)
@@ -414,7 +414,7 @@ export function createAvatar(team: Team, name: string): Avatar {
       neck.rotation.x = pitch * 0.55 - spine.rotation.x * 0.5
       neck.rotation.y = -spine.rotation.y
 
-      // arma e braccia seguono il beccheggio; rinculo sul lampo
+      // weapon and arms follow the pitch; recoil on the flash
       rec = damp(rec, 0, 14, dt)
       flashT += dt
       const low = (1 - ready) * 0.45
@@ -435,7 +435,7 @@ export function createAvatar(team: Team, name: string): Avatar {
       }
       reach(arms[1].a, arms[1].h, tmpV)
 
-      // sgnape: barcolla e arrossisce
+      // sgnape: staggers and blushes
       cheeks.visible = pose.sgnape
       body.rotation.z = pose.sgnape ? Math.sin(t * 2.3) * 0.07 : damp(body.rotation.z, 0, 6, dt)
       body.rotation.x = pose.sgnape ? Math.sin(t * 1.7) * 0.04 : damp(body.rotation.x, 0, 6, dt)

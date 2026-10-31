@@ -1,6 +1,6 @@
 /**
- * Il medico: chi ha la Cassele dal Miedi come arma principale cura piano sé stesso
- * e i compagni vicini. Manda solo cure: le applica `ApplyDamage`.
+ * The medic: whoever has the Cassele dal Miedi as primary weapon slowly heals themselves
+ * and nearby teammates. It only sends heals: `ApplyDamage` applies them.
  */
 import { MEDIC_AURA } from "../../weapons.ts"
 import { allied } from "../rules.ts"

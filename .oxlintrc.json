@@ -22,7 +22,7 @@
     {
       "files": ["shared/**"],
       "rules": {
-        "no-restricted-imports": ["error", { "patterns": [{ "group": ["three", "howler", "../client/*", "../../client/*", "../server/*"], "message": "La simulazione condivisa non importa renderer, audio, client o server: passa dati semplici." }] }]
+        "no-restricted-imports": ["error", { "patterns": [{ "group": ["three", "howler", "../client/*", "../../client/*", "../server/*"], "message": "The shared simulation does not import renderer, audio, client or server: pass plain data." }] }]
       }
     }
   ]

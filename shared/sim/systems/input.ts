@@ -1,9 +1,9 @@
 /**
- * I comandi arrivati dall'host diventano i passi del tick per ogni giocatore.
+ * Commands arriving from the host become each player's steps for the tick.
  *
- * Ogni comando del client è un passo di movimento, né più né meno: così il
- * server rifà esattamente ciò che la predizione del client ha già mostrato, anche
- * quando la rete ne consegna due in un tick e zero in quello dopo.
+ * Each client command is one movement step, no more, no less: that way the
+ * server replays exactly what client prediction has already shown, even
+ * when the network delivers two in one tick and zero in the next.
  */
 import { BUTTON, type ButtonName, type PlayerInput } from "../../input.ts"
 import { Controls, Game, InputArrived, Player, type ControlsValue } from "../schema.ts"
@@ -47,6 +47,6 @@ export const ApplyInputs = Game.System(
   }
 )
 
-/** Pulsante premuto in questo tick (non tenuto dal precedente). */
+/** Button pressed this tick (not held from the previous one). */
 export const justPressed = (c: ControlsValue, b: ButtonName) => (c.pressed & BUTTON[b]) !== 0 && (c.previous & BUTTON[b]) === 0
 export const held = (c: ControlsValue, b: ButtonName) => (c.input.buttons & BUTTON[b]) !== 0

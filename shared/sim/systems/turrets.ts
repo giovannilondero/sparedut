@@ -1,8 +1,8 @@
 /**
- * Le torrette con la mitraie: si montano col tasto "usa" stando dietro l'arma, si
- * smontano con "usa" o col salto. Chi muore o esce la lascia libera. Il calore scende
- * da solo; da surriscaldata non spara finché non è tornata fredda. Sparare lo fa
- * `UseWeapons`, fermare il corpo al posto `MovePlayers`.
+ * Turrets with the mitraie: mount with the "use" key while standing behind the gun,
+ * dismount with "use" or by jumping. Whoever dies or leaves frees it. Heat drops
+ * on its own; when overheated it won't fire until it has cooled down. Firing is done by
+ * `UseWeapons`, holding the body in the seat by `MovePlayers`.
  */
 import { Ops } from "@typeonce/ritmo"
 import { turretSeat } from "../../map.ts"
@@ -29,7 +29,7 @@ export const MountTurrets = Game.System(
     const players = queries.players.each()
     const alive = new Set(players.filter((m) => m.data.life.get()._tag === "Alive").map((m) => m.data.player.get().session))
 
-    // Raffreddamento, colpo successivo, e chi non c'è più lascia il posto.
+    // Cooling, next shot, and whoever is gone gives up the seat.
     const next: TurretState[] = resources.turrets.get().map((t, i) => {
       const heat = Math.max(0, t.heat - (t.jammed ? TURRET.jamCool : TURRET.cool))
       const jammed = t.jammed && heat > 0
@@ -53,7 +53,7 @@ export const MountTurrets = Game.System(
           continue
         }
         if (!justPressed(controls, "use")) continue
-        // La torretta libera più vicina, se si sta dietro di lei.
+        // The nearest free turret, if standing behind it.
         const body = m.data.motion.get().body
         let best = -1
         let bestD: number = TURRET.reach

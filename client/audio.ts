@@ -1,6 +1,6 @@
 /**
- * Audio del gioco: tutti i suoni sono sintetizzati qui (nessun file), codificati in WAV
- * e suonati con Howler. Posizionali in 3D quando hanno un punto nel mondo.
+ * Game audio: every sound is synthesized here (no files), encoded as WAV
+ * and played with Howler. Positional in 3D when they have a point in the world.
  */
 import { Howl, Howler } from "howler"
 import type { GameAudio, P3, SoundName } from "./contracts.ts"
@@ -11,7 +11,7 @@ import { SFX, renderSound } from "./audio/sfx.ts"
 
 type Range = "far" | "mid" | "near"
 
-/** Attenuazione per una mappa di ~150 m: gli spari si sentono ovunque, i passi da vicino. */
+/** Attenuation for a ~150 m map: shots are heard everywhere, footsteps up close. */
 const RANGES: Record<Range, { distanceModel: "inverse" | "linear"; refDistance: number; rolloffFactor: number; maxDistance: number }> = {
   far: { distanceModel: "inverse", refDistance: 10, rolloffFactor: 0.55, maxDistance: 10000 },
   mid: { distanceModel: "inverse", refDistance: 4, rolloffFactor: 1.1, maxDistance: 10000 },
@@ -20,10 +20,10 @@ const RANGES: Record<Range, { distanceModel: "inverse" | "linear"; refDistance: 
 
 interface Spec {
   readonly range: Range
-  /** Voci contemporanee al massimo. */
+  /** Maximum simultaneous voices. */
   readonly voices: number
   readonly gain: number
-  /** Variazione casuale di intonazione (±). */
+  /** Random pitch variation (±). */
   readonly jitter: number
 }
 
@@ -82,7 +82,7 @@ const SPECS: Record<SoundName, Spec> = {
 }
 
 const NAMES = Object.keys(SFX) as SoundName[]
-/** Lunghi e non urgenti: si sintetizzano in sottofondo dopo l'avvio. */
+/** Long and not urgent: synthesized in the background after startup. */
 const LATE: readonly SoundName[] = ["death", "respawn", "flag_taken", "flag_returned", "flag_captured", "streak", "bells", "victory", "defeat"]
 const MUSIC_FADE = 1200
 
@@ -93,9 +93,9 @@ export function createAudio(): GameAudio {
   const urls = new Map<SoundName, string[]>()
   const t0 = performance.now()
   for (const name of NAMES) if (!LATE.includes(name)) urls.set(name, renderSound(name).map(toUrl))
-  console.info(`[audio] effetti sintetizzati in ${(performance.now() - t0).toFixed(0)} ms`)
+  console.info(`[audio] effects synthesized in ${(performance.now() - t0).toFixed(0)} ms`)
 
-  // gli Howl si creano al primo uso: così l'AudioContext nasce dopo un gesto
+  // Howls are created on first use, so the AudioContext is born after a gesture
   let howls: Map<SoundName, Howl[]> | null = null
   let listener: [P3, number] = [[0, 0, 0], 0]
   const applyListener = () => {
@@ -117,7 +117,7 @@ export function createAudio(): GameAudio {
     applyListener()
     return howls
   }
-  /** Sintetizza un suono tardivo se non è ancora pronto (anche subito, se serve adesso). */
+  /** Synthesizes a late sound if it isn't ready yet (immediately too, if needed now). */
   const renderLate = (name: SoundName) => {
     if (urls.has(name)) return
     urls.set(name, renderSound(name).map(toUrl))
@@ -134,7 +134,7 @@ export function createAudio(): GameAudio {
   let music: Howl | null = null
   let musicOn = false
   let musicLoading = false
-  // in sottofondo, a pezzetti: prima i suoni lunghi, poi la villotta
+  // in the background, in small chunks: first the long sounds, then the villotta
   const musicUrl = (async () => {
     const t1 = performance.now()
     for (const name of LATE) {
@@ -144,7 +144,7 @@ export function createAudio(): GameAudio {
     const t2 = performance.now()
     const src = toUrl(await renderVillotta())
     console.info(
-      `[audio] suoni lunghi in ${(t2 - t1).toFixed(0)} ms, villotta in ${(performance.now() - t2).toFixed(0)} ms (in sottofondo)`
+      `[audio] long sounds in ${(t2 - t1).toFixed(0)} ms, villotta in ${(performance.now() - t2).toFixed(0)} ms (in background)`
     )
     return src
   })()
@@ -166,7 +166,7 @@ export function createAudio(): GameAudio {
     })
   }
 
-  // La discoteca del casot: due loop (aperta e attutita) nello stesso punto, uno sentito alla volta.
+  // The casot's disco: two loops (open and muffled) at the same point, one heard at a time.
   let disco: { open: Howl; muffled: Howl } | null = null
   let discoLoading = false
   let discoWant: { at: P3; open: boolean } | null = null
@@ -192,7 +192,7 @@ export function createAudio(): GameAudio {
       const attrs = { distanceModel: "inverse" as const, refDistance: 5, rolloffFactor: 1.3, maxDistance: 10000, panningModel: "HRTF" as const }
       const a = new Howl({ src: [toUrl(open)], format: ["wav"], loop: true, volume: 0, ...attrs })
       const m = new Howl({ src: [toUrl(muffled)], format: ["wav"], loop: true, volume: 0, ...attrs })
-      // stesso istante nei due loop: la porta che si apre non fa saltare il ritmo
+      // same instant in both loops: the door opening doesn't skip the beat
       a.once("play", () => m.seek(a.seek()))
       disco = { open: a, muffled: m }
       discoLoading = false
@@ -211,7 +211,7 @@ export function createAudio(): GameAudio {
       const variants = howlsOf(name)
       if (!variants) return
       const s = SPECS[name]
-      // limite di voci: si zittisce la più vecchia
+      // voice limit: the oldest one is silenced
       const list = (active.get(name) ?? []).filter(([h, id]) => h.playing(id))
       while (list.length >= s.voices) {
         const [h, id] = list.shift()!

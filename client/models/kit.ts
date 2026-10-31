@@ -1,7 +1,7 @@
 /**
- * Attrezzi comuni per i modelli procedurali: materiali e texture condivisi (in cache,
- * vivono quanto la pagina), un "fornaio" che cuoce tante primitive in un'unica
- * geometria a colori per vertice, e un generatore pseudo-casuale deterministico.
+ * Common tools for the procedural models: shared materials and textures (cached,
+ * they live as long as the page), a "baker" that bakes many primitives into a single
+ * vertex-coloured geometry, and a deterministic pseudo-random generator.
  */
 import * as THREE from "three"
 
@@ -13,7 +13,7 @@ export const rng = (seed: number) => () => {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296
 }
 
-// --- texture da canvas ----------------------------------------------------------------
+// --- canvas textures -----------------------------------------------------------------
 const textures = new Map<string, THREE.CanvasTexture>()
 
 export function canvasTexture(
@@ -37,7 +37,7 @@ export function canvasTexture(
   return t
 }
 
-/** Venatura del legno, in grigi chiari: il colore lo dà il materiale. */
+/** Wood grain, in light greys: the material provides the colour. */
 export const woodTex = () =>
   canvasTexture("wood", 128, 256, (g, w, h) => {
     const r = rng(7)
@@ -60,7 +60,7 @@ export const woodTex = () =>
     }
   })
 
-/** Legno intarsiato con volute e una crocetta: la doppietta del plevan. */
+/** Inlaid wood with scrolls and a small cross: the plevan's double-barrel. */
 export const engravedTex = () =>
   canvasTexture("engraved", 256, 256, (g, w, h) => {
     g.drawImage(woodTex().image as HTMLCanvasElement, 0, 0, w, h)
@@ -85,7 +85,7 @@ export const engravedTex = () =>
     g.strokeRect(6, 6, w - 12, h - 12)
   })
 
-/** Rame martellato. */
+/** Hammered copper. */
 export const copperTex = () =>
   canvasTexture("copper", 128, 128, (g, w, h) => {
     const r = rng(11)
@@ -105,7 +105,7 @@ export const copperTex = () =>
     }
   })
 
-/** Frico: crosta dorata con buchi di pizzo bruciacchiati. */
+/** Frico: golden crust with scorched lacy holes. */
 export const fricoTex = () =>
   canvasTexture("frico", 128, 128, (g, w, h) => {
     const r = rng(23)
@@ -125,7 +125,7 @@ export const fricoTex = () =>
     }
   })
 
-/** Pietra del campanile con le finestrelle ad arco della cella campanaria. */
+/** Bell-tower stone with the arched windows of the belfry. */
 export const towerTex = () =>
   canvasTexture("tower", 64, 128, (g, w, h) => {
     const r = rng(5)
@@ -157,7 +157,7 @@ export const towerTex = () =>
     g.stroke()
   })
 
-/** Juta del sacchetto del cramâr. */
+/** Burlap of the cramâr's pouch. */
 export const burlapTex = () =>
   canvasTexture("burlap", 64, 64, (g, w, h) => {
     g.fillStyle = "#e0d6c0"
@@ -173,7 +173,7 @@ export const burlapTex = () =>
     }
   })
 
-/** Stella morbida per lampi e scintille. */
+/** Soft star for flashes and sparks. */
 export const flashTex = () =>
   canvasTexture("flash", 128, 128, (g, w, h) => {
     const cx = w / 2
@@ -196,7 +196,7 @@ export const flashTex = () =>
     }
   })
 
-// --- materiali ------------------------------------------------------------------------
+// --- materials ------------------------------------------------------------------------
 const materials = new Map<string, THREE.MeshStandardMaterial>()
 
 export function std(key: string, params: THREE.MeshStandardMaterialParameters): THREE.MeshStandardMaterial {
@@ -208,10 +208,10 @@ export function std(key: string, params: THREE.MeshStandardMaterialParameters): 
   return m
 }
 
-/** Materiale unico dei modelli cotti: colori per vertice, faccette piatte. */
+/** The single material for baked models: vertex colours, flat facets. */
 export const bakedMaterial = () => std("baked", { vertexColors: true, flatShading: true, roughness: 0.85 })
 
-// --- il fornaio -----------------------------------------------------------------------
+// --- the baker -----------------------------------------------------------------------
 const tmpM = new THREE.Matrix4()
 const tmpQ = new THREE.Quaternion()
 const tmpE = new THREE.Euler()
@@ -220,7 +220,7 @@ const tmpS = new THREE.Vector3()
 const tmpC = new THREE.Color()
 const tmpN = new THREE.Matrix3()
 
-/** Accumula primitive trasformate e colorate, poi le fonde in una geometria sola. */
+/** Accumulates transformed, coloured primitives, then merges them into a single geometry. */
 export class Baker {
   private pos: number[] = []
   private nor: number[] = []
@@ -263,7 +263,7 @@ export class Baker {
     return this
   }
 
-  /** Cuoce tutte le mesh visibili di un gruppo (colore = colore del materiale). */
+  /** Bakes all visible meshes of a group (colour = the material's colour). */
   addGroup(root: THREE.Object3D): this {
     root.updateMatrixWorld(true)
     const inv = new THREE.Matrix4().copy(root.matrixWorld).invert()
@@ -289,7 +289,7 @@ export class Baker {
   }
 }
 
-/** Mette una mesh in un genitore, in una riga. */
+/** Puts a mesh into a parent, in one line. */
 export function put(
   parent: THREE.Object3D,
   geo: THREE.BufferGeometry,
@@ -311,7 +311,7 @@ export function put(
 export const damp = (a: number, b: number, k: number, dt: number) => a + (b - a) * (1 - Math.exp(-k * dt))
 export const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v)
 export const smooth = (t: number) => t * t * (3 - 2 * t)
-/** 0→1→0 su [a,b]. */
+/** 0→1→0 over [a,b]. */
 export const bump = (p: number, a: number, b: number) => (p <= a || p >= b ? 0 : Math.sin(((p - a) / (b - a)) * Math.PI))
-/** 0 prima di a, 1 dopo b, liscio in mezzo. */
+/** 0 before a, 1 after b, smooth in between. */
 export const ramp = (p: number, a: number, b: number) => smooth(clamp((p - a) / (b - a), 0, 1))

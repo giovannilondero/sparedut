@@ -1,6 +1,6 @@
 /**
- * Regole pure della simulazione: equipaggiamento, rinascita, danni, chi è nemico di chi,
- * la tempesta.
+ * Pure simulation rules: loadout, respawn, damage, who is whose enemy,
+ * the storm.
  */
 import type { MapDef, Spawn, Team } from "../map.ts"
 import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type WeaponId } from "../weapons.ts"
@@ -9,42 +9,42 @@ import type { Ammo, ArsenalValue, RulesValue, StatsValue, TurretState } from "./
 export const MAX_HP = 100
 export const MAX_ARMOR = 100
 export const RESPAWN_TICKS = 180
-/** Dopo una corsa l'arma torna su in questi tick (il server e la predizione del client). */
+/** After sprinting the weapon comes back up in this many ticks (server and client prediction). */
 export const RAISE_TICKS = 12
 export const SHIELD_TICKS = 90
 export const SGNAPE_TICKS = 600
 export const SGNAPE_SPEED = 1.3
 export const ASSIST_WINDOW_TICKS = 600
 export const OVER_TICKS = 15 * 60
-/** Il riscaldamento finisce da solo dopo 30 s dalla creazione; l'host può partire prima. */
+/** Warmup ends on its own 30 s after creation; the host can start earlier. */
 export const WARMUP_TICKS = 30 * 60
 export const FLAG_RETURN_TICKS = 30 * 60
 
 export const otherTeam = (team: Team): Team => (team === "benandanti" ? "malandanti" : "benandanti")
 
-/** Nella Tampieste non ci sono squadre: tutti contro tutti. */
+/** The Tampieste has no teams: free-for-all. */
 export const everyoneAlone = (rules: RulesValue) => rules.mode === "tampieste"
 
-/** Compagni: si curano a vicenda (in squadra, fuori dalla Tampieste). */
+/** Teammates: they heal each other (same team, outside the Tampieste). */
 export const allied = (rules: RulesValue, a: Team, b: Team) => !everyoneAlone(rules) && a === b
 
-/** Si fanno male (due giocatori diversi): avversari, o compagni col fuoco amico. */
+/** They can hurt each other (two different players): opponents, or teammates with friendly fire. */
 export const hostile = (rules: RulesValue, a: Team, b: Team) => !allied(rules, a, b) || rules.friendlyFire
 
-/** I punti di rinascita di una squadra; nella Tampieste valgono tutti per tutti. */
+/** A team's spawn points; in the Tampieste every point is open to everyone. */
 export const spawnsFor = (map: MapDef, rules: RulesValue, team: Team): readonly Spawn[] =>
   everyoneAlone(rules) ? [...map.spawns.benandanti, ...map.spawns.malandanti] : map.spawns[team]
 
 // --- La Tampieste --------------------------------------------------------------------------
 
-/** Tick dopo l'inizio in cui, nella Tampieste, si nasce ancora (e la partita non può finire). */
+/** Ticks after the start during which, in the Tampieste, players still spawn (and the match can't end). */
 export const START_GRACE_TICKS = 5
 
-/** La tempesta resta ferma per i primi secondi, poi stringe fino all'80% del tempo. */
+/** The storm holds still for the first seconds, then closes in until 80% of the time. */
 export const STORM_GRACE_TICKS = 20 * 60
 export const STORM_MIN_RADIUS = 6
 export const STORM_SHRINK_SHARE = 0.8
-/** Fuori dalla tempesta: danno ogni `STORM_EVERY` tick. */
+/** Outside the storm: damage every `STORM_EVERY` ticks. */
 export const STORM_EVERY = 30
 export const STORM_DAMAGE = 4
 
@@ -55,9 +55,9 @@ export interface StormValue {
 }
 
 /**
- * Il cerchio sicuro della Tampieste, ricavato dal solo tempo di partita: centro nella
- * zona da tenere della mappa, raggio che parte dall'angolo più lontano e si chiude.
- * `start` è il tick di inizio della partita in corso.
+ * The Tampieste's safe circle, derived from match time alone: centred on the map's
+ * hill zone, with a radius that starts from the farthest corner and closes in.
+ * `start` is the start tick of the current match.
  */
 export function stormAt(map: MapDef, rules: RulesValue, start: number, tick: number): StormValue {
   const [x, , z] = map.hill.at
@@ -73,12 +73,12 @@ export const outsideStorm = (storm: StormValue, p: { x: number; z: number }) => 
 // --- Spingi il Cjar ------------------------------------------------------------------------
 
 export const CART = {
-  /** Raggio (m) entro cui si spinge o si ferma il cjar. */
+  /** Radius (m) within which the cjar is pushed or blocked. */
   reach: 4,
-  /** Velocità con un Benandante (m/s); ogni altro fino a 3 aggiunge un quarto. */
+  /** Speed with one Benandante (m/s); each extra one, up to 3, adds a quarter. */
   speed: 1.1,
   maxPushers: 3,
-  /** Dopo questi tick senza nessuno, il cjar torna indietro piano. */
+  /** After this many ticks with nobody on it, the cjar slowly rolls back. */
   idleTicks: 10 * 60,
   backSpeed: 0.4
 } as const
@@ -108,21 +108,21 @@ export function freshArsenal(primary: PrimaryId): ArsenalValue {
 
 export const NO_STATS: StatsValue = { kills: 0, deaths: 0, assists: 0, caps: 0, score: 0, damage: 0, headshots: 0, streak: 0, best: 0 }
 
-/** Le armi che il giocatore può impugnare adesso (la mitraie non si impugna: si usa la torretta). */
+/** The weapons the player can hold right now (the mitraie isn't held: you use the turret). */
 export const owned = (a: ArsenalValue, id: WeaponId) =>
   id === "mescul" || id === "mandi" || id === a.primary || (id === "lanciafrico" && a.launcher)
 
-/** Torrette fredde e libere, porte intere: come stanno a inizio partita. */
+/** Cool, free turrets and intact doors: how they are at match start. */
 export const freshTurrets = (map: MapDef): TurretState[] => map.turrets.map(() => ({ gunner: null, heat: 0, jammed: false, cooldown: 0 }))
 export const freshDoors = (map: MapDef): number[] => map.doors.map((d) => d.hp)
 
-/** Le porte da sfondare prendono di più a pedate (il mescul) che a pallini. */
+/** Breakable doors take more from kicks (the mescul) than from pellets. */
 export const DOOR_MELEE_SCALE = 1.6
 
-/** La torretta che usa `session`, se ne usa una. */
+/** The turret `session` is using, if any. */
 export const turretOf = (turrets: ReadonlyArray<TurretState>, session: string): number => turrets.findIndex((t) => t.gunner === session)
 
-/** Il punto di rinascita più lontano dai nemici vivi, con un po' di caso. */
+/** The spawn point farthest from living enemies, with a bit of randomness. */
 export function chooseSpawn(spots: readonly Spawn[], enemies: ReadonlyArray<{ x: number; z: number }>, roll: number): Spawn {
   let best = spots[0]
   let bestScore = -1
@@ -142,7 +142,7 @@ export function chooseSpawn(spots: readonly Spawn[], enemies: ReadonlyArray<{ x:
   return best
 }
 
-/** Danno di un colpo a distanza `dist`, col decadimento dell'arma. */
+/** Damage of a hit at distance `dist`, with the weapon's falloff. */
 export function damageAt(id: WeaponId, dist: number, head: boolean) {
   const w = WEAPONS[id]
   const half = w.range / 2
@@ -151,7 +151,7 @@ export function damageAt(id: WeaponId, dist: number, head: boolean) {
   return w.damage * scale * (head ? w.headMultiplier : 1)
 }
 
-/** Metà del danno la prende la corazza (finché c'è). */
+/** Armor takes half the damage (while it lasts). */
 export function absorb(hp: number, armor: number, amount: number) {
   const toArmor = Math.min(armor, amount * 0.5)
   return { hp: hp - (amount - toArmor), armor: armor - toArmor }

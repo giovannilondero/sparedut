@@ -1,7 +1,7 @@
 /**
- * Il deploy su Cloudflare (`alchemy.run.ts`): il client buildato è servito come asset statico,
- * le partite vivono in un solo Durable Object con lo stesso `Hub` del server Bun.
- * A questo Worker arriva solo `/ws`.
+ * The Cloudflare deploy (`alchemy.run.ts`): the built client is served as static assets,
+ * matches live in a single Durable Object with the same `Hub` as the Bun server.
+ * Only `/ws` reaches this Worker.
  */
 import { DurableObject } from "cloudflare:workers"
 import { initPhysics } from "../shared/physics.ts"
@@ -9,21 +9,21 @@ import { Hub, type Peer } from "./hub.ts"
 import { networkOf } from "./network.ts"
 
 /**
- * Un telefono che va in standby non saluta: smette e basta di parlare. Il client manda un
- * ping al secondo, ma Chrome sveglia una scheda nascosta da un po' solo una volta al minuto.
+ * A phone going to standby doesn't say goodbye: it just stops talking. The client sends a
+ * ping every second, but Chrome wakes a tab that's been hidden for a while only once a minute.
  */
 const SILENT_MS = 90_000
-/** Tutte le stanze stanno in un oggetto solo: oltre questo numero di connessioni rifiutiamo. */
+/** All rooms live in a single object: beyond this many connections we refuse. */
 const MAX_CONNECTIONS = 300
-/** Una LAN party dietro lo stesso router riempie una stanza; uno script che apre socket no. */
+/** A LAN party behind the same router fills a room; a script opening sockets doesn't. */
 const MAX_CONNECTIONS_PER_NETWORK = 20
-/** Come `setInterval(update, 2)` del server Bun, ma ogni risveglio qui costa di più. */
+/** Like the Bun server's `setInterval(update, 2)`, but every wake-up costs more here. */
 const LOOP_MS = 4
 
 /**
- * Un Durable Object nasce vicino alla prima richiesta e lì resta per sempre (balon ne ha
- * avuto uno a 100 ms oltre l'edge): questo nasce in Europa occidentale. Cambiare nome crea
- * un oggetto nuovo, ed è l'unico modo per spostarlo.
+ * A Durable Object is created near the first request and stays there forever (balon had
+ * one 100 ms past the edge): this one is created in Western Europe. Changing the name creates
+ * a new object, and that's the only way to move it.
  */
 const OBJECT_NAME = "partidis-weur"
 
@@ -33,14 +33,14 @@ export interface Env {
 
 interface Connection {
   readonly peer: Peer
-  /** Quando ha parlato l'ultima volta, input o ping. */
+  /** When it last spoke, input or ping. */
   seen: number
 }
 
 /**
- * Tutte le stanze in un oggetto solo, come il processo Bun: chi cerca le partite della propria
- * rete le vede tutte. Resta in memoria finché c'è qualcuno connesso; niente viene salvato,
- * quindi un deploy chiude le partite in corso.
+ * All rooms in a single object, like the Bun process: whoever looks for matches on their own
+ * network sees them all. It stays in memory while someone is connected; nothing is saved,
+ * so a deploy ends the matches in progress.
  */
 export class Partidis extends DurableObject<Env> {
   private readonly hub = new Hub()
@@ -49,10 +49,10 @@ export class Partidis extends DurableObject<Env> {
 
   override async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected a WebSocket", { status: 426 })
-    // Il gioco si apre solo dalla sua pagina: un altro sito non usa questo server dal browser di chi lo visita.
+    // The game only opens from its own page: another site can't use this server from its visitors' browsers.
     const origin = request.headers.get("Origin")
     if (origin && URL.parse(origin)?.host !== new URL(request.url).host) return new Response("Forbidden", { status: 403 })
-    // Per rete, non per indirizzo: con IPv6 ogni casa ha milioni di indirizzi (`networkOf` guarda il /64).
+    // Per network, not per address: with IPv6 every home has millions of addresses (`networkOf` looks at the /64).
     const network = networkOf(request.headers.get("CF-Connecting-IP") ?? undefined)
     if (this.sockets.size >= MAX_CONNECTIONS || this.connectionsFrom(network.key) >= MAX_CONNECTIONS_PER_NETWORK) {
       return new Response("Too many connections", { status: 429 })
@@ -77,11 +77,11 @@ export class Partidis extends DurableObject<Env> {
     socket.addEventListener("message", (event) => {
       connection.seen = performance.now()
       if (typeof event.data !== "string") return
-      // Un'eccezione qui riavvierebbe l'oggetto, chiudendo le partite di tutti: paga solo chi l'ha causata.
+      // An exception here would restart the object, ending everyone's matches: only whoever caused it pays.
       try {
         this.hub.message(peer, event.data)
       } catch (error) {
-        console.error("Messaggio non gestito:", error)
+        console.error("Unhandled message:", error)
         this.drop(socket)
         socket.close(1011, "error")
       }
@@ -105,7 +105,7 @@ export class Partidis extends DurableObject<Env> {
     this.hub.close(connection.peer)
   }
 
-  /** Avanza le stanze finché c'è qualcuno; poi si ferma e lascia dormire l'oggetto. */
+  /** Advances the rooms while someone is around; then stops and lets the object sleep. */
   private start() {
     if (this.loop) return
     this.loop = setInterval(() => {

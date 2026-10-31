@@ -7,7 +7,7 @@ import { createPhysicsWorld, initPhysics } from "../shared/physics.ts"
 import { playBots } from "./play.ts"
 
 for (const mode of MODE_IDS) {
-  test(`i bot giocano una partita a Cave dal Predil: ${mode}`, async () => {
+  test(`bots play a match at Cave dal Predil: ${mode}`, async () => {
     await initPhysics()
     const { kills, view: v } = playBots("predil", mode)
     console.log("predil", mode, { score: v.score, kills })
@@ -15,7 +15,7 @@ for (const mode of MODE_IDS) {
   }, 120000)
 }
 
-test("i binaris dal cjar a Cave dal Predil si percorrin a pît", async () => {
+test("the cjar rails at Cave dal Predil can be walked on foot", async () => {
   await initPhysics()
   const physics = createPhysicsWorld(PREDIL)
   const track = PREDIL.track
@@ -34,7 +34,7 @@ test("i binaris dal cjar a Cave dal Predil si percorrin a pît", async () => {
         break
       }
       body = stepBody(body, { ...IDLE_INPUT, mz: 1, yaw: Math.atan2(-dx, -dz) }, physics, 1).body
-      // distanza dal segmento
+      // distance from the segment
       const k = Math.max(0, Math.min(1, ((body.x - ax) * (bx - ax) + (body.z - az) * (bz - az)) / (len * len)))
       worst = Math.max(worst, Math.hypot(body.x - (ax + (bx - ax) * k), body.z - (az + (bz - az) * k)))
     }

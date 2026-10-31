@@ -1,14 +1,14 @@
 /**
- * Cave dal Predil: la miniere di plomp e zinc di Raibl, in te valade strete sot dai
- * crets des Alps Juliis.
+ * Cave dal Predil: the lead and zinc mine of Raibl, in the narrow valley beneath the
+ * peaks of the Julian Alps.
  *
- * Tre gradons, di nord a sud: in alt (6) il plaçâl de miniere cul ingrès de galarie
- * (un anel sot la mont cun dôs jessudis) e lis cjasis dai uficis; tal mieç (3) il
- * plaçâl dal Poç Clara cul castelut di aciâr e la laverie cul pian tiere viert; in bas
- * (0) il borc dai minadôrs e la glesie di Sante Barbare. I binaris dai carei a vegnin
- * fûr de galarie e a van jù fin tal borc: il cjar di Spingi il Cjar al cor su di lôr.
+ * Three terraces, north to south: at the top (6) the mine yard with the tunnel entrance
+ * (a loop under the mountain with two exits) and the office buildings; in the middle (3)
+ * the yard of Poç Clara with its steel headframe and the washery with its open ground floor;
+ * at the bottom (0) the miners' village and the church of Sante Barbare. The mine-cart rails
+ * come out of the tunnel and run down into the village: the Spingi il Cjar cart runs on them.
  *
- * Assi: x viers est, y in alt, z viers sud. Metris.
+ * Axes: x east, y up, z south. Metres.
  */
 import { defineMap, type Block, type Building, type Mat, type PickupSpot, type Spawn, type Team, type V3, type Wedge } from "../map.ts"
 
@@ -24,7 +24,7 @@ const box = (min: V3, max: V3, mat: Mat, look?: Block["look"]) => {
   blocks.push(look ? { min, max, mat, look } : { min, max, mat })
 }
 
-// --- Gradons e rampis -----------------------------------------------------------
+// --- Terraces and ramps ---------------------------------------------------------
 box([BOUNDS.minX, BOTTOM, BOUNDS.minZ], [BOUNDS.maxX, P_UP, -30], "terra", "terreno")
 box([BOUNDS.minX, BOTTOM, -30], [BOUNDS.maxX, P_MID, 30], "terra", "terreno")
 box([BOUNDS.minX, BOTTOM, 30], [BOUNDS.maxX, P_LOW, BOUNDS.maxZ], "terra", "terreno")
@@ -33,10 +33,10 @@ const wedges: Wedge[] = []
 for (const [x0, x1] of [[-22, -14], [-6, 6], [28, 36]] as const) wedges.push({ x0, x1, z0: -30, z1: -22, y0: P_UP, y1: P_MID, mat: "terra" })
 for (const [x0, x1] of [[-30, -22], [-6, 6], [28, 36]] as const) wedges.push({ x0, x1, z0: 30, z1: 38, y0: P_MID, y1: P_LOW, mat: "terra" })
 
-// --- La mont e la galarie --------------------------------------------------------
-/** La mont sore la galarie: roccie fin a `top`, galariis alte fin a `ceiling`. */
+// --- The mountain and the tunnel ------------------------------------------------
+/** The mountain over the tunnel: rock up to `top`, tunnels high up to `ceiling`. */
 export const MONT = { minX: BOUNDS.minX, maxX: -10, minZ: -98, maxZ: -55, floor: P_UP, ceiling: P_UP + 3.4, top: P_UP + 10 } as const
-/** I corridôrs de galarie: un anel e dôs jessudis (a est e a sud). */
+/** The tunnel corridors: a loop and two exits (east and south). */
 export const GALARIE: readonly { readonly x0: number; readonly x1: number; readonly z0: number; readonly z1: number }[] = [
   { x0: -40, x1: -14, z0: -94, z1: -90 },
   { x0: -40, x1: -14, z0: -72, z1: -68 },
@@ -46,8 +46,8 @@ export const GALARIE: readonly { readonly x0: number; readonly x1: number; reado
   { x0: -29, x1: -25, z0: -68, z1: -55 }
 ]
 {
-  // Si tae la mont in celis lis ôrs dai corridôrs: lis celis plenis a son roccie fin in
-  // alt, chês vueidis a àn la volte de galarie. Lis celis compagnis si unissin par riis.
+  // Cut the mountain into cells along the corridor edges: solid cells are rock all the way
+  // up, empty ones get the tunnel vault. Matching cells are merged per row.
   const xs = [...new Set([MONT.minX, MONT.maxX, ...GALARIE.flatMap((g) => [g.x0, g.x1])])].sort((a, b) => a - b)
   const zs = [...new Set([MONT.minZ, MONT.maxZ, ...GALARIE.flatMap((g) => [g.z0, g.z1])])].sort((a, b) => a - b)
   const open = (x: number, z: number) => GALARIE.some((g) => x > g.x0 && x < g.x1 && z > g.z0 && z < g.z1)
@@ -64,11 +64,11 @@ export const GALARIE: readonly { readonly x0: number; readonly x1: number; reado
     }
   }
 }
-// Il cret a nord, sore dut il plaçâl.
+// The cliff to the north, above the whole yard.
 box([BOUNDS.minX, P_UP, BOUNDS.minZ], [BOUNDS.maxX, P_UP + 24, -98], "roccia")
 
-// --- Edificis --------------------------------------------------------------------
-/** Lis laveriis: pian tiere viert su pilastris, sore il capanon. */
+// --- Buildings -------------------------------------------------------------------
+/** The washeries: open ground floor on pillars, the shed above. */
 export const LAVERIE = [
   { minX: 24, maxX: 45, minZ: -16, maxZ: 26, floor: P_MID, slab: 4.6, top: 14, rows: [-16, -8, 0, 8, 16, 25.2] },
   { minX: 24, maxX: 45, minZ: 44, maxZ: 74, floor: P_LOW, slab: 4.6, top: 16, rows: [44, 50, 56, 62, 68, 73.2] }
@@ -86,29 +86,29 @@ const buildings: Building[] = [
 for (const l of LAVERIE) {
   const y = l.floor
   buildings.push({ name: "Laverie", min: [l.minX, y + l.slab + 0.4, l.minZ], max: [l.maxX, y + l.top, l.maxZ], mat: "intonacoBianco", roof: "falde" })
-  // il sofit sot dal capanon e i pilastris di aciâr
+  // the ceiling under the shed and the steel pillars
   box([l.minX, y + l.slab, l.minZ], [l.maxX, y + l.slab + 0.4, l.maxZ], "pietra", "copertura")
   for (const x of [l.minX, 34, l.maxX - 0.8]) for (const z of l.rows) box([x, y, z], [x + 0.8, y + l.slab, z + 0.8], "ferro")
 }
-// Lis machinis de laverie (frantoi e crivei): ripars bas.
+// The washery machines (crushers and sieves): low cover.
 box([31, P_MID, -6], [37, P_MID + 2.2, -2], "ferro")
 box([31, P_MID, 10], [37, P_MID + 2.2, 14], "ferro")
 box([31, P_LOW, 51.5], [37, P_LOW + 2.2, 55.5], "ferro")
 
-// --- Poç Clara: la sale dai argagns sot dal castelut -----------------------------
-/** Il bloc che al ten sù il castelut (il client lu dissegne di modon, il traliç parsore). */
+// --- Poç Clara: the machine hall under the headframe -----------------------------
+/** The block holding up the headframe (the client draws it in brick, the lattice on top). */
 export const POC = { minX: 12, maxX: 20, minZ: -6, maxZ: 2, floor: P_MID, height: 6, tower: 21 } as const
 box([POC.minX, POC.floor, POC.minZ], [POC.maxX, POC.floor + POC.height, POC.maxZ], "invisibile")
 
-// --- Tramoggia sui pîts, carei, cassis --------------------------------------------
-/** La tramoggia dal minerâl: si passe sot. */
+// --- Hopper on legs, mine carts, crates --------------------------------------------
+/** The ore hopper: you can walk under it. */
 export const TRAMOGGE = { minX: -38, maxX: -30, minZ: -48, maxZ: -40, floor: P_UP, under: 2, top: 5 } as const
 {
   const t = TRAMOGGE
   box([t.minX, t.floor + t.under, t.minZ], [t.maxX, t.floor + t.top, t.maxZ], "ferro")
   for (const x of [t.minX, t.maxX - 0.4]) for (const z of [t.minZ, t.maxZ - 0.4]) box([x, t.floor, z], [x + 0.4, t.floor + t.under, z + 0.4], "legno")
 }
-/** I carei fers (il client ju dissegne; chi a son dome lis scjatulis che a tocjin). */
+/** The parked mine carts (the client draws them; here are only the boxes that collide). */
 export const CAREI: readonly { readonly min: V3; readonly max: V3 }[] = [
   { min: [14, P_UP, -60], max: [15.4, P_UP + 1.4, -57.6] },
   { min: [-12, P_MID, 4], max: [-10.6, P_MID + 1.4, 6.4] },
@@ -125,10 +125,10 @@ box([-18, P_MID, -14], [-15, P_MID + 1.3, -11], "legno", "cassa")
 box([-9, P_MID, 20], [-6, P_MID + 1.3, 23], "legno", "cassa")
 box([4, P_LOW, 56], [7, P_LOW + 1.3, 59], "legno", "cassa")
 box([-10, P_LOW, 72], [-7.5, P_LOW + 1.3, 74.5], "legno", "cassa")
-// Tetis no calpestabii: sore lis laveriis e lis cjasis.
+// Roofs you can't walk on: over the washeries and the houses.
 box([24, P_MID + 14, -16], [45, P_MID + 26, 26], "invisibile")
 
-// --- Zûc ----------------------------------------------------------------------------
+// --- Game --------------------------------------------------------------------------
 
 const spawns: Record<Team, readonly Spawn[]> = {
   benandanti: [
@@ -170,21 +170,21 @@ const pickups: PickupSpot[] = [
 ]
 
 const navPoints: V3[] = [
-  // Galarie
+  // Tunnel
   [-38, P_UP, -92], [-27, P_UP, -92], [-16, P_UP, -92], [-38, P_UP, -81], [-16, P_UP, -82],
   [-38, P_UP, -70], [-27, P_UP, -70], [-16, P_UP, -70], [-12, P_UP, -82], [-27, P_UP, -62],
-  // Plaçâl alt
+  // Upper yard
   [-5, P_UP, -82], [-5, P_UP, -94], [8, P_UP, -94], [22, P_UP, -94], [36, P_UP, -95], [8, P_UP, -80], [22, P_UP, -78],
   [-5, P_UP, -66], [8, P_UP, -64], [22, P_UP, -62], [36, P_UP, -56],
   [-27, P_UP, -50], [-42, P_UP, -52], [-14, P_UP, -48], [0, P_UP, -48], [14, P_UP, -42], [24, P_UP, -48], [36, P_UP, -44],
   [-42, P_UP, -35], [-27, P_UP, -37], [-18, P_UP, -32], [0, P_UP, -32], [32, P_UP, -32],
-  // Plaçâl dal Poç
+  // Poç yard
   [-18, P_MID, -19], [0, P_MID, -19], [32, P_MID, -19], [-38, P_MID, -19],
   [-26, P_MID, -6], [-26, P_MID, 8], [-26, P_MID, 22], [-38, P_MID, 20],
   [-12, P_MID, -10], [-14, P_MID, 14], [0, P_MID, -6], [0, P_MID, 8], [8, P_MID, -12], [16, P_MID, -12], [8, P_MID, 12], [16, P_MID, 10], [22, P_MID, -4],
   [29, P_MID, -12], [39, P_MID, -12], [29, P_MID, 4], [39, P_MID, 4], [29, P_MID, 20], [39, P_MID, 20],
   [0, P_MID, 27], [-26, P_MID, 27], [32, P_MID, 28],
-  // Borc
+  // Village
   [0, P_LOW, 40], [-26, P_LOW, 40], [32, P_LOW, 40], [-40, P_LOW, 40], [42, P_LOW, 40],
   [0, P_LOW, 52], [0, P_LOW, 66], [0, P_LOW, 80], [-6, P_LOW, 92],
   [-30, P_LOW, 64], [-40, P_LOW, 64], [-10, P_LOW, 64], [16, P_LOW, 48], [16, P_LOW, 62], [16, P_LOW, 74], [25, P_LOW, 86], [16, P_LOW, 98], [36, P_LOW, 100],
@@ -193,8 +193,8 @@ const navPoints: V3[] = [
 ]
 
 /**
- * I binaris dal cjar: fûr de jessude a sud de galarie, a traviers il plaçâl alt, jù
- * pe rampe tal plaçâl dal Poç e ancjemò jù fin tal borc, denant de glesie.
+ * The cart rails: out of the tunnel's south exit, across the upper yard, down the
+ * ramp into the Poç yard and further down into the village, in front of the church.
  */
 const track: V3[] = [
   [-27, P_UP, -64],
@@ -217,9 +217,9 @@ export const PREDIL = defineMap({
   walls: { bottom: BOTTOM, top: 40 },
   jumpPads: [],
   spawns,
-  /** Il frico dai Benandants tal fonts de galarie, chel dai Malandants denant de glesie. */
+  /** The Benandanti's frico at the back of the tunnel, the Malandanti's in front of the church. */
   flagBases: { benandanti: [-38, P_UP, -80], malandanti: [0, P_LOW, 96] },
-  /** Il plaçâl sot dal castelut dal Poç Clara. */
+  /** The yard under the Poç Clara headframe. */
   hill: { at: [0, P_MID, 8], radius: 7.5 },
   pickups,
   navPoints,

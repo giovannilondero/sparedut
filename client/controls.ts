@@ -1,7 +1,7 @@
 /**
- * Tastiera e mouse in prima persona (puntatore bloccato) e controller (DualShock e
- * ogni pad con la mappatura "standard" del browser): sguardo, movimento, pulsanti.
- * Le pressioni brevi (un clic fra due tick) vengono trattenute fino al tick dopo.
+ * First-person keyboard and mouse (pointer lock) and controller (DualShock and
+ * any pad with the browser's "standard" mapping): look, movement, buttons.
+ * Short presses (a click between two ticks) are held until the next tick.
  */
 import { BUTTON, type ButtonName } from "../shared/input.ts"
 import type { WeaponId } from "../shared/weapons.ts"
@@ -18,11 +18,11 @@ const KEYS: Record<string, ButtonName> = {
 }
 
 /**
- * I tasti del pad (indici della mappatura "standard") come i tasti della tastiera:
- * passano dagli stessi percorsi, così ogni azione funziona uguale.
- * ✕ salta, ◯ accucciati, ▢ ricarica, L1 bomba, R1 mina, R3 mescul, croce armi
- * (giù: monta o smonta la torretta), Share classifica, touchpad armeria. L2/R2 (mira/spara), △ (arma dopo),
- * L3 (corsa) e Options (pausa) li gestisce `poll`.
+ * Pad buttons (indices of the "standard" mapping) as keyboard keys:
+ * they go through the same paths, so every action works the same.
+ * ✕ jump, ◯ crouch, ▢ reload, L1 bomb, R1 mine, R3 mescul, d-pad weapons
+ * (down: mount or dismount the turret), Share scoreboard, touchpad armoury. L2/R2 (aim/fire), △ (next weapon),
+ * L3 (sprint) and Options (pause) are handled by `poll`.
  */
 const PAD_KEYS: Readonly<Record<number, string>> = {
   0: "Space",
@@ -41,7 +41,7 @@ const PAD_KEYS: Readonly<Record<number, string>> = {
 const PAD = { triangle: 3, l2: 6, r2: 7, options: 9, l3: 10 } as const
 const STICK_DEAD = 0.15
 const TRIGGER_ON = 0.35
-/** Velocità massima dello sguardo con lo stick (rad/s), prima della sensibilità. */
+/** Maximum stick look speed (rad/s), before sensitivity. */
 const LOOK_YAW = 3.4
 const LOOK_PITCH = 2.4
 
@@ -50,7 +50,7 @@ export interface ControlsHandlers {
   onLastWeapon: () => void
   onWheel: (dir: 1 | -1) => void
   onKey: (code: string, down: boolean) => void
-  /** Options sul pad: apre o chiude il menu di partita. */
+  /** Options on the pad: opens or closes the match menu. */
   onPause: () => void
 }
 
@@ -60,21 +60,21 @@ export class Controls {
   sensitivity = 1
   invertY = false
   locked = false
-  /** Variazione di sguardo dall'ultimo frame, per l'inerzia dell'arma. */
+  /** Look change since the last frame, for weapon inertia. */
   lookDx = 0
   lookDy = 0
-  /** Rinculo da aggiungere al beccheggio (lo smaltisce il loop). */
+  /** Recoil to add to the pitch (the loop bleeds it off). */
   kick = 0
   private held = new Set<ButtonName>()
   private latched = 0
   private keys = new Set<string>()
   enabled = true
-  /** Si sta giocando col pad: niente blocco del mouse da chiedere. */
+  /** Playing with the pad: no mouse lock to request. */
   padActive = false
   private padHeld = new Set<ButtonName>()
   private padWas: boolean[] = []
   private padMove = { mx: 0, mz: 0 }
-  /** L3 accende la corsa: resta finché si spinge lo stick in avanti. */
+  /** L3 turns on sprint: it stays on while the stick is pushed forward. */
   private padSprint = false
   private padIndex: number | null = null
 
@@ -131,7 +131,7 @@ export class Controls {
     window.addEventListener("blur", () => this.releaseAll())
   }
 
-  /** Il FOV stretto (cannocchiale) rallenta la mira. */
+  /** A narrow FOV (scope) slows down aiming. */
   zoomScale = 1
 
   private press(b: ButtonName) {
@@ -139,7 +139,7 @@ export class Controls {
     this.latched |= BUTTON[b]
   }
 
-  /** Tasti numerici e Q: le armi. */
+  /** Number keys and Q: weapons. */
   private shortcut(code: string) {
     if (code === "Digit1") this.handlers.onSlot(1)
     if (code === "Digit2") this.handlers.onSlot(2)
@@ -160,7 +160,7 @@ export class Controls {
     this.padSprint = false
   }
 
-  /** Il pad usato per ultimo (quello che ha premuto qualcosa). */
+  /** The most recently used pad (the one that pressed something). */
   private pad(): Gamepad | null {
     const pads = navigator.getGamepads?.() ?? []
     if (this.padIndex !== null && pads[this.padIndex]?.connected) return pads[this.padIndex]
@@ -172,9 +172,9 @@ export class Controls {
   }
 
   /**
-   * Legge il pad: da chiamare a ogni frame, prima dei tick. Lo sguardo si integra
-   * col tempo del frame, i tasti diventano pressioni come quelli della tastiera.
-   * Con `playing` falso (un menu aperto) passano solo i tasti, niente sguardo né passi.
+   * Reads the pad: call every frame, before the ticks. Look is integrated
+   * over the frame time, buttons become presses like keyboard keys.
+   * With `playing` false (a menu open) only buttons go through, no look or movement.
    */
   poll(dt: number, playing = true) {
     const p = this.pad()
@@ -191,7 +191,7 @@ export class Controls {
     const right = stick(p.axes[2] ?? 0, p.axes[3] ?? 0)
     if (down.some(Boolean) || left.x || left.y || right.x || right.y) this.padActive = true
 
-    // Options va sempre (anche col menu aperto); il resto solo in partita e senza chat.
+    // Options always works (even with the menu open); the rest only in a match and without chat.
     if (edge(PAD.options)) this.handlers.onPause()
     for (const [i, code] of Object.entries(PAD_KEYS)) {
       const n = Number(i)
@@ -228,7 +228,7 @@ export class Controls {
     if (this.padMove.mz < 0.3) this.padSprint = false
     if (this.padSprint) this.padHeld.add("sprint")
 
-    // Sguardo: curva quadratica (precisione al centro, svelto ai bordi), più lento col cannocchiale.
+    // Look: quadratic curve (precise at the centre, fast at the edges), slower with the scope.
     const s = this.sensitivity * this.zoomScale * dt
     const dx = right.x * Math.abs(right.x) * LOOK_YAW * s
     const dy = right.y * Math.abs(right.y) * LOOK_PITCH * s
@@ -239,25 +239,25 @@ export class Controls {
     this.lookDy += dy
   }
 
-  /** Vibrazione del pad (se c'è e la supporta): `strong` e `weak` fra 0 e 1. */
+  /** Pad vibration (if present and supported): `strong` and `weak` between 0 and 1. */
   rumble(strong: number, weak: number, ms: number) {
     if (!this.padActive || this.padIndex === null) return
     const actuator = navigator.getGamepads?.()[this.padIndex]?.vibrationActuator
     void actuator?.playEffect?.("dual-rumble", { duration: ms, strongMagnitude: Math.min(1, strong), weakMagnitude: Math.min(1, weak) }).catch(() => undefined)
   }
 
-  /** Si gioca: col mouse bloccato o col pad. */
+  /** Playing: with the mouse locked or with the pad. */
   get active() {
     return this.locked || this.padActive
   }
 
   lock() {
-    // Senza un gesto dell'utente il browser rifiuta: il clic sullo schermo riprova.
+    // Without a user gesture the browser refuses: a click on the screen retries.
     const r = this.element.requestPointerLock?.() as Promise<void> | undefined
     r?.catch?.(() => undefined)
   }
 
-  /** Movimento: laterale e avanti, da WASD/frecce o dallo stick sinistro (analogico). */
+  /** Movement: strafe and forward, from WASD/arrows or the left stick (analog). */
   move() {
     if (!this.enabled) return { mx: 0, mz: 0 }
     const k = this.keys
@@ -267,7 +267,7 @@ export class Controls {
     return this.padMove
   }
 
-  /** I pulsanti del tick: tenuti più quelli premuti e già rilasciati. */
+  /** The tick's buttons: held ones plus those pressed and already released. */
   buttons() {
     if (!this.enabled) return 0
     const b = this.latched | this.heldButtons()
@@ -275,7 +275,7 @@ export class Controls {
     return b
   }
 
-  /** I pulsanti tenuti adesso, senza consumare le pressioni brevi (per animazioni e HUD). */
+  /** The buttons held right now, without consuming short presses (for animations and HUD). */
   heldButtons() {
     if (!this.enabled) return 0
     let b = 0

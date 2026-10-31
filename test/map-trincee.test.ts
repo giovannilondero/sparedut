@@ -11,14 +11,14 @@ beforeAll(async () => {
 })
 
 for (const mode of MODE_IDS) {
-  test(`i bot giocano tes trinceis: ${mode}`, () => {
+  test(`bots play in the trinceis: ${mode}`, () => {
     const { kills, view: v } = playBots("trincee", mode)
     console.log("trincee", mode, { score: v.score, kills })
     expect(kills).toBeGreaterThan(3)
   }, 120000)
 }
 
-test("la ferade Decauville si fâs a pît, sù e jù pes rampis", () => {
+test("the Decauville railway can be walked on foot, up and down the ramps", () => {
   const physics = createPhysicsWorld(TRINCEE)
   const track = TRINCEE.track
   let body: Body = { x: track[0][0], y: track[0][1], z: track[0][2], vx: 0, vy: 0, vz: 0, grounded: true, crouch: false }
@@ -31,7 +31,7 @@ test("la ferade Decauville si fâs a pît, sù e jù pes rampis", () => {
       const dz = b[2] - body.z
       if (Math.hypot(dx, dz) < 0.5) break
       body = stepBody(body, { ...IDLE_INPUT, mz: 1, yaw: Math.atan2(-dx, -dz) }, physics, 1).body
-      // Distanza dal tratto (in pianta) e quota attesa sul tratto.
+      // Distance from the segment (in plan) and expected height on the segment.
       const len = Math.hypot(b[0] - a[0], b[2] - a[2])
       const k = Math.max(0, Math.min(1, ((body.x - a[0]) * (b[0] - a[0]) + (body.z - a[2]) * (b[2] - a[2])) / (len * len)))
       const px = a[0] + (b[0] - a[0]) * k

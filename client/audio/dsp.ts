@@ -1,16 +1,16 @@
 /**
- * Mattoncini di sintesi: oscillatori, rumore, filtri, inviluppi, risonatori modali,
- * riverbero ed eco. Tutto su Float32Array mono a `SR`, poi WAV 16 bit.
+ * Synthesis building blocks: oscillators, noise, filters, envelopes, modal resonators,
+ * reverb and echo. All on mono Float32Array at `SR`, then 16-bit WAV.
  */
 
 export const SR = 32000
 
 export type Rnd = () => number
-/** Parametro costante o funzione del tempo (secondi dall'inizio della voce). */
+/** Constant parameter or function of time (seconds since the voice started). */
 export type Param = number | ((t: number) => number)
 export type Wave = "sin" | "tri" | "saw" | "sqr" | "noise"
 
-/** Generatore pseudo-casuale deterministico (mulberry32). */
+/** Deterministic pseudo-random generator (mulberry32). */
 export function rng(seed: number): Rnd {
   let a = seed >>> 0
   return () => {
@@ -28,7 +28,7 @@ export const midi = (n: number) => 440 * 2 ** ((n - 69) / 12)
 const pv = (p: Param, t: number) => (typeof p === "number" ? p : p(t))
 const TAU = Math.PI * 2
 
-/** Filtro a variabile di stato (TPT): passa-basso, passa-banda, passa-alto insieme. */
+/** State-variable filter (TPT): low-pass, band-pass, high-pass at once. */
 export class Svf {
   private ic1 = 0
   private ic2 = 0
@@ -61,7 +61,7 @@ export class Svf {
   }
 }
 
-// polyBLEP: toglie l'aliasing ai salti di dente di sega e quadra
+// polyBLEP: removes aliasing at the saw and square discontinuities
 function blep(t: number, dt: number) {
   if (t < dt) {
     t /= dt
@@ -75,30 +75,30 @@ function blep(t: number, dt: number) {
 }
 
 export interface Voice {
-  /** Inizio, secondi. */
+  /** Start, seconds. */
   at?: number
   dur: number
   f?: Param
   wave?: Wave
   amp?: Param
-  /** Attacco lineare (s). */
+  /** Linear attack (s). */
   a?: number
-  /** Costante di tempo del decadimento esponenziale (s). */
+  /** Time constant of the exponential decay (s). */
   d?: number
-  /** Inviluppo personalizzato al posto di a/d. */
+  /** Custom envelope instead of a/d. */
   env?: (t: number) => number
   lp?: Param
   hp?: Param
   bp?: Param
   q?: number
-  /** Larghezza d'impulso per "sqr". */
+  /** Pulse width for "sqr". */
   pw?: number
-  /** Oscillatori scordati sommati (cents), attraverso un solo filtro. */
+  /** Summed detuned oscillators (cents), through a single filter. */
   detune?: readonly number[]
   rnd?: Rnd
 }
 
-/** Una voce: oscillatore → filtri → inviluppo, sommata in `out`. */
+/** One voice: oscillator → filters → envelope, summed into `out`. */
 export function voice(out: Float32Array, v: Voice) {
   const start = Math.floor((v.at ?? 0) * SR)
   const n = Math.min(len(v.dur), out.length - start)
@@ -122,7 +122,7 @@ export function voice(out: Float32Array, v: Voice) {
   const nOsc = ratios.length
   const phs = ratios.map((_, i) => (i * 0.37) % 1)
   const oscGain = 1 / Math.sqrt(nOsc)
-  // inviluppo predefinito: rampa lineare poi decadimento esponenziale ricorsivo
+  // default envelope: linear ramp then recursive exponential decay
   const na = Math.max(1, Math.floor(a * SR))
   const k = Number.isFinite(d) ? Math.exp(-1 / (d * SR)) : 1
   let e = 1
@@ -175,7 +175,7 @@ export function voice(out: Float32Array, v: Voice) {
   }
 }
 
-/** Risonatore smorzato: un modo di vibrazione (campane, legno, metallo). `d` costante di tempo. */
+/** Damped resonator: one vibration mode (bells, wood, metal). `d` is the time constant. */
 export function mode(out: Float32Array, at: number, freq: number, amp: number, d: number) {
   const start = Math.floor(at * SR)
   if (freq >= SR / 2) return
@@ -194,18 +194,18 @@ export function mode(out: Float32Array, at: number, freq: number, amp: number, d
   }
 }
 
-/** Raffica di rumore breve: lo "schiocco" di un meccanismo. */
+/** Short noise burst: the "snap" of a mechanism. */
 export function click(out: Float32Array, at: number, amp: number, bright = 3000, rnd: Rnd = Math.random) {
   voice(out, { at, dur: 0.012, wave: "noise", hp: bright, amp, a: 0.0003, d: 0.0025, rnd })
 }
 
-/** Saturazione morbida. */
+/** Soft saturation. */
 export function drive(b: Float32Array, k: number) {
   const norm = 1 / Math.tanh(k)
   for (let i = 0; i < b.length; i++) b[i] = Math.tanh(k * b[i]) * norm
 }
 
-/** Eco multiple, ogni ritorno più scuro (passa-basso a `lpHz`). */
+/** Multiple echoes, each return darker (low-pass at `lpHz`). */
 export function echo(b: Float32Array, taps: readonly (readonly [number, number])[], lpHz: number) {
   const dry = b.slice()
   const f = new Svf(lpHz)
@@ -220,7 +220,7 @@ export function echo(b: Float32Array, taps: readonly (readonly [number, number])
   }
 }
 
-/** Riverbero di Schroeder/Freeverb ridotto: 4 comb con smorzamento + 2 allpass. */
+/** Reduced Schroeder/Freeverb reverb: 4 damped combs + 2 allpasses. */
 export function reverb(b: Float32Array, mix: number, size = 1, damp = 0.3, fb = 0.8) {
   const s = (SR / 44100) * size
   const combs = [1116, 1188, 1277, 1356].map(c => Math.floor(c * s))
@@ -262,7 +262,7 @@ export function normalize(b: Float32Array, peak = 0.9) {
   return b
 }
 
-/** Taglia il silenzio in coda e sfuma gli ultimi millisecondi. */
+/** Trims trailing silence and fades out the last milliseconds. */
 export function trim(b: Float32Array, threshold = 0.0005) {
   let end = b.length
   while (end > 1 && Math.abs(b[end - 1]) < threshold) end--
@@ -272,7 +272,7 @@ export function trim(b: Float32Array, threshold = 0.0005) {
   return out
 }
 
-/** WAV PCM 16 bit mono. */
+/** 16-bit mono PCM WAV. */
 export function wav(samples: Float32Array): ArrayBuffer {
   const ab = new ArrayBuffer(44 + samples.length * 2)
   const v = new DataView(ab)

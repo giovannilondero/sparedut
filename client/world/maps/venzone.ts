@@ -1,12 +1,12 @@
 /**
- * Lo scenario di Vençon: il Duomo gotico di Sant'Andrea (portali acuti, rosone,
- * contrafforti, bifore), il campanile con la cuspide, la cappella tonda di San
- * Michele, la loggia gotica e l'orologio del Comune, gli archi delle porte, gli
- * stendardi; fuori, la valle stretta del Tagliamento fra il Plauris e le montagne
- * di Portis, con i pioppi lungo il fossato.
+ * The scenery of Vençon: the Gothic Duomo of Sant'Andrea (pointed portals, rose window,
+ * buttresses, mullioned windows), the bell tower with its spire, the round chapel of San
+ * Michele, the Gothic loggia and the Comune's clock, the gate arches, the
+ * banners; outside, the narrow Tagliamento valley between the Plauris and the mountains
+ * of Portis, with poplars along the moat.
  *
- * Solo decori sottili o irraggiungibili: tutto ciò che si tocca sta nei blocchi di
- * `shared/maps/venzone.ts` (i merli compresi).
+ * Only thin or unreachable decorations: everything you can touch lives in the blocks of
+ * `shared/maps/venzone.ts` (merlons included).
  */
 import * as THREE from "three"
 import { CAMPANILE, CLOCK, COMUNE, DUOMO, GATE, SAN_MICHELE, WALL } from "../../../shared/maps/venzone.ts"
@@ -20,10 +20,10 @@ const DARK = "#3a352e"
 
 function build(kit: SceneryKit) {
   const { B, root, C, cylBetween, sphere, roof, atlas } = kit
-  /** Aggiunge una geometria disegnata nel piano di una facciata (x lungo il muro, z uscente). */
+  /** Adds a geometry drawn in a façade's plane (x along the wall, z outward). */
   const onFace = (k: Parameters<typeof B.add>[0], g: THREE.BufferGeometry, n: V, p: V, color?: THREE.Color) => B.add(k, g.applyMatrix4(faceMatrix(n, p)), color)
 
-  /** Finestra gotica stretta (monofora): vano scuro con l'arco acuto e la ghiera. */
+  /** Narrow Gothic window (lancet): dark opening with a pointed arch and its ring. */
   const lancet = (n: V, p: V, a: number, h: number) => {
     onFace("pietra", archPanel(a, h, a * 0.6), n, [p[0] + n[0] * 0.02, p[1], p[2] + n[2] * 0.02], C(DARK))
     onFace("pietraChiara", archRing(a, a + 0.14, 0.12, a * 0.6), n, [p[0] + n[0] * 0.06, p[1], p[2] + n[2] * 0.06], C(STONE))
@@ -35,24 +35,24 @@ function build(kit: SceneryKit) {
     B.add("ferro", cylBetween([-h * reg.aspect * 0.6, h / 2 + 0.02, 0.05], [h * reg.aspect * 0.6, h / 2 + 0.02, 0.05], 0.03, 0.03, 6).applyMatrix4(m), C("#c9a040"))
   }
 
-  // --- Duomo di Sant'Andrea -------------------------------------------------------------
+  // --- Duomo of Sant'Andrea ------------------------------------------------------------
   {
     const { minX, maxX, minZ, maxZ, height: h } = DUOMO
     const fz = maxZ
     const cx = (minX + maxX) / 2
-    // Portale maggiore acuto con la lunetta, e i due minori.
+    // Main pointed portal with its lunette, and the two smaller ones.
     for (const [x, a, top] of [[17.5, 2, 5.5], [11.5, 1, 4], [23, 1, 4]] as const) {
       B.add("pietra", archPanel(a, 0, a * 0.45).translate(x, top, fz + 0.02), C("#6e665a"))
       B.add("pietraChiara", archRing(a, a + 0.5, 0.4, a * 0.45).translate(x, top, fz + 0.2), C(STONE))
       B.add("pietraChiara", archRing(a + 0.55, a + 0.75, 0.25, a * 0.5).translate(x, top, fz + 0.12), C("#c9c0ae"))
       for (const s of [-1, 1]) B.add("pietraChiara", cylBetween([x + s * (a + 0.25), 0, fz + 0.2], [x + s * (a + 0.25), top, fz + 0.2], 0.16, 0.14, 8), C(STONE))
     }
-    // Il rosone sopra il portale.
+    // The rose window above the portal.
     const ry = 10.6
     B.add("atlas", atlasDisc(atlas.rose, 2.1, 40).translate(17.5, ry, fz + 0.02))
     B.add("pietraChiara", new THREE.TorusGeometry(2.22, 0.2, 8, 40).translate(17.5, ry, fz + 0.1), C(STONE))
     B.add("pietraChiara", new THREE.TorusGeometry(2.55, 0.1, 6, 40).translate(17.5, ry, fz + 0.06), C("#c9c0ae"))
-    // Contrafforti sottili (30 cm): angoli della facciata e lungo i fianchi.
+    // Thin buttresses (30 cm): façade corners and along the sides.
     const buttress = (x0: number, z0: number, x1: number, z1: number) => {
       B.add("pietra", boxAt([x0, 0, z0], [x1, h - 1.2, z1]), C("#cfc8bb"))
       B.add("pietra", boxAt([x0 - 0.05, h - 1.2, z0 - 0.05], [x1 + 0.05, h - 0.9, z1 + 0.05]), C(STONE))
@@ -62,15 +62,15 @@ function build(kit: SceneryKit) {
       buttress(minX - 0.3, z, minX, z + 0.8)
       buttress(maxX, z, maxX + 0.3, z + 0.8)
     }
-    // Monofore lungo i fianchi, fra i contrafforti.
+    // Lancet windows along the sides, between the buttresses.
     for (const z of [-52, -59, -73, -79]) {
       lancet([-1, 0, 0], [minX, 10, z], 0.55, 3.4)
       lancet([1, 0, 0], [maxX, 10, z], 0.55, 3.4)
     }
     lancet([1, 0, 0], [maxX, 10, -66], 0.55, 3.4)
-    // Archetto sopra la porta laterale ovest.
+    // Small arch above the west side door.
     onFace("pietraChiara", archRing(1.5, 1.9, 0.3, 0.7), [-1, 0, 0], [minX - 0.1, 4, -64.5], C(STONE))
-    // Tetto a capanna ripido, col timpano di pietra; pinnacoli agli angoli.
+    // Steep gable roof, with a stone pediment; pinnacles at the corners.
     roof(minX, minZ, maxX, maxZ, h + 0.8, C("#cbc4b6"), 6.5, "pietra")
     for (const x of [minX + 0.35, maxX - 0.35]) {
       B.add("pietra", cylBetween([x, h + 0.8, fz + 0.15], [x, h + 3.2, fz + 0.15], 0.3, 0.26, 6), C(STONE))
@@ -79,7 +79,7 @@ function build(kit: SceneryKit) {
     B.add("pietraChiara", new THREE.ConeGeometry(0.3, 1.4, 6).translate(cx, h + 0.8 + 6.5 + 0.9, fz), C(STONE))
     B.add("ferro", cylBetween([cx, h + 7.9, fz], [cx, h + 9.3, fz], 0.04), C("#3a3028"))
     B.add("ferro", cylBetween([cx - 0.4, h + 8.9, fz], [cx + 0.4, h + 8.9, fz], 0.04), C("#3a3028"))
-    // Dentro: le volte a crociera accennate sopra i pilastri e la luce sull'altare.
+    // Inside: hinted cross vaults above the pillars and the light on the altar.
     for (const z of [-54, -60, -66, -72]) {
       for (const x of [13, 22]) B.add("pietraChiara", boxAt([x - 0.75, 11.6, z - 0.75], [x + 0.75, 12, z + 0.75]), C(STONE))
       B.add("pietraChiara", spandrel(4.5, 3, 0.5, 1.2).translate(17.5, 12, z), C("#e6e0d4"))
@@ -87,11 +87,11 @@ function build(kit: SceneryKit) {
     const altar = new THREE.PointLight("#ffb46a", 50, 18, 1.3)
     altar.position.set(17.5, 4, -76)
     root.add(altar)
-    // Stendardi dei Benandanti sul fianco ovest, verso la via maestra.
+    // Benandanti banners on the west side, towards the main street.
     for (const z of [-55, -73]) banner(atlas.bannerB, [-1, 0, 0], [minX - 0.3, 7.5, z], 4.5)
   }
 
-  // --- Campanile: bifore della cella campanaria e cuspide ----------------------------------
+  // --- Bell tower: belfry mullioned windows and spire ---------------------------------------
   {
     const { minX, maxX, minZ, maxZ, height: h } = CAMPANILE
     const cx = (minX + maxX) / 2
@@ -108,7 +108,7 @@ function build(kit: SceneryKit) {
         const at = new THREE.Vector3(dx, h - 3, 0).applyMatrix4(m)
         lancet(n, [at.x, at.y, at.z], 0.5, 2.6)
       }
-      // marcapiani
+      // string courses
       onFace("pietraChiara", boxAt([-half - 0.1, 0, 0], [half + 0.1, 0.25, 0.15]), n, [p[0], h - 6.4, p[2]], C(STONE))
     }
     B.add("pietraChiara", boxAt([minX - 0.2, h, minZ - 0.2], [maxX + 0.2, h + 0.4, maxZ + 0.2]), C(STONE))
@@ -117,7 +117,7 @@ function build(kit: SceneryKit) {
     B.add("marmo", sphere([cx, h + 11.1, cz], 0.18), C("#d9b45a"))
   }
 
-  // --- San Michele: la cappella tonda delle mummie ------------------------------------------
+  // --- San Michele: the round chapel of the mummies ------------------------------------------
   {
     const { x, z, r, height: h } = SAN_MICHELE
     B.add("pietraChiara", new THREE.CylinderGeometry(r, r + 0.08, h, 20).translate(x, h / 2, z), C("#e4dccd"))
@@ -125,7 +125,7 @@ function build(kit: SceneryKit) {
     B.add("coppi", new THREE.ConeGeometry(r + 0.5, 3.2, 20).translate(x, h + 1.7, z), C("#c88a6c"))
     B.add("pietraChiara", new THREE.CylinderGeometry(0.5, 0.55, 1.1, 8).translate(x, h + 3.5, z), C(STONE))
     B.add("coppi", new THREE.ConeGeometry(0.7, 1, 8).translate(x, h + 4.5, z), C("#b07060"))
-    // La porta verso il sagrato, ad ovest, con la lunetta; feritoie tonde.
+    // The door towards the churchyard, to the west, with its lunette; round slit windows.
     const door = faceMatrix([-1, 0, 0], [x - r - 0.02, 0, z])
     B.add("legno", boxAt([-0.75, 0, 0], [0.75, 2.4, 0.06]).applyMatrix4(door), C("#6a4428"))
     B.add("pietraChiara", archRing(0.75, 1.0, 0.2).translate(0, 2.4, 0.1).applyMatrix4(door), C(STONE))
@@ -135,22 +135,22 @@ function build(kit: SceneryKit) {
     }
   }
 
-  // --- Palazzo Comunale: archi acuti della loggia, bifore, orologio ---------------------------
+  // --- Palazzo Comunale: pointed loggia arches, mullioned windows, clock ----------------------
   const hands: THREE.Mesh[] = []
   {
     const { minX, maxX, minZ, maxZ, loggiaH, roof: top } = COMUNE
     const arch = (a: number) => spandrel(a, 2, 0.6, a * 0.35)
-    // Fronte sulla via (x = maxX): tre archi fra i pilastri.
+    // Street front (x = maxX): three arches between the pillars.
     for (const [z0, z1] of [[59, 62.33], [63.33, 66.67], [67.67, 71]] as const) {
       B.add("pietraChiara", arch((z1 - z0) / 2).rotateY(Math.PI / 2).translate(maxX - 0.3, loggiaH - 2, (z0 + z1) / 2), C(STONE))
     }
-    // Fianchi nord e sud: due archi ciascuno.
+    // North and south sides: two arches each.
     for (const z of [minZ + 0.3, maxZ - 0.3]) {
       for (const [x0, x1] of [[COMUNE.loggiaX, -11.5], [-10.5, maxX - 1]] as const) {
         B.add("pietraChiara", arch((x1 - x0) / 2).translate((x0 + x1) / 2, loggiaH - 2, z), C(STONE))
       }
     }
-    // Bifore al piano nobile sulla via e sui fianchi.
+    // Mullioned windows on the main floor, on the street and the sides.
     for (const z of [61, 65, 69]) {
       for (const dz of [-0.5, 0.5]) lancet([1, 0, 0], [maxX, 9.5, z + dz], 0.38, 2)
       onFace("pietraChiara", boxAt([-1.1, -2.1, 0], [1.1, -1.95, 0.25]), [1, 0, 0], [maxX, 9.5, z], C(STONE))
@@ -160,7 +160,7 @@ function build(kit: SceneryKit) {
       lancet([0, 0, 1], [x, 9.5, maxZ], 0.42, 2)
     }
     roof(minX, minZ, maxX, maxZ, top, C("#e8dcc8"), 3.2, "pietraChiara")
-    // Torre dell'orologio: quadranti, cella e tetto a piramide.
+    // Clock tower: dials, belfry and pyramid roof.
     const tx = (CLOCK.minX + CLOCK.maxX) / 2
     const tz = (CLOCK.minZ + CLOCK.maxZ) / 2
     const cy = CLOCK.top - 2.4
@@ -174,7 +174,7 @@ function build(kit: SceneryKit) {
       hands.push(hand)
     }
     B.add("pietraChiara", boxAt([CLOCK.minX - 0.2, CLOCK.top, CLOCK.minZ - 0.2], [CLOCK.maxX + 0.2, CLOCK.top + 0.3, CLOCK.maxZ + 0.2]), C(STONE))
-    // Merli a coda di rondine (decoro: la cima della torre non si raggiunge).
+    // Swallowtail merlons (decor: the top of the tower can't be reached).
     for (const [x0, z0, x1, z1] of [
       [CLOCK.minX - 0.2, CLOCK.minZ - 0.2, CLOCK.maxX + 0.2, CLOCK.minZ + 0.2],
       [CLOCK.minX - 0.2, CLOCK.maxZ - 0.2, CLOCK.maxX + 0.2, CLOCK.maxZ + 0.2]
@@ -185,7 +185,7 @@ function build(kit: SceneryKit) {
     for (const z of [61, 69]) banner(atlas.bannerM, [1, 0, 0], [maxX, 5.9 + 0.1, z], 4)
   }
 
-  // --- le porte: volta acuta nell'androne, archi sulle facce, stemmi -------------------------
+  // --- the gates: pointed vault in the passage, arches on the faces, coats of arms ----------
   for (const s of [-1, 1] as const) {
     const { passHalf: ph, passH, depthOut, depthIn, top } = GATE
     const zo = s * (WALL.outZ + depthOut)
@@ -199,13 +199,13 @@ function build(kit: SceneryKit) {
     }
     banner(s < 0 ? atlas.bannerB : atlas.bannerM, [0, 0, -s], [0, 8.8, zo], 3.6)
     banner(s < 0 ? atlas.bannerB : atlas.bannerM, [0, 0, s], [0, 9.5, zi], 3.2)
-    // Coronamento della torre: cornice su beccatelli.
+    // Tower crown: cornice on corbels.
     for (let x = -GATE.halfX + 0.3; x < GATE.halfX; x += 0.8) {
       for (const z of [Math.min(zo, zi), Math.max(zo, zi)]) B.add("pietra", boxAt([x, top - 0.5, z - 0.12], [x + 0.25, top - 0.1, z + 0.12]), C("#b8b0a2"))
     }
   }
 
-  // Stendardi lungo il camminamento, verso l'interno.
+  // Banners along the wall walk, facing inward.
   for (const z of [-40, 0, 40]) {
     banner(z < 0 ? atlas.bannerB : atlas.bannerM, [1, 0, 0], [-WALL.inX, 3.5, z], 3.2)
     banner(z < 0 ? atlas.bannerB : atlas.bannerM, [-1, 0, 0], [WALL.inX, 3.5, z], 3.2)
@@ -216,14 +216,14 @@ function build(kit: SceneryKit) {
       const d = new Date()
       const min = d.getMinutes() + d.getSeconds() / 60
       const hr = (d.getHours() % 12) + min / 60
-      // Visto da est (dalla via) il senso orario è una rotazione negativa attorno a x.
+      // Seen from the east (from the street), clockwise is a negative rotation around x.
       hands[0].rotation.x = -(hr / 12) * Math.PI * 2
       hands[1].rotation.x = -(min / 60) * Math.PI * 2
     }
   }
 }
 
-/** Fuori dai bordi: fondovalle coi campi, montagne ripide a est e a ovest. */
+/** Beyond the edges: valley floor with fields, steep mountains east and west. */
 function backdrop(kit: SceneryKit): THREE.Object3D[] {
   const { map } = kit
   const { minX, maxX, minZ, maxZ } = map.bounds
@@ -231,17 +231,17 @@ function backdrop(kit: SceneryKit): THREE.Object3D[] {
     const dx = Math.max(minX - x, x - maxX, 0)
     const dz = Math.max(minZ - z, z - maxZ, 0)
     const d = Math.max(dx, dz)
-    // Il Plauris a est è più alto e più vicino; a ovest i monti di Portis.
+    // The Plauris to the east is higher and closer; to the west the Portis mountains.
     const east = x > 0 ? 1.15 : 0.9
     const wall = smooth(25, 330, dx) * (420 + 420 * fbm(x / 310 + 5, z / 310)) * east
-    // Il fondovalle sale piano verso nord (la stretta di Portis) e scende verso sud.
+    // The valley floor rises gently northwards (the Portis narrows) and drops southwards.
     const valley = z < 0 ? smooth(200, 1100, dz) * 90 : -smooth(300, 1200, dz) * 15
     return -0.3 + wall + valley * smooth(0, 60, d) + fbm(x / 90, z / 90) * 6 * smooth(0, 50, d)
   }
   const terrain = makeHeightfield(height, map.bounds, 717)
   terrain.name = "valle-dal-tiliment"
 
-  // Pioppi e cipressi lungo il fossato e i campi, fuori dalla cinta.
+  // Poplars and cypresses along the moat and the fields, outside the walls.
   const trees = new THREE.Group()
   trees.name = "pioppi"
   const r = rng(733)
