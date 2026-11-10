@@ -8,7 +8,7 @@ import type { Viewmodel, ViewmodelFrame } from "./contracts.ts"
 import { WEAPON_IDS, type WeaponId } from "../shared/weapons.ts"
 import { bump, burlapTex, clamp, damp, flashTex, put, ramp, std } from "./models/kit.ts"
 import { sgnapeBottle } from "./models/props.ts"
-import { buildWeapon, type WeaponModel } from "./models/weapons.ts"
+import { buildWeapon, remodel, type WeaponModel } from "./models/weapons.ts"
 
 interface Hold {
   readonly hip: readonly [number, number, number]
@@ -51,6 +51,8 @@ const cuff = () => std("vm-cuff", { color: 0x6b4a2a, roughness: 0.9 })
 /** Hand + sleeve leaving the frame in direction `dir` (rig space). */
 function arm(parent: THREE.Object3D, at: THREE.Vector3, dir: THREE.Vector3, hold: Euler3): THREE.Group {
   const g = new THREE.Group()
+  // a hand is not part of the weapon: a detailed model leaves it where it is
+  g.userData.keep = true
   g.position.copy(at)
   parent.add(g)
   put(g, new THREE.BoxGeometry(0.044, 0.052, 0.082), skin(), 0, -0.006, 0.008)
@@ -497,6 +499,9 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
   return {
     scene,
     camera,
+    remodel(id, detailed) {
+      remodel(slots[id].model, detailed)
+    },
     setWeapon(id) {
       if (cur?.id === id && !pending) return
       if (!cur) {

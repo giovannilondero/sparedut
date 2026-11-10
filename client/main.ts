@@ -14,6 +14,7 @@ import { isLocalHost } from "../shared/hosts.ts"
 import { Game } from "./game.ts"
 import { t } from "./i18n.ts"
 import { createLook, lookFromUrl, mountLookSwitcher } from "./looks.ts"
+import { DETAILED, loadDetailed } from "./models/detailed.ts"
 import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
 import { PerfMonitor } from "./perf.ts"
@@ -77,6 +78,8 @@ const loadMap = (id: MapId) => {
 const fx = createFx(scene)
 const viewmodel = createViewmodel(camera)
 viewmodel.setVisible(false)
+// The realistic look holds the weapons modelled in Blender; the files are fetched only then.
+if (look.id === "ver") for (const id of DETAILED) void loadDetailed(id).then((model) => viewmodel.remodel(id, model))
 const audio = createAudio()
 audio.setVolumes(settings.master, settings.music)
 addEventListener("resize", resize)

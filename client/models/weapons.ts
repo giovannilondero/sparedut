@@ -438,6 +438,35 @@ const BUILDERS: Record<WeaponId, () => WeaponModel> = { mescul, mandi, cramar, d
 
 export const buildWeapon = (id: WeaponId): WeaponModel => BUILDERS[id]()
 
+/**
+ * Swaps a weapon's meshes for a detailed model (see `detailed.ts`). Its `body` node goes
+ * under the root and each node named after a moving part under that part's pivot; what
+ * else hangs from the weapon and is marked `userData.keep` (the hands) stays.
+ */
+export function remodel(model: WeaponModel, detailed: THREE.Object3D) {
+  const old: THREE.Mesh[] = []
+  const visit = (o: THREE.Object3D) => {
+    if (o.userData.keep) return
+    if (o instanceof THREE.Mesh) old.push(o)
+    for (const c of o.children) visit(c)
+  }
+  visit(model.root)
+  for (const m of old) {
+    m.removeFromParent()
+    m.geometry.dispose()
+  }
+  const body = detailed.getObjectByName("body")
+  if (body) model.root.add(body)
+  for (const [name, pivot] of Object.entries(model.parts)) {
+    const node = detailed.getObjectByName(name)
+    if (!node || !(pivot instanceof THREE.Object3D)) continue
+    node.position.set(0, 0, 0)
+    pivot.add(node)
+  }
+  const muzzle = detailed.getObjectByName("muzzle")
+  if (muzzle) model.muzzle.position.copy(muzzle.position)
+}
+
 export interface BakedWeapon {
   readonly geometry: THREE.BufferGeometry
   readonly muzzle: THREE.Vector3
