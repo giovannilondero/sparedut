@@ -9,7 +9,7 @@ import { createAvatar, setDetailedWeapon } from "../avatars.ts"
 import type { AvatarPose } from "../contracts.ts"
 import { createFx } from "../fx.ts"
 import { createLook, lookFromUrl, mountLookSwitcher } from "../looks.ts"
-import { loadDetailed } from "../models/detailed.ts"
+import { loadDetailed, loadHands } from "../models/detailed.ts"
 import { createViewmodel } from "../viewmodel.ts"
 import type { PickupKind } from "../../shared/map.ts"
 import { WEAPONS, WEAPON_IDS, type WeaponId } from "../../shared/weapons.ts"
@@ -52,6 +52,7 @@ scene.add(fpCam)
 
 const fx = createFx(scene)
 const vm = createViewmodel(fpCam)
+if (style.id === "ver") loadHands((hands) => vm.remodelHands(hands))
 if (style.id === "ver")
   loadDetailed((id, model) => {
     const far = model.getObjectByName("far")

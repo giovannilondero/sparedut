@@ -13,6 +13,9 @@ bun scripts/models.ts mandi   # one
 
 The game reads the nodes by name: `body`, one node per moving part named like the key in
 the builder's `parts` (`mag`, `slide`, `shells0`…), and the points `muzzle` and `left`.
+Each file also carries `far`, the whole weapon joined and thinned to 3000 triangles: what
+the other players are seen holding. `hands.py` is not a weapon: it builds the shooter's hands
+(`fist`, `cup`) and `sleeve`, which `client/viewmodel.ts` places on every weapon.
 Everything is authored in weapon space at rest, where the primitive version has it: pivots,
 hands and animations stay the ones in the game code.
 
