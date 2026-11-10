@@ -7,6 +7,7 @@ import * as THREE from "three"
 import type { Viewmodel, ViewmodelFrame } from "./contracts.ts"
 import { WEAPON_IDS, type WeaponId } from "../shared/weapons.ts"
 import { bump, burlapTex, clamp, damp, flashTex, put, ramp, std } from "./models/kit.ts"
+import { handMaker, type HandMaker } from "./models/hands.ts"
 import { sgnapeBottle } from "./models/props.ts"
 import { buildWeapon, remodel, type WeaponModel } from "./models/weapons.ts"
 
@@ -49,39 +50,14 @@ const skin = () => std("vm-skin", { color: 0xe3a985, roughness: 0.75 })
 const linen = () => std("vm-linen", { color: 0xe9e2d0, map: burlapTex(), roughness: 0.95 })
 const cuff = () => std("vm-cuff", { color: 0x6b4a2a, roughness: 0.9 })
 
-/**
- * How a modelled hand closes on what it holds (weapon space). `thumb`: where the thumb side
- * of the hand points, which is the axis of the thing held. `fore`: where the hand's own
- * forearm leaves (default: along the sleeve). `cock`: how far the wrist is bent towards the
- * little finger. `lift`: how far the hand moves towards what it holds.
- */
-interface Grasp {
-  readonly shape: "fist" | "cup"
-  readonly thumb: Euler3
-  readonly fore?: Euler3
-  readonly cock?: number
-  readonly lift?: number
-}
-/** On a pistol grip. */
-const GRIP: Grasp = { shape: "fist", thumb: [0, 1, 0], cock: 0.35 }
-/** Under a fore-end, which lies across the palm: the wrist is bent back. */
-const CRADLE: Grasp = { shape: "cup", thumb: [-0.6, 0, -0.8], fore: [-0.77, -0.15, 0.62], lift: 0.02 }
-/** Around a stick that runs along the barrel. */
-const STICK: Grasp = { shape: "fist", thumb: [0, 0, -1] }
-const GRASP: Partial<Record<WeaponId, { right?: Grasp; left?: Grasp }>> = {
-  mescul: { right: STICK, left: STICK },
-  mulin: { left: GRIP },
-  mitraie: { left: GRIP }
-}
 interface ArmSpec {
-  /** Towards the elbow (the arm group's space). */
-  readonly d: THREE.Vector3
   readonly left: boolean
-  readonly grasp: Grasp
+  /** The pose the modelled hand takes here (`assets/blender/hands.py`). */
+  readonly pose: string
 }
 
 /** Hand + sleeve leaving the frame in direction `dir` (rig space). */
-function arm(parent: THREE.Object3D, at: THREE.Vector3, dir: THREE.Vector3, hold: Euler3, left: boolean, grasp: Grasp): THREE.Group {
+function arm(parent: THREE.Object3D, at: THREE.Vector3, dir: THREE.Vector3, hold: Euler3, left: boolean, pose: string): THREE.Group {
   const g = new THREE.Group()
   // a hand is not part of the weapon: a detailed model leaves it where it is
   g.userData.keep = true
@@ -91,7 +67,7 @@ function arm(parent: THREE.Object3D, at: THREE.Vector3, dir: THREE.Vector3, hold
   put(g, new THREE.BoxGeometry(0.016, 0.016, 0.04), skin(), -0.022, 0.012, -0.012, 0, 0.3)
   const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(...hold)).invert()
   const d = dir.clone().normalize().applyQuaternion(q)
-  g.userData.arm = { d, left, grasp } satisfies ArmSpec
+  g.userData.arm = { left, pose } satisfies ArmSpec
   const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.028, 0.44, 10), linen())
   sleeve.position.copy(d).multiplyScalar(0.27)
   sleeve.quaternion.setFromUnitVectors(Y, d)
@@ -105,41 +81,16 @@ function arm(parent: THREE.Object3D, at: THREE.Vector3, dir: THREE.Vector3, hold
 
 type Euler3 = readonly [number, number, number]
 
-/**
- * Replaces an arm's boxes with the hand and sleeve modelled in Blender
- * (`assets/blender/hands.py`): a right hand, mirrored for the left arm.
- */
-function dress(g: THREE.Group, hands: THREE.Object3D) {
-  const { d, left, grasp } = g.userData.arm as ArmSpec
-  const shape = hands.getObjectByName(grasp.shape)
-  const cloth = hands.getObjectByName("sleeve")
-  const wristAt = hands.getObjectByName("wrist")
-  if (!shape || !cloth || !wristAt) return
+/** Replaces an arm's boxes with the hand and sleeve modelled in Blender, closed on what this arm holds. */
+function dress(g: THREE.Group, make: HandMaker) {
+  const { left, pose } = g.userData.arm as ArmSpec
+  const hand = make(pose, left)
+  if (!hand) return
   for (const c of [...g.children]) {
     c.removeFromParent()
     ;(c as THREE.Mesh).geometry?.dispose()
   }
-  // the hand's frame: z along its forearm, y to the thumb side, x across the palm
-  const f = grasp.fore ? new THREE.Vector3(...grasp.fore).normalize() : d.clone()
-  const t = new THREE.Vector3(...grasp.thumb)
-  t.addScaledVector(f, -t.dot(f)).normalize()
-  const hand = new THREE.Group()
-  hand.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3().crossVectors(t, f), t, f))
-  hand.rotateX(-(grasp.cock ?? 0))
-  const skin = shape.clone()
-  skin.position.set(0, 0, 0)
-  if (left) skin.scale.x = -1
-  hand.add(skin)
-  const side = left ? -1 : 1
-  hand.position.set(-side, 0, 0).applyQuaternion(hand.quaternion).multiplyScalar(grasp.lift ?? 0)
-  // the sleeve runs from the wrist to where the elbow is
-  const wrist = wristAt.position.clone()
-  wrist.x *= side
-  wrist.applyQuaternion(hand.quaternion).add(hand.position)
-  const sleeve = cloth.clone()
-  sleeve.position.copy(wrist)
-  sleeve.quaternion.setFromUnitVectors(Z, d.clone().multiplyScalar(0.52).sub(wrist).normalize())
-  g.add(hand, sleeve)
+  g.add(hand)
 }
 
 interface Slot {
@@ -155,9 +106,9 @@ interface Slot {
 function makeSlot(id: WeaponId): Slot {
   const model = buildWeapon(id)
   const hold = HOLD[id]
-  arm(model.root, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.25, -0.55, 0.8), hold.rot, false, GRASP[id]?.right ?? GRIP)
+  arm(model.root, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.25, -0.55, 0.8), hold.rot, false, `${id}_right`)
   const leftBase = model.left ? model.left.clone() : new THREE.Vector3(-0.1, -0.22, 0.08)
-  const leftArm = arm(model.root, leftBase, new THREE.Vector3(-0.35, -0.5, 0.8), hold.rot, true, GRASP[id]?.left ?? CRADLE)
+  const leftArm = arm(model.root, leftBase, new THREE.Vector3(-0.35, -0.5, 0.8), hold.rot, true, `${id}_left`)
   leftArm.visible = model.left !== null
   const rest: Slot["rest"] = []
   const parts = model.parts
@@ -201,7 +152,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
   // left arm for throwing the boce of sgnape
   const toss = new THREE.Group()
   scene.add(toss)
-  arm(toss, new THREE.Vector3(), new THREE.Vector3(-0.2, -0.6, 0.75), [0, 0, 0], true, GRIP)
+  arm(toss, new THREE.Vector3(), new THREE.Vector3(-0.2, -0.6, 0.75), [0, 0, 0], true, "toss_left")
   const bottle = sgnapeBottle()
   bottle.position.set(0.0, 0.0, -0.02)
   bottle.rotation.set(-0.3, 0, 0.2)
@@ -570,9 +521,10 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     scene,
     camera,
     remodelHands(hands) {
+      const make = handMaker(hands)
       for (const root of [rig, toss])
         root.traverse((o) => {
-          if (o.userData.arm) dress(o as THREE.Group, hands)
+          if (o.userData.arm) dress(o as THREE.Group, make)
         })
     },
     remodel(id, detailed) {

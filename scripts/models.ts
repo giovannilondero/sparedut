@@ -1,12 +1,13 @@
 /**
  * Rebuilds the weapons modelled in Blender: every `assets/blender/<id>.py` (but the shared
- * `kit.py`) becomes `client/public/models/<id>.glb`. `bun scripts/models.ts cramar mandi`
+ * `kit.py`) becomes `client/public/models/<id>.glb`; `hands.py` last, as it reads the others' files. `bun scripts/models.ts cramar mandi`
  * rebuilds only those. `BLENDER` overrides the binary.
  */
 import { readdirSync } from "node:fs"
 
 const blender = process.env.BLENDER ?? "/Applications/Blender.app/Contents/MacOS/Blender"
-const all = readdirSync("assets/blender").filter((f) => f.endsWith(".py") && f !== "kit.py").map((f) => f.slice(0, -3))
+// the hands come last: they are closed on the weapons' own files
+const all = readdirSync("assets/blender").filter((f) => f.endsWith(".py") && f !== "kit.py").map((f) => f.slice(0, -3)).sort((a, b) => Number(a === "hands") - Number(b === "hands"))
 const ids = process.argv.length > 2 ? process.argv.slice(2) : all
 for (const id of ids) {
   const run = Bun.spawnSync([blender, "-b", "--python", `assets/blender/${id}.py`, "--", `client/public/models/${id}.glb`], { stdout: "pipe", stderr: "pipe" })
