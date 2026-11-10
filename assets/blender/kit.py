@@ -22,7 +22,11 @@ def reset():
 # --- materials ---------------------------------------------------------------------------
 
 def material(name, color, metallic=0.0, roughness=0.5, texture=None, scale=1.0, tint=1.0):
-    """A Principled material; `texture` is the name of a colour/normal/roughness set in tex/."""
+    """
+    A Principled material; `texture` is the name of a colour/normal/roughness set in tex/.
+    The colour multiplies the texture, and the glTF exporter clamps that factor to 1: a set
+    can be darkened or tinted, never made paler than it is (use a paler set for a pale wood).
+    """
     m = bpy.data.materials.get(name)
     if m:
         return m

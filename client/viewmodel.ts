@@ -460,8 +460,8 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
       if (p >= 1) tossT = -1
     }
 
-    // pendulum of the cramâr's pouch
-    if (s.model.parts.pouch) {
+    // pendulum of the cramâr's pouch (the medic's `pouch` is a pump rod: it does not swing)
+    if (s.id === "cramar" && s.model.parts.pouch) {
       const x = rig.position.x
       const v = (x - prevX) / Math.max(dt, 1e-3)
       const acc = (v - prevV) / Math.max(dt, 1e-3)
@@ -500,7 +500,18 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     scene,
     camera,
     remodel(id, detailed) {
-      remodel(slots[id].model, detailed)
+      // The file may arrive in the middle of a reload: the parts go on their pivots at rest.
+      const s = slots[id]
+      const now = s.rest.map(({ o }) => ({ p: o.position.clone(), r: o.rotation.clone() }))
+      for (const { o, p, r } of s.rest) {
+        o.position.copy(p)
+        o.rotation.copy(r)
+      }
+      remodel(s.model, detailed)
+      s.rest.forEach(({ o }, i) => {
+        o.position.copy(now[i].p)
+        o.rotation.copy(now[i].r)
+      })
     },
     setWeapon(id) {
       if (cur?.id === id && !pending) return
