@@ -380,7 +380,8 @@ function createRealLook(renderer: THREE.WebGLRenderer): Look {
   // Photographs load once per page and are shared by every map's materials.
   const loader = new THREE.TextureLoader()
   const photos = new Map<string, Promise<Photo>>()
-  const photoOf = (name: string): Promise<Photo> => {
+  /** `relief: false` for a photograph that comes without a normal map (the mountains). */
+  const photoOf = (name: string, relief = true): Promise<Photo> => {
     let p = photos.get(name)
     if (!p) {
       const load = async (file: string, srgb: boolean) => {
@@ -391,7 +392,7 @@ function createRealLook(renderer: THREE.WebGLRenderer): Look {
         if (srgb) t.colorSpace = THREE.SRGBColorSpace
         return t
       }
-      p = Promise.all([load(`${name}_d`, true), load(`${name}_n`, false)]).then(([map, normal]) => ({ map, normal, mean: meanOf(map.image as CanvasImageSource) }))
+      p = Promise.all([load(`${name}_d`, true), relief ? load(`${name}_n`, false) : null]).then(([map, normal]) => ({ map, normal: normal ?? map, mean: meanOf(map.image as CanvasImageSource) }))
       photos.set(name, p)
     }
     return p
@@ -451,7 +452,7 @@ function createRealLook(renderer: THREE.WebGLRenderer): Look {
       blended.add(o)
       blendFacets(o as THREE.Mesh)
       const m = (o as THREE.Mesh).material
-      if (m instanceof THREE.MeshLambertMaterial) void Promise.all([photoOf("montePrato"), photoOf("monteRoccia")]).then(([meadow, rock]) => mountain(m, meadow, rock))
+      if (m instanceof THREE.MeshLambertMaterial) void Promise.all([photoOf("montePrato", false), photoOf("monteRoccia", false)]).then(([meadow, rock]) => mountain(m, meadow, rock))
     })
     scene.environment = env
     scene.environmentIntensity = env === fallback ? 0.2 : 0.3

@@ -1,7 +1,7 @@
 # Photographed surfaces
 
 Used by the realistic look (`client/looks.ts`). All from [Poly Haven](https://polyhaven.com), licensed CC0.
-`_d` is the colour, `_n` the normal map (OpenGL convention), converted to WebP.
+`_d` is the colour, `_n` the normal map (OpenGL convention), converted to WebP. The two `monte` photographs have no normal map.
 
 | File | Poly Haven asset | Size |
 |---|---|---|
