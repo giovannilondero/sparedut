@@ -5,7 +5,7 @@
  * it stays on one weapon.
  */
 import * as THREE from "three"
-import { createAvatar } from "../avatars.ts"
+import { createAvatar, setDetailedWeapon } from "../avatars.ts"
 import type { AvatarPose } from "../contracts.ts"
 import { createFx } from "../fx.ts"
 import { createLook, lookFromUrl, mountLookSwitcher } from "../looks.ts"
@@ -52,7 +52,20 @@ scene.add(fpCam)
 
 const fx = createFx(scene)
 const vm = createViewmodel(fpCam)
-if (style.id === "ver") loadDetailed((id, model) => vm.remodel(id, model))
+if (style.id === "ver")
+  loadDetailed((id, model) => {
+    const far = model.getObjectByName("far")
+    if (far) {
+      far.removeFromParent()
+      setDetailedWeapon(id, far)
+    }
+    vm.remodel(id, model)
+  })
+
+// ?aw=doplete: every actor holds that weapon; ?cam=x,y,z,lx,ly,lz: a fixed camera on them, without the first-person weapon
+const params = new URLSearchParams(location.search)
+const actorWeapon = WEAPON_IDS.find((id) => id === params.get("aw")) ?? null
+const fixedCam = params.get("cam")?.split(",").map(Number) ?? null
 
 // avatars: per team, one per behaviour
 type Act = "walk" | "run" | "crouch" | "death" | "jump" | "idle"
@@ -78,7 +91,7 @@ for (const [ti, team] of (["benandanti", "malandanti"] as const).entries())
       act,
       ox: (i - 2.5) * 2.2,
       oz: ti ? -4 : 0,
-      weapon: WEAPON_IDS[(i + ti * 3) % WEAPON_IDS.length],
+      weapon: actorWeapon ?? WEAPON_IDS[(i + ti * 3) % WEAPON_IDS.length],
       shield: act === "idle" && ti === 0,
       carrier: act === "walk" || (act === "idle" && ti === 1),
       sgnape: act === "idle" || act === "run"
@@ -250,11 +263,16 @@ function frame() {
     // closer to the actors than the split view: the look is judged on them
     fpCam.position.z = 3.4
     fpCam.fov = 62
+    if (fixedCam?.length === 6) {
+      fpCam.position.set(fixedCam[0], fixedCam[1], fixedCam[2])
+      fpCam.lookAt(fixedCam[3], fixedCam[4], fixedCam[5])
+      fpCam.fov = 40
+    }
     fpCam.aspect = vm.camera.aspect = W / H
     fpCam.updateProjectionMatrix()
     vm.camera.updateProjectionMatrix()
     fpCam.updateMatrixWorld()
-    style.render(scene, fpCam, vm)
+    style.render(scene, fpCam, fixedCam ? null : vm)
     requestAnimationFrame(frame)
     return
   }

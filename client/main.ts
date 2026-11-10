@@ -8,7 +8,7 @@ import { MAPS } from "../shared/maps/index.ts"
 import { createPhysicsWorld, initPhysics, type PhysicsWorld } from "../shared/physics.ts"
 import { PROTOCOL_VERSION, type ServerMessage } from "../shared/protocol.ts"
 import { createAudio } from "./audio.ts"
-import { createAvatar } from "./avatars.ts"
+import { createAvatar, setDetailedWeapon } from "./avatars.ts"
 import { createFx } from "./fx.ts"
 import { isLocalHost } from "../shared/hosts.ts"
 import { Game } from "./game.ts"
@@ -79,7 +79,15 @@ const fx = createFx(scene)
 const viewmodel = createViewmodel(camera)
 viewmodel.setVisible(false)
 // The realistic look holds the weapons modelled in Blender; the files are fetched only then.
-if (look.id === "ver") loadDetailed((id, model) => viewmodel.remodel(id, model))
+if (look.id === "ver")
+  loadDetailed((id, model) => {
+    const far = model.getObjectByName("far")
+    if (far) {
+      far.removeFromParent()
+      setDetailedWeapon(id, far)
+    }
+    viewmodel.remodel(id, model)
+  })
 const audio = createAudio()
 audio.setVolumes(settings.master, settings.music)
 addEventListener("resize", resize)

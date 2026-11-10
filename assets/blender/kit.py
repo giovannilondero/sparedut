@@ -256,10 +256,46 @@ def marker(name, at):
 
 # --- output ------------------------------------------------------------------------------
 
-def export(path):
+FAR_TRIANGLES = 3000
+
+
+def far_copy():
+    """
+    The whole model as one light mesh, named `far`: what the other players are seen
+    holding. The parts are joined where they rest and thinned to a few thousand triangles.
+    """
+    meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
+    copies = []
+    for o in meshes:
+        c = o.copy()
+        c.data = o.data.copy()
+        bpy.context.scene.collection.objects.link(c)
+        copies.append(c)
+    _select(copies)
+    if len(copies) > 1:
+        bpy.ops.object.join()
+    far = bpy.context.view_layer.objects.active
+    far.name = "far"
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    far.data.calc_loop_triangles()
+    triangles = len(far.data.loop_triangles)
+    if triangles > FAR_TRIANGLES:
+        d = far.modifiers.new("thin", "DECIMATE")
+        d.ratio = FAR_TRIANGLES / triangles
+        bpy.ops.object.modifier_apply(modifier=d.name)
+    for p in far.data.polygons:
+        p.use_smooth = True
+    far.data.set_sharp_from_angle(angle=math.radians(40))
+    return far
+
+
+def export(path, far=True):
     drop_cutters()
+    light = far_copy() if far else None
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", export_apply=True, use_selection=True, export_image_format="WEBP", export_image_quality=85, export_yup=True)
+    if light:
+        bpy.data.objects.remove(light, do_unlink=True)
     print(f"exported {path}: {os.path.getsize(path) // 1024} KB")
 
 
