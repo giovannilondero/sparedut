@@ -100,6 +100,7 @@ pouch = part("pouch", [cord, sack, tie, *sticks], pivot=HANG, crease=180)
 
 marker("muzzle", (0, 0.485, AXIS))
 marker("left", (0, 0.28, -0.012))
+marker("trigger", (0, 0.0495, 0.0))  # the face the trigger finger presses
 kit.drop_cutters()
 
 if len(args) > 1:

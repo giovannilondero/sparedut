@@ -157,6 +157,7 @@ for o in (case, bullet):
 mag = part("mag", [tube_, floor, case, bullet], pivot=(0, *MAG))
 
 marker("muzzle", (0, 0.185, AXIS))
+marker("trigger", (0, 0.049, 0.021))  # the face the trigger finger presses
 kit.drop_cutters()
 kit.export(args[0])
 

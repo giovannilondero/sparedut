@@ -305,6 +305,7 @@ bolt = part("bolt", [bolt_body, shroud, handle, flag], pivot=PIVOT)
 
 marker("muzzle", (0, 0.925, AXIS))
 marker("left", (0, 0.30, 0.012))
+marker("trigger", (0, 0.044, 0.013))  # the face the trigger finger presses
 kit.drop_cutters()
 kit.export(args[0])
 

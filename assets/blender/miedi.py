@@ -364,6 +364,7 @@ pump = part("pouch", [rod, socket, *grips], pivot=PUMP)
 
 marker("muzzle", (0, 0.44, LZ))
 marker("left", (0, 0.18, 0.03))
+marker("trigger", (0, 0.0495, -0.002))  # the face the trigger finger presses
 kit.drop_cutters()
 
 if len(args) > 1:
