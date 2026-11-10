@@ -3,6 +3,7 @@ import * as THREE from "three"
 import { trackLength, trackPoint, type MapId } from "../../shared/map.ts"
 import { MAP_IDS, MAPS } from "../../shared/maps/index.ts"
 import type { WorldFrame } from "../contracts.ts"
+import { createLook, lookFromUrl, mountLookSwitcher } from "../looks.ts"
 import { createWorld } from "../world.ts"
 
 const q = new URLSearchParams(location.search)
@@ -15,6 +16,9 @@ renderer.toneMappingExposure = 1.05
 renderer.shadowMap.enabled = true
 renderer.shadowMap.type = THREE.PCFSoftShadowMap
 renderer.setPixelRatio(Math.min(devicePixelRatio, Number(q.get("pr") ?? 1.5)))
+
+const look = createLook(lookFromUrl(), renderer)
+mountLookSwitcher(look.id)
 
 const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera(75, 1, 0.05, 2500)
@@ -70,7 +74,7 @@ const loop = (now: number) => {
     camera
   }
   world.update(dt, t, frame)
-  renderer.render(scene, camera)
+  look.render(scene, camera)
   frames++
   if (now - fpsT > 500) {
     fps = (frames * 1000) / (now - fpsT)
@@ -91,7 +95,7 @@ requestAnimationFrame(loop)
   } else world.menuCamera(t, camera)
   camera.updateMatrixWorld()
   world.update(0.016, t, { pickups: PICKUPS.map(() => true), flags: mode === "frico" ? { benandanti: { pos: FLAG_BASES.benandanti, state: "base" }, malandanti: { pos: FLAG_BASES.malandanti, state: "base" } } : null, hill: mode === "culine" ? { owner: null, contested: false } : null, ...extras(t), camera })
-  renderer.render(scene, camera)
+  look.render(scene, camera)
   const out = document.createElement("canvas")
   out.width = w
   out.height = Math.round((w * canvas.height) / canvas.width)

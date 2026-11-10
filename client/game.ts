@@ -18,6 +18,7 @@ import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, Wor
 import { Controls } from "./controls.ts"
 import { boardHtml, esc, Hud, rosterHtml } from "./hud.ts"
 import { t } from "./i18n.ts"
+import type { Look } from "./looks.ts"
 import type { Menu } from "./menu.ts"
 import type { Net } from "./net.ts"
 import { Predictor } from "./predict.ts"
@@ -44,6 +45,8 @@ const PICK_SOUND = {
 
 export interface GameDeps {
   readonly renderer: THREE.WebGLRenderer
+  /** How a frame reaches the screen (prototype: the graphic looks). */
+  readonly look: Look
   readonly scene: THREE.Scene
   readonly camera: THREE.PerspectiveCamera
   /** The visible world and physics of a map (the world is rebuilt only if it changes). */
@@ -1211,12 +1214,8 @@ export class Game {
   }
 
   render() {
-    const { renderer, scene, camera, viewmodel } = this.d
-    renderer.autoClear = false
+    const { renderer, look, scene, camera, viewmodel } = this.d
     renderer.info.reset()
-    renderer.clear()
-    renderer.render(scene, camera)
-    renderer.clearDepth()
-    renderer.render(viewmodel.scene, viewmodel.camera)
+    look.render(scene, camera, viewmodel)
   }
 }

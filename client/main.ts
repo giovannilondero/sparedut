@@ -13,6 +13,7 @@ import { createFx } from "./fx.ts"
 import { isLocalHost } from "../shared/hosts.ts"
 import { Game } from "./game.ts"
 import { t } from "./i18n.ts"
+import { createLook, lookFromUrl, mountLookSwitcher } from "./looks.ts"
 import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
 import { PerfMonitor } from "./perf.ts"
@@ -31,6 +32,8 @@ renderer.toneMappingExposure = 1.05
 // The draw call and triangle count covers world and weapon: the frame resets it.
 renderer.info.autoReset = false
 const perf = new PerfMonitor(renderer)
+const look = createLook(lookFromUrl(), renderer)
+mountLookSwitcher(look.id)
 
 /** The maximum pixel ratio per quality; dynamic resolution goes down to `minRatio`. */
 const maxRatio = () => Math.min(devicePixelRatio, settings.quality === "alta" ? 2 : settings.quality === "media" ? 1.5 : 1)
@@ -136,6 +139,7 @@ let autostart = false
 const physicsReady = initPhysics().then(() => {
   game = new Game({
     renderer,
+    look,
     scene,
     camera,
     loadMap,
@@ -268,8 +272,7 @@ const loop = (now: number) => {
     world.update(dt, time, { pickups: [], flags: null, hill: null, cart: null, storm: null, turrets: [], doors: [], camera })
     fx.update(dt, camera)
     renderer.info.reset()
-    renderer.autoClear = true
-    renderer.render(scene, camera)
+    look.render(scene, camera)
   }
   perf.sample(dt * 1000, performance.now() - cpuStart)
   perf.panel(now, { quality: `${t().quality[quality]}${settings.autoRes ? ` · ${t().perf.dynRes}` : ""}`, net: game?.active ? game.netStats() : null })

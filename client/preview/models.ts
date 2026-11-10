@@ -8,6 +8,7 @@ import * as THREE from "three"
 import { createAvatar } from "../avatars.ts"
 import type { AvatarPose } from "../contracts.ts"
 import { createFx } from "../fx.ts"
+import { createLook, lookFromUrl, mountLookSwitcher } from "../looks.ts"
 import { createViewmodel } from "../viewmodel.ts"
 import type { PickupKind } from "../../shared/map.ts"
 import { WEAPONS, WEAPON_IDS, type WeaponId } from "../../shared/weapons.ts"
@@ -19,6 +20,9 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping
 renderer.autoClear = false
 document.body.appendChild(renderer.domElement)
 const info = document.getElementById("info")!
+// With a look other than the current one the view is not split: first person only.
+const style = createLook(lookFromUrl(), renderer)
+mountLookSwitcher(style.id)
 
 // a bit of plaçute at sunset
 const scene = new THREE.Scene()
@@ -232,9 +236,21 @@ function frame() {
   tpCam.lookAt(0, 1, -1)
   fx.update(dt, tpCam)
 
-  // left: third person; right: first person + weapon
   const W = innerWidth
   const H = innerHeight
+  if (style.id !== "cumo") {
+    // closer to the actors than the split view: the look is judged on them
+    fpCam.position.z = 3.4
+    fpCam.fov = 62
+    fpCam.aspect = vm.camera.aspect = W / H
+    fpCam.updateProjectionMatrix()
+    vm.camera.updateProjectionMatrix()
+    fpCam.updateMatrixWorld()
+    style.render(scene, fpCam, vm)
+    requestAnimationFrame(frame)
+    return
+  }
+  // left: third person; right: first person + weapon
   const split = Math.floor(W * 0.4)
   renderer.setScissorTest(true)
   renderer.setViewport(0, 0, split, H)
