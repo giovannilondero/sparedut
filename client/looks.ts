@@ -228,6 +228,63 @@ function blendFacets(mesh: THREE.Mesh) {
   col.needsUpdate = true
 }
 
+/**
+ * The mountains get their ground from two aerial photographs, laid out in world metres:
+ * alpine meadow where the slope is gentle and green, limestone cliff where it is steep or
+ * bare. The blended vertex colour stays as the tint (woods darker, fields paler), each
+ * photograph is repeated at a second, much larger scale so that no tile shows from afar.
+ */
+const MOUNTAIN_VERTEX = /* glsl */ `
+  #include <begin_vertex>
+  vHfPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
+  vHfNormal = normal;
+`
+const MOUNTAIN_FRAGMENT = /* glsl */ `
+  #include <color_fragment>
+  {
+    vec3 hn = normalize( vHfNormal );
+    vec3 tint = diffuseColor.rgb;
+    float hi = max( tint.r, max( tint.g, tint.b ) ), lo = min( tint.r, min( tint.g, tint.b ) );
+    float bare = 1.0 - smoothstep( 0.18, 0.4, ( hi - lo ) / max( hi, 1e-3 ) );
+    float rocky = max( smoothstep( 0.3, 0.52, 1.0 - hn.y ), bare );
+    // the cliff is projected along the three axes: on a wall a top-down photograph would smear
+    vec3 w = pow( abs( hn ), vec3( 4.0 ) );
+    w /= w.x + w.y + w.z;
+    vec3 rock = texture2D( hfRock, vHfPos.zy / 85.0 ).rgb * w.x + texture2D( hfRock, vHfPos.xz / 85.0 ).rgb * w.y + texture2D( hfRock, vHfPos.xy / 85.0 ).rgb * w.z;
+    // one large-scale sample breaks the tiling of both grounds
+    float macro = texture2D( hfMeadow, vHfPos.xz / 530.0 ).g / hfMeadowMean.g;
+    rock *= 0.5 + 0.5 * macro;
+    // strata and cracks read from far away only with more contrast than the photograph has
+    rock = hfRockMean * pow( rock / hfRockMean, vec3( 1.9 ) );
+    vec3 meadow = texture2D( hfMeadow, vHfPos.xz / 70.0 ).rgb;
+    meadow *= 0.5 + 0.5 * macro;
+    // bare rock is limestone grey whatever the zone was painted: half its own colour
+    vec3 stone = mix( tint, vec3( dot( tint, vec3( 0.3333 ) ) ) * vec3( 1.02, 1.0, 0.96 ), 0.55 ) * rock / hfRockMean;
+    diffuseColor.rgb = mix( tint * meadow / hfMeadowMean, stone, rocky );
+  }
+`
+/** Distance cools a mountain: its haze leans to the blue of the air instead of the warm horizon. */
+const MOUNTAIN_FOG = /* glsl */ `
+  #ifdef USE_FOG
+    float hfFog = 1.0 - exp( - fogDensity * fogDensity * vFogDepth * vFogDepth * 0.45 );
+    gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor * vec3( 0.84, 0.95, 1.14 ), hfFog );
+  #endif
+`
+function mountain(m: THREE.MeshLambertMaterial, meadow: Photo, rock: Photo) {
+  // seen from below and from far: more filtering only costs
+  meadow.map.anisotropy = rock.map.anisotropy = 2
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.hfMeadow = { value: meadow.map }
+    shader.uniforms.hfRock = { value: rock.map }
+    shader.uniforms.hfMeadowMean = { value: meadow.mean }
+    shader.uniforms.hfRockMean = { value: rock.mean }
+    shader.vertexShader = "varying vec3 vHfPos;\nvarying vec3 vHfNormal;\n" + shader.vertexShader.replace("#include <begin_vertex>", MOUNTAIN_VERTEX)
+    shader.fragmentShader = "uniform sampler2D hfMeadow;\nuniform sampler2D hfRock;\nuniform vec3 hfMeadowMean;\nuniform vec3 hfRockMean;\nvarying vec3 vHfPos;\nvarying vec3 vHfNormal;\n" + shader.fragmentShader.replace("#include <color_fragment>", MOUNTAIN_FRAGMENT).replace("#include <fog_fragment>", MOUNTAIN_FOG)
+  }
+  m.customProgramCacheKey = () => "mountain"
+  m.needsUpdate = true
+}
+
 /** 0 by day, 1 at night: read off the horizon colour the world paints as its background. */
 const hsl = { h: 0, s: 0, l: 0 }
 function nightOf(scene: THREE.Scene): number {
@@ -329,7 +386,7 @@ function createRealLook(renderer: THREE.WebGLRenderer): Look {
       const load = async (file: string, srgb: boolean) => {
         const t = await loader.loadAsync(`/tex/${file}.webp`)
         t.wrapS = t.wrapT = THREE.RepeatWrapping
-        t.repeat.setScalar(PHOTOS[name])
+        t.repeat.setScalar(PHOTOS[name] ?? 1)
         t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
         if (srgb) t.colorSpace = THREE.SRGBColorSpace
         return t
@@ -393,6 +450,8 @@ function createRealLook(renderer: THREE.WebGLRenderer): Look {
       if (!o.userData.heightfield || blended.has(o)) return
       blended.add(o)
       blendFacets(o as THREE.Mesh)
+      const m = (o as THREE.Mesh).material
+      if (m instanceof THREE.MeshLambertMaterial) void Promise.all([photoOf("montePrato"), photoOf("monteRoccia")]).then(([meadow, rock]) => mountain(m, meadow, rock))
     })
     scene.environment = env
     scene.environmentIntensity = env === fallback ? 0.2 : 0.3

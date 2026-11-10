@@ -14,3 +14,5 @@ Used by the realistic look (`client/looks.ts`). All from [Poly Haven](https://po
 | `erba` | `leafy_grass` | 1024 |
 | `terra` | `brown_mud_dry` | 1024 |
 | `roccia` | `rock_face_03` | 1024 |
+| `montePrato` | `aerial_rocks_01` (the relief around the maps: meadow) | 2048 |
+| `monteRoccia` | `marble_cliff_05` (the relief around the maps: cliff) | 2048 |
