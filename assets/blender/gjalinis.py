@@ -380,6 +380,7 @@ hen += [place(o, HEAD) for o in head]
 frico = plain_uv(part("frico", hen, pivot=PERCH, crease=180))
 
 marker("muzzle", (0, 0.45, AZ))
+marker("trigger", (0, 0.0615, -0.008))  # the face the trigger finger presses
 kit.drop_cutters()
 
 if len(args) > 1:

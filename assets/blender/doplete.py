@@ -294,6 +294,7 @@ for i, x in enumerate((GAP, -GAP)):
 
 marker("muzzle", (0, 0.645, AXIS))
 marker("left", (0, 0.25, 0.005))
+marker("trigger", (0.004, 0.0395, 0.0))  # the face the trigger finger presses
 kit.drop_cutters()
 kit.export(args[0])
 

@@ -320,6 +320,7 @@ for loop in frico.data.loops:
 
 marker("muzzle", (0, 0.48, AXIS))
 marker("left", (0, 0.2, 0.0))
+marker("trigger", (0, 0.0485, 0.001))  # the face the trigger finger presses
 kit.drop_cutters()
 
 if len(args) > 1:

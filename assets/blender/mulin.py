@@ -211,6 +211,7 @@ mag = part("mag", [chest, lid, *bands, latch, latch_stud, slot, belt, *rounds], 
 # at the barrels' mouths (the primitive model has it 10 cm short of them)
 marker("muzzle", (0, 0.548, AXIS))
 marker("left", (0, 0.26, -0.06))
+marker("trigger", (0, 0.0475, -0.003))  # the face the trigger finger presses
 kit.drop_cutters()
 
 if len(args) > 1:

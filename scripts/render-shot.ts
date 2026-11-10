@@ -4,6 +4,8 @@
  * Chromium browser (`BROWSER` overrides the binary).
  *
  *   bun scripts/render-shot.ts "http://localhost:5173/preview/models.html?look=ver&w=cramar&still" out.png [seconds] [js to run first]
+ *
+ * `SIZE=1920,1080` and `SCALE=2` change the window and its pixel ratio (1280,720 at 1).
  */
 export {}
 
@@ -11,7 +13,7 @@ const [url, out, wait = "6", script] = process.argv.slice(2)
 if (!url || !out) throw new Error("usage: bun scripts/render-shot.ts <url> <out.png> [seconds] [js]")
 const browser = process.env.BROWSER ?? "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
 const port = 9300 + Math.floor(Math.random() * 500)
-const child = Bun.spawn([browser, "--headless=new", "--use-angle=metal", "--enable-gpu", "--hide-scrollbars", "--window-size=1280,720", `--remote-debugging-port=${port}`, `--user-data-dir=/tmp/render-shot-${port}`, url], { stdout: "ignore", stderr: "ignore" })
+const child = Bun.spawn([browser, "--headless=new", "--use-angle=metal", "--enable-gpu", "--hide-scrollbars", `--window-size=${process.env.SIZE ?? "1280,720"}`, `--force-device-scale-factor=${process.env.SCALE ?? "1"}`, `--remote-debugging-port=${port}`, `--user-data-dir=/tmp/render-shot-${port}`, url], { stdout: "ignore", stderr: "ignore" })
 try {
   let socket: WebSocket | null = null
   for (let i = 0; i < 50 && !socket; i++) {
