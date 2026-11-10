@@ -87,6 +87,7 @@ const applyQuality = () => {
   quality = settings.quality
   perf.scale = maxRatio()
   world.setQuality(quality)
+  look.setQuality(quality)
   fx.setQuality(quality)
   game?.setQuality(quality)
   resize()

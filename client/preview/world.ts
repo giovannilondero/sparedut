@@ -1,4 +1,4 @@
-// World preview: map with ?map=osoppo, menu camera (or fixed with ?cam=x,y,z,lx,ly,lz), mode with ?mode=frico|culine|cjar|tampieste.
+// World preview: map with ?map=osoppo, look with ?look=ver, quality with ?q=alta, menu camera (or fixed with ?cam=x,y,z,lx,ly,lz), mode with ?mode=frico|culine|cjar|tampieste.
 import * as THREE from "three"
 import { trackLength, trackPoint, type MapId } from "../../shared/map.ts"
 import { MAP_IDS, MAPS } from "../../shared/maps/index.ts"
@@ -28,6 +28,12 @@ const map = MAPS[mapId]
 const { flagBases: FLAG_BASES, pickups: PICKUPS } = map
 const world = createWorld(scene, renderer, map)
 const buildMs = performance.now() - t0
+// ?q=bassa|media|alta: the quality setting, as the game applies it
+const quality = (["bassa", "media", "alta"] as const).find((x) => x === q.get("q"))
+if (quality) {
+  world.setQuality(quality)
+  look.setQuality(quality)
+}
 
 const resize = () => {
   renderer.setSize(innerWidth, innerHeight, false)
