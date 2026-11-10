@@ -439,9 +439,11 @@ const BUILDERS: Record<WeaponId, () => WeaponModel> = { mescul, mandi, cramar, d
 export const buildWeapon = (id: WeaponId): WeaponModel => BUILDERS[id]()
 
 /**
- * Swaps a weapon's meshes for a detailed model (see `detailed.ts`). Its `body` node goes
- * under the root and each node named after a moving part under that part's pivot; what
- * else hangs from the weapon and is marked `userData.keep` (the hands) stays.
+ * Swaps a weapon's meshes for a detailed model (see `detailed.ts`), authored in weapon
+ * space at rest. Its `body` node goes under the root; each node named after a moving part
+ * (`mag`, `bolt`…; `shells0`, `shells1`… for a list) goes under that part's pivot, keeping
+ * its place, so it moves as the part does. What hangs from the weapon marked
+ * `userData.keep` (the hands) stays.
  */
 export function remodel(model: WeaponModel, detailed: THREE.Object3D) {
   const old: THREE.Mesh[] = []
@@ -455,16 +457,18 @@ export function remodel(model: WeaponModel, detailed: THREE.Object3D) {
     m.removeFromParent()
     m.geometry.dispose()
   }
-  const body = detailed.getObjectByName("body")
-  if (body) model.root.add(body)
-  for (const [name, pivot] of Object.entries(model.parts)) {
-    const node = detailed.getObjectByName(name)
-    if (!node || !(pivot instanceof THREE.Object3D)) continue
-    node.position.set(0, 0, 0)
-    pivot.add(node)
+  const pivots = new Map<string, THREE.Object3D>()
+  for (const [name, part] of Object.entries(model.parts)) {
+    if (part instanceof THREE.Object3D) pivots.set(name, part)
+    else part.forEach((p, i) => pivots.set(`${name}${i}`, p))
   }
-  const muzzle = detailed.getObjectByName("muzzle")
-  if (muzzle) model.muzzle.position.copy(muzzle.position)
+  for (const node of [...detailed.children]) {
+    if (node.name === "muzzle") model.muzzle.position.copy(node.position)
+    const pivot = pivots.get(node.name)
+    if (!pivot && node.name !== "body") continue
+    model.root.add(node)
+    pivot?.attach(node)
+  }
 }
 
 export interface BakedWeapon {

@@ -9,7 +9,7 @@ import { createAvatar } from "../avatars.ts"
 import type { AvatarPose } from "../contracts.ts"
 import { createFx } from "../fx.ts"
 import { createLook, lookFromUrl, mountLookSwitcher } from "../looks.ts"
-import { DETAILED, loadDetailed } from "../models/detailed.ts"
+import { loadDetailed } from "../models/detailed.ts"
 import { createViewmodel } from "../viewmodel.ts"
 import type { PickupKind } from "../../shared/map.ts"
 import { WEAPONS, WEAPON_IDS, type WeaponId } from "../../shared/weapons.ts"
@@ -52,7 +52,7 @@ scene.add(fpCam)
 
 const fx = createFx(scene)
 const vm = createViewmodel(fpCam)
-if (style.id === "ver") for (const id of DETAILED) void loadDetailed(id).then((model) => vm.remodel(id, model))
+if (style.id === "ver") loadDetailed((id, model) => vm.remodel(id, model))
 
 // avatars: per team, one per behaviour
 type Act = "walk" | "run" | "crouch" | "death" | "jump" | "idle"

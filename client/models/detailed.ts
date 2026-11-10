@@ -5,13 +5,15 @@
  */
 import type * as THREE from "three"
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
-import type { WeaponId } from "../../shared/weapons.ts"
-
-/** The weapons that have a detailed model so far. */
-export const DETAILED: readonly WeaponId[] = ["cramar"]
+import { WEAPON_IDS, type WeaponId } from "../../shared/weapons.ts"
 
 const loader = new GLTFLoader()
 
-export async function loadDetailed(id: WeaponId): Promise<THREE.Object3D> {
-  return (await loader.loadAsync(`/models/${id}.glb`)).scene
+/** Hands every weapon that has a detailed model to `use`, as each file arrives; the others keep their primitives. */
+export function loadDetailed(use: (id: WeaponId, model: THREE.Object3D) => void) {
+  for (const id of WEAPON_IDS)
+    loader.loadAsync(`/models/${id}.glb`).then(
+      (gltf) => use(id, gltf.scene),
+      () => console.warn(`no detailed model for ${id}`)
+    )
 }
