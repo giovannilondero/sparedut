@@ -4,8 +4,8 @@
  * localStorage); "cumo" is the game as it always was, drawn exactly as before.
  *
  *  - cumo: the original graphics
- *  - ver:  realistic: surfaces with relief, smooth models that reflect the sky, a harder
- *          sun, haze, a film grade and ambient occlusion
+ *  - ver:  realistic: photographed surfaces with relief, smooth models that reflect the
+ *          sky, a harder sun, haze, a film grade and ambient occlusion
  *
  * "ver" is built to cost little more than "cumo": the world is still drawn once, straight
  * to the canvas. The grade lives in the tone mapping of every material (no extra pass),
@@ -165,6 +165,69 @@ const relieved: Restyle = (m) => {
   m.needsUpdate = true
 }
 
+/**
+ * Photographed surfaces that take the place of the drawn ones (CC0, from Poly Haven: see
+ * `client/public/tex/README.md`), by the material's name. The number is how many times
+ * the photograph repeats over one tile of the texture it replaces.
+ */
+const PHOTOS: Record<string, number> = {
+  pietra: 1,
+  pietraChiara: 1,
+  intonaco: 1,
+  porfido: 1,
+  coppi: 1,
+  legno: 1,
+  erba: 1,
+  terra: 1,
+  roccia: 1
+}
+
+/** The average colour of an image, in linear light. */
+function meanOf(image: CanvasImageSource): THREE.Color {
+  const c = document.createElement("canvas")
+  c.width = c.height = 16
+  const g = c.getContext("2d", { willReadFrequently: true })!
+  g.drawImage(image, 0, 0, 16, 16)
+  const d = g.getImageData(0, 0, 16, 16).data
+  const sum = new THREE.Color(0, 0, 0)
+  const px = new THREE.Color()
+  for (let i = 0; i < d.length; i += 4) sum.add(px.setRGB(d[i] / 255, d[i + 1] / 255, d[i + 2] / 255, THREE.SRGBColorSpace))
+  return sum.multiplyScalar(4 / d.length)
+}
+
+interface Photo {
+  readonly map: THREE.Texture
+  readonly normal: THREE.Texture
+  readonly mean: THREE.Color
+}
+
+/**
+ * The relief around the map is coloured one triangle at a time: the facets are what makes
+ * it read as low-poly. Averaging the colours that meet at each grid point leaves woods,
+ * fields and rock shading into each other over the same smooth normals.
+ */
+function blendFacets(mesh: THREE.Mesh) {
+  const pos = mesh.geometry.getAttribute("position")
+  const col = mesh.geometry.getAttribute("color")
+  if (!pos || !col || mesh.geometry.index) return
+  const sums = new Map<string, [number, number, number, number]>()
+  const key = (i: number) => `${Math.round(pos.getX(i))},${Math.round(pos.getZ(i))}`
+  for (let i = 0; i < pos.count; i++) {
+    const k = key(i)
+    const s = sums.get(k) ?? [0, 0, 0, 0]
+    s[0] += col.getX(i)
+    s[1] += col.getY(i)
+    s[2] += col.getZ(i)
+    s[3]++
+    sums.set(k, s)
+  }
+  for (let i = 0; i < pos.count; i++) {
+    const s = sums.get(key(i))!
+    col.setXYZ(i, s[0] / s[3], s[1] / s[3], s[2] / s[3])
+  }
+  col.needsUpdate = true
+}
+
 /** 0 by day, 1 at night: read off the horizon colour the world paints as its background. */
 const hsl = { h: 0, s: 0, l: 0 }
 function nightOf(scene: THREE.Scene): number {
@@ -183,8 +246,9 @@ vec3 CustomToneMapping( vec3 color ) {
   vec3 c = ACESFilmicToneMapping( color );
   float l = dot( c, vec3( 0.2126, 0.7152, 0.0722 ) );
   c = mix( vec3( l ), c, 0.82 );
-  c = mix( c, c * c * ( 3.0 - 2.0 * c ), 0.35 );
-  c += vec3( -0.004, 0.008, 0.022 ) * ( 1.0 - smoothstep( 0.0, 0.45, l ) );
+  c = mix( c, c * c * ( 3.0 - 2.0 * c ), 0.25 );
+  // the cold goes in the half-shadows only: black stays black, and dark grass stays green
+  c += vec3( -0.002, 0.004, 0.011 ) * smoothstep( 0.0, 0.1, l ) * ( 1.0 - smoothstep( 0.12, 0.45, l ) );
   c *= mix( vec3( 1.0 ), vec3( 1.05, 1.0, 0.92 ), smoothstep( 0.4, 1.0, l ) );
   return saturate( c );
 }
@@ -256,8 +320,46 @@ function createRealLook(renderer: THREE.WebGLRenderer): Look {
   })
   const quad = new FullScreenQuad(shade)
 
+  // Photographs load once per page and are shared by every map's materials.
+  const loader = new THREE.TextureLoader()
+  const photos = new Map<string, Promise<Photo>>()
+  const photoOf = (name: string): Promise<Photo> => {
+    let p = photos.get(name)
+    if (!p) {
+      const load = async (file: string, srgb: boolean) => {
+        const t = await loader.loadAsync(`/tex/${file}.webp`)
+        t.wrapS = t.wrapT = THREE.RepeatWrapping
+        t.repeat.setScalar(PHOTOS[name])
+        t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
+        if (srgb) t.colorSpace = THREE.SRGBColorSpace
+        return t
+      }
+      p = Promise.all([load(`${name}_d`, true), load(`${name}_n`, false)]).then(([map, normal]) => ({ map, normal, mean: meanOf(map.image as CanvasImageSource) }))
+      photos.set(name, p)
+    }
+    return p
+  }
+  /**
+   * Relief first, from the drawn texture; then, where there is one, the photograph. Its
+   * colour is brought to the average of the texture it replaces: the palette of every
+   * wall, roof and street stays the one the maps were painted with.
+   */
+  const surfaced: Restyle = (m) => {
+    relieved(m)
+    if (!(m instanceof THREE.MeshLambertMaterial) || !m.map || !(m.name in PHOTOS)) return
+    const drawn = meanOf(m.map.image as CanvasImageSource)
+    void photoOf(m.name).then((photo) => {
+      const k = (a: number, b: number) => THREE.MathUtils.clamp(a / Math.max(b, 1e-3), 0.3, 3)
+      m.color.setRGB(m.color.r * k(drawn.r, photo.mean.r), m.color.g * k(drawn.g, photo.mean.g), m.color.b * k(drawn.b, photo.mean.b))
+      m.map = photo.map
+      m.normalMap = photo.normal
+      m.needsUpdate = true
+    })
+  }
+
   const seen = new WeakSet<THREE.Material>()
   const lit = new WeakSet<THREE.Object3D>()
+  const blended = new WeakSet<THREE.Object3D>()
   const hazed = new WeakSet<THREE.FogExp2>()
   const pmrem = new THREE.PMREMGenerator(renderer)
   const fallback = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
@@ -277,8 +379,8 @@ function createRealLook(renderer: THREE.WebGLRenderer): Look {
     const night = nightOf(scene)
     if (env !== fallback && night < 0.5) scene.traverse((o) => {
       if (lit.has(o)) return
-      if (o instanceof THREE.DirectionalLight) o.intensity *= 1.35
-      else if (o instanceof THREE.HemisphereLight) o.intensity *= 0.72
+      if (o instanceof THREE.DirectionalLight) o.intensity *= 1.3
+      else if (o instanceof THREE.HemisphereLight) o.intensity *= 0.88
       else return
       lit.add(o)
     })
@@ -286,7 +388,12 @@ function createRealLook(renderer: THREE.WebGLRenderer): Look {
       scene.fog.density *= 1.4
       hazed.add(scene.fog)
     }
-    restyle(scene, seen, relieved)
+    restyle(scene, seen, surfaced)
+    scene.traverse((o) => {
+      if (!o.userData.heightfield || blended.has(o)) return
+      blended.add(o)
+      blendFacets(o as THREE.Mesh)
+    })
     scene.environment = env
     scene.environmentIntensity = env === fallback ? 0.2 : 0.3
     if (overlay) {

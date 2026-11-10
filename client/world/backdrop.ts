@@ -257,6 +257,8 @@ export function makeHeightfield(height: (x: number, z: number) => number, hole: 
   g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3))
   const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }))
   m.name = "prealpi"
+  // a look can tell the relief from the rest, whatever a map renames it
+  m.userData.heightfield = true
   m.receiveShadow = true
   m.matrixAutoUpdate = false
   return m
