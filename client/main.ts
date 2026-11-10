@@ -14,7 +14,7 @@ import { isLocalHost } from "../shared/hosts.ts"
 import { Game } from "./game.ts"
 import { t } from "./i18n.ts"
 import { createLook, lookFromUrl, mountLookSwitcher } from "./looks.ts"
-import { loadDetailed } from "./models/detailed.ts"
+import { loadDetailed, loadHands } from "./models/detailed.ts"
 import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
 import { PerfMonitor } from "./perf.ts"
@@ -79,6 +79,7 @@ const fx = createFx(scene)
 const viewmodel = createViewmodel(camera)
 viewmodel.setVisible(false)
 // The realistic look holds the weapons modelled in Blender; the files are fetched only then.
+if (look.id === "ver") loadHands((hands) => viewmodel.remodelHands(hands))
 if (look.id === "ver")
   loadDetailed((id, model) => {
     const far = model.getObjectByName("far")

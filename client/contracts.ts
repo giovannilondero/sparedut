@@ -110,6 +110,8 @@ export interface Viewmodel {
   setWeapon(id: WeaponId): void
   /** Replaces a weapon's meshes with a detailed model (`client/models/detailed.ts`). */
   remodel(id: WeaponId, detailed: THREE.Object3D): void
+  /** Replaces the hands and sleeves with the modelled ones. */
+  remodelHands(hands: THREE.Object3D): void
   fire(): void
   /** Reload duration in seconds. */
   reload(seconds: number): void
