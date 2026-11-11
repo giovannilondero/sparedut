@@ -5,7 +5,7 @@
 import { Howl, Howler } from "howler"
 import type { GameAudio, P3, SoundName } from "./contracts.ts"
 import { wav } from "./audio/dsp.ts"
-import { renderDisco } from "./audio/disco.ts"
+import { renderTechno } from "./audio/techno.ts"
 import { renderVillotta } from "./audio/music.ts"
 import { SFX, renderSound } from "./audio/sfx.ts"
 
@@ -187,7 +187,7 @@ export function createAudio(): GameAudio {
   const loadDisco = () => {
     if (disco || discoLoading) return
     discoLoading = true
-    void renderDisco().then(({ open, muffled }) => {
+    void renderTechno().then(({ open, muffled }) => {
       ensure()
       const attrs = { distanceModel: "inverse" as const, refDistance: 5, rolloffFactor: 1.3, maxDistance: 10000, panningModel: "HRTF" as const }
       const a = new Howl({ src: [toUrl(open)], format: ["wav"], loop: true, volume: 0, ...attrs })
