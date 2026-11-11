@@ -9,7 +9,7 @@ import { accordion, clarinet, melody, oomPahPah, thirdBelow, type Chord, type No
 const BEAT = 60 / 144
 const BAR = BEAT * 3
 
-const A: readonly Note[] = [
+export const A: readonly Note[] = [
   [71, 1.5], [72, 0.5], [74, 1],
   [79, 2], [74, 1],
   [72, 1], [69, 1], [66, 1],
@@ -19,8 +19,8 @@ const A: readonly Note[] = [
   [78, 1], [76, 1], [72, 1],
   [67, 2], [62, 1]
 ]
-const A_END: readonly Note[] = [...A.slice(0, -2), [67, 2], [74, 1]]
-const B: readonly Note[] = [
+export const A_END: readonly Note[] = [...A.slice(0, -2), [67, 2], [74, 1]]
+export const B: readonly Note[] = [
   [81, 1], [78, 1], [74, 1],
   [78, 1.5], [76, 0.5], [74, 1],
   [71, 1], [74, 1], [79, 1],
@@ -30,8 +30,8 @@ const B: readonly Note[] = [
   [81, 1], [78, 1], [72, 1],
   [71, 2], [74, 1]
 ]
-const CH_A: readonly Chord[] = ["G", "G", "D7", "G", "C", "G", "D7", "G"]
-const CH_B: readonly Chord[] = ["D7", "D7", "G", "G", "C", "C", "D7", "G"]
+export const CH_A: readonly Chord[] = ["G", "G", "D7", "G", "C", "G", "D7", "G"]
+export const CH_B: readonly Chord[] = ["D7", "D7", "G", "G", "C", "C", "D7", "G"]
 
 /** Each job plays a small piece; between jobs control is yielded to the browser. */
 type Job = (out: Float32Array) => void
