@@ -45,7 +45,7 @@ const PICK_SOUND = {
 
 export interface GameDeps {
   readonly renderer: THREE.WebGLRenderer
-  /** How a frame reaches the screen (prototype: the graphic looks). */
+  /** How a frame reaches the screen: the graphic look (`looks.ts`). */
   readonly look: Look
   readonly scene: THREE.Scene
   readonly camera: THREE.PerspectiveCamera
