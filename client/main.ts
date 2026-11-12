@@ -8,11 +8,13 @@ import { MAPS } from "../shared/maps/index.ts"
 import { createPhysicsWorld, initPhysics, type PhysicsWorld } from "../shared/physics.ts"
 import { PROTOCOL_VERSION, type ServerMessage } from "../shared/protocol.ts"
 import { createAudio } from "./audio.ts"
-import { createAvatar } from "./avatars.ts"
+import { createAvatar, setDetailedWeapon } from "./avatars.ts"
 import { createFx } from "./fx.ts"
 import { isLocalHost } from "../shared/hosts.ts"
 import { Game } from "./game.ts"
 import { t } from "./i18n.ts"
+import { createLook, lookFromUrl, mountLookSwitcher } from "./looks.ts"
+import { loadDetailed } from "./models/detailed.ts"
 import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
 import { PerfMonitor } from "./perf.ts"
@@ -31,6 +33,8 @@ renderer.toneMappingExposure = 1.05
 // The draw call and triangle count covers world and weapon: the frame resets it.
 renderer.info.autoReset = false
 const perf = new PerfMonitor(renderer)
+const look = createLook(lookFromUrl(), renderer)
+mountLookSwitcher(look.id)
 
 /** The maximum pixel ratio per quality; dynamic resolution goes down to `minRatio`. */
 const maxRatio = () => Math.min(devicePixelRatio, settings.quality === "alta" ? 2 : settings.quality === "media" ? 1.5 : 1)
@@ -74,6 +78,16 @@ const loadMap = (id: MapId) => {
 const fx = createFx(scene)
 const viewmodel = createViewmodel(camera)
 viewmodel.setVisible(false)
+// The realistic look holds the weapons modelled in Blender; the files are fetched only then.
+if (look.id === "ver")
+  loadDetailed((id, model) => {
+    const far = model.getObjectByName("far")
+    if (far) {
+      far.removeFromParent()
+      setDetailedWeapon(id, far)
+    }
+    viewmodel.remodel(id, model)
+  })
 const audio = createAudio()
 audio.setVolumes(settings.master, settings.music)
 addEventListener("resize", resize)
@@ -84,6 +98,7 @@ const applyQuality = () => {
   quality = settings.quality
   perf.scale = maxRatio()
   world.setQuality(quality)
+  look.setQuality(quality)
   fx.setQuality(quality)
   game?.setQuality(quality)
   resize()
@@ -136,6 +151,7 @@ let autostart = false
 const physicsReady = initPhysics().then(() => {
   game = new Game({
     renderer,
+    look,
     scene,
     camera,
     loadMap,
@@ -268,8 +284,7 @@ const loop = (now: number) => {
     world.update(dt, time, { pickups: [], flags: null, hill: null, cart: null, storm: null, turrets: [], doors: [], camera })
     fx.update(dt, camera)
     renderer.info.reset()
-    renderer.autoClear = true
-    renderer.render(scene, camera)
+    look.render(scene, camera)
   }
   perf.sample(dt * 1000, performance.now() - cpuStart)
   perf.panel(now, { quality: `${t().quality[quality]}${settings.autoRes ? ` · ${t().perf.dynRes}` : ""}`, net: game?.active ? game.netStats() : null })

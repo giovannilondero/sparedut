@@ -194,6 +194,16 @@ const GRIP: Record<WeaponId, { p: [number, number, number]; r: [number, number, 
   mitraie: { p: [0.14, -0.1, -0.3], r: [0, 0, 0] }
 }
 
+/**
+ * The weapons modelled in Blender, as the others are seen holding them (the `far` node of
+ * each file): shared by every avatar, like the baked ones. Filled as the files arrive.
+ */
+const detailed = new Map<WeaponId, THREE.Object3D>()
+const NOTHING = new THREE.BufferGeometry()
+export function setDetailedWeapon(id: WeaponId, far: THREE.Object3D) {
+  detailed.set(id, far)
+}
+
 function nameLabel(name: string, color: string) {
   const c = document.createElement("canvas")
   c.width = 256
@@ -282,6 +292,10 @@ export function createAvatar(team: Team, name: string): Avatar {
   object.add(label)
 
   let curWeapon: WeaponId | null = null
+  /** The detailed model in hand, and the baked geometry that stands in for it while fading. */
+  let detail: THREE.Object3D | null = null
+  let detailOf: THREE.Object3D | null = null
+  let plain: THREE.BufferGeometry = weapon.geometry
   let leftGrip: THREE.Vector3 | null = null
   let labelOn = false
   let t = Math.random() * 10
@@ -304,7 +318,18 @@ export function createAvatar(team: Team, name: string): Avatar {
   function setWeapon(id: WeaponId) {
     curWeapon = id
     const b = bakedWeapon(id)
-    weapon.geometry = b.geometry
+    plain = b.geometry
+    detail?.removeFromParent()
+    detailOf = detailed.get(id) ?? null
+    detail = detailOf?.clone() ?? null
+    if (detail) {
+      detail.traverse((o) => {
+        o.castShadow = weapon.castShadow
+      })
+      detail.visible = !fading
+      weapon.add(detail)
+    }
+    weapon.geometry = detail && !fading ? NOTHING : plain
     // at the turret the weapon is the turret's own, drawn by the world
     weapon.visible = id !== "mitraie"
     muzzleFlash.position.copy(b.muzzle)
@@ -322,6 +347,11 @@ export function createAvatar(team: Team, name: string): Avatar {
       mat.transparent = tr
       mat.depthWrite = !tr
       mat.needsUpdate = true
+      // a detailed weapon shares its materials with everyone: the baked one does the fading
+      if (detail) {
+        detail.visible = !tr
+        weapon.geometry = tr ? plain : NOTHING
+      }
     }
     mat.opacity = o
   }
@@ -341,7 +371,7 @@ export function createAvatar(team: Team, name: string): Avatar {
     update(dt, pose: AvatarPose) {
       dt = Math.min(dt, 0.1)
       t += dt
-      if (pose.weapon !== curWeapon) setWeapon(pose.weapon)
+      if (pose.weapon !== curWeapon || detailOf !== (detailed.get(pose.weapon) ?? null)) setWeapon(pose.weapon)
       object.position.set(pose.x, pose.y, pose.z)
 
       // death: topples over, then sinks and fades

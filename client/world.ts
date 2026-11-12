@@ -217,6 +217,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
     sacs: lam(tex.sacs, { bumpMap: tex.sacs, bumpScale: 1.4 }),
     atlas: lam(atlas.texture, { alphaTest: 0.5, side: THREE.DoubleSide })
   }
+  for (const [k, m] of Object.entries(MATS)) m.name = k
   const B = new Batch<K>(SCALES, ["atlas"])
 
   // Repeated instances.

@@ -5,9 +5,11 @@
  * it stays on one weapon.
  */
 import * as THREE from "three"
-import { createAvatar } from "../avatars.ts"
+import { createAvatar, setDetailedWeapon } from "../avatars.ts"
 import type { AvatarPose } from "../contracts.ts"
 import { createFx } from "../fx.ts"
+import { createLook, lookFromUrl, mountLookSwitcher } from "../looks.ts"
+import { loadDetailed } from "../models/detailed.ts"
 import { createViewmodel } from "../viewmodel.ts"
 import type { PickupKind } from "../../shared/map.ts"
 import { WEAPONS, WEAPON_IDS, type WeaponId } from "../../shared/weapons.ts"
@@ -19,6 +21,9 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping
 renderer.autoClear = false
 document.body.appendChild(renderer.domElement)
 const info = document.getElementById("info")!
+// With a look other than the current one the view is not split: first person only.
+const style = createLook(lookFromUrl(), renderer)
+mountLookSwitcher(style.id)
 
 // a bit of plaçute at sunset
 const scene = new THREE.Scene()
@@ -47,6 +52,20 @@ scene.add(fpCam)
 
 const fx = createFx(scene)
 const vm = createViewmodel(fpCam)
+if (style.id === "ver")
+  loadDetailed((id, model) => {
+    const far = model.getObjectByName("far")
+    if (far) {
+      far.removeFromParent()
+      setDetailedWeapon(id, far)
+    }
+    vm.remodel(id, model)
+  })
+
+// ?aw=doplete: every actor holds that weapon; ?cam=x,y,z,lx,ly,lz: a fixed camera on them, without the first-person weapon
+const params = new URLSearchParams(location.search)
+const actorWeapon = WEAPON_IDS.find((id) => id === params.get("aw")) ?? null
+const fixedCam = params.get("cam")?.split(",").map(Number) ?? null
 
 // avatars: per team, one per behaviour
 type Act = "walk" | "run" | "crouch" | "death" | "jump" | "idle"
@@ -72,7 +91,7 @@ for (const [ti, team] of (["benandanti", "malandanti"] as const).entries())
       act,
       ox: (i - 2.5) * 2.2,
       oz: ti ? -4 : 0,
-      weapon: WEAPON_IDS[(i + ti * 3) % WEAPON_IDS.length],
+      weapon: actorWeapon ?? WEAPON_IDS[(i + ti * 3) % WEAPON_IDS.length],
       shield: act === "idle" && ti === 0,
       carrier: act === "walk" || (act === "idle" && ti === 1),
       sgnape: act === "idle" || act === "run"
@@ -110,6 +129,12 @@ function poseOf(a: Actor, t: number): AvatarPose {
 const fixed = WEAPON_IDS.indexOf(new URLSearchParams(location.search).get("w") as WeaponId)
 let auto = fixed < 0
 const force = { aim: null as boolean | null, walk: null as boolean | null }
+// ?still: the weapon at rest on the hip (?still=aim: aimed), to look at the model
+const still = new URLSearchParams(location.search).get("still")
+if (still !== null) {
+  force.walk = false
+  force.aim = still === "aim"
+}
 let wIndex = Math.max(0, fixed)
 let wTimer = 0
 let fireAcc = 0
@@ -232,9 +257,26 @@ function frame() {
   tpCam.lookAt(0, 1, -1)
   fx.update(dt, tpCam)
 
-  // left: third person; right: first person + weapon
   const W = innerWidth
   const H = innerHeight
+  if (style.id !== "cumo") {
+    // closer to the actors than the split view: the look is judged on them
+    fpCam.position.z = 3.4
+    fpCam.fov = 62
+    if (fixedCam?.length === 6) {
+      fpCam.position.set(fixedCam[0], fixedCam[1], fixedCam[2])
+      fpCam.lookAt(fixedCam[3], fixedCam[4], fixedCam[5])
+      fpCam.fov = 40
+    }
+    fpCam.aspect = vm.camera.aspect = W / H
+    fpCam.updateProjectionMatrix()
+    vm.camera.updateProjectionMatrix()
+    fpCam.updateMatrixWorld()
+    style.render(scene, fpCam, fixedCam ? null : vm)
+    requestAnimationFrame(frame)
+    return
+  }
+  // left: third person; right: first person + weapon
   const split = Math.floor(W * 0.4)
   renderer.setScissorTest(true)
   renderer.setViewport(0, 0, split, H)
