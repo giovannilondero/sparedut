@@ -107,6 +107,10 @@ export interface ViewmodelFrame {
   readonly sgnape: boolean
   /** Mulin spin, from 0 to 1. */
   readonly spin: number
+  /** A hen sits at the hen cannon's mouth (from the first-person presentation). */
+  readonly henAtMouth: boolean
+  /** Hens the hen cannon's reload under way drops in (from the first-person presentation). */
+  readonly reloadHens: number
 }
 export interface Viewmodel {
   readonly scene: THREE.Scene
@@ -156,6 +160,7 @@ export type SoundName =
   | "beam_miedi"
   | "launch_gjaline"
   | "boom_gjaline"
+  | "cluck_gjaline"
   | "shot_mitraie"
   | "turret_on"
   | "turret_hot"

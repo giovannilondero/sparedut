@@ -5,8 +5,9 @@ the mouth, craning her neck out to see where she is going.
 
     blender -b --python assets/blender/gjalinis.py -- <out.glb> [preview-folder]
 
-The game reads these node names: `body`, the moving part `frico` (the hen, hidden for a moment
-after each shot: her origin is where the game hangs her, in the mouth) and the point `muzzle`.
+The game reads these node names: `body`, the moving parts `frico` (the hen, hidden for a moment
+after each shot: her origin is where the game hangs her, in the mouth) and `lid` (the hatch's lid
+with its latch and knob, opened on the hinge pin to reload), and the point `muzzle`.
 It is held with one hand: there is no `left`.
 
 The beaten sheet is `miedi_copper` (drawn by miedi.py), the leather `mescul_leather` (Poly
@@ -284,7 +285,14 @@ handle_caps.append(lathe("handle-ferrule", [(0.0125, -0.0048), (0.0150, -0.0042)
 guard = ribbon("guard", [(0.078, 0.001), (0.079, -0.010), (0.071, -0.021), (0.050, -0.024), (0.040, -0.019), (0.0375, -0.006)], 0.0028, 0.013, STEEL)
 trigger = box("trigger", (0.006, 0.007, 0.022), (0, 0.058, -0.009), WORN, bevel=0.002, rot=(0.35, 0, 0))
 
-hard = part("hard", [barrel, lip, *hoops, *rivets, seam, collar, lid, *lid_rivets, *hinge, *latch, *knob, *gauge, bracket, *bracket_feet, handle, *handle_caps, guard, trigger])
+# the dark inside of the hatch, seen when the lid is open
+hole = lathe("hatch-hole", [(0, 0.1619), (0.0310, 0.1619), (0.0310, 0.1624), (0, 0.1624)], (0, HATCH, 0), BLACK, axis="Z", steps=32)
+# what swings open with the lid: the hinge's own leaf, the latch's ear, boss and wing nut, the knob
+LID_HINGE = (0, HATCH - 0.0405, 0.1655)
+on_lid = [lid, *lid_rivets, *(o for o in hinge if o.name == "hinge-leaf-lid"), *(o for o in latch if o.name.startswith(("latch-ear", "latch-boss", "latch-wing"))), *knob]
+fixed = [o for o in [*hinge, *latch] if o not in on_lid]
+part("lid", on_lid, pivot=LID_HINGE)
+hard = part("hard", [barrel, lip, *hoops, *rivets, seam, collar, hole, *fixed, *gauge, bracket, *bracket_feet, handle, *handle_caps, guard, trigger])
 wrap_uv(hard, SHEET)
 
 # --- the leather cuffs that strap it to the forearm, each drawn tight by a buckled belt ----------------------

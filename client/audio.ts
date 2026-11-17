@@ -39,6 +39,7 @@ const SPECS: Record<SoundName, Spec> = {
   beam_miedi: spec("mid", 4, 0.45, 0.06),
   launch_gjaline: spec("far", 3, 0.85, 0.06),
   boom_gjaline: spec("far", 4, 0.9, 0.08),
+  cluck_gjaline: spec("near", 3, 0.7, 0.08),
   shot_mitraie: spec("far", 10, 0.7, 0.04),
   turret_on: spec("mid", 2, 0.7),
   turret_hot: spec("mid", 2, 0.75),

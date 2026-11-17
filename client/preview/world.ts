@@ -60,7 +60,10 @@ const gunner = gunnerSpot
       aim: 0,
       baseFov: 80,
       look: { yaw: gunnerSpot.yaw + (gunnerAim[0] ?? 0), pitch: gunnerAim[1] ?? 0 },
-      sinceShot: q.get("shot") === null ? Infinity : Number(q.get("shot"))
+      sinceShot: q.get("shot") === null ? Infinity : Number(q.get("shot")),
+      mag: 0,
+      reserve: 0,
+      reload: null
     })
   : null
 const gunnerCamera = () => {

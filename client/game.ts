@@ -100,6 +100,11 @@ export class Game {
   private localCooldown = 0
   private localMag: number | null = null
   private shots: number[] = []
+  /**
+   * This player's reload under way, as it began: weapon, start (frame time, s), length, and the
+   * magazine and reserve it started from; `hensIn` counts the cannon's hens that have gone in, and clucked.
+   */
+  private ownReload: { weapon: WeaponId; at: number; seconds: number; mag: number; reserve: number; hensIn: number } | null = null
   private prevFire = false
   private prevBomb = false
   private prevMine = false
@@ -196,6 +201,7 @@ export class Game {
     this.wanted = this.d.settings.primary
     this.wantedSeq = 0
     this.shownWeapon = null
+    this.ownReload = null
     this.applySettings()
     this.updateRoster(room)
     this.hud.show(true)
@@ -527,7 +533,12 @@ export class Game {
         }
         return
       case "reload":
-        if (e.s === me) this.d.viewmodel.reload(WEAPONS[e.w].reloadTicks / 60)
+        if (e.s === me) {
+          const seconds = WEAPONS[e.w].reloadTicks / 60
+          const ammo = this.you()?.arsenal.ammo[e.w]
+          this.ownReload = ammo ? { weapon: e.w, at: this.time, seconds, mag: ammo.mag, reserve: ammo.reserve, hensIn: 0 } : null
+          this.d.viewmodel.reload(seconds)
+        }
         else {
           const at = this.posOf(e.s)
           if (at) audio.play("reload", { at, volume: 0.7 })
@@ -1110,6 +1121,10 @@ export class Game {
     const turret = you?.alive ? this.mounted() : -1
     const aiming = c.isHeld("aim") && !!you?.alive
     this.aimBlend += ((aiming ? 1 : 0) - this.aimBlend) * Math.min(1, dt * 12)
+    const reload = this.ownReload
+    // The reload is over once its time has run out and the server has finished it too (its magazine is then the new one).
+    if (reload && (!you?.alive || reload.weapon !== this.wanted || (this.time - reload.at >= reload.seconds && you.arsenal.action._tag !== "reload")))
+      this.ownReload = null
     this.sinceShot += dt
     const spot = turret >= 0 ? this.physics.map.turrets[turret] : undefined
     const view = firstPerson({
@@ -1119,8 +1134,15 @@ export class Game {
       sinceShot: this.sinceShot,
       alive: !!you?.alive,
       aim: this.aimBlend,
-      baseFov: settings.fov
+      baseFov: settings.fov,
+      mag: you ? (this.localMag ?? you.arsenal.ammo[this.wanted].mag) : 0,
+      reserve: you?.arsenal.ammo[this.wanted].reserve ?? 0,
+      reload: this.ownReload && { progress: Math.min(1, (this.time - this.ownReload.at) / this.ownReload.seconds), mag: this.ownReload.mag, reserve: this.ownReload.reserve }
     })
+    if (this.ownReload && view.hensIn > this.ownReload.hensIn) {
+      audio.play("cluck_gjaline")
+      this.ownReload.hensIn = view.hensIn
+    }
     const inHand = view.inHand
     const def = WEAPONS[inHand]
     camera.fov = view.fov
@@ -1171,7 +1193,9 @@ export class Game {
         lookDx,
         lookDy,
         sgnape: you.arsenal.sgnape > 0,
-        spin: def.spinTicks > 0 ? this.localSpin / def.spinTicks : 0
+        spin: def.spinTicks > 0 ? this.localSpin / def.spinTicks : 0,
+        henAtMouth: view.henAtMouth,
+        reloadHens: view.reloadHens
       })
     }
 
