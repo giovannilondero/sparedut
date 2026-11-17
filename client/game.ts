@@ -23,6 +23,7 @@ import type { Look } from "./looks.ts"
 import type { Menu } from "./menu.ts"
 import type { Connection } from "./connection.ts"
 import { inviteLink } from "./invite.ts"
+import { MatchClock } from "./match-clock.ts"
 import { Predictor } from "./predict.ts"
 import type { Settings } from "./settings.ts"
 
@@ -142,7 +143,10 @@ export class Game {
   private seed = 1
   private lastPhase = ""
   private renderTick = 0
+  /** Match time (s): reloads, prediction and the others' interpolation all read it. */
   private time = 0
+  /** Stands still while an Offline match is paused: on resume, the pause never happened. */
+  private clock = new MatchClock(() => performance.now())
   private running = false
   private readonly blobGeo = new THREE.CircleGeometry(0.42, 20).rotateX(-Math.PI / 2)
   private readonly blobMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false })
@@ -182,6 +186,7 @@ export class Game {
       if (e.key === "Escape") this.closeChat()
     })
     d.net.on((msg) => this.running && this.message(msg))
+    document.addEventListener("visibilitychange", () => this.syncPause())
     // Development only: automated tests drive the player without pointer lock.
     if (import.meta.env.DEV) Object.assign(window, { __sparedut: { controls: this.controls, game: this } })
   }
@@ -203,6 +208,7 @@ export class Game {
     this.wantedSeq = 0
     this.shownWeapon = null
     this.ownReload = null
+    this.clock = new MatchClock(() => performance.now())
     this.applySettings()
     this.updateRoster(room)
     this.hud.show(true)
@@ -312,9 +318,9 @@ export class Game {
   }
 
   private onSnapshot(s: Snapshot) {
-    this.snapArrivals.push(performance.now())
+    this.snapArrivals.push(this.clock.now())
     if (this.snapArrivals.length > 31) this.snapArrivals.shift()
-    const now = performance.now() / 1000
+    const now = this.clock.now() / 1000
     const target = s.tick - now * 60
     if (this.offset === null || Math.abs(target - this.offset) > 30) this.offset = target
     // The others' clock drifts slowly: an early or late snapshot
@@ -704,6 +710,7 @@ export class Game {
     $("pause").classList.toggle("hidden", which !== "pause")
     $("loadout").classList.toggle("hidden", which !== "loadout")
     if (which === "pause") this.renderPause()
+    this.syncPause()
     if (which === "loadout") {
       if (document.pointerLockElement) document.exitPointerLock()
       const el = $("loadout")
@@ -724,6 +731,19 @@ export class Game {
         this.controls.lock()
       }
     }
+  }
+
+  /**
+   * An Offline match stands still while a menu is open or the tab is hidden: the host stops
+   * stepping and this client stops predicting. A room on the game server never pauses.
+   */
+  private syncPause() {
+    const paused = this.running && this.room?.reach === "offline" && (this.overlay !== "none" || document.hidden)
+    if (paused === this.clock.paused) return
+    if (paused) this.clock.pause()
+    else this.clock.resume()
+    // Leaving the match is no resume: the room is already gone.
+    if (this.running) this.d.net.send({ t: "pause", paused })
   }
 
   private renderPause() {
@@ -1051,19 +1071,22 @@ export class Game {
 
   frame(dt: number, t: number) {
     if (!this.running) return
-    this.time = t
+    this.time = this.clock.now() / 1000
     const { camera, audio, viewmodel, fx, settings } = this.d
     const world = this.world
-    const now = performance.now() / 1000
-    if (this.offset !== null) this.renderTick = now * 60 + this.offset - INTERP_TICKS
+    if (this.offset !== null) this.renderTick = this.time * 60 + this.offset - INTERP_TICKS
 
+    const paused = this.clock.paused
     this.controls.poll(dt, this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over")
-    this.acc += Math.min(dt, 0.25)
-    while (this.acc >= DT) {
-      this.acc -= DT
-      this.fixedStep()
+    // Paused: no commands, no prediction, and the paused time never reaches the fixed tick.
+    if (!paused) {
+      this.acc += Math.min(dt, 0.25)
+      while (this.acc >= DT) {
+        this.acc -= DT
+        this.fixedStep()
+      }
+      this.predictor.decay(dt)
     }
-    this.predictor.decay(dt)
 
     const s = this.snap
     const you = s?.you ?? null
@@ -1133,7 +1156,7 @@ export class Game {
     // The reload is over once its time has run out and the server has finished it too (its magazine is then the new one).
     if (reload && (!you?.alive || reload.weapon !== this.wanted || (this.time - reload.at >= reload.seconds && you.arsenal.action._tag !== "reload")))
       this.ownReload = null
-    this.sinceShot += dt
+    if (!paused) this.sinceShot += dt
     const spot = turret >= 0 ? this.physics.map.turrets[turret] : undefined
     const view = firstPerson({
       chosen: this.wanted,

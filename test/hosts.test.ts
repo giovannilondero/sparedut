@@ -18,6 +18,11 @@ const HOSTS = [
   { name: "the in-browser host", reach: "offline", access: {}, make: (clock: Clock) => createBrowserHost(clock) }
 ] as const
 
+const HOSTS_CREATE = {
+  online: { t: "create", mode: "bataie", map: "glemone", minutes: 10, reach: "online", access: { kind: "open" }, bots: 2, level: "pari", ff: false, primary: "cramar" },
+  offline: { t: "create", mode: "bataie", map: "glemone", minutes: 10, reach: "offline", bots: 2, level: "pari", ff: false, primary: "cramar" }
+}
+
 function harness(make: (clock: Clock) => Hub) {
   let clock = 0
   const hub = make(() => clock)
@@ -90,6 +95,75 @@ for (const host of HOSTS) {
 
   })
 }
+
+describe("the game server", () => {
+  test("a room on the server does not pause when its player opens the match menu or hides the tab", () => {
+    const { connect, play } = harness(HOSTS[0].make)
+    const me = connect()
+    me.say(HOSTS_CREATE.online)
+    play(30)
+    me.say({ t: "pause", paused: true })
+    play(60)
+    expect(me.last("snap")!.tick).toBe(90)
+    expect(me.got.some((m) => m.t === "error")).toBe(false)
+  })
+})
+
+describe("pause in an Offline room", () => {
+  const browser = HOSTS[1].make
+
+  test("pausing stops the match at its tick, with no snapshots; resuming goes on from that same tick", () => {
+    const { connect, play } = harness(browser)
+    const me = connect()
+    me.say(HOSTS_CREATE.offline)
+    me.say({ t: "start" })
+    play(30)
+    const before = me.last("snap")!
+    expect(before.tick).toBe(30)
+    me.say({ t: "pause", paused: true })
+    const sent = me.got.length
+    play(600)
+    // Bots, projectiles and the match clock all live in the room's tick: nothing moved.
+    expect(me.got.slice(sent).filter((m) => m.t === "snap")).toEqual([])
+    me.say({ t: "ping", c: 1 })
+    expect(me.last("pong")!.tick).toBe(30)
+    me.say({ t: "pause", paused: false })
+    play(2)
+    const after = me.last("snap")!
+    expect(after.tick).toBe(32)
+    // The match's end is the same distance away as before the pause: no time was lost.
+    expect(after.phase.tag === "Live" && before.phase.tag === "Live" && after.phase.ends === before.phase.ends).toBe(true)
+  })
+
+  test("host tools used while paused take effect: bots, their skill, restart", () => {
+    const { connect, play } = harness(browser)
+    const me = connect()
+    me.say(HOSTS_CREATE.offline)
+    me.say({ t: "start" })
+    play(120)
+    const live = me.last("snap")!.phase
+    me.say({ t: "pause", paused: true })
+    // A player in the menu clicks more than a burst of commands, over some seconds of real time.
+    for (let i = 0; i < 6; i++) {
+      me.say({ t: "bot", team: "malandanti", delta: 1 })
+      me.say({ t: "bot", team: "malandanti", delta: -1 })
+      play(60)
+    }
+    me.say({ t: "bot", team: "malandanti", delta: 1 })
+    expect(me.last("room")!.room.bots).toBe(4)
+    me.say({ t: "level", level: "plevan" })
+    expect(me.last("room")!.room.level).toBe("plevan")
+    me.say({ t: "start" })
+    play(60)
+    me.say({ t: "pause", paused: false })
+    play(2)
+    const snap = me.last("snap")!
+    expect(snap.tick).toBe(122)
+    expect(snap.players).toHaveLength(5)
+    // Restarted while paused: the new match ends later than the one that was playing.
+    expect(snap.phase.tag === "Live" && live.tag === "Live" && snap.phase.ends > live.ends).toBe(true)
+  })
+})
 
 describe("the in-browser host", () => {
   const create = { t: "create", mode: "bataie", map: "glemone", minutes: 10, reach: "offline", bots: 2, level: "pari", ff: false, primary: "cramar" }
