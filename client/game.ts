@@ -212,6 +212,7 @@ export class Game {
     this.openOverlay("none")
     this.d.viewmodel.setVisible(false)
     if (document.pointerLockElement) document.exitPointerLock()
+    this.controls.track(null)
   }
 
   get active() {
@@ -250,6 +251,7 @@ export class Game {
     const s = this.d.settings
     this.controls.sensitivity = s.sensitivity
     this.controls.invertY = s.invertY
+    this.controls.crouchMode = s.crouch
   }
 
   // ---------------------------------------------------------------- network
@@ -332,6 +334,7 @@ export class Game {
         else this.predictor.reconcile(you.body, you.seq, true)
       }
       this.wasAlive = you.alive
+      this.controls.track({ alive: you.alive, mounted: this.mounted() >= 0 })
       // The server has already seen my last weapon switch and holds a different one: it
       // switched it itself (lanciafrico pickup, armoury, respawn) or rejected the switch. Follow it.
       const server = you.arsenal.current
