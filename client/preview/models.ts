@@ -256,6 +256,7 @@ function frame() {
     alive: true,
     aim: 0,
     baseFov: 75,
+    look: { yaw: 0, pitch: 0 },
     mag: ammo.mag,
     reserve: ammo.reserve,
     sinceShot: t - ammo.lastShot,

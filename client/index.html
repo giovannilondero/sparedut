@@ -61,7 +61,7 @@
           <span data-t="join"></span><small data-t="joinSub"></small>
         </button>
         <div class="lan-box">
-          <div class="lan-title" data-t="lanTitle"></div>
+          <div class="lan-title" data-t="roomsTitle"></div>
           <ul id="lan-list"></ul>
         </div>
         <div class="row small-buttons">
@@ -80,7 +80,12 @@
           <label class="field"><span data-t="botsLabel"></span><select id="c-bots"></select></label>
         </div>
         <div class="field"><span data-t="levelLabel"></span><div id="c-level" class="levels" role="radiogroup"></div></div>
-        <label class="field"><span data-t="visLabel"></span><select id="c-vis"><option value="lan" data-t="visLan"></option><option value="code" data-t="visCode"></option></select></label>
+        <label class="field"><span data-t="reachLabel"></span><select id="c-reach"><option value="lan" data-t="reachLan"></option><option value="online" data-t="reachOnline"></option></select></label>
+        <div class="grid2">
+          <label class="field"><span data-t="accessLabel"></span><select id="c-access"><option value="open" data-t="accessOpen"></option><option value="password" data-t="accessPassword"></option></select></label>
+          <label class="field" id="c-password-field" hidden><span data-t="passwordLabel"></span><input id="c-password" maxlength="32" autocomplete="off" spellcheck="false" /></label>
+        </div>
+        <p id="c-msg" class="form-msg" role="alert"></p>
         <label class="check"><input type="checkbox" id="c-ff" /> <span data-t="ff"></span></label>
         <div class="row">
           <button data-go="home" data-t="back"></button>
@@ -94,6 +99,17 @@
         <div class="row">
           <button data-go="home" data-t="back"></button>
           <button class="primary" id="j-go" data-t="joinGo"></button>
+        </div>
+      </section>
+
+      <section id="menu-password" class="panel hidden">
+        <h2 data-t="passwordTitle"></h2>
+        <p id="pw-for" class="muted"></p>
+        <input id="pw-input" class="pw-input" maxlength="32" autocomplete="off" spellcheck="false" />
+        <p id="pw-msg" class="form-msg" role="alert"></p>
+        <div class="row">
+          <button data-go="home" data-t="back"></button>
+          <button class="primary" id="pw-go" data-t="joinGo"></button>
         </div>
       </section>
 
@@ -115,6 +131,7 @@
           <label class="check"><input type="checkbox" id="s-autores" /> <span data-t="autoRes"></span></label>
           <label class="check"><input type="checkbox" id="s-info" /> <span data-t="showInfo"></span></label>
           <label class="check"><input type="checkbox" id="s-invert" /> <span data-t="invert"></span></label>
+          <label class="field"><span data-t="crouchMode"></span><select id="s-crouch"><option value="hold" data-t="crouchHold"></option><option value="toggle" data-t="crouchToggle"></option></select></label>
           <div class="keys" data-t="keys"></div>
         </div></div>
         <div class="row"><button data-go="home" data-t="back"></button></div>

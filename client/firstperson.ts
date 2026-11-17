@@ -2,13 +2,14 @@
  * First-person presentation: what the local player's own view shows, decided from
  * plain data. No renderer here; the frame loop and the viewmodel read the result.
  */
-import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
+import { turretAim, type TurretSpot, type V3 } from "../shared/map.ts"
+import { TURRET, WEAPONS, type WeaponId } from "../shared/weapons.ts"
 
 export interface FirstPersonInput {
   /** The weapon the player chose to hold (their loadout slot). */
   readonly chosen: WeaponId
   /** The turret the player is mounted on, or null when on foot. */
-  readonly mount: { readonly turret: number } | null
+  readonly mount: { readonly turret: number; readonly spot: TurretSpot } | null
   readonly alive: boolean
   /** How far into aiming the view is: 0 = hip, 1 = fully aimed. */
   readonly aim: number
@@ -18,10 +19,24 @@ export interface FirstPersonInput {
   readonly mag: number
   /** Rounds in reserve for the chosen weapon. */
   readonly reserve: number
-  /** Seconds since this player's last shot. */
-  readonly sinceShot: number
   /** The reload under way, or null: progress from 0 to 1 and the magazine and reserve it started from. */
   readonly reload: { readonly progress: number; readonly mag: number; readonly reserve: number } | null
+  /** Seconds since the player's last shot; Infinity if none. */
+  readonly sinceShot: number
+  /** Where the player looks, in radians. */
+  readonly look: { readonly yaw: number; readonly pitch: number }
+}
+
+/** The mitraie on its turret's tripod, as its gunner sees it: the world's gun, turned around its pivot. */
+export interface MitraiePose {
+  readonly turret: number
+  /** The pivot in the world: fixed on the tripod, whatever the aim. */
+  readonly pivot: V3
+  /** The gun's aim around the pivot, kept inside the turret's arc. */
+  readonly yaw: number
+  readonly pitch: number
+  /** How far the last shot throws the gun back along its barrel (m). */
+  readonly recoil: number
 }
 
 export interface FirstPersonView {
@@ -33,15 +48,17 @@ export interface FirstPersonView {
   readonly lookScale: number
   /** The scope overlay replaces the view. */
   readonly scope: boolean
-  /** The weapon in hand is drawn. */
+  /** The carried weapon is drawn in the hands. Never on a turret: there the gun is the mitraie on its pivot. */
   readonly drawWeapon: boolean
   readonly crosshair: boolean
   /** A hen sits at the hen cannon's mouth. */
   readonly henAtMouth: boolean
-  /** Of those, how many have gone in so far: each one clucks as it does. */
-  readonly hensIn: number
   /** Hens the reload under way drops into the hen cannon: the rounds it loads. 0 when not reloading it. */
   readonly reloadHens: number
+  /** Of those, how many have gone in so far: each one clucks as it does. */
+  readonly hensIn: number
+  /** Mounted: the pose of the mitraie on its pivot. Null on foot. */
+  readonly mitraie: MitraiePose | null
 }
 
 /** Weapons with a scope overlay. The mitraie has none, so a turret never shows one. */
@@ -75,7 +92,18 @@ export const firstPerson = (input: FirstPersonInput): FirstPersonView => {
   const fov = input.baseFov + (WEAPONS[inHand].aimFov - input.baseFov) * input.aim
   const scope = SCOPED.has(inHand) && input.aim > SCOPE_AT
   const hen = henCannon(inHand, input)
-  return { inHand, fov, lookScale: fov / input.baseFov, scope, drawWeapon: input.alive && !scope, crosshair: input.alive && !scope, ...hen }
+  return { inHand, fov, lookScale: fov / input.baseFov, scope, drawWeapon: input.alive && !scope && !input.mount, crosshair: input.alive && !scope, mitraie: mitraiePose(input), ...hen }
+}
+
+/** The mitraie's kick on its tripod: how far back (m) and for how long (s). It fires every 4 ticks, so a burst keeps it shaking. */
+const RECOIL = { back: 0.04, seconds: 0.08 }
+
+const mitraiePose = ({ mount, look, sinceShot }: FirstPersonInput): MitraiePose | null => {
+  if (!mount) return null
+  const { at } = mount.spot
+  const aim = turretAim(mount.spot, look.yaw, look.pitch)
+  const left = Math.max(0, 1 - sinceShot / RECOIL.seconds)
+  return { turret: mount.turret, pivot: [at[0], at[1] + TURRET.pivot, at[2]], yaw: aim.yaw, pitch: aim.pitch, recoil: RECOIL.back * left * left }
 }
 
 /** What the hen cannon shows: the hen at the mouth and the hens a reload drops in. */

@@ -3,6 +3,7 @@ import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId } from "../shared/map.ts"
 import { MAP_IDS } from "../shared/maps/index.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
+import type { CrouchMode } from "./controls.ts"
 import type { Lang } from "./i18n.ts"
 
 export interface Settings {
@@ -14,6 +15,8 @@ export interface Settings {
   master: number
   music: number
   invertY: boolean
+  /** Crouch while the key is held, or a press to crouch and one to stand. */
+  crouch: CrouchMode
   primary: PrimaryId
   quality: "bassa" | "media" | "alta"
   /** Performance panel (F3). */
@@ -37,6 +40,7 @@ const DEFAULTS: Settings = {
   master: 0.8,
   music: 0.5,
   invertY: false,
+  crouch: "hold",
   primary: "cramar",
   quality: "media",
   showInfo: false,
@@ -53,6 +57,7 @@ export function loadSettings(): Settings {
     const s: Settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") }
     // A value saved by an old version (or a removed map) falls back to the default.
     if (!MAP_IDS.includes(s.lastMap)) s.lastMap = DEFAULTS.lastMap
+    if (s.crouch !== "hold" && s.crouch !== "toggle") s.crouch = DEFAULTS.crouch
     return s
   } catch {
     return { ...DEFAULTS }

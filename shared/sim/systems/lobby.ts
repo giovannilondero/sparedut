@@ -39,8 +39,9 @@ export const HandleJoin = Game.System(
     commands: Game.System.commands(Game.System.spawns(Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers))
   },
   ({ queries, resources, events, commands }) => {
+    const { data } = queries.members
     const spawns = MAPS[resources.rules.get().map].spawns
-    const present = new Set(queries.members.each().map((m) => m.data.player.get().session))
+    const present = new Set(queries.members.each().map((m) => data.player.get(m).session))
     for (const j of events.join.all()) {
       if (present.has(j.session)) continue
       present.add(j.session)
@@ -68,10 +69,11 @@ export const HandleLeave = Game.System(
     commands: Game.System.commands(Game.System.despawns(Player))
   },
   ({ queries, events, commands }) => {
+    const { data } = queries.members
     const gone = new Set(events.leave.all().map((l) => l.session))
     if (gone.size === 0) return
     for (const m of queries.members.each()) {
-      if (gone.has(m.data.player.get().session)) commands.despawn(m.entity)
+      if (gone.has(data.player.get(m).session)) commands.despawn(m)
     }
   }
 )
@@ -83,23 +85,24 @@ export const HandleTeamChanges = Game.System(
     events: { team: Game.System.readEvent(ChangeTeam), primary: Game.System.readEvent(ChangePrimary) }
   },
   ({ queries, events }) => {
+    const { data } = queries.members
     const teams = new Map(events.team.all().map((e) => [e.session, e.team]))
     const primaries = new Map(events.primary.all().map((e) => [e.session, e.primary]))
     if (teams.size === 0 && primaries.size === 0) return
     for (const m of queries.members.each()) {
-      const session = m.data.player.get().session
+      const session = data.player.get(m).session
       const team = teams.get(session)
-      if (team && team !== m.data.team.get()) {
-        m.data.team.set(team)
-        const life = m.data.life.get()
+      if (team && team !== data.team.get(m)) {
+        data.team.set(m, team)
+        const life = data.life.get(m)
         // Switching team while alive costs your life (no points to anyone).
-        if (life._tag === "Alive") m.data.life.transition({ from: "Alive", to: "Dead", data: { respawn: 60, killer: null } })
+        if (life._tag === "Alive") data.life.transition(m, { from: "Alive", to: "Dead", data: { respawn: 60, killer: null } })
       }
       const primary = primaries.get(session)
       // The new primary arrives immediately; if you were holding the old one, you switch to the new one.
       // Each weapon keeps its own ammo: switching back and forth reloads nothing.
       if (primary)
-        m.data.arsenal.update((a) =>
+        data.arsenal.update(m, (a) =>
           a.primary === primary
             ? { ...a, nextPrimary: primary }
             : {

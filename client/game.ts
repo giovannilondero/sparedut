@@ -21,6 +21,7 @@ import { boardHtml, esc, Hud, rosterHtml } from "./hud.ts"
 import { t } from "./i18n.ts"
 import type { Look } from "./looks.ts"
 import type { Menu } from "./menu.ts"
+import { inviteLink } from "./invite.ts"
 import type { Net } from "./net.ts"
 import { Predictor } from "./predict.ts"
 import type { Settings } from "./settings.ts"
@@ -63,6 +64,8 @@ export interface GameDeps {
   readonly onLeave: () => void
   /** Origin and path for invite links (the public address when playing from localhost). */
   readonly inviteBase: () => string
+  /** The room's password, if this client knows it: it goes into the invite link's fragment. */
+  readonly roomPassword: () => string | null
 }
 
 interface Frame {
@@ -97,8 +100,6 @@ export class Game {
   private localCooldown = 0
   private localMag: number | null = null
   private shots: number[] = []
-  /** When this player last fired (frame time, s): the hen at the cannon's mouth waits a moment after it. */
-  private lastShotAt = -9
   /**
    * This player's reload under way, as it began: weapon, start (frame time, s), length, and the
    * magazine and reserve it started from; `hensIn` counts the cannon's hens that have gone in, and clucked.
@@ -109,6 +110,8 @@ export class Game {
   private prevMine = false
   /** Predicted Mulin spin-up (ticks), counted as the server does. */
   private localSpin = 0
+  /** Seconds since my last shot, for the first-person view (the mitraie's recoil on its tripod). */
+  private sinceShot = Infinity
   /** Ticks until the next predicted mitraie shot, at the turret. */
   private turretCooldown = 0
   /** Last time (s) the heal sound played, so it doesn't turn into a barrage. */
@@ -199,7 +202,6 @@ export class Game {
     this.wantedSeq = 0
     this.shownWeapon = null
     this.ownReload = null
-    this.lastShotAt = -9
     this.applySettings()
     this.updateRoster(room)
     this.hud.show(true)
@@ -222,6 +224,7 @@ export class Game {
     this.openOverlay("none")
     this.d.viewmodel.setVisible(false)
     if (document.pointerLockElement) document.exitPointerLock()
+    this.controls.track(null)
   }
 
   get active() {
@@ -260,6 +263,7 @@ export class Game {
     const s = this.d.settings
     this.controls.sensitivity = s.sensitivity
     this.controls.invertY = s.invertY
+    this.controls.crouchMode = s.crouch
   }
 
   // ---------------------------------------------------------------- network
@@ -342,6 +346,7 @@ export class Game {
         else this.predictor.reconcile(you.body, you.seq, true)
       }
       this.wasAlive = you.alive
+      this.controls.track({ alive: you.alive, mounted: this.mounted() >= 0 })
       // The server has already seen my last weapon switch and holds a different one: it
       // switched it itself (lanciafrico pickup, armoury, respawn) or rejected the switch. Follow it.
       const server = you.arsenal.current
@@ -725,7 +730,7 @@ export class Game {
     if (!room) return
     const host = room.hostId === this.me
     const el = $("pause")
-    const link = `${this.d.inviteBase()}?p=${room.code}`
+    const link = inviteLink(this.d.inviteBase(), room.code, this.d.roomPassword())
     const myTeam = this.teams.get(this.me)
     const other: Team = myTeam === "benandanti" ? "malandanti" : "benandanti"
     const phase = this.snap?.phase.tag ?? "Warmup"
@@ -735,7 +740,7 @@ export class Game {
       <h2>${s.modes[room.mode].name} <small class="muted">· ${s.modes[room.mode].sub}</small></h2>
       <div class="row" style="align-items:center;justify-content:space-between">
         <div><div class="muted">${p.code}</div><div class="invite">${room.code}</div></div>
-        <div style="text-align:right"><button id="p-copy">${p.copy}</button><div class="muted" style="font-size:12px;margin-top:4px">${room.visibility === "lan" ? p.visLan : p.visCode}</div></div>
+        <div style="text-align:right"><button id="p-copy">${p.copy}</button><div class="muted" style="font-size:12px;margin-top:4px">${p.reach[room.reach]}${room.access ? ` · ${p.access[room.access]}` : ""}</div></div>
       </div>
       <div class="roster">${rosterHtml(room, this.me)}</div>
       ${
@@ -943,7 +948,7 @@ export class Game {
     const physics = this.physics
     const def = WEAPONS[id]
     viewmodel.fire()
-    this.lastShotAt = this.time
+    this.sinceShot = 0
     this.kickPitch += def.kick
     this.controls.rumble(def.kick * 4, 0.15 + def.kick * 3, def.mode === "melee" ? 90 : 60)
     if (def.mode === "melee") {
@@ -969,7 +974,7 @@ export class Game {
         const hit = rayPose(eye, dir, { x: p.x, y: p.y, z: p.z, crouch: (p.f & FLAG_BIT.crouch) !== 0 })
         if (hit && hit.dist < reach) reach = hit.dist
       }
-      const muzzle = viewmodel.muzzleWorld(new THREE.Vector3())
+      const muzzle = this.muzzle()
       fx.tracer([muzzle.x, muzzle.y, muzzle.z], [eye.x + dir.x * reach, eye.y + dir.y * reach, eye.z + dir.z * reach], id)
       return
     }
@@ -977,7 +982,7 @@ export class Game {
     const b = this.predictor.body
     if (!b) return
     const eye = { x: b.x, y: b.y + this.eye, z: b.z }
-    const muzzle = viewmodel.muzzleWorld(new THREE.Vector3())
+    const muzzle = this.muzzle()
     const aiming = (input.buttons & BUTTON.aim) !== 0
     const spread = aiming ? def.spread.aimed : Math.hypot(b.vx, b.vz) > 1.5 ? def.spread.moving : def.spread.still
     for (let i = 0; i < def.pellets; i++) {
@@ -994,6 +999,12 @@ export class Game {
       fx.tracer([muzzle.x, muzzle.y, muzzle.z], end, id)
     }
     fx.muzzle([muzzle.x, muzzle.y, muzzle.z])
+  }
+
+  /** Where my shots leave from: the mitraie's own muzzle on a turret, the carried weapon's otherwise. */
+  private muzzle() {
+    const turret = this.mounted()
+    return turret >= 0 ? this.world.turretMuzzle(turret, new THREE.Vector3()) : this.d.viewmodel.muzzleWorld(new THREE.Vector3())
   }
 
   // ---------------------------------------------------------------- interpolation
@@ -1114,15 +1125,18 @@ export class Game {
     // The reload is over once its time has run out and the server has finished it too (its magazine is then the new one).
     if (reload && (!you?.alive || reload.weapon !== this.wanted || (this.time - reload.at >= reload.seconds && you.arsenal.action._tag !== "reload")))
       this.ownReload = null
+    this.sinceShot += dt
+    const spot = turret >= 0 ? this.physics.map.turrets[turret] : undefined
     const view = firstPerson({
       chosen: this.wanted,
-      mount: turret >= 0 ? { turret } : null,
+      mount: spot ? { turret, spot } : null,
+      look: { yaw: c.yaw, pitch: c.pitch },
+      sinceShot: this.sinceShot,
       alive: !!you?.alive,
       aim: this.aimBlend,
       baseFov: settings.fov,
       mag: you ? (this.localMag ?? you.arsenal.ammo[this.wanted].mag) : 0,
       reserve: you?.arsenal.ammo[this.wanted].reserve ?? 0,
-      sinceShot: this.time - this.lastShotAt,
       reload: this.ownReload && { progress: Math.min(1, (this.time - this.ownReload.at) / this.ownReload.seconds), mag: this.ownReload.mag, reserve: this.ownReload.reserve }
     })
     if (this.ownReload && view.hensIn > this.ownReload.hensIn) {
@@ -1205,13 +1219,15 @@ export class Game {
         turrets: s.turrets.map((tu, i): TurretVisual => {
           const mine = tu.gunner === this.me
           const gunner = tu.gunner && !mine ? this.interpolated(tu.gunner) : null
+          const pose = view.mitraie?.turret === i ? view.mitraie : null
           return {
-            yaw: mine ? c.yaw : gunner?.yaw ?? 0,
-            pitch: mine ? c.pitch : gunner?.pitch ?? 0,
+            yaw: pose ? pose.yaw : mine ? c.yaw : gunner?.yaw ?? 0,
+            pitch: pose ? pose.pitch : mine ? c.pitch : gunner?.pitch ?? 0,
             heat: tu.heat,
             jammed: tu.jammed,
             manned: tu.gunner !== null,
-            mine: mine && i === turret
+            mine: pose !== null,
+            recoil: pose?.recoil ?? 0
           }
         }),
         doors: s.doors.map((hp, i) => hp / (this.physics.map.doors[i]?.hp ?? 1)),
