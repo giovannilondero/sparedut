@@ -84,7 +84,9 @@ export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("start") }),
   z.object({ t: z.literal("bot"), team, delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ t: z.literal("level"), level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]) }),
-  z.object({ t: z.literal("ping"), c: z.number(), rtt: z.number().min(0).max(10000).optional() })
+  z.object({ t: z.literal("ping"), c: z.number(), rtt: z.number().min(0).max(10000).optional() }),
+  /** The match menu opened or closed, the tab hidden or shown. Only an Offline room pauses; the server ignores it. */
+  z.object({ t: z.literal("pause"), paused: z.boolean() })
 ])
 export type ClientMessage = z.infer<typeof ClientMessage>
 

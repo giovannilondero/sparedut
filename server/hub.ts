@@ -109,7 +109,8 @@ export class Hub {
       return
     }
     const msg = parsed.data
-    if (msg.t !== "input" && msg.t !== "ping" && !limits.commands.take()) return
+    // Pausing is not a command: opening and closing the menu quickly must never leave a match paused.
+    if (msg.t !== "input" && msg.t !== "ping" && msg.t !== "pause" && !limits.commands.take()) return
     const id = peer.id!
     const room = peer.room
     switch (msg.t) {
@@ -188,6 +189,9 @@ export class Hub {
       case "input":
         room.queueInput(id, msg.i)
         return
+      case "pause":
+        this.pause(room, msg.paused)
+        return
       case "team":
         room.setTeam(id, msg.team)
         this.roomChanged(room)
@@ -251,14 +255,19 @@ export class Hub {
     return [...lan, ...online].map((r) => r.summary())
   }
 
+  /** A room on the game server never pauses: other players are in it, and nobody may stop their match. */
+  protected pause(_room: Room, _paused: boolean) {}
+
   /** Nobody connected and no rooms: the loop can stop (on Cloudflare the object goes to sleep). */
   get idle() {
     return this.peers.size === 0 && this.rooms.size === 0
   }
 
-  /** Call often: advances the rooms by as many ticks as have elapsed. */
-  update() {
-    const now = this.clock()
+  /**
+   * Call often: advances the rooms by as many ticks as have elapsed. `now` is the match's time,
+   * the hub's clock unless a host stops it (an Offline room's pause); limits keep the hub's clock.
+   */
+  update(now = this.clock()) {
     this.acc += Math.min(250, now - this.last)
     this.last = now
     let steps = 0
