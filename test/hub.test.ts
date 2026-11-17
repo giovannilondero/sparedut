@@ -119,3 +119,12 @@ test("the old visibility setting is refused", () => {
   expect(got.at(-1)).toEqual({ t: "error", code: "invalid" })
   expect(peer.room).toBeNull()
 })
+
+test("the server refuses to create an Offline room", () => {
+  const hub = new Hub()
+  const { peer, got, say } = connect(hub)
+  say({ ...create, reach: "offline" })
+  expect(got.at(-1)).toEqual({ t: "error", code: "invalid" })
+  expect(peer.room).toBeNull()
+  expect(hub.rooms.size).toBe(0)
+})

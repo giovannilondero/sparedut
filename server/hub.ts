@@ -1,7 +1,7 @@
 /**
  * The game server, transport-agnostic: sessions, rooms, the fixed-tick loop.
  */
-import { ClientMessage, PROTOCOL_VERSION, type ServerMessage } from "../shared/protocol.ts"
+import { ClientMessage, PROTOCOL_VERSION, SERVER_REACHES, type Reach, type ServerMessage } from "../shared/protocol.ts"
 import { TICK_RATE } from "../shared/movement.ts"
 import type { NetworkId } from "./network.ts"
 import { newCode, Room } from "./room.ts"
@@ -27,15 +27,23 @@ const COMMANDS = { perSecond: 2, burst: 8 }
 const MAX_ROOMS = 40
 const MAX_ROOMS_PER_NETWORK = 6
 
+export interface HubOptions {
+  /** The reaches this host creates rooms with: LAN and Online on the game server, Offline in a browser. */
+  readonly reaches?: readonly Reach[]
+  /** Milliseconds, monotonic. Tests move it by hand. */
+  readonly now?: () => number
+}
+
 /** A token bucket: refills at `perSecond`, up to `burst`. */
 class Bucket {
   private tokens: number
-  private last = performance.now()
-  constructor(private readonly rate: { perSecond: number; burst: number }) {
+  private last: number
+  constructor(private readonly rate: { perSecond: number; burst: number }, private readonly clock: () => number) {
     this.tokens = rate.burst
+    this.last = clock()
   }
   take() {
-    const now = performance.now()
+    const now = this.clock()
     this.tokens = Math.min(this.rate.burst, this.tokens + ((now - this.last) / 1000) * this.rate.perSecond)
     this.last = now
     if (this.tokens < 1) return false
@@ -57,12 +65,20 @@ export class Hub {
     console.log(`🌍 Public address: ${url}`)
     for (const peer of this.peers) this.send(peer, { t: "public", url })
   }
-  private last = performance.now()
+  private readonly reaches: readonly Reach[]
+  private readonly now: () => number
+  private last: number
   private acc = 0
+
+  constructor(options: HubOptions = {}) {
+    this.reaches = options.reaches ?? SERVER_REACHES
+    this.now = options.now ?? (() => performance.now())
+    this.last = this.now()
+  }
 
   open(peer: Peer) {
     this.peers.add(peer)
-    this.limits.set(peer, { messages: new Bucket(MESSAGES), commands: new Bucket(COMMANDS) })
+    this.limits.set(peer, { messages: new Bucket(MESSAGES, this.now), commands: new Bucket(COMMANDS, this.now) })
     peer.id = `p${++sessionCounter}-${Math.random().toString(36).slice(2, 7)}`
   }
 
@@ -98,6 +114,7 @@ export class Hub {
         this.send(peer, { t: "rooms", rooms: this.visibleTo(peer) })
         return
       case "create": {
+        if (!this.reaches.includes(msg.reach)) return this.send(peer, { t: "error", code: "invalid" })
         const mine = [...this.rooms.values()].filter((r) => r.networkKey === peer.network.key).length
         if (this.rooms.size >= MAX_ROOMS || mine >= MAX_ROOMS_PER_NETWORK) return this.send(peer, { t: "error", code: "busy" })
         this.leave(peer)
@@ -120,7 +137,8 @@ export class Hub {
       }
       case "join": {
         const target = this.rooms.get(msg.code)
-        if (!target) return this.send(peer, { t: "error", code: "notFound" })
+        // An Offline room has no code to share: only its creator is ever in it.
+        if (!target || target.settings.reach === "offline") return this.send(peer, { t: "error", code: "notFound" })
         if (target.settings.reach === "lan" && target.networkKey !== peer.network.key) {
           return this.send(peer, { t: "error", code: "lanOnly" })
         }
@@ -217,7 +235,7 @@ export class Hub {
 
   /** Call often: advances the rooms by as many ticks as have elapsed. */
   update() {
-    const now = performance.now()
+    const now = this.now()
     this.acc += Math.min(250, now - this.last)
     this.last = now
     let steps = 0

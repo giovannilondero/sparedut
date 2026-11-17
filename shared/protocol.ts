@@ -31,10 +31,14 @@ const name = visible(20)
 
 /**
  * Who can see and join a room. A room on the server is LAN (players on the host's network) or Online (anyone).
- * Offline, hosted in the player's browser, joins this list later.
+ * An Offline room is hosted in the player's own browser, against bots: no code, no list.
  */
-export const SERVER_REACHES = ["lan", "online"] as const
-export type Reach = (typeof SERVER_REACHES)[number]
+export const REACHES = ["offline", "lan", "online"] as const
+export type Reach = (typeof REACHES)[number]
+/** The reaches the game server creates rooms with. */
+export const SERVER_REACHES = ["lan", "online"] as const satisfies readonly Reach[]
+/** The reaches the host in the player's browser creates rooms with. */
+export const BROWSER_REACHES = ["offline"] as const satisfies readonly Reach[]
 
 export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("hello"), name, version: z.number() }),
@@ -44,7 +48,7 @@ export const ClientMessage = z.discriminatedUnion("t", [
     mode: z.enum(MODE_IDS as [ModeId, ...ModeId[]]),
     map: z.enum(MAP_IDS as [MapId, ...MapId[]]),
     minutes: z.number().int().min(2).max(30),
-    reach: z.enum(SERVER_REACHES),
+    reach: z.enum(REACHES),
     /**
      * The home screen's "play against the bots": a room joinable by code but left out of the list.
      * Temporary: it goes once offline rooms exist (#18).
