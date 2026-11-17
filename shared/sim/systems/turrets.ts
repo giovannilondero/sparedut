@@ -24,10 +24,11 @@ export const MountTurrets = Game.System(
     machines: { match: Game.System.machine(Match) }
   },
   ({ queries, resources, events, machines }) => {
+    const { data } = queries.players
     const spots = MAPS[resources.rules.get().map].turrets
     if (spots.length === 0) return
     const players = queries.players.each()
-    const alive = new Set(players.filter((m) => m.data.life.get()._tag === "Alive").map((m) => m.data.player.get().session))
+    const alive = new Set(players.filter((m) => data.life.get(m)._tag === "Alive").map((m) => data.player.get(m).session))
 
     // Cooling, next shot, and whoever is gone gives up the seat.
     const next: TurretState[] = resources.turrets.get().map((t, i) => {
@@ -41,9 +42,9 @@ export const MountTurrets = Game.System(
 
     if (machines.match.get()._tag !== "Over") {
       for (const m of players) {
-        const session = m.data.player.get().session
+        const session = data.player.get(m).session
         if (!alive.has(session)) continue
-        const controls = m.data.controls.get()
+        const controls = data.controls.get(m)
         const mounted = next.findIndex((t) => t.gunner === session)
         if (mounted >= 0) {
           if (justPressed(controls, "use") || justPressed(controls, "jump")) {
@@ -54,7 +55,7 @@ export const MountTurrets = Game.System(
         }
         if (!justPressed(controls, "use")) continue
         // The nearest free turret, if standing behind it.
-        const body = m.data.motion.get().body
+        const body = data.motion.get(m).body
         let best = -1
         let bestD: number = TURRET.reach
         spots.forEach((spot, i) => {

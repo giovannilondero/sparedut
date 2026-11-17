@@ -78,6 +78,7 @@ export const UseWeapons = Game.System(
     commands: Game.System.commands(Game.System.spawns(Projectile))
   },
   ({ queries, resources, services, events, machines, commands }) => {
+    const { data } = queries.players
     if (machines.match.get()._tag === "Over") return
     const tick = resources.tick.get()
     const rules = resources.rules.get()
@@ -89,14 +90,14 @@ export const UseWeapons = Game.System(
     const all = queries.players.each()
     const minesOf = new Map<string, number>()
     for (const p of queries.projectiles.each()) {
-      const v = p.data.projectile.get()
+      const v = queries.projectiles.data.projectile.get(p)
       if (v.kind === "mine") minesOf.set(v.owner, (minesOf.get(v.owner) ?? 0) + 1)
     }
 
-    const teamOf = new Map(all.map((m) => [m.data.player.get().session, m.data.team.get()]))
+    const teamOf = new Map(all.map((m) => [data.player.get(m).session, data.team.get(m)]))
     const currentPoses = new Map<string, Pose>()
     for (const m of all) {
-      if (m.data.life.get()._tag === "Alive") currentPoses.set(m.data.player.get().session, m.data.motion.get().body)
+      if (data.life.get(m)._tag === "Alive") currentPoses.set(data.player.get(m).session, data.motion.get(m).body)
     }
     const posesAt = (view: number): Map<string, Pose> => {
       const target = Math.max(tick - MAX_REWIND, Math.min(tick, view))
@@ -109,14 +110,14 @@ export const UseWeapons = Game.System(
     }
 
     for (const m of all) {
-      const life = m.data.life.get()
+      const life = data.life.get(m)
       if (life._tag !== "Alive") continue
-      const session = m.data.player.get().session
-      const team = m.data.team.get()
-      const controls = m.data.controls.get()
+      const session = data.player.get(m).session
+      const team = data.team.get(m)
+      const controls = data.controls.get(m)
       const input = controls.input
-      const motion = m.data.motion.get()
-      let a: ArsenalValue = m.data.arsenal.get()
+      const motion = data.motion.get(m)
+      let a: ArsenalValue = data.arsenal.get(m)
       const targets = posesAt(input.view)
       const hittable = (other: string) => other !== session && hostile(rules, team, teamOf.get(other) ?? team)
 
@@ -170,9 +171,9 @@ export const UseWeapons = Game.System(
           const heat = Math.min(1, gun.heat + TURRET.heatPerShot)
           turrets[mounted] = { ...gun, heat, jammed: heat >= 1, cooldown: WEAPONS.mitraie.cooldownTicks }
           if (heat >= 1) events.out.emit({ t: "turret", i: mounted, s: session, a: "hot" })
-          if (life.shield > 0) m.data.life.update({ state: "Alive", data: (l) => ({ hp: l.hp, armor: l.armor, shield: 0 }) })
+          if (life.shield > 0) data.life.update(m, { state: "Alive", data: (l) => ({ hp: l.hp, armor: l.armor, shield: 0 }) })
         }
-        m.data.arsenal.set(a)
+        data.arsenal.set(m, a)
         continue
       }
 
@@ -289,7 +290,7 @@ export const UseWeapons = Game.System(
           action: { _tag: "cooldown", ticks: def.cooldownTicks },
           ammo: needsAmmo ? { ...a.ammo, [a.current]: { mag: ammo.mag - 1, reserve: ammo.reserve } } : a.ammo
         }
-        if (life.shield > 0) m.data.life.update({ state: "Alive", data: (l) => ({ hp: l.hp, armor: l.armor, shield: 0 }) })
+        if (life.shield > 0) data.life.update(m, { state: "Alive", data: (l) => ({ hp: l.hp, armor: l.armor, shield: 0 }) })
       }
 
       // Sgnape bombs.
@@ -347,7 +348,7 @@ export const UseWeapons = Game.System(
         events.out.emit({ t: "launch", s: session, k: "mine" })
       }
 
-      m.data.arsenal.set(a)
+      data.arsenal.set(m, a)
     }
     resources.turrets.set(turrets)
   }

@@ -40,23 +40,25 @@ export const ApplyDamage = Game.System(
     machines: { match: Game.System.machine(Match) }
   },
   ({ queries, resources, events, machines }) => {
+    const { data } = queries.players
     const hits = events.damage.all()
     const heals = events.heal.all()
     if (hits.length === 0 && heals.length === 0) return
     const tick = resources.tick.get()
     const rules = resources.rules.get()
     const live = machines.match.get()._tag === "Live"
-    const bySession = new Map(queries.players.each().map((m) => [m.data.player.get().session, m]))
+    const bySession = new Map(queries.players.each().map((m) => [data.player.get(m).session, m]))
 
     for (const h of heals) {
       const target = bySession.get(h.target)
       if (!target) continue
-      const life = target.data.life.get()
+      const life = data.life.get(target)
       if (life._tag !== "Alive" || life.hp >= MAX_HP) continue
       const gained = Math.min(MAX_HP - life.hp, h.amount)
-      target.data.life.update({ state: "Alive", data: (l) => ({ hp: l.hp + gained, armor: l.armor, shield: l.shield }) })
+      data.life.update(target, { state: "Alive", data: (l) => ({ hp: l.hp + gained, armor: l.armor, shield: l.shield }) })
       if (h.healer !== h.target) {
-        bySession.get(h.healer)?.data.stats.update((s) => ({ ...s, score: s.score + gained * HEAL_SCORE }))
+        const healer = bySession.get(h.healer)
+        if (healer) data.stats.update(healer, (s) => ({ ...s, score: s.score + gained * HEAL_SCORE }))
         events.out.emit({ t: "heal", s: h.healer, v: h.target, n: gained })
       }
     }
@@ -64,41 +66,41 @@ export const ApplyDamage = Game.System(
     for (const hit of hits) {
       const victim = bySession.get(hit.victim)
       if (!victim) continue
-      const life = victim.data.life.get()
+      const life = data.life.get(victim)
       if (life._tag !== "Alive") continue
       const attacker = hit.attacker === null ? undefined : bySession.get(hit.attacker)
       const self = hit.attacker === hit.victim
-      const victimTeam = victim.data.team.get()
-      if (attacker && !self && !hostile(rules, attacker.data.team.get(), victimTeam)) continue
+      const victimTeam = data.team.get(victim)
+      if (attacker && !self && !hostile(rules, data.team.get(attacker), victimTeam)) continue
       if (life.shield > 0 && hit.weapon !== "fall") continue
 
       if (hit.push) {
         const push = hit.push
-        victim.data.motion.update((mo) => ({ ...mo, body: { ...mo.body, vx: mo.body.vx + push.x, vy: Math.max(mo.body.vy, 0) + push.y, vz: mo.body.vz + push.z, grounded: false } }))
+        data.motion.update(victim, (mo) => ({ ...mo, body: { ...mo.body, vx: mo.body.vx + push.x, vy: Math.max(mo.body.vy, 0) + push.y, vz: mo.body.vz + push.z, grounded: false } }))
       }
 
       const after = absorb(life.hp, life.armor, hit.amount)
       const dead = after.hp <= 0
       if (attacker && !self) {
-        victim.data.attackers.update((list) => [...list.filter((x) => x.session !== hit.attacker), { session: hit.attacker ?? "", tick }])
-        attacker.data.stats.update((s) => ({ ...s, damage: s.damage + Math.min(hit.amount, life.hp + life.armor) }))
+        data.attackers.update(victim, (list) => [...list.filter((x) => x.session !== hit.attacker), { session: hit.attacker ?? "", tick }])
+        data.stats.update(attacker, (s) => ({ ...s, damage: s.damage + Math.min(hit.amount, life.hp + life.armor) }))
       }
       events.out.emit({ t: "hit", a: hit.attacker, v: hit.victim, d: Math.round(hit.amount), h: hit.head, kill: dead })
 
       if (!dead) {
-        victim.data.life.update({ state: "Alive", data: (l) => ({ hp: after.hp, armor: after.armor, shield: l.shield }) })
+        data.life.update(victim, { state: "Alive", data: (l) => ({ hp: after.hp, armor: after.armor, shield: l.shield }) })
         continue
       }
 
       const killer = attacker && !self ? attacker : undefined
-      victim.data.life.transition({ from: "Alive", to: "Dead", data: { respawn: RESPAWN_TICKS, killer: killer ? hit.attacker : null } })
-      victim.data.stats.update((s) => ({ ...s, deaths: s.deaths + 1, streak: 0 }))
+      data.life.transition(victim, { from: "Alive", to: "Dead", data: { respawn: RESPAWN_TICKS, killer: killer ? hit.attacker : null } })
+      data.stats.update(victim, (s) => ({ ...s, deaths: s.deaths + 1, streak: 0 }))
 
       let streak = 0
       if (killer) {
-        const ks = killer.data.stats.get()
+        const ks = data.stats.get(killer)
         streak = ks.streak + 1
-        killer.data.stats.set({
+        data.stats.set(killer, {
           ...ks,
           kills: ks.kills + 1,
           headshots: ks.headshots + (hit.head ? 1 : 0),
@@ -107,7 +109,7 @@ export const ApplyDamage = Game.System(
           score: ks.score + 100
         })
         if (live && rules.mode === "bataie") {
-          const team = killer.data.team.get()
+          const team = data.team.get(killer)
           resources.score.update((s) => ({ ...s, [team]: s[team] + 1 }))
         }
         if (STREAK_AT.has(streak)) events.out.emit({ t: "streak", s: hit.attacker ?? "", n: streak })
@@ -117,11 +119,12 @@ export const ApplyDamage = Game.System(
         resources.score.update((s) => ({ ...s, [other]: s[other] + 1 }))
       }
 
-      for (const a of victim.data.attackers.get()) {
+      for (const a of data.attackers.get(victim)) {
         if (a.session === hit.attacker || tick - a.tick > ASSIST_WINDOW_TICKS) continue
-        bySession.get(a.session)?.data.stats.update((s) => ({ ...s, assists: s.assists + 1, score: s.score + 50 }))
+        const helper = bySession.get(a.session)
+        if (helper) data.stats.update(helper, (s) => ({ ...s, assists: s.assists + 1, score: s.score + 50 }))
       }
-      victim.data.attackers.set([])
+      data.attackers.set(victim, [])
 
       events.out.emit({ t: "kill", k: killer ? hit.attacker : null, v: hit.victim, w: self && !SELF_HARM.has(hit.weapon) ? "fall" : hit.weapon, h: hit.head, n: streak })
     }

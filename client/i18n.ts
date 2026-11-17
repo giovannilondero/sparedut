@@ -21,7 +21,8 @@ type StaticKey =
   | "roomsTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "reachLabel" | "reachLan" | "reachOnline"
   | "ff" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
   | "qHigh" | "autoRes" | "showInfo" | "invert" | "keys" | "vocabTitle" | "connecting" | "chatPh" | "deathTitle" | "deathHint"
-  | "clickplay" | "language" | "mapLabel" | "accessLabel" | "accessOpen" | "accessPassword" | "passwordLabel" | "passwordTitle"
+  | "clickplay" | "language" | "mapLabel" | "crouchMode" | "crouchHold" | "crouchToggle"
+  | "accessLabel" | "accessOpen" | "accessPassword" | "passwordLabel" | "passwordTitle"
 
 export interface Strings {
   readonly static: Record<StaticKey, string>
@@ -294,6 +295,9 @@ const fur: Strings = {
     autoRes: "Risoluzion dinamiche (e sbasse la risoluzion se i FPS a calin)",
     showInfo: "Mostre lis informazions su lis prestazions (FPS, ping…) · ancje cul tast <kbd>F3</kbd>",
     invert: "Invertìs l'ass verticâl",
+    crouchMode: "Sbassâsi",
+    crouchHold: "tignint fracât il tast",
+    crouchToggle: "fracant une volte (torne a fracâ par jevâ sù)",
     keys: keysHtml(KEYS_FUR),
     vocabTitle: "Vocabolari furlan-talian",
     connecting: "Conession…",
@@ -624,6 +628,9 @@ const it: Strings = {
     autoRes: "Risoluzione dinamica (abbassa la risoluzione se gli FPS calano)",
     showInfo: "Mostra info prestazioni (FPS, ping…) · anche col tasto <kbd>F3</kbd>",
     invert: "Inverti asse verticale",
+    crouchMode: "Accucciarsi",
+    crouchHold: "tenendo premuto il tasto",
+    crouchToggle: "premendo una volta (ripremi per alzarti)",
     keys: keysHtml(KEYS_IT),
     vocabTitle: "Vocabolario friulano-italiano",
     connecting: "Connessione…",
