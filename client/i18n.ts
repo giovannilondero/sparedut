@@ -8,7 +8,7 @@
  */
 import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId, Team } from "../shared/map.ts"
-import type { ErrorCode, Reach } from "../shared/protocol.ts"
+import type { Access, ErrorCode, Reach } from "../shared/protocol.ts"
 import type { WeaponId } from "../shared/weapons.ts"
 
 export type Lang = "fur" | "it"
@@ -21,7 +21,7 @@ type StaticKey =
   | "roomsTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "reachLabel" | "reachLan" | "reachOnline"
   | "ff" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
   | "qHigh" | "autoRes" | "showInfo" | "invert" | "keys" | "vocabTitle" | "connecting" | "chatPh" | "deathTitle" | "deathHint"
-  | "clickplay" | "language" | "mapLabel"
+  | "clickplay" | "language" | "mapLabel" | "accessLabel" | "accessOpen" | "accessPassword" | "passwordLabel" | "passwordTitle"
 
 export interface Strings {
   readonly static: Record<StaticKey, string>
@@ -41,6 +41,12 @@ export interface Strings {
     readonly reach: Record<Reach, string>
     /** A full room in the list: shown, not selectable. */
     readonly full: string
+    /** The lock on a password room in the list, read out by screen readers. */
+    readonly locked: string
+    /** The password prompt: which room asks for it. */
+    readonly passwordFor: Fn
+    /** A password the create form or the prompt refuses before sending it. */
+    readonly passwordBad: string
     readonly botsNone: string
     readonly minutes: Fn<[number]>
     readonly tag: { readonly primary: string; readonly power: string; readonly melee: string; readonly pistol: string }
@@ -126,6 +132,7 @@ export interface Strings {
     readonly copy: string
     readonly copied: string
     readonly reach: Record<Reach, string>
+    readonly access: Record<Access, string>
     readonly start: string
     readonly restart: string
     readonly hostOnly: string
@@ -266,6 +273,11 @@ const fur: Strings = {
     reachLabel: "Puartade",
     reachLan: "LAN · dome te stesse rêt",
     reachOnline: "In linie · par ducj",
+    accessLabel: "Acès",
+    accessOpen: "Viert",
+    accessPassword: "Cun password",
+    passwordLabel: "Password <small>(di 1 a 32 caratars)</small>",
+    passwordTitle: "Al covente la password",
     ff: "Fûc amì (i compagns si fasin mâl)",
     back: "Indaûr <kbd>Esc</kbd>",
     createGo: "Cree e jentre",
@@ -369,13 +381,19 @@ const fur: Strings = {
     notFound: "Nissune partide cun chest codiç. Controle, o domande al host.",
     lanOnly: "Cheste partide e je dome pe rêt locâl di cui che le à creade.",
     full: "Partide plene: o sin za in sedis, come a une sagre.",
-    busy: "Masse partidis viertis sul server: torne a provâ ca di un pôc."
+    busy: "Masse partidis viertis sul server: torne a provâ ca di un pôc.",
+    passwordRequired: "Cheste partide e domande une password.",
+    wrongPassword: "Password sbaliade. Torne a provâ.",
+    tooManyAttempts: "Masse password sbaliadis: spiete un pôc e torne a provâ."
   },
   menu: {
     needName: "Prime il non!",
     roomsEmpty: "Nissune partide viarte. Creine une!",
     reach: { lan: "LAN", online: "In linie" },
     full: "Plene",
+    locked: "Cun password",
+    passwordFor: (code) => `La partide ${code} e domande une password.`,
+    passwordBad: "La password e à di vê di 1 a 32 caratars.",
     botsNone: "Nissun (dome personis)",
     minutes: (n) => `${n} minûts`,
     tag: {
@@ -502,6 +520,7 @@ const fur: Strings = {
     copy: "Copie il link di invît",
     copied: "Copiât! Mandi a ducj",
     reach: { lan: "LAN · dome te stesse rêt", online: "In linie · par ducj" },
+    access: { open: "Viert", password: "Cun password" },
     start: "Fâs partî la partide",
     restart: "Torne a scomençâ",
     hostOnly: "L'host (👑) al fâs partî la partide.",
@@ -584,6 +603,11 @@ const it: Strings = {
     reachLabel: "Portata",
     reachLan: "LAN · solo sulla stessa rete",
     reachOnline: "Online · per tutti",
+    accessLabel: "Accesso",
+    accessOpen: "Aperto",
+    accessPassword: "Con password",
+    passwordLabel: "Password <small>(da 1 a 32 caratteri)</small>",
+    passwordTitle: "Serve la password",
     ff: "Fuoco amico (i compagni si fanno male)",
     back: "Indietro <kbd>Esc</kbd>",
     createGo: "Crea ed entra",
@@ -687,13 +711,19 @@ const it: Strings = {
     notFound: "Nessuna partita con questo codice. Controlla, o chiedi all'host.",
     lanOnly: "Questa partita è solo per la rete locale di chi l'ha creata.",
     full: "Partita piena: siamo già in sedici, come a una sagra.",
-    busy: "Troppe partite aperte sul server: riprova tra poco."
+    busy: "Troppe partite aperte sul server: riprova tra poco.",
+    passwordRequired: "Questa partita chiede una password.",
+    wrongPassword: "Password sbagliata. Riprova.",
+    tooManyAttempts: "Troppe password sbagliate: aspetta un attimo e riprova."
   },
   menu: {
     needName: "Prima il nome!",
     roomsEmpty: "Nessuna partita aperta. Creane una!",
     reach: { lan: "LAN", online: "Online" },
     full: "Piena",
+    locked: "Con password",
+    passwordFor: (code) => `La partita ${code} chiede una password.`,
+    passwordBad: "La password deve avere da 1 a 32 caratteri.",
     botsNone: "Nessuno (solo persone)",
     minutes: (n) => `${n} minuti`,
     tag: {
@@ -831,6 +861,7 @@ const it: Strings = {
     copy: "Copia il link d'invito",
     copied: "Copiato! Mandi a tutti",
     reach: { lan: "LAN · solo sulla stessa rete", online: "Online · per tutti" },
+    access: { open: "Aperto", password: "Con password" },
     start: "Fai partire la partita",
     restart: "Ricomincia",
     hostOnly: "L'host (👑) fa partire la partita.",
