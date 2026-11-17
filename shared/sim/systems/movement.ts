@@ -34,6 +34,7 @@ export const MovePlayers = Game.System(
     machines: { match: Game.System.machine(Match) }
   },
   ({ queries, resources, services, events, machines }) => {
+    const { data } = queries.players
     if (machines.match.get()._tag === "Over") return
     const flags = resources.flags.get()
     const turrets = resources.turrets.get()
@@ -41,19 +42,19 @@ export const MovePlayers = Game.System(
     const carriers = new Set<string>()
     for (const f of Object.values(flags)) if (f._tag === "carried") carriers.add(f.by)
     for (const m of queries.players.each()) {
-      if (m.data.life.get()._tag !== "Alive") continue
-      const session = m.data.player.get().session
-      const controls = m.data.controls.get()
+      if (data.life.get(m)._tag !== "Alive") continue
+      const session = data.player.get(m).session
+      const controls = data.controls.get(m)
       // On a turret you stay put in the seat, and the view turns only within the gun's arc.
       const mounted = turretOf(turrets, session)
       if (mounted >= 0) {
         const spot = spots[mounted]
         const [x, y, z] = turretSeat(spot)
         const aim = turretAim(spot, controls.input.yaw, controls.input.pitch)
-        m.data.motion.set({ body: { x, y, z, vx: 0, vy: 0, vz: 0, grounded: true, crouch: false }, yaw: aim.yaw, pitch: aim.pitch })
+        data.motion.set(m, { body: { x, y, z, vx: 0, vy: 0, vz: 0, grounded: true, crouch: false }, yaw: aim.yaw, pitch: aim.pitch })
         continue
       }
-      const arsenal = m.data.arsenal.get()
+      const arsenal = data.arsenal.get(m)
       const buff = (arsenal.sgnape > 0 ? SGNAPE_SPEED : 1) * (carriers.has(session) ? 0.9 : 1)
       // Weapon weight is that of the one requested in the command (if you own it): the way prediction computes it.
       const scaleFor = (input: PlayerInput) => WEAPONS[owned(arsenal, input.weapon) ? input.weapon : arsenal.current].moveScale * buff
@@ -63,7 +64,7 @@ export const MovePlayers = Game.System(
         controls.steps.length > 0 ? controls.steps
         : controls.starved > STARVED_TICKS ? [{ ...controls.input, mx: 0, mz: 0, buttons: controls.input.buttons & ~BUTTON.jump }]
         : []
-      let body = m.data.motion.get().body
+      let body = data.motion.get(m).body
       for (const input of steps) {
         const step = stepBody(body, input, services.physics, scaleFor(input))
         body = step.body
@@ -73,7 +74,7 @@ export const MovePlayers = Game.System(
           break
         }
       }
-      m.data.motion.set({ body, yaw: controls.input.yaw, pitch: controls.input.pitch })
+      data.motion.set(m, { body, yaw: controls.input.yaw, pitch: controls.input.pitch })
     }
   }
 )
@@ -87,11 +88,12 @@ export const RecordHistory = Game.System(
     resources: { tick: Game.System.readResource(Tick), history: Game.System.writeResource(History) }
   },
   ({ queries, resources }) => {
+    const { data } = queries.players
     const poses: PoseRecord[] = []
     for (const m of queries.players.each()) {
-      if (m.data.life.get()._tag !== "Alive") continue
-      const b = m.data.motion.get().body
-      poses.push({ session: m.data.player.get().session, x: b.x, y: b.y, z: b.z, crouch: b.crouch })
+      if (data.life.get(m)._tag !== "Alive") continue
+      const b = data.motion.get(m).body
+      poses.push({ session: data.player.get(m).session, x: b.x, y: b.y, z: b.z, crouch: b.crouch })
     }
     const tick = resources.tick.get()
     resources.history.update((h) => [...h.slice(-(HISTORY_TICKS - 1)), { tick, poses }])

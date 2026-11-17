@@ -17,6 +17,7 @@ export const ApplyInputs = Game.System(
     events: { inputs: Game.System.readEvent(InputArrived) }
   },
   ({ queries, events }) => {
+    const { data } = queries.players
     const arrived = new Map<string, PlayerInput[]>()
     for (const e of events.inputs.all()) {
       const list = arrived.get(e.session)
@@ -24,8 +25,8 @@ export const ApplyInputs = Game.System(
       else arrived.set(e.session, [e.input])
     }
     for (const m of queries.players.each()) {
-      const old = m.data.controls.get()
-      const steps = arrived.get(m.data.player.get().session) ?? []
+      const old = data.controls.get(m)
+      const steps = arrived.get(data.player.get(m).session) ?? []
       const last = steps.length ? steps[steps.length - 1] : old.input
       let pressed = 0
       let weapon = old.input.weapon
@@ -35,7 +36,7 @@ export const ApplyInputs = Game.System(
         if (s.weapon !== weapon) switchTo = s.weapon
         weapon = s.weapon
       }
-      m.data.controls.set({
+      data.controls.set(m, {
         input: last,
         previous: old.input.buttons,
         pressed: pressed | last.buttons,

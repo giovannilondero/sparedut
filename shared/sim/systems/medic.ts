@@ -25,18 +25,19 @@ export const MedicAura = Game.System(
     machines: { match: Game.System.machine(Match) }
   },
   ({ queries, resources, events, machines }) => {
+    const { data } = queries.players
     if (machines.match.get()._tag === "Over" || resources.tick.get() % MEDIC_AURA.everyTicks !== 0) return
     const rules = resources.rules.get()
-    const living = queries.players.each().filter((m) => m.data.life.get()._tag === "Alive")
+    const living = queries.players.each().filter((m) => data.life.get(m)._tag === "Alive")
     for (const medic of living) {
-      if (medic.data.arsenal.get().primary !== "miedi") continue
-      const healer = medic.data.player.get().session
-      const team = medic.data.team.get()
-      const at = medic.data.motion.get().body
+      if (data.arsenal.get(medic).primary !== "miedi") continue
+      const healer = data.player.get(medic).session
+      const team = data.team.get(medic)
+      const at = data.motion.get(medic).body
       for (const m of living) {
-        const session = m.data.player.get().session
-        if (session !== healer && !allied(rules, team, m.data.team.get())) continue
-        const b = m.data.motion.get().body
+        const session = data.player.get(m).session
+        if (session !== healer && !allied(rules, team, data.team.get(m))) continue
+        const b = data.motion.get(m).body
         const dx = b.x - at.x
         const dy = b.y - at.y
         const dz = b.z - at.z

@@ -10,7 +10,7 @@ import type { PrimaryId } from "../weapons.ts"
 import type { GameEvent } from "./events.ts"
 import { freshDoors, freshTurrets } from "./rules.ts"
 import { simulate } from "./schedule.ts"
-import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, StartMatch } from "./schema.ts"
+import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, StartMatch, type PickupState } from "./schema.ts"
 import { ReadOutbox, ViewWorld, type WorldView } from "./view.ts"
 
 export interface SimOptions {
@@ -42,7 +42,7 @@ export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: H
       Flags: { benandanti: { _tag: "base" }, malandanti: { _tag: "base" } },
       Hill: { owner: null, contested: false, ticks: 0 },
       Cart: { d: 0, pushers: 0, contested: false, idle: 0 },
-      Pickups: options.physics.map.pickups.map(() => ({ _tag: "up" })),
+      Pickups: options.physics.map.pickups.map((): PickupState => ({ _tag: "up" })),
       Turrets: freshTurrets(options.physics.map),
       Doors: freshDoors(options.physics.map),
       History: [],

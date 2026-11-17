@@ -125,6 +125,7 @@ export const ViewWorld = Game.Inspector(
     machines: { match: Game.System.machine(Match) }
   },
   ({ queries, resources, machines }): WorldView => {
+    const { data } = queries.players
     const rules = resources.rules.get()
     const map = MAPS[rules.map]
     const tick = resources.tick.get()
@@ -159,17 +160,17 @@ export const ViewWorld = Game.Inspector(
       pickups: resources.pickups.get().map((p) => p._tag === "up"),
       turrets: resources.turrets.get(),
       doors: resources.doors.get(),
-      projectiles: queries.projectiles.each().map((m) => m.data.projectile.get()),
+      projectiles: queries.projectiles.each().map((m) => queries.projectiles.data.projectile.get(m)),
       players: queries.players.each().map((m) => {
-        const life = m.data.life.get()
-        const motion = m.data.motion.get()
-        const controls = m.data.controls.get()
-        const info = m.data.player.get()
+        const life = data.life.get(m)
+        const motion = data.motion.get(m)
+        const controls = data.controls.get(m)
+        const info = data.player.get(m)
         return {
           session: info.session,
           name: info.name,
           bot: info.bot,
-          team: m.data.team.get(),
+          team: data.team.get(m),
           alive: life._tag === "Alive",
           hp: life._tag === "Alive" ? life.hp : 0,
           armor: life._tag === "Alive" ? life.armor : 0,
@@ -179,8 +180,8 @@ export const ViewWorld = Game.Inspector(
           body: motion.body,
           yaw: motion.yaw,
           pitch: motion.pitch,
-          arsenal: m.data.arsenal.get(),
-          stats: m.data.stats.get(),
+          arsenal: data.arsenal.get(m),
+          stats: data.stats.get(m),
           seq: controls.input.seq,
           buttons: controls.input.buttons
         }
