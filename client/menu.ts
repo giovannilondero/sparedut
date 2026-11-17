@@ -4,7 +4,7 @@
 import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "../shared/folklore.ts"
 import type { MapId } from "../shared/map.ts"
 import { MAP_IDS } from "../shared/maps/index.ts"
-import type { RoomSummary, Visibility } from "../shared/protocol.ts"
+import type { Reach, RoomSummary } from "../shared/protocol.ts"
 import { PRIMARIES, WEAPON_IDS, WEAPONS, type PrimaryId } from "../shared/weapons.ts"
 import type { GameAudio } from "./contracts.ts"
 import { esc } from "./hud.ts"
@@ -17,14 +17,16 @@ export interface CreateOptions {
   readonly mode: ModeId
   readonly map: MapId
   readonly minutes: number
-  readonly visibility: Visibility
+  readonly reach: Reach
+  /** The home screen's quick match against the bots: kept out of the room list (until offline rooms, #18). */
+  readonly quick?: boolean
   readonly bots: number
   readonly level: BotLevel
   readonly ff: boolean
 }
 
 export interface MenuHandlers {
-  readonly create: (o: CreateOptions, quick?: boolean) => void
+  readonly create: (o: CreateOptions) => void
   readonly join: (code: string) => void
   /** The map chosen in the menu: it becomes the background. */
   readonly mapChanged: (id: MapId) => void
@@ -146,7 +148,7 @@ export class Menu {
 
   private quick() {
     if (this.needName()) return
-    this.handlers.create({ mode: this.settings.lastMode, map: this.settings.lastMap, minutes: 10, visibility: "code", bots: this.settings.lastBots || 4, level: this.settings.lastLevel, ff: false }, true)
+    this.handlers.create({ mode: this.settings.lastMode, map: this.settings.lastMap, minutes: 10, reach: "online", quick: true, bots: this.settings.lastBots || 4, level: this.settings.lastLevel, ff: false })
   }
 
   private joinCode() {
@@ -157,17 +159,18 @@ export class Menu {
   rooms(list: readonly RoomSummary[]) {
     this.roomList = list
     const ul = $("lan-list")
+    const s = t()
     if (!list.length) {
-      ul.innerHTML = `<li class="muted">${t().menu.lanEmpty}</li>`
+      ul.innerHTML = `<li class="muted">${s.menu.roomsEmpty}</li>`
       return
     }
     ul.innerHTML = list
-      .map(
-        (r) =>
-          `<li><button data-code="${r.code}"><span><b>${esc(r.host)}</b> · ${t().modes[r.mode].name} · ${t().maps[r.map].name}</span><span>${r.players}👤 ${r.bots}🤖 · ${r.code}</span></button></li>`
-      )
+      .map((r) => {
+        const full = r.players >= r.max
+        return `<li><button data-code="${r.code}"${full ? " disabled" : ""}><span><i class="chip ${r.reach}">${s.menu.reach[r.reach]}</i> <b>${esc(r.host)}</b> · ${s.modes[r.mode].name} · ${s.maps[r.map].name}</span><span>${full ? `${s.menu.full} · ` : ""}${r.players}/${r.max}👤 ${r.bots}🤖 · ${r.code}</span></button></li>`
+      })
       .join("")
-    for (const b of ul.querySelectorAll<HTMLButtonElement>("button")) b.addEventListener("click", () => !this.needName() && this.handlers.join(b.dataset.code!))
+    for (const b of ul.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")) b.addEventListener("click", () => !this.needName() && this.handlers.join(b.dataset.code!))
   }
 
   // ---------------------------------------------------------------- create match
@@ -203,7 +206,7 @@ export class Menu {
         mode: this.mode,
         map: this.map,
         minutes: Number($<HTMLSelectElement>("c-minutes").value),
-        visibility: $<HTMLSelectElement>("c-vis").value as Visibility,
+        reach: $<HTMLSelectElement>("c-reach").value as Reach,
         bots: Number($<HTMLSelectElement>("c-bots").value),
         level: this.level,
         ff: $<HTMLInputElement>("c-ff").checked

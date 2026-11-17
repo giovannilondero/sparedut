@@ -106,7 +106,8 @@ export class Hub {
           mode: msg.mode,
           map: msg.map,
           minutes: msg.minutes,
-          visibility: msg.visibility,
+          reach: msg.reach,
+          unlisted: msg.quick ?? false,
           level: msg.level,
           ff: msg.ff
         })
@@ -114,13 +115,13 @@ export class Hub {
         this.enter(peer, created, msg.primary)
         created.fillBots(msg.bots)
         this.roomChanged(created)
-        console.log(`🏰 Room ${code} (${msg.mode} on ${msg.map}, ${msg.visibility}) by ${peer.name}`)
+        console.log(`🏰 Room ${code} (${msg.mode} on ${msg.map}, ${msg.quick ? "quick" : msg.reach}) by ${peer.name}`)
         return
       }
       case "join": {
         const target = this.rooms.get(msg.code)
         if (!target) return this.send(peer, { t: "error", code: "notFound" })
-        if (target.settings.visibility === "lan" && target.networkKey !== peer.network.key) {
+        if (target.settings.reach === "lan" && target.networkKey !== peer.network.key) {
           return this.send(peer, { t: "error", code: "lanOnly" })
         }
         if (target.full && ![...target.members.values()].some((m) => m.bot)) return this.send(peer, { t: "error", code: "full" })
@@ -201,8 +202,12 @@ export class Hub {
     room.broadcast({ t: "room", room: room.info() })
   }
 
+  /** The rooms a peer can reach: the LAN rooms of its own network, then every Online room. */
   private visibleTo(peer: Peer) {
-    return [...this.rooms.values()].filter((r) => r.settings.visibility === "lan" && r.networkKey === peer.network.key).map((r) => r.summary())
+    const listed = [...this.rooms.values()].filter((r) => !r.settings.unlisted)
+    const lan = listed.filter((r) => r.settings.reach === "lan" && r.networkKey === peer.network.key)
+    const online = listed.filter((r) => r.settings.reach === "online")
+    return [...lan, ...online].map((r) => r.summary())
   }
 
   /** Nobody connected and no rooms: the loop can stop (on Cloudflare the object goes to sleep). */

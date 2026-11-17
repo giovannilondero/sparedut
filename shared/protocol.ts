@@ -14,7 +14,7 @@ import type { StormValue } from "./sim/rules.ts"
 import type { CartView, PhaseView } from "./sim/view.ts"
 import { PRIMARIES, type PrimaryId, type ProjectileKind, type WeaponId } from "./weapons.ts"
 
-export const PROTOCOL_VERSION = 9
+export const PROTOCOL_VERSION = 10
 export const MAX_PLAYERS = 16
 export const SNAPSHOT_EVERY = 2 // ticks: 30 snapshots per second
 
@@ -29,6 +29,13 @@ const visible = (max: number) =>
     .pipe(z.string().trim().min(1).max(max))
 const name = visible(20)
 
+/**
+ * Who can see and join a room. A room on the server is LAN (players on the host's network) or Online (anyone).
+ * Offline, hosted in the player's browser, joins this list later.
+ */
+export const SERVER_REACHES = ["lan", "online"] as const
+export type Reach = (typeof SERVER_REACHES)[number]
+
 export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("hello"), name, version: z.number() }),
   z.object({ t: z.literal("list") }),
@@ -37,7 +44,12 @@ export const ClientMessage = z.discriminatedUnion("t", [
     mode: z.enum(MODE_IDS as [ModeId, ...ModeId[]]),
     map: z.enum(MAP_IDS as [MapId, ...MapId[]]),
     minutes: z.number().int().min(2).max(30),
-    visibility: z.enum(["lan", "code"]),
+    reach: z.enum(SERVER_REACHES),
+    /**
+     * The home screen's "play against the bots": a room joinable by code but left out of the list.
+     * Temporary: it goes once offline rooms exist (#18).
+     */
+    quick: z.literal(true).optional(),
     bots: z.number().int().min(0).max(7),
     level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]),
     ff: z.boolean(),
@@ -56,8 +68,6 @@ export const ClientMessage = z.discriminatedUnion("t", [
 ])
 export type ClientMessage = z.infer<typeof ClientMessage>
 
-export type Visibility = "lan" | "code"
-
 export interface RosterEntry {
   readonly id: string
   readonly name: string
@@ -71,7 +81,8 @@ export interface RoomSummary {
   readonly host: string
   readonly mode: ModeId
   readonly map: MapId
-  readonly visibility: Visibility
+  readonly reach: Reach
+  /** Humans in the room; bots give their seat up to a human who joins. */
   readonly players: number
   readonly bots: number
   readonly max: number
