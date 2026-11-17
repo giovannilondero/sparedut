@@ -299,6 +299,12 @@ export class Menu {
       s.quality = q.value as Settings["quality"]
       this.handlers.settingsChanged()
     })
+    const crouch = $<HTMLSelectElement>("s-crouch")
+    crouch.value = s.crouch
+    crouch.addEventListener("change", () => {
+      s.crouch = crouch.value as Settings["crouch"]
+      this.handlers.settingsChanged()
+    })
     for (const [id, key] of [["s-autores", "autoRes"], ["s-info", "showInfo"], ["s-invert", "invertY"]] as const) {
       const box = $<HTMLInputElement>(id)
       box.checked = s[key]
