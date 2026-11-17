@@ -522,6 +522,17 @@ const launchGjaline: Recipe = r => {
   return done(b, 0.85)
 }
 
+const cluckGjaline: Recipe = r => {
+  // a hen dropped into the cannon's hatch: a startled "co-cò", muffled by the brass
+  const b = buffer(0.35)
+  const f = 480 + r() * 80
+  cluck(b, 0, f, 0.06, 0.6, r)
+  cluck(b, 0.09, f * 1.12, 0.09, 0.8, r)
+  mode(b, 0.12, 380, 0.12, 0.05)
+  reverb(b, 0.08, 0.3)
+  return done(b, 0.8)
+}
+
 const boomGjaline: Recipe = r => {
   // a soft "pof", the last squawk and the fluttering feathers
   const b = buffer(1.3)
@@ -598,6 +609,7 @@ export const SFX: Record<SoundName, readonly [Recipe, number]> = {
   beam_miedi: [beamMiedi, 2],
   launch_gjaline: [launchGjaline, 2],
   boom_gjaline: [boomGjaline, 2],
+  cluck_gjaline: [cluckGjaline, 3],
   shot_mitraie: [shotMitraie, 3],
   turret_on: [turretOn, 1],
   turret_hot: [turretHot, 1],
