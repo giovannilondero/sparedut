@@ -337,6 +337,8 @@ export const TURRET = {
   reach: 1.6,
   /** The gunner's seat is behind the gun, at this distance. */
   seat: 1.0,
+  /** Height of the gun's pivot on its tripod, above the turret's foot (m). */
+  pivot: 1.2,
   /** How far it turns left and right from its facing (rad), and up and down. */
   arc: 1.35,
   pitchUp: 0.55,

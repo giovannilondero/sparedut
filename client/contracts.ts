@@ -44,14 +44,18 @@ export interface TurretVisual {
   readonly heat: number
   readonly jammed: boolean
   readonly manned: boolean
-  /** I'm the one using it: the viewmodel draws the gun. */
+  /** I'm the one using it: the gun snaps to my aim, with no lag, and is the only gun I see. */
   readonly mine: boolean
+  /** How far my last shot throws the gun back along its barrel (m); 0 when it is not mine. */
+  readonly recoil: number
 }
 export interface WorldScene {
   /** Call every frame. `t` in seconds since startup. */
   update(dt: number, t: number, frame: WorldFrame): void
   /** Shadows and lights according to quality; can be called again mid-match. */
   setQuality(q: Quality): void
+  /** The muzzle of turret `i`'s mitraie, in the world (for its gunner's tracers and flashes). */
+  turretMuzzle(i: number, target: THREE.Vector3): THREE.Vector3
   /** Framing for the menu background: the camera slowly circles the map. */
   menuCamera(t: number, camera: THREE.PerspectiveCamera): void
   /** Removes the map from the scene and frees geometries, materials and textures. */
