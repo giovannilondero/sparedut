@@ -81,6 +81,11 @@
         </div>
         <div class="field"><span data-t="levelLabel"></span><div id="c-level" class="levels" role="radiogroup"></div></div>
         <label class="field"><span data-t="reachLabel"></span><select id="c-reach"><option value="lan" data-t="reachLan"></option><option value="online" data-t="reachOnline"></option></select></label>
+        <div class="grid2">
+          <label class="field"><span data-t="accessLabel"></span><select id="c-access"><option value="open" data-t="accessOpen"></option><option value="password" data-t="accessPassword"></option></select></label>
+          <label class="field" id="c-password-field" hidden><span data-t="passwordLabel"></span><input id="c-password" maxlength="32" autocomplete="off" spellcheck="false" /></label>
+        </div>
+        <p id="c-msg" class="form-msg" role="alert"></p>
         <label class="check"><input type="checkbox" id="c-ff" /> <span data-t="ff"></span></label>
         <div class="row">
           <button data-go="home" data-t="back"></button>
@@ -94,6 +99,17 @@
         <div class="row">
           <button data-go="home" data-t="back"></button>
           <button class="primary" id="j-go" data-t="joinGo"></button>
+        </div>
+      </section>
+
+      <section id="menu-password" class="panel hidden">
+        <h2 data-t="passwordTitle"></h2>
+        <p id="pw-for" class="muted"></p>
+        <input id="pw-input" class="pw-input" maxlength="32" autocomplete="off" spellcheck="false" />
+        <p id="pw-msg" class="form-msg" role="alert"></p>
+        <div class="row">
+          <button data-go="home" data-t="back"></button>
+          <button class="primary" id="pw-go" data-t="joinGo"></button>
         </div>
       </section>
 

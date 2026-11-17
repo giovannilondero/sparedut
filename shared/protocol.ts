@@ -14,7 +14,7 @@ import type { StormValue } from "./sim/rules.ts"
 import type { CartView, PhaseView } from "./sim/view.ts"
 import { PRIMARIES, type PrimaryId, type ProjectileKind, type WeaponId } from "./weapons.ts"
 
-export const PROTOCOL_VERSION = 10
+export const PROTOCOL_VERSION = 11
 export const MAX_PLAYERS = 16
 export const SNAPSHOT_EVERY = 2 // ticks: 30 snapshots per second
 
@@ -36,6 +36,19 @@ const name = visible(20)
 export const SERVER_REACHES = ["lan", "online"] as const
 export type Reach = (typeof SERVER_REACHES)[number]
 
+/** Whether a room lets anyone within its reach in, or asks for a password. */
+export const ACCESSES = ["open", "password"] as const
+export type Access = (typeof ACCESSES)[number]
+/** A password is cleaned like a name. It stays with the host: never sent back, never logged. */
+export const PASSWORD_MAX = 32
+export const Password = visible(PASSWORD_MAX)
+/** A room's access as the host chose it, password included: it travels only in `create`. */
+export const RoomAccess = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("open") }),
+  z.object({ kind: z.literal("password"), password: Password })
+])
+export type RoomAccess = z.infer<typeof RoomAccess>
+
 export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("hello"), name, version: z.number() }),
   z.object({ t: z.literal("list") }),
@@ -45,6 +58,7 @@ export const ClientMessage = z.discriminatedUnion("t", [
     map: z.enum(MAP_IDS as [MapId, ...MapId[]]),
     minutes: z.number().int().min(2).max(30),
     reach: z.enum(SERVER_REACHES),
+    access: RoomAccess,
     /**
      * The home screen's "play against the bots": a room joinable by code but left out of the list.
      * Temporary: it goes once offline rooms exist (#18).
@@ -55,7 +69,13 @@ export const ClientMessage = z.discriminatedUnion("t", [
     ff: z.boolean(),
     primary: z.enum(PRIMARIES)
   }),
-  z.object({ t: z.literal("join"), code: z.string().trim().toUpperCase().length(4), primary: z.enum(PRIMARIES) }),
+  z.object({
+    t: z.literal("join"),
+    code: z.string().trim().toUpperCase().length(4),
+    /** Only for a password room; an open room ignores it. */
+    password: Password.optional(),
+    primary: z.enum(PRIMARIES)
+  }),
   z.object({ t: z.literal("leave") }),
   z.object({ t: z.literal("input"), i: PlayerInputSchema }),
   z.object({ t: z.literal("team"), team }),
@@ -82,6 +102,8 @@ export interface RoomSummary {
   readonly mode: ModeId
   readonly map: MapId
   readonly reach: Reach
+  /** Whether the room asks for a password. Never the password itself. Absent for a reach without access (Offline, #17). */
+  readonly access?: Access
   /** Humans in the room; bots give their seat up to a human who joins. */
   readonly players: number
   readonly bots: number
@@ -168,7 +190,17 @@ export interface BoardRow {
 }
 
 /** Errors for the client: it picks the text, in its own language. */
-export type ErrorCode = "invalid" | "version" | "notFound" | "lanOnly" | "full" | "busy"
+export type ErrorCode =
+  | "invalid"
+  | "version"
+  | "notFound"
+  | "lanOnly"
+  | "full"
+  | "busy"
+  | "passwordRequired"
+  | "wrongPassword"
+  /** Too many wrong passwords from this connection: it waits a while before trying again. */
+  | "tooManyAttempts"
 
 export type ServerMessage =
   /** `publicUrl`: the game's public address (tunnel or PUBLIC_URL), if the server knows it. */

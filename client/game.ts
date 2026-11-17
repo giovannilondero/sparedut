@@ -21,6 +21,7 @@ import { boardHtml, esc, Hud, rosterHtml } from "./hud.ts"
 import { t } from "./i18n.ts"
 import type { Look } from "./looks.ts"
 import type { Menu } from "./menu.ts"
+import { inviteLink } from "./invite.ts"
 import type { Net } from "./net.ts"
 import { Predictor } from "./predict.ts"
 import type { Settings } from "./settings.ts"
@@ -63,6 +64,8 @@ export interface GameDeps {
   readonly onLeave: () => void
   /** Origin and path for invite links (the public address when playing from localhost). */
   readonly inviteBase: () => string
+  /** The room's password, if this client knows it: it goes into the invite link's fragment. */
+  readonly roomPassword: () => string | null
 }
 
 interface Frame {
@@ -714,7 +717,7 @@ export class Game {
     if (!room) return
     const host = room.hostId === this.me
     const el = $("pause")
-    const link = `${this.d.inviteBase()}?p=${room.code}`
+    const link = inviteLink(this.d.inviteBase(), room.code, this.d.roomPassword())
     const myTeam = this.teams.get(this.me)
     const other: Team = myTeam === "benandanti" ? "malandanti" : "benandanti"
     const phase = this.snap?.phase.tag ?? "Warmup"
@@ -724,7 +727,7 @@ export class Game {
       <h2>${s.modes[room.mode].name} <small class="muted">· ${s.modes[room.mode].sub}</small></h2>
       <div class="row" style="align-items:center;justify-content:space-between">
         <div><div class="muted">${p.code}</div><div class="invite">${room.code}</div></div>
-        <div style="text-align:right"><button id="p-copy">${p.copy}</button><div class="muted" style="font-size:12px;margin-top:4px">${p.reach[room.reach]}</div></div>
+        <div style="text-align:right"><button id="p-copy">${p.copy}</button><div class="muted" style="font-size:12px;margin-top:4px">${p.reach[room.reach]}${room.access ? ` · ${p.access[room.access]}` : ""}</div></div>
       </div>
       <div class="roster">${rosterHtml(room, this.me)}</div>
       ${
