@@ -9,7 +9,7 @@ import { PRIMARIES, WEAPON_IDS, WEAPONS, type PrimaryId } from "../shared/weapon
 import type { GameAudio } from "./contracts.ts"
 import { esc } from "./hud.ts"
 import { onLangChange, setLang, t, type Lang } from "./i18n.ts"
-import type { Settings } from "./settings.ts"
+import { oneTapRoom, type Settings } from "./settings.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -20,15 +20,14 @@ export interface CreateOptions {
   readonly reach: Reach
   /** Absent for Offline: a room in this browser has nobody to keep out. */
   readonly access?: RoomAccess
-  /** The home screen's quick match against the bots: kept out of the room list (until offline rooms, #18). */
-  readonly quick?: boolean
   readonly bots: number
   readonly level: BotLevel
   readonly ff: boolean
 }
 
 export interface MenuHandlers {
-  readonly create: (o: CreateOptions) => void
+  /** `oneTap`: the home screen's button, whose match starts at once, without warm-up. */
+  readonly create: (o: CreateOptions, oneTap?: boolean) => void
   /** `password` only once the player typed one (from the prompt or an invite link). */
   readonly join: (code: string, password?: string) => void
   /** The map chosen in the menu: it becomes the background. */
@@ -175,9 +174,10 @@ export class Menu {
     this.handlers.join(this.passwordCode, password.data)
   }
 
+  /** The home screen's "play against the bots": an Offline match in one tap. */
   private quick() {
     if (this.needName()) return
-    this.handlers.create({ mode: this.settings.lastMode, map: this.settings.lastMap, minutes: 10, reach: "online", access: { kind: "open" }, quick: true, bots: this.settings.lastBots || 4, level: this.settings.lastLevel, ff: false })
+    this.handlers.create(oneTapRoom(this.settings), true)
   }
 
   private joinCode() {

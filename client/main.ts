@@ -154,10 +154,10 @@ const sendJoin = (code: string, password?: string) => {
 }
 
 const menu = new Menu(settings, audio, {
-  create: ({ quick = false, ...o }) => {
+  create: (o, oneTap = false) => {
     if (o.reach === "offline") {
       // The room lives in this page: the game server need not be reachable.
-      autostart = quick
+      autostart = oneTap
       roomPassword = null
       link.use(browserHost)
       browserHost.open(settings.name)
@@ -165,10 +165,10 @@ const menu = new Menu(settings, audio, {
       return
     }
     if (!ensureOnline()) return
-    autostart = quick
+    autostart = oneTap
     roomPassword = o.access?.kind === "password" ? o.access.password : null
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
-    net.send({ t: "create", ...o, ...(quick ? { quick } : {}), primary: settings.primary })
+    net.send({ t: "create", ...o, primary: settings.primary })
   },
   mapChanged: (id) => {
     if (!game?.active) loadMap(id)
@@ -185,7 +185,7 @@ const menu = new Menu(settings, audio, {
 let publicUrl: string | null = null
 const inviteBase = () => `${publicUrl && isLocalHost(location.hostname) ? publicUrl : location.origin}${location.pathname}`
 
-/** A quick match against bots starts right away, without warmup. */
+/** The home screen's one-tap match against the bots starts right away, without warm-up. */
 let autostart = false
 const physicsReady = initPhysics().then(() => {
   game = new Game({
@@ -247,7 +247,7 @@ link.on((msg: ServerMessage) => {
         // An Offline room has no code to share.
         if (msg.room.reach !== "offline") history.replaceState(null, "", inviteLink("", msg.room.code, roomPassword))
         game!.start(msg.room, msg.you)
-        if (autostart && msg.room.hostId === msg.you) net.send({ t: "start" })
+        if (autostart && msg.room.hostId === msg.you) link.send({ t: "start" })
         autostart = false
       })
       return

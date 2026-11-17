@@ -99,16 +99,27 @@ test("a full room stays in the list", () => {
   expect(rooms(me.got)).toEqual([expect.objectContaining({ code: host.peer.room!.code, players: 16, max: 16 })])
 })
 
-test("the quick match against the bots is joinable by code but stays out of the list", () => {
+test("every room on the server appears in the list of a player who can reach it", () => {
   const hub = new Hub()
-  const solo = connect(hub, "1.2.3.4")
-  solo.say({ ...create, quick: true })
-  const code = solo.peer.room!.code
+  const kinds = [
+    create,
+    { ...create, reach: "lan" },
+    { ...create, access: { kind: "password", password: "Cjavedal-7q" } },
+    { ...create, reach: "lan", access: { kind: "password", password: "Cjavedal-7q" } },
+    { ...create, bots: 7, ff: true },
+    // What the home screen's button used to send: the flag is gone, the room is a room like any other.
+    { ...create, quick: true }
+  ]
+  const hosts = kinds.map((msg) => {
+    const host = connect(hub, "1.2.3.4")
+    host.say(msg)
+    return host
+  })
   const me = connect(hub, "1.2.3.4")
   me.say({ t: "list" })
-  expect(rooms(me.got)).toEqual([])
-  me.say({ t: "join", code, primary: "cramar" })
-  expect(me.peer.room?.code).toBe(code)
+  const lan = [hosts[1], hosts[3]].map((h) => h.peer.room!.code)
+  const online = [hosts[0], hosts[2], hosts[4], hosts[5]].map((h) => h.peer.room!.code)
+  expect(rooms(me.got).map((r) => r.code)).toEqual([...lan, ...online])
 })
 
 test("the old visibility setting is refused", () => {
@@ -168,14 +179,6 @@ test("an open room lets a player in whatever password they send", () => {
   const me = connect(hub, "1.2.3.4")
   me.say({ t: "join", code: host.peer.room!.code, password: "anything", primary: "cramar" })
   expect(me.peer.room?.code).toBe(host.peer.room!.code)
-})
-
-test("the quick match against the bots cannot have a password", () => {
-  const hub = new Hub()
-  const solo = connect(hub)
-  solo.say({ ...locked, quick: true })
-  expect(solo.got.at(-1)).toEqual({ t: "error", code: "invalid" })
-  expect(solo.peer.room).toBeNull()
 })
 
 test("after five wrong passwords a connection waits ten seconds before trying again, other connections do not", () => {

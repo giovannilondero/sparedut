@@ -51,8 +51,6 @@ export interface RoomSettings {
   readonly reach: Reach
   /** Absent for a reach without access (Offline, #17). Read the password only through `admits`. */
   readonly access?: RoomAccess
-  /** Left out of the room list: only the quick match against the bots, until offline rooms replace it (#18). */
-  readonly unlisted?: boolean
   readonly level: BotLevel
   readonly ff: boolean
 }

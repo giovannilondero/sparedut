@@ -14,7 +14,7 @@ import type { StormValue } from "./sim/rules.ts"
 import type { CartView, PhaseView } from "./sim/view.ts"
 import { PRIMARIES, type PrimaryId, type ProjectileKind, type WeaponId } from "./weapons.ts"
 
-export const PROTOCOL_VERSION = 11
+export const PROTOCOL_VERSION = 12
 export const MAX_PLAYERS = 16
 export const SNAPSHOT_EVERY = 2 // ticks: 30 snapshots per second
 
@@ -64,11 +64,6 @@ export const ClientMessage = z.discriminatedUnion("t", [
     reach: z.enum(REACHES),
     /** Absent exactly for Offline, which has no access. */
     access: RoomAccess.optional(),
-    /**
-     * The home screen's "play against the bots": a room joinable by code but left out of the list.
-     * Temporary: it goes once offline rooms exist (#18).
-     */
-    quick: z.literal(true).optional(),
     bots: z.number().int().min(0).max(7),
     level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]),
     ff: z.boolean(),
