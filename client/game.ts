@@ -14,6 +14,7 @@ import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOt
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
 import { outsideStorm, owned, RAISE_TICKS } from "../shared/sim/rules.ts"
 import { TURRET, WEAPONS, type WeaponId } from "../shared/weapons.ts"
+import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
 import { Controls } from "./controls.ts"
 import { boardHtml, esc, Hud, rosterHtml } from "./hud.ts"
@@ -1092,18 +1093,23 @@ export class Game {
     const c = this.controls
     this.kickPitch *= Math.exp(-dt * 9)
     const turret = you?.alive ? this.mounted() : -1
-    const inHand: WeaponId = turret >= 0 ? "mitraie" : this.wanted
-    const def = WEAPONS[inHand]
     const aiming = c.isHeld("aim") && !!you?.alive
     this.aimBlend += ((aiming ? 1 : 0) - this.aimBlend) * Math.min(1, dt * 12)
-    const scoped = this.wanted === "cjampanili" && this.aimBlend > 0.85
-    const baseFov = settings.fov
-    camera.fov = baseFov + (def.aimFov - baseFov) * this.aimBlend
+    const view = firstPerson({
+      chosen: this.wanted,
+      mount: turret >= 0 ? { turret } : null,
+      alive: !!you?.alive,
+      aim: this.aimBlend,
+      baseFov: settings.fov
+    })
+    const inHand = view.inHand
+    const def = WEAPONS[inHand]
+    camera.fov = view.fov
     if (you?.arsenal.sgnape) camera.fov += Math.sin(t * 2.3) * 2
     camera.updateProjectionMatrix()
-    c.zoomScale = camera.fov / baseFov
-    this.hud.scope(scoped)
-    viewmodel.setVisible(!!you?.alive && !scoped)
+    c.zoomScale = view.lookScale
+    this.hud.scope(view.scope)
+    viewmodel.setVisible(view.drawWeapon)
 
     const b = this.predictor.body
     const drawn = this.predictor.render(this.acc / DT)
@@ -1208,7 +1214,7 @@ export class Game {
       const speed = b ? Math.hypot(b.vx, b.vz) : 0
       const spread = aiming ? def.spread.aimed : speed > 1.5 || !b?.grounded ? def.spread.moving : def.spread.still
       const px = (Math.tan(spread) / Math.tan(((camera.fov / 2) * Math.PI) / 180)) * (innerHeight / 2)
-      this.hud.crosshair(Math.min(60, px * 1.6), you.alive && !scoped)
+      this.hud.crosshair(Math.min(60, px * 1.6), view.crosshair)
     }
     this.hud.clickToPlay(!this.controls.active && this.overlay === "none" && !this.chatting && !this.boardOpen && s?.phase.tag !== "Over")
   }
