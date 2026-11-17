@@ -125,8 +125,6 @@ export class Hub {
         if (!this.reaches.includes(msg.reach)) return this.send(peer, { t: "error", code: "invalid" })
         // A room on the server says who may come in; an Offline room has nobody to keep out.
         if ((msg.reach === "offline") !== (msg.access === undefined)) return this.send(peer, { t: "error", code: "invalid" })
-        // The quick match against the bots is always open.
-        if (msg.quick && msg.access?.kind !== "open") return this.send(peer, { t: "error", code: "invalid" })
         const mine = [...this.rooms.values()].filter((r) => r.networkKey === peer.network.key).length
         if (this.rooms.size >= MAX_ROOMS || mine >= MAX_ROOMS_PER_NETWORK) return this.send(peer, { t: "error", code: "busy" })
         this.leave(peer)
@@ -137,7 +135,6 @@ export class Hub {
           minutes: msg.minutes,
           reach: msg.reach,
           ...(msg.access ? { access: msg.access } : {}),
-          unlisted: msg.quick ?? false,
           level: msg.level,
           ff: msg.ff
         })
@@ -145,7 +142,7 @@ export class Hub {
         this.enter(peer, created, msg.primary)
         created.fillBots(msg.bots)
         this.roomChanged(created)
-        console.log(`🏰 Room ${code} (${msg.mode} on ${msg.map}, ${msg.quick ? "quick" : msg.access ? `${msg.reach}, ${msg.access.kind}` : msg.reach}) by ${peer.name}`)
+        console.log(`🏰 Room ${code} (${msg.mode} on ${msg.map}, ${msg.access ? `${msg.reach}, ${msg.access.kind}` : msg.reach}) by ${peer.name}`)
         return
       }
       case "join": {
@@ -248,9 +245,9 @@ export class Hub {
 
   /** The rooms a peer can reach: the LAN rooms of its own network, then every Online room. */
   private visibleTo(peer: Peer) {
-    const listed = [...this.rooms.values()].filter((r) => !r.settings.unlisted)
-    const lan = listed.filter((r) => r.settings.reach === "lan" && r.networkKey === peer.network.key)
-    const online = listed.filter((r) => r.settings.reach === "online")
+    const all = [...this.rooms.values()]
+    const lan = all.filter((r) => r.settings.reach === "lan" && r.networkKey === peer.network.key)
+    const online = all.filter((r) => r.settings.reach === "online")
     return [...lan, ...online].map((r) => r.summary())
   }
 
