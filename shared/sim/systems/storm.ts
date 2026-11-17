@@ -17,14 +17,15 @@ export const StormDamage = Game.System(
     machines: { match: Game.System.machine(Match) }
   },
   ({ queries, resources, events, machines }) => {
+    const { data } = queries.players
     const match = machines.match.get()
     const rules = resources.rules.get()
     const tick = resources.tick.get()
     if (match._tag !== "Live" || rules.mode !== "tampieste" || tick % STORM_EVERY !== 0) return
     const storm = stormAt(MAPS[rules.map], rules, match.ends - rules.timeLimitTicks, tick)
     for (const m of queries.players.each()) {
-      if (m.data.life.get()._tag !== "Alive" || !outsideStorm(storm, m.data.motion.get().body)) continue
-      events.damage.emit({ victim: m.data.player.get().session, attacker: null, amount: STORM_DAMAGE, weapon: "tampieste", head: false, push: null })
+      if (data.life.get(m)._tag !== "Alive" || !outsideStorm(storm, data.motion.get(m).body)) continue
+      events.damage.emit({ victim: data.player.get(m).session, attacker: null, amount: STORM_DAMAGE, weapon: "tampieste", head: false, push: null })
     }
   }
 )

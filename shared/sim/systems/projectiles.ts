@@ -36,13 +36,14 @@ export const FlyProjectiles = Game.System(
     commands: Game.System.commands(Game.System.despawns(Projectile))
   },
   ({ queries, resources, services, events, commands }) => {
+    const { data } = queries.players
     const physics = services.physics
     const rules = resources.rules.get()
     const doors = MAPS[rules.map].doors
-    const living = queries.players.each().filter((m) => m.data.life.get()._tag === "Alive").map((m) => ({
-      session: m.data.player.get().session,
-      team: m.data.team.get(),
-      center: bodyCenter(m.data.motion.get().body)
+    const living = queries.players.each().filter((m) => data.life.get(m)._tag === "Alive").map((m) => ({
+      session: data.player.get(m).session,
+      team: data.team.get(m),
+      center: bodyCenter(data.motion.get(m).body)
     }))
 
     const explode = (p: ProjectileValue, at: Vec3) => {
@@ -83,7 +84,7 @@ export const FlyProjectiles = Game.System(
     }
 
     for (const m of queries.projectiles.each()) {
-      const p = m.data.projectile.get()
+      const p = queries.projectiles.data.projectile.get(m)
       // A planted mine doesn't move: it waits to arm, then for someone to pass nearby.
       if (p.kind === "mine" && p.vx === 0 && p.vy === 0 && p.vz === 0) {
         const fuse = p.fuse - 1
@@ -97,8 +98,8 @@ export const FlyProjectiles = Game.System(
           })
         if (victim || fuse <= 0) {
           explode(p, { x: p.x, y: p.y + 0.15, z: p.z })
-          commands.despawn(m.entity)
-        } else m.data.projectile.set({ ...p, fuse, age: p.age + 1 })
+          commands.despawn(m)
+        } else queries.projectiles.data.projectile.set(m, { ...p, fuse, age: p.age + 1 })
         continue
       }
       let vx = p.vx
@@ -203,8 +204,8 @@ export const FlyProjectiles = Game.System(
         explode(p, { x, y, z })
         exploded = true
       }
-      if (exploded) commands.despawn(m.entity)
-      else m.data.projectile.set({ kind: p.kind, x, y, z, vx, vy, vz, fuse, age: p.age + 1, bounces, owner: p.owner, team: p.team })
+      if (exploded) commands.despawn(m)
+      else queries.projectiles.data.projectile.set(m, { kind: p.kind, x, y, z, vx, vy, vz, fuse, age: p.age + 1, bounces, owner: p.owner, team: p.team })
     }
   }
 )
