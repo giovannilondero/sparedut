@@ -5,6 +5,7 @@ import { MAP_IDS } from "../shared/maps/index.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 import type { CrouchMode } from "./controls.ts"
 import type { Lang } from "./i18n.ts"
+import type { CreateOptions } from "./menu.ts"
 
 export interface Settings {
   name: string
@@ -66,4 +67,21 @@ export function loadSettings(): Settings {
 
 export function saveSettings(s: Settings) {
   localStorage.setItem(KEY, JSON.stringify(s))
+}
+
+/**
+ * The room the home screen's "play against the bots" button makes in one tap: Offline, with the
+ * mode, map, duration, bots and bot skill chosen last, friendly fire off. It needs no game server.
+ */
+export function oneTapRoom(s: Settings): CreateOptions {
+  return {
+    mode: s.lastMode,
+    map: s.lastMap,
+    minutes: s.lastMinutes,
+    reach: "offline",
+    // The button promises bots: a room last made without them falls back to the default.
+    bots: s.lastBots || DEFAULTS.lastBots,
+    level: s.lastLevel,
+    ff: false
+  }
 }

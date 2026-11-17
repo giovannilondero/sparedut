@@ -4,7 +4,7 @@ Sparatutto in prima persona nel browser, ambientato a **Gemona del Friuli, zona 
 Due squadre del folklore friulano si contendono il sagrato, Via Bini e Piazza del Municipio:
 i **Benandanti** (fusti di finocchio, salvano il raccolto) contro i **Malandanti** (canne di sorgo, vogliono la grandine).
 
-Multigiocatore online con codice d'invito e in rete locale, fino a 16 giocatori, con bot a tre livelli di bravura.
+Multigiocatore online e in rete locale, fino a 16 giocatori, con bot a tre livelli di bravura; contro i bot si gioca anche offline, senza server.
 Interfaccia in **friulano** o **italiano** (selettore in alto a destra nel menu); `Esc` torna indietro in tutti i menu.
 Due stili grafici, dal selettore in basso a destra: **Cumò** (l'originale) e **Vêr** (realistico: superfici fotografate e armi modellate in Blender). La scelta resta salvata nel browser.
 
@@ -42,10 +42,14 @@ Un deploy chiude le partite in corso.
 
 ## Partite
 
-- **Zuie cuintri i bot**: partita privata contro la CPU, subito.
-- **Cree une partide**: modalità, mappa, durata, bot per squadra e bravura (Zovin, Pari di famee, Plevan), fuoco amico.
-  - *Rete locale*: compare nella lista "Partidis in rêt locâl" di chi è sulla stessa rete (stesso IP pubblico visto dal server; se il server gira in LAN, tutti gli IP privati contano come stessa rete), ed è raggiungibile anche col codice.
-  - *Solo con codice*: non è in lista; si entra col codice di 4 lettere o col link `?p=CODICE`.
+- **Zuie cuintri i bot**: una partita offline contro la CPU, subito e senza riscaldamento, con modalità, mappa, durata, bot e bravura dell'ultima partita creata (la prima volta quelli di partenza) e fuoco amico spento.
+- **Cree une partide**: modalità, mappa, durata, bot per squadra e bravura (Zovin, Pari di famee, Plevan), fuoco amico, e la **portata**:
+  - *Offline*: la stanza gira nel browser di chi la crea (stesso codice di stanza e bot del server, in un worker), solo contro i bot. Funziona anche se il server non risponde; non ha codice né link d'invito, non è in nessuna lista e si perde ricaricando la pagina.
+  - *LAN*: compare nella lista di chi è sulla stessa rete (stesso IP pubblico visto dal server; se il server gira in LAN, tutti gli IP privati contano come stessa rete); da altre reti non si entra nemmeno col codice.
+  - *Online*: compare nella lista di tutti.
+- Le stanze LAN e Online hanno anche un **accesso**: *Aperto*, oppure *Con password* (lucchetto nella lista: chi entra la deve scrivere, e dopo cinque password sbagliate aspetta dieci secondi).
+  Ogni stanza sul server è in lista per chi la può raggiungere; si entra anche col codice di 4 lettere o col link `?p=CODICE` (il link porta con sé la password, se c'è).
+  Senza server si gioca solo offline: LAN e Online restano bloccate finché non risponde.
 - Chi crea è l'host: dal menu di partita (`Esc`) fa partire la partita, aggiunge o toglie bot, cambia la bravura.
   Se una partita è piena di bot, una persona che entra prende il posto di un bot.
 
@@ -122,6 +126,7 @@ Stack dalle linee guida (`giovannilondero/game-dev-guidelines`, 3D): **Ritmo** (
 - `client/i18n.ts`: tutti i testi in friulano e italiano: menu, HUD, battute, consigli, vocabolario
 - `shared/protocol.ts`: messaggi client ↔ server, validati con zod
 - `server/`: server autoritativo Bun (stanze, rete locale, codici), bot e loro grafo di navigazione; `worker.ts` è lo stesso server in un Durable Object
+- `client/offline.ts`, `client/host.worker.ts`: le stanze offline, ospitate in un worker del browser dallo stesso `Hub` del server (vedi `docs/adr/0001-offline-rooms-hosted-in-the-browser.md`)
 - `server/nav-graphs.ts`: i grafi dei bot precalcolati (costano decine di secondi di CPU); `pnpm nav` li rifà quando cambia una mappa, il movimento o la fisica, e `test/nav.test.ts` controlla che siano aggiornati
 - `client/`: rendering Three.js (mondo, avatar, arma in prima persona, effetti), audio sintetizzato con Howler, predizione e interpolazione, HUD e menu
 - `client/looks.ts`: i due stili grafici; **Vêr** carica le superfici fotografate di `client/public/tex/` e le armi di `client/public/models/`, esportate dagli script Blender di `assets/blender/` (`pnpm models`)
