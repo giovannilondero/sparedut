@@ -125,11 +125,11 @@ const persist = () => {
 }
 
 const menu = new Menu(settings, audio, {
-  create: (o, quick = false) => {
+  create: ({ quick = false, ...o }) => {
     if (!ensureOnline()) return
     autostart = quick
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
-    net.send({ t: "create", ...o, primary: settings.primary })
+    net.send({ t: "create", ...o, ...(quick ? { quick } : {}), primary: settings.primary })
   },
   mapChanged: (id) => {
     if (!game?.active) loadMap(id)

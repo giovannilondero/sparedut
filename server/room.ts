@@ -15,8 +15,8 @@ import {
   type RoomSummary,
   type ServerMessage,
   type SnapOther,
-  type Snapshot,
-  type Visibility
+  type Reach,
+  type Snapshot
 } from "../shared/protocol.ts"
 import { createSim, type GameEvent, type Sim, type WorldView } from "../shared/sim/index.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
@@ -47,7 +47,9 @@ export interface RoomSettings {
   readonly mode: ModeId
   readonly map: MapId
   readonly minutes: number
-  readonly visibility: Visibility
+  readonly reach: Reach
+  /** Left out of the room list: only the quick match against the bots, until offline rooms replace it (#18). */
+  readonly unlisted?: boolean
   readonly level: BotLevel
   readonly ff: boolean
 }
@@ -307,7 +309,7 @@ export class Room {
       host: this.hostName,
       mode: this.settings.mode,
       map: this.settings.map,
-      visibility: this.settings.visibility,
+      reach: this.settings.reach,
       players: this.humans.length,
       bots: this.bots.size,
       max: MAX_PLAYERS,

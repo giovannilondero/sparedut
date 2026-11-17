@@ -720,7 +720,7 @@ export class Game {
       <h2>${s.modes[room.mode].name} <small class="muted">· ${s.modes[room.mode].sub}</small></h2>
       <div class="row" style="align-items:center;justify-content:space-between">
         <div><div class="muted">${p.code}</div><div class="invite">${room.code}</div></div>
-        <div style="text-align:right"><button id="p-copy">${p.copy}</button><div class="muted" style="font-size:12px;margin-top:4px">${room.visibility === "lan" ? p.visLan : p.visCode}</div></div>
+        <div style="text-align:right"><button id="p-copy">${p.copy}</button><div class="muted" style="font-size:12px;margin-top:4px">${p.reach[room.reach]}</div></div>
       </div>
       <div class="roster">${rosterHtml(room, this.me)}</div>
       ${

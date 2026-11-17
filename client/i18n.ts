@@ -8,7 +8,7 @@
  */
 import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId, Team } from "../shared/map.ts"
-import type { ErrorCode } from "../shared/protocol.ts"
+import type { ErrorCode, Reach } from "../shared/protocol.ts"
 import type { WeaponId } from "../shared/weapons.ts"
 
 export type Lang = "fur" | "it"
@@ -18,7 +18,7 @@ type Fn<A extends unknown[] = [string]> = (...args: A) => string
 /** Static HTML texts: `data-t="key"` (innerHTML) and `data-t-ph="key"` (placeholder). */
 type StaticKey =
   | "title" | "kicker" | "sub" | "nameLabel" | "namePh" | "quick" | "quickSub" | "create" | "createSub" | "join" | "joinSub"
-  | "lanTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "visLabel" | "visLan" | "visCode"
+  | "roomsTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "reachLabel" | "reachLan" | "reachOnline"
   | "ff" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
   | "qHigh" | "autoRes" | "showInfo" | "invert" | "keys" | "vocabTitle" | "connecting" | "chatPh" | "deathTitle" | "deathHint"
   | "clickplay" | "language" | "mapLabel"
@@ -36,7 +36,11 @@ export interface Strings {
   readonly errors: Record<ErrorCode, string>
   readonly menu: {
     readonly needName: string
-    readonly lanEmpty: string
+    readonly roomsEmpty: string
+    /** The chip on a room in the list. */
+    readonly reach: Record<Reach, string>
+    /** A full room in the list: shown, not selectable. */
+    readonly full: string
     readonly botsNone: string
     readonly minutes: Fn<[number]>
     readonly tag: { readonly primary: string; readonly power: string; readonly melee: string; readonly pistol: string }
@@ -121,8 +125,7 @@ export interface Strings {
     readonly code: string
     readonly copy: string
     readonly copied: string
-    readonly visLan: string
-    readonly visCode: string
+    readonly reach: Record<Reach, string>
     readonly start: string
     readonly restart: string
     readonly hostOnly: string
@@ -253,16 +256,16 @@ const fur: Strings = {
     createSub: "In linie cul codiç o te rêt locâl",
     join: "Jentre cul codiç",
     joinSub: "Âstu un codiç di 4 letaris?",
-    lanTitle: "Partidis te rêt locâl <small>(stesse rêt)</small>",
+    roomsTitle: "Partidis viertis <small>(prime la tô rêt, po in linie)</small>",
     armarie: "Armarie",
     settings: "Impostazions",
     vocab: "Vocabolari",
     minutesLabel: "Durade",
     botsLabel: "Bot par scuadre",
     levelLabel: "Bravure dai bot",
-    visLabel: "Cui che le viôt",
-    visLan: "Rêt locâl (in liste) + codiç",
-    visCode: "Dome cul codiç (in linie)",
+    reachLabel: "Puartade",
+    reachLan: "LAN · dome te stesse rêt",
+    reachOnline: "In linie · par ducj",
     ff: "Fûc amì (i compagns si fasin mâl)",
     back: "Indaûr <kbd>Esc</kbd>",
     createGo: "Cree e jentre",
@@ -370,7 +373,9 @@ const fur: Strings = {
   },
   menu: {
     needName: "Prime il non!",
-    lanEmpty: "Nissune partide te rêt. Creine une!",
+    roomsEmpty: "Nissune partide viarte. Creine une!",
+    reach: { lan: "LAN", online: "In linie" },
+    full: "Plene",
     botsNone: "Nissun (dome personis)",
     minutes: (n) => `${n} minûts`,
     tag: {
@@ -496,8 +501,7 @@ const fur: Strings = {
     code: "Codiç de partide",
     copy: "Copie il link di invît",
     copied: "Copiât! Mandi a ducj",
-    visLan: "Visibil te rêt locâl",
-    visCode: "Dome cul codiç",
+    reach: { lan: "LAN · dome te stesse rêt", online: "In linie · par ducj" },
     start: "Fâs partî la partide",
     restart: "Torne a scomençâ",
     hostOnly: "L'host (👑) al fâs partî la partide.",
@@ -570,16 +574,16 @@ const it: Strings = {
     createSub: "Online con codice o in rete locale",
     join: "Entra con codice",
     joinSub: "Hai un codice di 4 lettere?",
-    lanTitle: "Partite in rete locale <small>(stessa rete)</small>",
+    roomsTitle: "Partite aperte <small>(prima la tua rete, poi online)</small>",
     armarie: "Armeria",
     settings: "Impostazioni",
     vocab: "Vocabolario",
     minutesLabel: "Durata",
     botsLabel: "Bot per squadra",
     levelLabel: "Bravura dei bot",
-    visLabel: "Chi la vede",
-    visLan: "Rete locale (in lista) + codice",
-    visCode: "Solo con codice (online)",
+    reachLabel: "Portata",
+    reachLan: "LAN · solo sulla stessa rete",
+    reachOnline: "Online · per tutti",
     ff: "Fuoco amico (i compagni si fanno male)",
     back: "Indietro <kbd>Esc</kbd>",
     createGo: "Crea ed entra",
@@ -687,7 +691,9 @@ const it: Strings = {
   },
   menu: {
     needName: "Prima il nome!",
-    lanEmpty: "Nessuna partita in rete. Creane una!",
+    roomsEmpty: "Nessuna partita aperta. Creane una!",
+    reach: { lan: "LAN", online: "Online" },
+    full: "Piena",
     botsNone: "Nessuno (solo persone)",
     minutes: (n) => `${n} minuti`,
     tag: {
@@ -824,8 +830,7 @@ const it: Strings = {
     code: "Codice partita",
     copy: "Copia il link d'invito",
     copied: "Copiato! Mandi a tutti",
-    visLan: "Visibile in rete locale",
-    visCode: "Solo con codice",
+    reach: { lan: "LAN · solo sulla stessa rete", online: "Online · per tutti" },
     start: "Fai partire la partita",
     restart: "Ricomincia",
     hostOnly: "L'host (👑) fa partire la partita.",
