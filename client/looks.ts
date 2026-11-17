@@ -429,7 +429,7 @@ function createRealLook(renderer: THREE.WebGLRenderer): Look {
   /** Relief, the sky reflected on models and metals, a harder sun, more haze. */
   const prepare = (scene: THREE.Scene, overlay?: Overlay | null) => {
     // The sky reflects on models and metals (a plain room where there is no sky).
-    let env = fallback
+    let env: THREE.Texture = fallback
     scene.traverse((o) => {
       const m = (o as THREE.Mesh).material
       if (m instanceof THREE.MeshStandardMaterial && m.envMap) env = m.envMap
