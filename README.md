@@ -6,6 +6,7 @@ i **Benandanti** (fusti di finocchio, salvano il raccolto) contro i **Malandanti
 
 Multigiocatore online con codice d'invito e in rete locale, fino a 16 giocatori, con bot a tre livelli di bravura.
 Interfaccia in **friulano** o **italiano** (selettore in alto a destra nel menu); `Esc` torna indietro in tutti i menu.
+Due stili grafici, dal selettore in basso a destra: **Cumò** (l'originale) e **Vêr** (realistico: superfici fotografate e armi modellate in Blender). La scelta resta salvata nel browser.
 
 ## Avvio
 
@@ -123,6 +124,7 @@ Stack dalle linee guida (`giovannilondero/game-dev-guidelines`, 3D): **Ritmo** (
 - `server/`: server autoritativo Bun (stanze, rete locale, codici), bot e loro grafo di navigazione; `worker.ts` è lo stesso server in un Durable Object
 - `server/nav-graphs.ts`: i grafi dei bot precalcolati (costano decine di secondi di CPU); `pnpm nav` li rifà quando cambia una mappa, il movimento o la fisica, e `test/nav.test.ts` controlla che siano aggiornati
 - `client/`: rendering Three.js (mondo, avatar, arma in prima persona, effetti), audio sintetizzato con Howler, predizione e interpolazione, HUD e menu
+- `client/looks.ts`: i due stili grafici; **Vêr** carica le superfici fotografate di `client/public/tex/` e le armi di `client/public/models/`, esportate dagli script Blender di `assets/blender/` (`pnpm models`)
 - `test/`: test senza browser della simulazione, del grafo dei bot e di partite intere fra bot
 
 Rete: il server è autoritativo; il client predice il proprio movimento con la stessa fisica e rigioca i comandi non confermati,

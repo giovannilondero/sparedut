@@ -8,7 +8,7 @@ import type { Viewmodel, ViewmodelFrame } from "./contracts.ts"
 import { WEAPON_IDS, type WeaponId } from "../shared/weapons.ts"
 import { bump, burlapTex, clamp, damp, flashTex, put, ramp, std } from "./models/kit.ts"
 import { sgnapeBottle } from "./models/props.ts"
-import { buildWeapon, type WeaponModel } from "./models/weapons.ts"
+import { buildWeapon, remodel, type WeaponModel } from "./models/weapons.ts"
 
 interface Hold {
   readonly hip: readonly [number, number, number]
@@ -51,6 +51,8 @@ const cuff = () => std("vm-cuff", { color: 0x6b4a2a, roughness: 0.9 })
 /** Hand + sleeve leaving the frame in direction `dir` (rig space). */
 function arm(parent: THREE.Object3D, at: THREE.Vector3, dir: THREE.Vector3, hold: Euler3): THREE.Group {
   const g = new THREE.Group()
+  // a hand is not part of the weapon: a detailed model leaves it where it is
+  g.userData.keep = true
   g.position.copy(at)
   parent.add(g)
   put(g, new THREE.BoxGeometry(0.044, 0.052, 0.082), skin(), 0, -0.006, 0.008)
@@ -458,8 +460,8 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
       if (p >= 1) tossT = -1
     }
 
-    // pendulum of the cramâr's pouch
-    if (s.model.parts.pouch) {
+    // pendulum of the cramâr's pouch (the medic's `pouch` is a pump rod: it does not swing)
+    if (s.id === "cramar" && s.model.parts.pouch) {
       const x = rig.position.x
       const v = (x - prevX) / Math.max(dt, 1e-3)
       const acc = (v - prevV) / Math.max(dt, 1e-3)
@@ -497,6 +499,20 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
   return {
     scene,
     camera,
+    remodel(id, detailed) {
+      // The file may arrive in the middle of a reload: the parts go on their pivots at rest.
+      const s = slots[id]
+      const now = s.rest.map(({ o }) => ({ p: o.position.clone(), r: o.rotation.clone() }))
+      for (const { o, p, r } of s.rest) {
+        o.position.copy(p)
+        o.rotation.copy(r)
+      }
+      remodel(s.model, detailed)
+      s.rest.forEach(({ o }, i) => {
+        o.position.copy(now[i].p)
+        o.rotation.copy(now[i].r)
+      })
+    },
     setWeapon(id) {
       if (cur?.id === id && !pending) return
       if (!cur) {

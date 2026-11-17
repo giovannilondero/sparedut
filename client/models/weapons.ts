@@ -438,6 +438,39 @@ const BUILDERS: Record<WeaponId, () => WeaponModel> = { mescul, mandi, cramar, d
 
 export const buildWeapon = (id: WeaponId): WeaponModel => BUILDERS[id]()
 
+/**
+ * Swaps a weapon's meshes for a detailed model (see `detailed.ts`), authored in weapon
+ * space at rest. Its `body` node goes under the root; each node named after a moving part
+ * (`mag`, `bolt`…; `shells0`, `shells1`… for a list) goes under that part's pivot, keeping
+ * its place, so it moves as the part does. What hangs from the weapon marked
+ * `userData.keep` (the hands) stays.
+ */
+export function remodel(model: WeaponModel, detailed: THREE.Object3D) {
+  const old: THREE.Mesh[] = []
+  const visit = (o: THREE.Object3D) => {
+    if (o.userData.keep) return
+    if (o instanceof THREE.Mesh) old.push(o)
+    for (const c of o.children) visit(c)
+  }
+  visit(model.root)
+  for (const m of old) {
+    m.removeFromParent()
+    m.geometry.dispose()
+  }
+  const pivots = new Map<string, THREE.Object3D>()
+  for (const [name, part] of Object.entries(model.parts)) {
+    if (part instanceof THREE.Object3D) pivots.set(name, part)
+    else part.forEach((p, i) => pivots.set(`${name}${i}`, p))
+  }
+  for (const node of [...detailed.children]) {
+    if (node.name === "muzzle") model.muzzle.position.copy(node.position)
+    const pivot = pivots.get(node.name)
+    if (!pivot && node.name !== "body") continue
+    model.root.add(node)
+    pivot?.attach(node)
+  }
+}
+
 export interface BakedWeapon {
   readonly geometry: THREE.BufferGeometry
   readonly muzzle: THREE.Vector3
