@@ -6,6 +6,7 @@
 import * as THREE from "three"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import { TEAMS, type MapDef, type PickupKind, type Team } from "../../shared/map.ts"
+import { TURRET } from "../../shared/weapons.ts"
 import type { WorldFrame } from "../contracts.ts"
 
 export const TEAM_COLOR: Record<Team, THREE.Color> = {
@@ -152,7 +153,7 @@ function turretModel(envMap: THREE.Texture | null) {
     return o
   }
   // tripod: three legs from the pivot to the ground
-  const PIV = 1.2
+  const PIV = TURRET.pivot
   for (const a of [Math.PI, Math.PI / 3, -Math.PI / 3]) {
     const foot = new THREE.Vector3(Math.sin(a) * 0.75, 0, Math.cos(a) * 0.75)
     const top = new THREE.Vector3(0, PIV - 0.1, 0)
@@ -174,6 +175,9 @@ function turretModel(envMap: THREE.Texture | null) {
   // the gun: water jacket (reddens with heat), receiver, spade grips
   const jacket = mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.75, 16).rotateX(Math.PI / 2), hot, pitchG, 0, 0.06, -0.55)
   mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.18, 10).rotateX(Math.PI / 2), dark, pitchG, 0, 0.06, -1.0)
+  const muzzle = new THREE.Object3D()
+  muzzle.position.set(0, 0.06, -1.1)
+  pitchG.add(muzzle)
   mesh(new THREE.BoxGeometry(0.16, 0.15, 0.4), steel, pitchG, 0, 0.05, -0.02)
   mesh(new THREE.BoxGeometry(0.12, 0.02, 0.2), steel, pitchG, 0, 0.13, 0.05)
   for (const gx of [-0.09, 0.09]) {
@@ -193,7 +197,7 @@ function turretModel(envMap: THREE.Texture | null) {
     pitchG.add(m)
     return m
   })
-  return { root, yawG, pitchG, hot, jacket, steam, gun: pitchG }
+  return { root, yawG, pitchG, hot, jacket, steam, muzzle }
 }
 
 /** A plank door (the size of its block), with crossbars. */
@@ -469,6 +473,10 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
   scene.add(storm)
 
   return {
+    turretMuzzle(i: number, target: THREE.Vector3) {
+      const tu = turrets[i]
+      return tu ? tu.muzzle.getWorldPosition(target) : target
+    },
     update(dt: number, t: number, frame: WorldFrame) {
       turrets.forEach((tu, i) => {
         const v = frame.turrets[i]
@@ -477,12 +485,15 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
         // the gun follows its user's aim; when idle it straightens back
         let dy = yaw - tu.yaw
         dy -= Math.round(dy / (2 * Math.PI)) * 2 * Math.PI
-        const k = Math.min(1, dt * (v?.manned ? 25 : 3))
+        // its own gunner's view has no handheld inertia: the gun is exactly where they aim
+        const k = v?.mine ? 1 : Math.min(1, dt * (v?.manned ? 25 : 3))
         tu.yaw += dy * k
         tu.pitch += (pitch - tu.pitch) * k
         tu.yawG.rotation.y = tu.yaw
         tu.pitchG.rotation.x = tu.pitch
-        tu.gun.visible = !v?.mine
+        // recoil: back along the barrel, the pivot stays put
+        const back = v?.recoil ?? 0
+        tu.pitchG.position.set(0, -Math.sin(tu.pitch) * back, Math.cos(tu.pitch) * back)
         const heat = v?.heat ?? 0
         hotColor.setRGB(1.6 * heat * heat, 0.35 * heat * heat * heat, 0)
         if (v?.jammed) hotColor.multiplyScalar(0.8 + 0.4 * Math.sin(t * 9))

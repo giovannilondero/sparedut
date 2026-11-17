@@ -102,6 +102,8 @@ export class Game {
   private prevMine = false
   /** Predicted Mulin spin-up (ticks), counted as the server does. */
   private localSpin = 0
+  /** Seconds since my last shot, for the first-person view (the mitraie's recoil on its tripod). */
+  private sinceShot = Infinity
   /** Ticks until the next predicted mitraie shot, at the turret. */
   private turretCooldown = 0
   /** Last time (s) the heal sound played, so it doesn't turn into a barrage. */
@@ -929,6 +931,7 @@ export class Game {
     const physics = this.physics
     const def = WEAPONS[id]
     viewmodel.fire()
+    this.sinceShot = 0
     this.kickPitch += def.kick
     this.controls.rumble(def.kick * 4, 0.15 + def.kick * 3, def.mode === "melee" ? 90 : 60)
     if (def.mode === "melee") {
@@ -954,7 +957,7 @@ export class Game {
         const hit = rayPose(eye, dir, { x: p.x, y: p.y, z: p.z, crouch: (p.f & FLAG_BIT.crouch) !== 0 })
         if (hit && hit.dist < reach) reach = hit.dist
       }
-      const muzzle = viewmodel.muzzleWorld(new THREE.Vector3())
+      const muzzle = this.muzzle()
       fx.tracer([muzzle.x, muzzle.y, muzzle.z], [eye.x + dir.x * reach, eye.y + dir.y * reach, eye.z + dir.z * reach], id)
       return
     }
@@ -962,7 +965,7 @@ export class Game {
     const b = this.predictor.body
     if (!b) return
     const eye = { x: b.x, y: b.y + this.eye, z: b.z }
-    const muzzle = viewmodel.muzzleWorld(new THREE.Vector3())
+    const muzzle = this.muzzle()
     const aiming = (input.buttons & BUTTON.aim) !== 0
     const spread = aiming ? def.spread.aimed : Math.hypot(b.vx, b.vz) > 1.5 ? def.spread.moving : def.spread.still
     for (let i = 0; i < def.pellets; i++) {
@@ -979,6 +982,12 @@ export class Game {
       fx.tracer([muzzle.x, muzzle.y, muzzle.z], end, id)
     }
     fx.muzzle([muzzle.x, muzzle.y, muzzle.z])
+  }
+
+  /** Where my shots leave from: the mitraie's own muzzle on a turret, the carried weapon's otherwise. */
+  private muzzle() {
+    const turret = this.mounted()
+    return turret >= 0 ? this.world.turretMuzzle(turret, new THREE.Vector3()) : this.d.viewmodel.muzzleWorld(new THREE.Vector3())
   }
 
   // ---------------------------------------------------------------- interpolation
@@ -1095,9 +1104,13 @@ export class Game {
     const turret = you?.alive ? this.mounted() : -1
     const aiming = c.isHeld("aim") && !!you?.alive
     this.aimBlend += ((aiming ? 1 : 0) - this.aimBlend) * Math.min(1, dt * 12)
+    this.sinceShot += dt
+    const spot = turret >= 0 ? this.physics.map.turrets[turret] : undefined
     const view = firstPerson({
       chosen: this.wanted,
-      mount: turret >= 0 ? { turret } : null,
+      mount: spot ? { turret, spot } : null,
+      look: { yaw: c.yaw, pitch: c.pitch },
+      sinceShot: this.sinceShot,
       alive: !!you?.alive,
       aim: this.aimBlend,
       baseFov: settings.fov
@@ -1176,13 +1189,15 @@ export class Game {
         turrets: s.turrets.map((tu, i): TurretVisual => {
           const mine = tu.gunner === this.me
           const gunner = tu.gunner && !mine ? this.interpolated(tu.gunner) : null
+          const pose = view.mitraie?.turret === i ? view.mitraie : null
           return {
-            yaw: mine ? c.yaw : gunner?.yaw ?? 0,
-            pitch: mine ? c.pitch : gunner?.pitch ?? 0,
+            yaw: pose ? pose.yaw : mine ? c.yaw : gunner?.yaw ?? 0,
+            pitch: pose ? pose.pitch : mine ? c.pitch : gunner?.pitch ?? 0,
             heat: tu.heat,
             jammed: tu.jammed,
             manned: tu.gunner !== null,
-            mine: mine && i === turret
+            mine: pose !== null,
+            recoil: pose?.recoil ?? 0
           }
         }),
         doors: s.doors.map((hp, i) => hp / (this.physics.map.doors[i]?.hp ?? 1)),

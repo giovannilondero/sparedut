@@ -1252,6 +1252,7 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
       live.update?.(t)
       dyn.update(dt, t, frame)
     },
+    turretMuzzle: (i, target) => dyn.turretMuzzle(i, target),
     dispose() {
       scene.remove(root)
       root.traverse((o) => {
