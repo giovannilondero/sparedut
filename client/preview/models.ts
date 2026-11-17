@@ -7,6 +7,7 @@
 import * as THREE from "three"
 import { createAvatar, setDetailedWeapon } from "../avatars.ts"
 import type { AvatarPose } from "../contracts.ts"
+import { firstPerson } from "../firstperson.ts"
 import { createFx } from "../fx.ts"
 import { createLook, lookFromUrl, mountLookSwitcher } from "../looks.ts"
 import { loadDetailed } from "../models/detailed.ts"
@@ -128,7 +129,8 @@ function poseOf(a: Actor, t: number): AvatarPose {
 // automatic cycle of the first-person weapon
 const fixed = WEAPON_IDS.indexOf(new URLSearchParams(location.search).get("w") as WeaponId)
 let auto = fixed < 0
-const force = { aim: null as boolean | null, walk: null as boolean | null }
+/** `timeScale` slows or stops the preview's time, to catch an animation at a given moment. */
+const force = { aim: null as boolean | null, walk: null as boolean | null, timeScale: 1 }
 // ?still: the weapon at rest on the hip (?still=aim: aimed), to look at the model
 const still = new URLSearchParams(location.search).get("still")
 if (still !== null) {
@@ -139,12 +141,30 @@ let wIndex = Math.max(0, fixed)
 let wTimer = 0
 let fireAcc = 0
 let lastLook = 0
+/** The shown weapon's magazine, so the hen cannon shows what is in it as in the game. */
+const ammo = { mag: 0, reserve: 0, lastShot: -9, reload: null as { at: number; mag: number; reserve: number } | null }
+const fill = () => {
+  const w = WEAPONS[WEAPON_IDS[wIndex]]
+  Object.assign(ammo, { mag: w.magazine, reserve: w.reserve, lastShot: -9, reload: null })
+}
+fill()
+function reload() {
+  const w = WEAPONS[WEAPON_IDS[wIndex]]
+  if (w.reloadTicks <= 0 || ammo.reload || ammo.mag >= w.magazine || ammo.reserve <= 0) return
+  ammo.reload = { at: t, mag: ammo.mag, reserve: ammo.reserve }
+  vm.reload(w.reloadTicks / 60)
+}
 vm.setWeapon(WEAPON_IDS[wIndex])
 const muzzle = new THREE.Vector3()
 const target = new THREE.Vector3()
 
 function shoot() {
   const id = WEAPON_IDS[wIndex]
+  if (WEAPONS[id].magazine > 0) {
+    if (ammo.mag <= 0 || ammo.reload) return
+    ammo.mag--
+  }
+  ammo.lastShot = t
   vm.fire()
   if (WEAPONS[id].mode === "melee") return
   vm.muzzleWorld(muzzle)
@@ -164,9 +184,10 @@ document.addEventListener("keydown", e => {
   if (n >= 1 && n <= 6) {
     wIndex = n - 1
     vm.setWeapon(WEAPON_IDS[wIndex])
+    fill()
   }
   if (e.key === "f") shoot()
-  if (e.key === "r") vm.reload(WEAPONS[WEAPON_IDS[wIndex]].reloadTicks / 60)
+  if (e.key === "r") reload()
   if (e.key === "g") vm.throwBomb()
   if (e.key === "e") fx.explosion([0, 0.3, -3], Math.random() < 0.5 ? "frico" : "sgnape", 0)
   if (e.key === "p") auto = !auto
@@ -187,7 +208,7 @@ resize()
 const clock = new THREE.Clock()
 let t = 0
 function frame() {
-  const dt = Math.min(clock.getDelta(), 0.05)
+  const dt = Math.min(clock.getDelta(), 0.05) * force.timeScale
   t += dt
   renderer.info.reset()
 
@@ -209,12 +230,13 @@ function frame() {
         shoot()
       }
     }
-    if (wTimer > 2.3 && wTimer - dt <= 2.3 && w.reloadTicks > 0) vm.reload(w.reloadTicks / 60)
+    if (wTimer > 2.3 && wTimer - dt <= 2.3) reload()
     if (wTimer > 2.3 + w.reloadTicks / 60 + 0.2 && wTimer - dt <= 2.3 + w.reloadTicks / 60 + 0.2) vm.throwBomb()
     if (wTimer > 3.4 + w.reloadTicks / 60) {
       wTimer = 0
       wIndex = (wIndex + 1) % WEAPON_IDS.length
       vm.setWeapon(WEAPON_IDS[wIndex])
+      fill()
     }
   }
   const look = Math.sin(t * 0.9) * 0.15
@@ -222,6 +244,23 @@ function frame() {
   const lookDx = -(look - lastLook)
   lastLook = look
   const walking = force.walk ?? Math.sin(t * 0.25) > 0
+  const w = WEAPONS[WEAPON_IDS[wIndex]]
+  const progress = ammo.reload ? Math.min(1, (t - ammo.reload.at) / (w.reloadTicks / 60)) : 0
+  if (ammo.reload && progress >= 1) {
+    const take = Math.min(w.magazine - ammo.reload.mag, ammo.reload.reserve)
+    Object.assign(ammo, { mag: ammo.reload.mag + take, reserve: ammo.reload.reserve - take, reload: null })
+  }
+  const view = firstPerson({
+    chosen: WEAPON_IDS[wIndex],
+    mount: null,
+    alive: true,
+    aim: 0,
+    baseFov: 75,
+    mag: ammo.mag,
+    reserve: ammo.reserve,
+    sinceShot: t - ammo.lastShot,
+    reload: ammo.reload && { progress, mag: ammo.reload.mag, reserve: ammo.reload.reserve }
+  })
   vm.update(dt, {
     speed: walking ? 5 : 0,
     grounded: true,
@@ -231,7 +270,9 @@ function frame() {
     lookDx,
     lookDy: 0,
     spin: Math.max(0, Math.sin(t * 0.5)),
-    sgnape: Math.sin(t * 0.13) > 0.8
+    sgnape: Math.sin(t * 0.13) > 0.8,
+    henAtMouth: view.henAtMouth,
+    reloadHens: view.reloadHens
   })
 
   // background effects in the third-person view
@@ -301,4 +342,4 @@ function frame() {
 }
 renderer.info.autoReset = false
 requestAnimationFrame(frame)
-Object.assign(window, { __preview: { vm, fx, actors, force, setAuto: (v: boolean) => (auto = v), pick: (i: number) => vm.setWeapon(WEAPON_IDS[(wIndex = i)]), shoot } })
+Object.assign(window, { __preview: { vm, fx, actors, force, setAuto: (v: boolean) => (auto = v), pick: (i: number) => (vm.setWeapon(WEAPON_IDS[(wIndex = i)]), fill()), shoot, reload, ammo, time: () => t } })

@@ -14,6 +14,14 @@ export interface FirstPersonInput {
   readonly aim: number
   /** The player's field of view setting, in degrees. */
   readonly baseFov: number
+  /** Rounds in the chosen weapon's magazine, as this client knows it. */
+  readonly mag: number
+  /** Rounds in reserve for the chosen weapon. */
+  readonly reserve: number
+  /** Seconds since this player's last shot. */
+  readonly sinceShot: number
+  /** The reload under way, or null: progress from 0 to 1 and the magazine and reserve it started from. */
+  readonly reload: { readonly progress: number; readonly mag: number; readonly reserve: number } | null
 }
 
 export interface FirstPersonView {
@@ -28,16 +36,57 @@ export interface FirstPersonView {
   /** The weapon in hand is drawn. */
   readonly drawWeapon: boolean
   readonly crosshair: boolean
+  /** A hen sits at the hen cannon's mouth. */
+  readonly henAtMouth: boolean
+  /** Of those, how many have gone in so far: each one clucks as it does. */
+  readonly hensIn: number
+  /** Hens the reload under way drops into the hen cannon: the rounds it loads. 0 when not reloading it. */
+  readonly reloadHens: number
 }
 
 /** Weapons with a scope overlay. The mitraie has none, so a turret never shows one. */
 const SCOPED: ReadonlySet<WeaponId> = new Set<WeaponId>(["cjampanili"])
 /** How far into aiming the scope overlay replaces the view. */
 const SCOPE_AT = 0.85
+/** Seconds after a shot before the next hen is back at the cannon's mouth. */
+export const HEN_BACK_AFTER = 0.45
+
+/**
+ * The hen cannon's reload, as fractions of the reload's duration (which stays the weapon's own):
+ * the lid opens, the hens drop in one at a time, the lid closes, a hen comes up to the mouth.
+ */
+export const HEN_RELOAD = { lidOpen: [0.06, 0.16], drops: [0.2, 0.76], lidClose: [0.78, 0.86], mouth: 0.9 } as const
+
+/** Within its own turn, when a dropped hen has gone into the chamber (and clucks). */
+export const HEN_IN = 0.8
+
+/**
+ * How far hen `i` of `count` is through her own turn at the chamber, from 0 (not yet taken)
+ * to 1 (gone in): the hens share the drop window in equal turns, one after the other.
+ */
+export const henDrop = (progress: number, count: number, i: number): number => {
+  const [from, to] = HEN_RELOAD.drops
+  const turn = (to - from) / Math.max(1, count)
+  return Math.min(1, Math.max(0, (progress - from - i * turn) / turn))
+}
 
 export const firstPerson = (input: FirstPersonInput): FirstPersonView => {
   const inHand: WeaponId = input.mount ? "mitraie" : input.chosen
   const fov = input.baseFov + (WEAPONS[inHand].aimFov - input.baseFov) * input.aim
   const scope = SCOPED.has(inHand) && input.aim > SCOPE_AT
-  return { inHand, fov, lookScale: fov / input.baseFov, scope, drawWeapon: input.alive && !scope, crosshair: input.alive && !scope }
+  const hen = henCannon(inHand, input)
+  return { inHand, fov, lookScale: fov / input.baseFov, scope, drawWeapon: input.alive && !scope, crosshair: input.alive && !scope, ...hen }
+}
+
+/** What the hen cannon shows: the hen at the mouth and the hens a reload drops in. */
+const henCannon = (inHand: WeaponId, input: FirstPersonInput): Pick<FirstPersonView, "henAtMouth" | "reloadHens" | "hensIn"> => {
+  if (inHand !== "gjalinis") return { henAtMouth: false, reloadHens: 0, hensIn: 0 }
+  const ready = input.mag > 0 && input.sinceShot > HEN_BACK_AFTER
+  const reload = input.reload
+  if (!reload) return { henAtMouth: ready, reloadHens: 0, hensIn: 0 }
+  const reloadHens = Math.min(WEAPONS[inHand].magazine - reload.mag, reload.reserve)
+  let hensIn = 0
+  for (let i = 0; i < reloadHens; i++) if (henDrop(reload.progress, reloadHens, i) >= HEN_IN) hensIn++
+  const loadedUp = reloadHens > 0 && reload.progress >= HEN_RELOAD.mouth
+  return { henAtMouth: ready || loadedUp, reloadHens, hensIn }
 }
