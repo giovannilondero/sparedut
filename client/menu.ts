@@ -201,6 +201,11 @@ export class Menu {
       this.audio.play("ui_click")
       this.renderCreate()
     })
+    // An Offline room lives in this browser: what only the server offers (access, password) hides.
+    const reach = $<HTMLSelectElement>("c-reach")
+    const showReach = () => ($("menu-create").dataset.reach = reach.value)
+    reach.addEventListener("change", showReach)
+    showReach()
     $("c-go").addEventListener("click", () => {
       const o: CreateOptions = {
         mode: this.mode,

@@ -18,7 +18,7 @@ type Fn<A extends unknown[] = [string]> = (...args: A) => string
 /** Static HTML texts: `data-t="key"` (innerHTML) and `data-t-ph="key"` (placeholder). */
 type StaticKey =
   | "title" | "kicker" | "sub" | "nameLabel" | "namePh" | "quick" | "quickSub" | "create" | "createSub" | "join" | "joinSub"
-  | "roomsTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "reachLabel" | "reachLan" | "reachOnline"
+  | "roomsTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "reachLabel" | "reachLan" | "reachOnline" | "reachOffline"
   | "ff" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
   | "qHigh" | "autoRes" | "showInfo" | "invert" | "keys" | "vocabTitle" | "connecting" | "chatPh" | "deathTitle" | "deathHint"
   | "clickplay" | "language" | "mapLabel" | "crouchMode" | "crouchHold" | "crouchToggle"
@@ -57,6 +57,8 @@ export interface Strings {
     readonly down: string
     readonly lost: string
     readonly lostRetry: string
+    /** The host of an Offline room did not start in this browser. */
+    readonly offlineFailed: string
   }
   readonly hud: {
     readonly over: string
@@ -266,6 +268,7 @@ const fur: Strings = {
     reachLabel: "Puartade",
     reachLan: "LAN · dome te stesse rêt",
     reachOnline: "In linie · par ducj",
+    reachOffline: "Offline (cuintri i bot)",
     ff: "Fûc amì (i compagns si fasin mâl)",
     back: "Indaûr <kbd>Esc</kbd>",
     createGo: "Cree e jentre",
@@ -377,7 +380,7 @@ const fur: Strings = {
   menu: {
     needName: "Prime il non!",
     roomsEmpty: "Nissune partide viarte. Creine une!",
-    reach: { lan: "LAN", online: "In linie" },
+    reach: { offline: "Offline", lan: "LAN", online: "In linie" },
     full: "Plene",
     botsNone: "Nissun (dome personis)",
     minutes: (n) => `${n} minûts`,
@@ -399,7 +402,8 @@ const fur: Strings = {
     retry: "Server no rivât. O torni a provâ…",
     down: "Il server nol rispuint. Isal impiât? (pnpm dev)",
     lost: "Conession pierdude. Mandi!",
-    lostRetry: "Conession pierdude: o torni a provâ…"
+    lostRetry: "Conession pierdude: o torni a provâ…",
+    offlineFailed: "No rivi a inviâ la partide offline: torne a cjamâ la pagjine."
   },
   hud: {
     over: "FIN",
@@ -504,7 +508,7 @@ const fur: Strings = {
     code: "Codiç de partide",
     copy: "Copie il link di invît",
     copied: "Copiât! Mandi a ducj",
-    reach: { lan: "LAN · dome te stesse rêt", online: "In linie · par ducj" },
+    reach: { offline: "Offline · dome tu cuintri i bot", lan: "LAN · dome te stesse rêt", online: "In linie · par ducj" },
     start: "Fâs partî la partide",
     restart: "Torne a scomençâ",
     hostOnly: "L'host (👑) al fâs partî la partide.",
@@ -587,6 +591,7 @@ const it: Strings = {
     reachLabel: "Portata",
     reachLan: "LAN · solo sulla stessa rete",
     reachOnline: "Online · per tutti",
+    reachOffline: "Offline (contro i bot)",
     ff: "Fuoco amico (i compagni si fanno male)",
     back: "Indietro <kbd>Esc</kbd>",
     createGo: "Crea ed entra",
@@ -698,7 +703,7 @@ const it: Strings = {
   menu: {
     needName: "Prima il nome!",
     roomsEmpty: "Nessuna partita aperta. Creane una!",
-    reach: { lan: "LAN", online: "Online" },
+    reach: { offline: "Offline", lan: "LAN", online: "Online" },
     full: "Piena",
     botsNone: "Nessuno (solo persone)",
     minutes: (n) => `${n} minuti`,
@@ -720,7 +725,8 @@ const it: Strings = {
     retry: "Server non raggiunto. Riprovo…",
     down: "Il server non risponde. È acceso? (pnpm dev)",
     lost: "Connessione persa. Mandi!",
-    lostRetry: "Connessione persa: riprovo…"
+    lostRetry: "Connessione persa: riprovo…",
+    offlineFailed: "Non riesco ad avviare la partita offline: ricarica la pagina."
   },
   hud: {
     over: "FINE",
@@ -836,7 +842,7 @@ const it: Strings = {
     code: "Codice partita",
     copy: "Copia il link d'invito",
     copied: "Copiato! Mandi a tutti",
-    reach: { lan: "LAN · solo sulla stessa rete", online: "Online · per tutti" },
+    reach: { offline: "Offline · solo tu contro i bot", lan: "LAN · solo sulla stessa rete", online: "Online · per tutti" },
     start: "Fai partire la partita",
     restart: "Ricomincia",
     hostOnly: "L'host (👑) fa partire la partita.",

@@ -21,7 +21,7 @@ import { boardHtml, esc, Hud, rosterHtml } from "./hud.ts"
 import { t } from "./i18n.ts"
 import type { Look } from "./looks.ts"
 import type { Menu } from "./menu.ts"
-import type { Net } from "./net.ts"
+import type { Connection } from "./connection.ts"
 import { Predictor } from "./predict.ts"
 import type { Settings } from "./settings.ts"
 
@@ -55,7 +55,8 @@ export interface GameDeps {
   readonly audio: GameAudio
   readonly fx: Fx
   readonly viewmodel: Viewmodel
-  readonly net: Net
+  /** Whoever hosts the room: the game server or this browser. */
+  readonly net: Connection
   readonly settings: Settings
   readonly menu: Menu
   readonly createAvatar: (team: Team, name: string) => Avatar
@@ -722,10 +723,15 @@ export class Game {
     const p = s.pause
     el.innerHTML = `
       <h2>${s.modes[room.mode].name} <small class="muted">· ${s.modes[room.mode].sub}</small></h2>
-      <div class="row" style="align-items:center;justify-content:space-between">
+      ${
+        // An Offline room has no code and no invite link: nobody else can come in.
+        room.reach === "offline"
+          ? `<div class="muted" style="font-size:12px">${p.reach.offline}</div>`
+          : `<div class="row" style="align-items:center;justify-content:space-between">
         <div><div class="muted">${p.code}</div><div class="invite">${room.code}</div></div>
         <div style="text-align:right"><button id="p-copy">${p.copy}</button><div class="muted" style="font-size:12px;margin-top:4px">${p.reach[room.reach]}</div></div>
-      </div>
+      </div>`
+      }
       <div class="roster">${rosterHtml(room, this.me)}</div>
       ${
         host
@@ -754,10 +760,12 @@ export class Game {
       this.d.net.send({ t: "leave" })
       this.d.onLeave()
     }
-    $("p-copy").onclick = () => {
-      void navigator.clipboard?.writeText(link)
-      $("p-copy").textContent = p.copied
-    }
+    const copy = document.getElementById("p-copy")
+    if (copy)
+      copy.onclick = () => {
+        void navigator.clipboard?.writeText(link)
+        copy.textContent = p.copied
+      }
     $("p-settings").onclick = () => this.openOverlay("settings")
     if (host) {
       $("p-start").onclick = () => {

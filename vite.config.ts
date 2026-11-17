@@ -10,6 +10,7 @@ export default defineConfig({
     host: true,
     port: 5173,
     ...(publicHost ? { allowedHosts: [publicHost] } : {}),
-    proxy: { "/ws": { target: "ws://localhost:3007", ws: true } }
+    // The game server's port: `PORT` as the server reads it, so a second checkout can run its own pair.
+    proxy: { "/ws": { target: `ws://localhost:${process.env.PORT ?? 3007}`, ws: true } }
   }
 })

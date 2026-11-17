@@ -1,9 +1,8 @@
-/** The connection to the server: typed messages in both directions. */
+/** The connection to the game server: typed messages in both directions. */
 import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage } from "../shared/protocol.ts"
+import { smoothRtt, type Connection, type Listener } from "./connection.ts"
 
-export type Listener = (msg: ServerMessage) => void
-
-export class Net {
+export class Net implements Connection {
   private ws: WebSocket | null = null
   private listeners = new Set<Listener>()
   private pingTimer = 0
@@ -33,7 +32,7 @@ export class Net {
       }
       ws.onmessage = (e) => {
         const msg = JSON.parse(e.data as string) as ServerMessage
-        if (msg.t === "pong") this.rtt = this.rtt === 0 ? performance.now() - msg.c : this.rtt * 0.8 + (performance.now() - msg.c) * 0.2
+        if (msg.t === "pong") this.rtt = smoothRtt(this.rtt, performance.now() - msg.c)
         for (const l of this.listeners) l(msg)
       }
     })
