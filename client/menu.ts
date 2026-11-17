@@ -18,7 +18,8 @@ export interface CreateOptions {
   readonly map: MapId
   readonly minutes: number
   readonly reach: Reach
-  readonly access: RoomAccess
+  /** Absent for Offline: a room in this browser has nobody to keep out. */
+  readonly access?: RoomAccess
   /** The home screen's quick match against the bots: kept out of the room list (until offline rooms, #18). */
   readonly quick?: boolean
   readonly bots: number
@@ -236,6 +237,11 @@ export class Menu {
       this.audio.play("ui_click")
       this.renderCreate()
     })
+    // An Offline room lives in this browser: what only the server offers (access, password) hides.
+    const reach = $<HTMLSelectElement>("c-reach")
+    const showReach = () => ($("menu-create").dataset.reach = reach.value)
+    reach.addEventListener("change", showReach)
+    showReach()
     const access = $<HTMLSelectElement>("c-access")
     access.addEventListener("change", () => {
       $("c-password-field").hidden = access.value !== "password"
@@ -243,8 +249,9 @@ export class Menu {
       if (access.value === "password") $("c-password").focus()
     })
     $("c-go").addEventListener("click", () => {
+      const reach = $<HTMLSelectElement>("c-reach").value as Reach
       let roomAccess: RoomAccess = { kind: "open" }
-      if (access.value === "password") {
+      if (reach !== "offline" && access.value === "password") {
         const password = Password.safeParse($<HTMLInputElement>("c-password").value)
         if (!password.success) {
           $("c-msg").textContent = t().menu.passwordBad
@@ -258,8 +265,8 @@ export class Menu {
         mode: this.mode,
         map: this.map,
         minutes: Number($<HTMLSelectElement>("c-minutes").value),
-        reach: $<HTMLSelectElement>("c-reach").value as Reach,
-        access: roomAccess,
+        reach,
+        ...(reach === "offline" ? {} : { access: roomAccess }),
         bots: Number($<HTMLSelectElement>("c-bots").value),
         level: this.level,
         ff: $<HTMLInputElement>("c-ff").checked

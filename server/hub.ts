@@ -1,7 +1,7 @@
 /**
  * The game server, transport-agnostic: sessions, rooms, the fixed-tick loop.
  */
-import { ClientMessage, PROTOCOL_VERSION, type ServerMessage } from "../shared/protocol.ts"
+import { ClientMessage, PROTOCOL_VERSION, SERVER_REACHES, type Reach, type ServerMessage } from "../shared/protocol.ts"
 import { TICK_RATE } from "../shared/movement.ts"
 import type { NetworkId } from "./network.ts"
 import { newCode, Room } from "./room.ts"
@@ -74,10 +74,13 @@ export class Hub {
     console.log(`🌍 Public address: ${url}`)
     for (const peer of this.peers) this.send(peer, { t: "public", url })
   }
+  private readonly reaches: readonly Reach[]
   private last: number
   private acc = 0
 
-  constructor(private readonly clock: Clock = () => performance.now()) {
+  /** `reaches`: the reaches this host creates rooms with, LAN and Online on the game server, Offline in a browser. */
+  constructor(private readonly clock: Clock = () => performance.now(), reaches: readonly Reach[] = SERVER_REACHES) {
+    this.reaches = reaches
     this.last = clock()
   }
 
@@ -119,8 +122,11 @@ export class Hub {
         this.send(peer, { t: "rooms", rooms: this.visibleTo(peer) })
         return
       case "create": {
+        if (!this.reaches.includes(msg.reach)) return this.send(peer, { t: "error", code: "invalid" })
+        // A room on the server says who may come in; an Offline room has nobody to keep out.
+        if ((msg.reach === "offline") !== (msg.access === undefined)) return this.send(peer, { t: "error", code: "invalid" })
         // The quick match against the bots is always open.
-        if (msg.quick && msg.access.kind !== "open") return this.send(peer, { t: "error", code: "invalid" })
+        if (msg.quick && msg.access?.kind !== "open") return this.send(peer, { t: "error", code: "invalid" })
         const mine = [...this.rooms.values()].filter((r) => r.networkKey === peer.network.key).length
         if (this.rooms.size >= MAX_ROOMS || mine >= MAX_ROOMS_PER_NETWORK) return this.send(peer, { t: "error", code: "busy" })
         this.leave(peer)
@@ -130,7 +136,7 @@ export class Hub {
           map: msg.map,
           minutes: msg.minutes,
           reach: msg.reach,
-          access: msg.access,
+          ...(msg.access ? { access: msg.access } : {}),
           unlisted: msg.quick ?? false,
           level: msg.level,
           ff: msg.ff
@@ -139,12 +145,13 @@ export class Hub {
         this.enter(peer, created, msg.primary)
         created.fillBots(msg.bots)
         this.roomChanged(created)
-        console.log(`🏰 Room ${code} (${msg.mode} on ${msg.map}, ${msg.quick ? "quick" : `${msg.reach}, ${msg.access.kind}`}) by ${peer.name}`)
+        console.log(`🏰 Room ${code} (${msg.mode} on ${msg.map}, ${msg.quick ? "quick" : msg.access ? `${msg.reach}, ${msg.access.kind}` : msg.reach}) by ${peer.name}`)
         return
       }
       case "join": {
         const target = this.rooms.get(msg.code)
-        if (!target) return this.send(peer, { t: "error", code: "notFound" })
+        // An Offline room has no code to share: only its creator is ever in it.
+        if (!target || target.settings.reach === "offline") return this.send(peer, { t: "error", code: "notFound" })
         if (target.settings.reach === "lan" && target.networkKey !== peer.network.key) {
           return this.send(peer, { t: "error", code: "lanOnly" })
         }

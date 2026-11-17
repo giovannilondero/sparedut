@@ -18,6 +18,8 @@ import { createLook, lookFromUrl, mountLookSwitcher } from "./looks.ts"
 import { loadDetailed } from "./models/detailed.ts"
 import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
+import { BrowserHost } from "./offline.ts"
+import { Link } from "./connection.ts"
 import { PerfMonitor } from "./perf.ts"
 import { loadSettings, saveSettings } from "./settings.ts"
 import type { WorldScene } from "./contracts.ts"
@@ -116,6 +118,22 @@ window.addEventListener("keydown", (e: KeyboardEvent) => {
 })
 
 const net = new Net()
+/** An Offline room's host, in a worker of this page: started on create, ended on leave. */
+const browserHost = new BrowserHost()
+/** What the game talks to: the server, or the browser's host while in an Offline room. */
+const link = new Link([net, browserHost])
+const offline = () => link.uses(browserHost)
+browserHost.onError = (error) => {
+  console.error("The Offline room's host failed:", error)
+  toast(t().net.offlineFailed)
+  if (offline()) leaveOffline()
+  backToMenu()
+}
+/** Back to the server: the browser's host and its Offline room end. */
+function leaveOffline() {
+  browserHost.close()
+  link.use(net)
+}
 const persist = () => {
   saveSettings(settings)
   audio.setVolumes(settings.master, settings.music)
@@ -137,9 +155,18 @@ const sendJoin = (code: string, password?: string) => {
 
 const menu = new Menu(settings, audio, {
   create: ({ quick = false, ...o }) => {
+    if (o.reach === "offline") {
+      // The room lives in this page: the game server need not be reachable.
+      autostart = quick
+      roomPassword = null
+      link.use(browserHost)
+      browserHost.open(settings.name)
+      browserHost.send({ t: "create", ...o, primary: settings.primary })
+      return
+    }
     if (!ensureOnline()) return
     autostart = quick
-    roomPassword = o.access.kind === "password" ? o.access.password : null
+    roomPassword = o.access?.kind === "password" ? o.access.password : null
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
     net.send({ t: "create", ...o, ...(quick ? { quick } : {}), primary: settings.primary })
   },
@@ -170,7 +197,7 @@ const physicsReady = initPhysics().then(() => {
     audio,
     fx,
     viewmodel,
-    net,
+    net: link,
     settings,
     menu,
     createAvatar,
@@ -202,7 +229,7 @@ function backToMenu() {
   audio.menuMusic(true)
 }
 
-net.on((msg: ServerMessage) => {
+link.on((msg: ServerMessage) => {
   switch (msg.t) {
     case "welcome":
       publicUrl = msg.publicUrl
@@ -217,13 +244,15 @@ net.on((msg: ServerMessage) => {
       void physicsReady.then(() => {
         menu.show(false)
         audio.menuMusic(false)
-        history.replaceState(null, "", inviteLink("", msg.room.code, roomPassword))
+        // An Offline room has no code to share.
+        if (msg.room.reach !== "offline") history.replaceState(null, "", inviteLink("", msg.room.code, roomPassword))
         game!.start(msg.room, msg.you)
         if (autostart && msg.room.hostId === msg.you) net.send({ t: "start" })
         autostart = false
       })
       return
     case "left":
+      if (offline()) leaveOffline()
       roomPassword = null
       history.replaceState(null, "", location.pathname)
       backToMenu()
@@ -267,7 +296,7 @@ async function connect() {
   }
 }
 net.onClose = () => {
-  if (game?.active) {
+  if (game?.active && !offline()) {
     toast(t().net.lost)
     backToMenu()
   }

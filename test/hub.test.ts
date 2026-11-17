@@ -257,3 +257,12 @@ test("the room keeps its access and password when the host leaves, and its membe
   late.say({ t: "join", code, password: PASSWORD, primary: "cramar" })
   expect(late.peer.room?.code).toBe(code)
 })
+
+test("the server refuses to create an Offline room", () => {
+  const hub = new Hub()
+  const { peer, got, say } = connect(hub)
+  say({ ...create, reach: "offline" })
+  expect(got.at(-1)).toEqual({ t: "error", code: "invalid" })
+  expect(peer.room).toBeNull()
+  expect(hub.rooms.size).toBe(0)
+})
