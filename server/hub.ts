@@ -26,19 +26,19 @@ const COMMANDS = { perSecond: 2, burst: 8 }
 /** Each room has its own physics world and up to 14 bots: a cap, overall and per network. */
 const MAX_ROOMS = 40
 const MAX_ROOMS_PER_NETWORK = 6
+/** Wrong passwords a connection may send in a row before it has to wait. */
+export const PASSWORD_ATTEMPTS = 5
+/** How long a connection waits after too many wrong passwords. */
+export const PASSWORD_WAIT_MS = 10_000
 
-export interface HubOptions {
-  /** The reaches this host creates rooms with: LAN and Online on the game server, Offline in a browser. */
-  readonly reaches?: readonly Reach[]
-  /** Milliseconds, monotonic. Tests move it by hand. */
-  readonly now?: () => number
-}
+/** Milliseconds from an arbitrary origin; tests pass their own. */
+export type Clock = () => number
 
 /** A token bucket: refills at `perSecond`, up to `burst`. */
 class Bucket {
   private tokens: number
   private last: number
-  constructor(private readonly rate: { perSecond: number; burst: number }, private readonly clock: () => number) {
+  constructor(private readonly rate: { perSecond: number; burst: number }, private readonly clock: Clock) {
     this.tokens = rate.burst
     this.last = clock()
   }
@@ -52,10 +52,19 @@ class Bucket {
   }
 }
 
+interface Limits {
+  readonly messages: Bucket
+  readonly commands: Bucket
+  /** Wrong passwords since the last right one or the last wait. */
+  wrong: number
+  /** Until when password attempts are refused. */
+  waitUntil: number
+}
+
 export class Hub {
   readonly rooms = new Map<string, Room>()
   private readonly peers = new Set<Peer>()
-  private readonly limits = new Map<Peer, { messages: Bucket; commands: Bucket }>()
+  private readonly limits = new Map<Peer, Limits>()
   /** Public address for invite links: from PUBLIC_URL or from the first client that came from outside. */
   private publicUrl: string | null = null
 
@@ -66,19 +75,18 @@ export class Hub {
     for (const peer of this.peers) this.send(peer, { t: "public", url })
   }
   private readonly reaches: readonly Reach[]
-  private readonly now: () => number
   private last: number
   private acc = 0
 
-  constructor(options: HubOptions = {}) {
-    this.reaches = options.reaches ?? SERVER_REACHES
-    this.now = options.now ?? (() => performance.now())
-    this.last = this.now()
+  /** `reaches`: the reaches this host creates rooms with, LAN and Online on the game server, Offline in a browser. */
+  constructor(private readonly clock: Clock = () => performance.now(), reaches: readonly Reach[] = SERVER_REACHES) {
+    this.reaches = reaches
+    this.last = clock()
   }
 
   open(peer: Peer) {
     this.peers.add(peer)
-    this.limits.set(peer, { messages: new Bucket(MESSAGES, this.now), commands: new Bucket(COMMANDS, this.now) })
+    this.limits.set(peer, { messages: new Bucket(MESSAGES, this.clock), commands: new Bucket(COMMANDS, this.clock), wrong: 0, waitUntil: 0 })
     peer.id = `p${++sessionCounter}-${Math.random().toString(36).slice(2, 7)}`
   }
 
@@ -115,6 +123,10 @@ export class Hub {
         return
       case "create": {
         if (!this.reaches.includes(msg.reach)) return this.send(peer, { t: "error", code: "invalid" })
+        // A room on the server says who may come in; an Offline room has nobody to keep out.
+        if ((msg.reach === "offline") !== (msg.access === undefined)) return this.send(peer, { t: "error", code: "invalid" })
+        // The quick match against the bots is always open.
+        if (msg.quick && msg.access?.kind !== "open") return this.send(peer, { t: "error", code: "invalid" })
         const mine = [...this.rooms.values()].filter((r) => r.networkKey === peer.network.key).length
         if (this.rooms.size >= MAX_ROOMS || mine >= MAX_ROOMS_PER_NETWORK) return this.send(peer, { t: "error", code: "busy" })
         this.leave(peer)
@@ -124,6 +136,7 @@ export class Hub {
           map: msg.map,
           minutes: msg.minutes,
           reach: msg.reach,
+          ...(msg.access ? { access: msg.access } : {}),
           unlisted: msg.quick ?? false,
           level: msg.level,
           ff: msg.ff
@@ -132,7 +145,7 @@ export class Hub {
         this.enter(peer, created, msg.primary)
         created.fillBots(msg.bots)
         this.roomChanged(created)
-        console.log(`🏰 Room ${code} (${msg.mode} on ${msg.map}, ${msg.quick ? "quick" : msg.reach}) by ${peer.name}`)
+        console.log(`🏰 Room ${code} (${msg.mode} on ${msg.map}, ${msg.quick ? "quick" : msg.access ? `${msg.reach}, ${msg.access.kind}` : msg.reach}) by ${peer.name}`)
         return
       }
       case "join": {
@@ -141,6 +154,19 @@ export class Hub {
         if (!target || target.settings.reach === "offline") return this.send(peer, { t: "error", code: "notFound" })
         if (target.settings.reach === "lan" && target.networkKey !== peer.network.key) {
           return this.send(peer, { t: "error", code: "lanOnly" })
+        }
+        if (target.settings.access?.kind === "password") {
+          if (msg.password === undefined) return this.send(peer, { t: "error", code: "passwordRequired" })
+          const now = this.clock()
+          if (now < limits.waitUntil) return this.send(peer, { t: "error", code: "tooManyAttempts" })
+          if (!target.admits(msg.password)) {
+            if (++limits.wrong >= PASSWORD_ATTEMPTS) {
+              limits.wrong = 0
+              limits.waitUntil = now + PASSWORD_WAIT_MS
+            }
+            return this.send(peer, { t: "error", code: "wrongPassword" })
+          }
+          limits.wrong = 0
         }
         if (target.full && ![...target.members.values()].some((m) => m.bot)) return this.send(peer, { t: "error", code: "full" })
         this.leave(peer)
@@ -235,7 +261,7 @@ export class Hub {
 
   /** Call often: advances the rooms by as many ticks as have elapsed. */
   update() {
-    const now = this.now()
+    const now = this.clock()
     this.acc += Math.min(250, now - this.last)
     this.last = now
     let steps = 0

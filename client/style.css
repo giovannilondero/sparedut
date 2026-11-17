@@ -94,6 +94,11 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 #lan-list li button:disabled { opacity: 0.55; cursor: not-allowed; }
 #lan-list .chip { font-style: normal; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--stone-line); }
 #lan-list .chip.lan { color: var(--gold); border-color: var(--gold); }
+#lan-list .lock { font-style: normal; }
+.pw-input { font-size: 22px; text-align: center; padding: 10px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--stone-line); border-radius: 10px; color: var(--ink); }
+.form-msg { margin: 0; min-block-size: 1lh; font-size: 13px; color: #f08a6c; }
+.form-msg:empty { display: none; }
+.field[hidden] { display: none; }
 
 .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .card { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 10px; }

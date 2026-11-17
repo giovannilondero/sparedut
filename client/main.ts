@@ -12,6 +12,7 @@ import { createAvatar, setDetailedWeapon } from "./avatars.ts"
 import { createFx } from "./fx.ts"
 import { isLocalHost } from "../shared/hosts.ts"
 import { Game } from "./game.ts"
+import { inviteLink, readInvite } from "./invite.ts"
 import { t } from "./i18n.ts"
 import { createLook, lookFromUrl, mountLookSwitcher } from "./looks.ts"
 import { loadDetailed } from "./models/detailed.ts"
@@ -142,11 +143,22 @@ const persist = () => {
   else resize()
 }
 
+/** The room being joined, for the password prompt. */
+let joining = ""
+/** The password of the room being created, joined or played, if it has one: it goes into the invite link. */
+let roomPassword: string | null = null
+const sendJoin = (code: string, password?: string) => {
+  joining = code
+  roomPassword = password ?? null
+  net.send({ t: "join", code, ...(password === undefined ? {} : { password }), primary: settings.primary })
+}
+
 const menu = new Menu(settings, audio, {
   create: ({ quick = false, ...o }) => {
     if (o.reach === "offline") {
       // The room lives in this page: the game server need not be reachable.
       autostart = quick
+      roomPassword = null
       link.use(browserHost)
       browserHost.open(settings.name)
       browserHost.send({ t: "create", ...o, primary: settings.primary })
@@ -154,16 +166,17 @@ const menu = new Menu(settings, audio, {
     }
     if (!ensureOnline()) return
     autostart = quick
+    roomPassword = o.access?.kind === "password" ? o.access.password : null
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
     net.send({ t: "create", ...o, ...(quick ? { quick } : {}), primary: settings.primary })
   },
   mapChanged: (id) => {
     if (!game?.active) loadMap(id)
   },
-  join: (code) => {
+  join: (code, password) => {
     if (!ensureOnline()) return
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
-    net.send({ t: "join", code, primary: settings.primary })
+    sendJoin(code, password)
   },
   settingsChanged: persist
 })
@@ -190,7 +203,8 @@ const physicsReady = initPhysics().then(() => {
     createAvatar,
     saveSettings: () => saveSettings(settings),
     onLeave: backToMenu,
-    inviteBase
+    inviteBase,
+    roomPassword: () => roomPassword
   })
   game.setQuality(quality)
 })
@@ -231,7 +245,7 @@ link.on((msg: ServerMessage) => {
         menu.show(false)
         audio.menuMusic(false)
         // An Offline room has no code to share.
-        if (msg.room.reach !== "offline") history.replaceState(null, "", `?p=${msg.room.code}`)
+        if (msg.room.reach !== "offline") history.replaceState(null, "", inviteLink("", msg.room.code, roomPassword))
         game!.start(msg.room, msg.you)
         if (autostart && msg.room.hostId === msg.you) net.send({ t: "start" })
         autostart = false
@@ -239,11 +253,15 @@ link.on((msg: ServerMessage) => {
       return
     case "left":
       if (offline()) leaveOffline()
+      roomPassword = null
       history.replaceState(null, "", location.pathname)
       backToMenu()
       return
     case "error":
-      toast(t().errors[msg.code])
+      // A password room: ask for it, saying why when the last one did not work.
+      if (msg.code === "passwordRequired") menu.askPassword(joining)
+      else if (msg.code === "wrongPassword" || msg.code === "tooManyAttempts") menu.askPassword(joining, t().errors[msg.code])
+      else toast(t().errors[msg.code])
       return
   }
 })
@@ -266,11 +284,11 @@ async function connect() {
     connecting = false
     menu.status(t().net.connected(settings.name || t().net.stranger))
     net.send({ t: "list" })
-    const invite = new URLSearchParams(location.search).get("p")
+    const invite = readInvite(location.search, location.hash)
     if (invite && settings.name) {
-      menu.status(t().net.invite(invite))
-      net.send({ t: "join", code: invite.toUpperCase(), primary: settings.primary })
-    } else if (invite) toast(t().net.inviteNeedName(invite))
+      menu.status(t().net.invite(invite.code))
+      sendJoin(invite.code, invite.password ?? undefined)
+    } else if (invite) toast(t().net.inviteNeedName(invite.code))
   } catch {
     connecting = false
     menu.status(t().net.retry)

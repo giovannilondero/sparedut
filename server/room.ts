@@ -16,6 +16,7 @@ import {
   type ServerMessage,
   type SnapOther,
   type Reach,
+  type RoomAccess,
   type Snapshot
 } from "../shared/protocol.ts"
 import { createSim, type GameEvent, type Sim, type WorldView } from "../shared/sim/index.ts"
@@ -48,6 +49,8 @@ export interface RoomSettings {
   readonly map: MapId
   readonly minutes: number
   readonly reach: Reach
+  /** Absent for a reach without access (Offline, #17). Read the password only through `admits`. */
+  readonly access?: RoomAccess
   /** Left out of the room list: only the quick match against the bots, until offline rooms replace it (#18). */
   readonly unlisted?: boolean
   readonly level: BotLevel
@@ -303,6 +306,12 @@ export class Room {
     for (const m of this.members.values()) m.send?.(msg)
   }
 
+  /** Whether a password lets a player in: always for an open room. */
+  admits(password: string | undefined): boolean {
+    const access = this.settings.access
+    return access?.kind !== "password" || password === access.password
+  }
+
   summary(): RoomSummary {
     return {
       code: this.code,
@@ -310,6 +319,7 @@ export class Room {
       mode: this.settings.mode,
       map: this.settings.map,
       reach: this.settings.reach,
+      ...(this.settings.access ? { access: this.settings.access.kind } : {}),
       players: this.humans.length,
       bots: this.bots.size,
       max: MAX_PLAYERS,

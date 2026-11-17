@@ -4,7 +4,7 @@
  */
 import { beforeAll, describe, expect, test } from "bun:test"
 import { createBrowserHost } from "../client/host.ts"
-import { Hub, type Peer } from "../server/hub.ts"
+import { Hub, type Clock, type Peer } from "../server/hub.ts"
 import { MODE_IDS } from "../shared/folklore.ts"
 import { initPhysics } from "../shared/physics.ts"
 import { PROTOCOL_VERSION, type ServerMessage } from "../shared/protocol.ts"
@@ -13,11 +13,12 @@ beforeAll(() => initPhysics())
 
 /** A host with a clock the test moves by hand. */
 const HOSTS = [
-  { name: "the game server", reach: "online", make: (now: () => number) => new Hub({ now }) },
-  { name: "the in-browser host", reach: "offline", make: (now: () => number) => createBrowserHost({ now }) }
+  { name: "the game server", reach: "online", access: { access: { kind: "open" } }, make: (clock: Clock) => new Hub(clock) },
+  // An Offline room has no access: nobody else can come in.
+  { name: "the in-browser host", reach: "offline", access: {}, make: (clock: Clock) => createBrowserHost(clock) }
 ] as const
 
-function harness(make: (now: () => number) => Hub) {
+function harness(make: (clock: Clock) => Hub) {
   let clock = 0
   const hub = make(() => clock)
   const connect = (network = "1.2.3.4") => {
@@ -40,7 +41,7 @@ function harness(make: (now: () => number) => Hub) {
 
 for (const host of HOSTS) {
   describe(host.name, () => {
-    const create = { t: "create", mode: "bataie", map: "glemone", minutes: 10, reach: host.reach, bots: 2, level: "pari", ff: false, primary: "cramar" }
+    const create = { t: "create", mode: "bataie", map: "glemone", minutes: 10, reach: host.reach, ...host.access, bots: 2, level: "pari", ff: false, primary: "cramar" }
 
     test("creating a room puts its creator in it as host, with the bots asked for", () => {
       const { connect } = harness(host.make)
@@ -94,11 +95,15 @@ describe("the in-browser host", () => {
   const create = { t: "create", mode: "bataie", map: "glemone", minutes: 10, reach: "offline", bots: 2, level: "pari", ff: false, primary: "cramar" }
   const browser = HOSTS[1].make
 
-  test("creates only Offline rooms", () => {
+  test("creates only Offline rooms, and those without an access", () => {
     const { hub, connect } = harness(browser)
     const me = connect()
     for (const reach of ["lan", "online"]) {
-      me.say({ ...create, reach })
+      me.say({ ...create, reach, access: { kind: "open" } })
+      expect(me.got.at(-1)).toEqual({ t: "error", code: "invalid" })
+    }
+    for (const access of [{ kind: "open" }, { kind: "password", password: "Cjavedal" }]) {
+      me.say({ ...create, access })
       expect(me.got.at(-1)).toEqual({ t: "error", code: "invalid" })
     }
     expect(hub.rooms.size).toBe(0)
@@ -108,6 +113,7 @@ describe("the in-browser host", () => {
     const { hub, connect } = harness(browser)
     const me = connect()
     me.say(create)
+    expect(me.last("room")!.room).not.toHaveProperty("access")
     const other = connect()
     other.say({ t: "list" })
     expect(other.last("rooms")!.rooms).toEqual([])
