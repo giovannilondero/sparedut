@@ -9,7 +9,7 @@ import { WEAPON_IDS, type WeaponId } from "../shared/weapons.ts"
 import { HEN_IN, HEN_RELOAD, henDrop } from "./firstperson.ts"
 import { bump, burlapTex, clamp, damp, flashTex, put, ramp, std } from "./models/kit.ts"
 import { sgnapeBottle } from "./models/props.ts"
-import { buildWeapon, remodel, type WeaponModel } from "./models/weapons.ts"
+import { buildWeapon, CHAIN_PERIOD, remodel, type WeaponModel } from "./models/weapons.ts"
 
 interface Hold {
   readonly hip: readonly [number, number, number]
@@ -36,7 +36,7 @@ const HOLD: Record<WeaponId, Hold> = {
   // at the turret: the gun sits in front, centred, held with both hands
   mitraie: { hip: [0.09, -0.25, -0.34], rot: [0, 0, 0], aim: null, kickZ: 0.008, kickR: 0.01, flash: 0.18 },
   // held low with both hands, the bar forward; no aiming
-  motosee: { hip: [0.16, -0.22, -0.36], rot: [0.04, 0.06, 0], aim: null, kickZ: 0.004, kickR: 0.01, flash: 0 }
+  motosee: { hip: [0.3, -0.42, -0.56], rot: [0.3, 0.34, 0.22], aim: null, kickZ: 0.004, kickR: 0.01, flash: 0 }
 }
 
 const SWITCH_DOWN = 0.16
@@ -478,8 +478,11 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     }
     // the Motosee shakes as it revs and cuts
     if (s.id === "motosee") {
-      A.px += f.spin * Math.sin(t * 90) * 0.002
-      A.py += f.spin * Math.sin(t * 77) * 0.0015
+      A.px += (0.15 + f.spin) * Math.sin(t * 90) * 0.002
+      A.py += (0.15 + f.spin) * Math.sin(t * 77) * 0.0015
+      // the chain runs as the engine takes up speed: a whole cutter's length makes the loop seamless
+      spinA += f.spin * dt * 30
+      s.model.parts.chain!.position.z = -(spinA % CHAIN_PERIOD)
     }
     if (s.id === "miedi" && fireT < 0.12) s.model.parts.pouch!.position.y += 0.012 * Math.sin(fireT * 50)
 
