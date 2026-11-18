@@ -263,7 +263,8 @@ const TRACER: Record<WeaponId, { color: THREE.Color; speed: number; len: number;
   gjalinis: null,
   lanciafrico: null,
   // the turrets' mitraie: long, warm tracers, one every four ticks
-  mitraie: { color: C(0xffc070), speed: 520, len: 5, width: 0.026 }
+  mitraie: { color: C(0xffc070), speed: 520, len: 5, width: 0.026 },
+  motosee: null
 }
 
 class Tracers {

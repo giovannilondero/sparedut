@@ -191,7 +191,8 @@ const GRIP: Record<WeaponId, { p: [number, number, number]; r: [number, number, 
   miedi: { p: [0.14, -0.12, -0.28], r: [0, 0, 0] },
   gjalinis: { p: [0.15, -0.13, -0.2], r: [0, 0, 0] },
   lanciafrico: { p: [0.16, -0.13, -0.24], r: [0, 0, 0] },
-  mitraie: { p: [0.14, -0.1, -0.3], r: [0, 0, 0] }
+  mitraie: { p: [0.14, -0.1, -0.3], r: [0, 0, 0] },
+  motosee: { p: [0.15, -0.16, -0.24], r: [0, 0, 0] }
 }
 
 /**

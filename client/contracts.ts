@@ -162,6 +162,7 @@ export type SoundName =
   | "shot_cjampanili"
   | "shot_mulin"
   | "spin_mulin"
+  | "cut_motosee"
   | "beam_miedi"
   | "launch_gjaline"
   | "boom_gjaline"

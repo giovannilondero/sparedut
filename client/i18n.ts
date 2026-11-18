@@ -339,7 +339,8 @@ const WEAPON_NAMES = {
   miedi: { name: "Cassele dal Miedi", short: "Miedi" },
   gjalinis: { name: "Cjanon des Gjalinis", short: "Gjalinis" },
   lanciafrico: { name: "Lanciafrico", short: "Lanciafrico" },
-  mitraie: { name: "Mitraie de Postazion", short: "Mitraie" }
+  mitraie: { name: "Mitraie de Postazion", short: "Mitraie" },
+  motosee: { name: "Motosee", short: "Motosee" }
 } as const
 
 /** The labels on the touch "use" button, mounting and dismounting: the turret prompts on touch name them. */
@@ -514,6 +515,10 @@ const fur: Strings = {
     mitraie: {
       ...WEAPON_NAMES.mitraie,
       blurb: "No si puarte: e je su lis toretis. Colps infinits e svelts, ma se no tu molis il grilet si scjalde e si ferme."
+    },
+    motosee: {
+      ...WEAPON_NAMES.motosee,
+      blurb: "A rivin chei di Paulâr. Ten strent il grilet: dopo une sgasade e tae ce che al è denant, a un braç di distance. No à bisugne di munizions, e si le sint di lontan."
     }
   },
   bomb: "Bombis di Sgnape",
@@ -612,6 +617,7 @@ const fur: Strings = {
       mine: ["al à fat saltâ par aria", "al à spedît in galarie", "al à fat cjatâ il plomp di Raibl a"],
       gjalinis: ["al à fat spenâ", "al à metût tal pulinâr", "al à fat cocodè cun"],
       mitraie: ["al à cusît a machine", "al à tignût a bade di lontan", "al à fat la puntade a"],
+      motosee: ["al à seât", "al à fat lens di", "al à taiât a fetis"],
       storm: "al è restât te tampieste",
       head: "tal cjâf",
       fall: "al è lât a mont",
@@ -935,6 +941,10 @@ const it: Strings = {
     mitraie: {
       ...WEAPON_NAMES.mitraie,
       blurb: "Non si porta: sta sulle torrette. Colpi infiniti e veloci, ma se non molli il grilletto si scalda e si ferma."
+    },
+    motosee: {
+      ...WEAPON_NAMES.motosee,
+      blurb: "«A rivin chei di Paulâr»: arrivano quelli di Paularo. Tieni premuto il grilletto: dopo una sgasata taglia quello che ha davanti, a un braccio di distanza. Non ha bisogno di munizioni, e la si sente da lontano."
     }
   },
   bomb: "Bombe di Sgnape",
@@ -1033,6 +1043,7 @@ const it: Strings = {
       mine: ["ha fatto saltare in aria", "ha spedito in galleria", "ha fatto trovare il piombo di Raibl a"],
       gjalinis: ["ha spennato", "ha messo nel pollaio", "ha fatto coccodè con"],
       mitraie: ["ha cucito a macchina", "ha tenuto a bada da lontano", "ha fatto l'orlo a"],
+      motosee: ["ha segato", "ha fatto legna di", "ha tagliato a fette"],
       storm: "è rimasto nella tempesta",
       head: "in testa",
       fall: "è caduto di sotto",
@@ -1114,7 +1125,8 @@ const it: Strings = {
       "Il frico è nostro!",
       "Salute e frico!",
       "Va bene, va bene...",
-      "Guarda il campanile!"
+      "Guarda il campanile!",
+      "Arrivano quelli di Paularo"
     ],
     doorBroken: (who) => `${who} ha sfondato la porta del capanno!`,
     doorSub: "Dentro c'è festa: i fenicotteri ballano",

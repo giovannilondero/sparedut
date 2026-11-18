@@ -407,6 +407,29 @@ function gjalinis(): WeaponModel {
 }
 
 /**
+ * The Motosee: a stand-in chainsaw until its finished model (an engine block with its top handle,
+ * the bar forward and the chain around it). The origin is the rear grip.
+ */
+function motosee(): WeaponModel {
+  const root = new THREE.Group()
+  const y = 0.06
+  // the engine, orange, with its pull cord and exhaust
+  put(root, B(0.1, 0.12, 0.2), M.roof(), 0, y, -0.04)
+  put(root, B(0.07, 0.05, 0.08), M.darkSteel(), 0.055, y - 0.01, -0.02)
+  put(root, C(0.02, 0.02, 0.01, 12), M.black(), -0.055, y + 0.02, -0.02, 0, 0, Math.PI / 2)
+  // the top handle, for the left hand, and the rear grip
+  put(root, B(0.012, 0.012, 0.16), M.black(), 0, y + 0.1, -0.06)
+  for (const z of [-0.13, 0.01]) put(root, B(0.012, 0.05, 0.012), M.black(), 0, y + 0.075, z)
+  put(root, B(0.03, 0.03, 0.1), M.black(), 0, y - 0.02, 0.1)
+  // the bar and the chain
+  put(root, B(0.012, 0.06, 0.42), M.steel(), 0, y - 0.01, -0.35)
+  put(root, B(0.016, 0.07, 0.42), M.darkSteel(), 0, y - 0.01, -0.35).scale.set(1, 1, 1.02)
+  put(root, C(0.035, 0.035, 0.016, 14), M.darkSteel(), 0, y - 0.01, -0.56, 0, 0, Math.PI / 2)
+  const muzzle = marker(root, 0, y - 0.01, -0.58)
+  return { root, muzzle, parts: {}, left: new THREE.Vector3(0, y + 0.1, -0.08), sightH: 0 }
+}
+
+/**
  * The turret's mitraie in first person: perforated water jacket, receiver and the two
  * spade grips with a thumb trigger. The origin is the right-hand grip.
  */
@@ -438,7 +461,7 @@ function mitraie(): WeaponModel {
   return { root, muzzle, parts: {}, left: new THREE.Vector3(-0.18, 0, 0.06), sightH: 0.14 }
 }
 
-const BUILDERS: Record<WeaponId, () => WeaponModel> = { mescul, mandi, cramar, doplete, cjampanili, mulin, miedi, gjalinis, lanciafrico, mitraie }
+const BUILDERS: Record<WeaponId, () => WeaponModel> = { mescul, mandi, cramar, doplete, cjampanili, mulin, miedi, gjalinis, lanciafrico, mitraie, motosee }
 
 export const buildWeapon = (id: WeaponId): WeaponModel => BUILDERS[id]()
 

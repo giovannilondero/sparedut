@@ -217,7 +217,7 @@ export const SAGRE_STATIONS = {
       cjampanili: { at: startAt(-45, 2), target: [[2, 0, 2]] as Route },
       mulin: { at: startAt(-25, -1.5), target: [[-12, 0, -2.5], [-12, 0, 3]] as Route },
       gjalinis: { at: startAt(-15, -1.5), target: [[0, 0, -3], [0, 0, 4]] as Route }
-    } satisfies Record<Exclude<PrimaryId, "miedi">, { readonly at: Spawn; readonly target: Route }>
+    } satisfies Record<Exclude<PrimaryId, "miedi" | "motosee">, { readonly at: Spawn; readonly target: Route }>
   }),
   /** 6. The armoury. */
   armoury: station({ area: area(5), start: startAt(8), gate: 5 }),
