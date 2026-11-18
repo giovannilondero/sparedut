@@ -225,7 +225,7 @@ test("with toggle, the crouch is cleared when a match start respawns everyone, t
       for (const m of got.splice(0)) {
         if (m.t !== "snap") continue
         deadSeen.push(m.you?.alive === false)
-        c.track(trackedIn(m, joined, false, false))
+        c.track(trackedIn(m, joined, { mounted: false, freeTurret: false }))
       }
     }
   }

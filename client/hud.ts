@@ -9,7 +9,7 @@ import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { WARMUP_TICKS } from "../shared/sim/rules.ts"
 import type { Device } from "./device.ts"
 import { t } from "./i18n.ts"
-import { playPrompt, turretPrompt } from "./prompts.ts"
+import { menuControl, playPrompt, turretPrompt } from "./prompts.ts"
 import { buttonBit, TOUCH_BUTTONS, type Insets, type PickerEntry, type TouchLayout, type TouchView } from "./touch.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -48,6 +48,13 @@ export class Hud {
     $(id).style.setProperty(prop, value)
   }
 
+  /** A custom property on the page's root, for elements outside the HUD too. */
+  private pageStyle(prop: string, value: string) {
+    if (this.written.get(`page:s:${prop}`) === value) return
+    this.written.set(`page:s:${prop}`, value)
+    document.documentElement.style.setProperty(prop, value)
+  }
+
   private toggleOn(el: Element, key: string, cls: string, on: boolean) {
     if (this.written.get(`${key}:c:${cls}`) === on) return
     this.written.set(`${key}:c:${cls}`, on)
@@ -76,8 +83,9 @@ export class Hud {
     const a = you.arsenal
     const def = WEAPONS[a.current]
     const endless = def.mode === "melee" || turret
-    this.text("weapon-name", t().weapons[turret ? "mitraie" : a.current].name)
-    this.text("touch-weapon", t().weapons[turret ? "mitraie" : a.current].name)
+    this.inHand = turret ? "mitraie" : a.current
+    this.text("weapon-name", t().weapons[this.inHand].name)
+    this.text("touch-weapon", t().weapons[this.inHand].name)
     const ammo = a.ammo[a.current]
     this.text("mag", endless ? "∞" : String(localMag ?? ammo.mag))
     this.text("reserve", endless ? "" : String(ammo.reserve))
@@ -151,8 +159,8 @@ export class Hud {
     }
   }
 
-  /** `outside`: I'm alive and outside the Tampieste circle. */
-  top(snap: Snapshot, mode: ModeId, names: Map<string, string>, outside = false) {
+  /** `outside`: I'm alive and outside the Tampieste circle. `device`: the active one, whose controls the banner names. */
+  top(snap: Snapshot, mode: ModeId, names: Map<string, string>, device: Device, outside = false) {
     const s = t()
     const alone = mode === "tampieste"
     const alive = snap.players.filter((p) => p.f & FLAG_BIT.alive).length
@@ -188,7 +196,7 @@ export class Hud {
     this.html("objective", obj)
     this.html(
       "banner",
-      phase.tag === "Warmup" ? s.hud.warmup(fmtClock(WARMUP_TICKS - snap.tick)) : outside ? `<b class="storm">${s.hud.stormOutside}</b>` : ""
+      phase.tag === "Warmup" ? s.hud.warmup(fmtClock(WARMUP_TICKS - snap.tick), menuControl(device)) : outside ? `<b class="storm">${s.hud.stormOutside}</b>` : ""
     )
   }
 
@@ -259,9 +267,15 @@ export class Hud {
     if (on) this.html("clickplay", playPrompt(t(), device))
   }
 
-  /** The HUD's layout: around the touch controls while touch is the active device, the desktop one otherwise. */
+  /**
+   * The HUD's layout: around the touch controls while touch is the active device, the desktop one
+   * otherwise. The page's `data-device` says the same to the menus' CSS (key hints, touch gestures).
+   */
   layFor(device: Device) {
     this.toggle("hud", "touch", device === "touch")
+    if (this.written.get("page:device") === device) return
+    this.written.set("page:device", device)
+    document.documentElement.dataset.device = device
   }
 
   /** The screen's safe-area insets (notch, home indicator), as CSS resolves them: read on resize, never per frame. */
@@ -294,12 +308,12 @@ export class Hud {
       this.style(`touch-${b}`, "--y", `${c.y}px`)
       this.style(`touch-${b}`, "--r", `${c.r}px`)
     }
-    // The HUD's area clear of the controls, and the orientation, for the touch HUD's CSS.
+    // The HUD's area clear of the controls, for the touch HUD's CSS and the performance panel outside it; the orientation.
     const f = layout.free
-    this.style("hud", "--free-l", `${f.left}px`)
-    this.style("hud", "--free-t", `${f.top}px`)
-    this.style("hud", "--free-w", `${f.width}px`)
-    this.style("hud", "--free-h", `${f.height}px`)
+    this.pageStyle("--free-l", `${f.left}px`)
+    this.pageStyle("--free-t", `${f.top}px`)
+    this.pageStyle("--free-w", `${f.width}px`)
+    this.pageStyle("--free-h", `${f.height}px`)
     this.toggle("hud", "portrait", layout.portrait)
     const w = layout.weapon
     this.style("touch", "--wx", `${w.left}px`)
@@ -309,6 +323,9 @@ export class Hud {
     this.touchLayout = layout
     this.drawnPicker = undefined
   }
+
+  /** The weapon the vitals last showed in hand: the picker marks it. */
+  private inHand: WeaponId | null = null
 
   /** What the touch buttons last showed: compared as plain values, so a finger's move redraws nothing else. */
   private touchLayout: TouchLayout | null = null
@@ -351,12 +368,11 @@ export class Hud {
       const picker = $("touch-picker")
       picker.classList.toggle("hidden", !view.picker)
       const rects = this.touchLayout?.picker ?? []
-      const current = $("weapon-name").textContent
       picker.innerHTML = (view.picker ?? [])
         .map((e, i) => {
           const r = rects[i]
           const name = t().weapons[e.id].name
-          return r ? `<div class="${name === current ? "on" : ""}" style="left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px">${esc(name)}</div>` : ""
+          return r ? `<div class="${e.id === this.inHand ? "on" : ""}" style="left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px">${esc(name)}</div>` : ""
         })
         .join("")
     }

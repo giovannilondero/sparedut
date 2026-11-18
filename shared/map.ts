@@ -226,6 +226,32 @@ export function turretSeat(t: TurretSpot, yaw: number): V3 {
 /** The seat with the gun at rest: where a player mounts the turret from, and where its prompt appears. */
 export const turretRestSeat = (t: TurretSpot): V3 => turretSeat(t, t.yaw)
 
+/** How far above or below a turret's seat a body still reaches it (m). */
+const SEAT_HEIGHT_REACH = 1.2
+
+/**
+ * The nearest free turret whose seat a body at `at` reaches, the one "use" mounts, or -1. The one
+ * rule for the simulation, the turret prompt and the touch "use" button.
+ */
+export function freeTurretInReach(
+  spots: readonly TurretSpot[],
+  turrets: readonly { readonly gunner: string | null }[],
+  at: { readonly x: number; readonly y: number; readonly z: number }
+): number {
+  let best = -1
+  let bestD: number = TURRET.reach
+  for (let i = 0; i < spots.length; i++) {
+    if (turrets[i]?.gunner !== null) continue
+    const seat = turretRestSeat(spots[i])
+    const d = Ops.hypot(at.x - seat[0], at.z - seat[2])
+    if (d <= bestD && Math.abs(at.y - seat[1]) < SEAT_HEIGHT_REACH) {
+      best = i
+      bestD = d
+    }
+  }
+  return best
+}
+
 /** The turret user's aim, clamped to the arc the gun turns through. */
 export function turretAim(t: TurretSpot, yaw: number, pitch: number): { readonly yaw: number; readonly pitch: number } {
   return { yaw: turretYaw(t, yaw), pitch: Math.max(-TURRET.pitchDown, Math.min(TURRET.pitchUp, pitch)) }

@@ -260,6 +260,17 @@ test("the first touch in a match makes touch the active device, with no mouse lo
   expect(doc.pointerLockElement).toBe(null) // a tap is no reason to lock a mouse
 })
 
+test("a pen is touch: it takes over and drives the controls as a finger does", () => {
+  const { c, finger, layout } = phone()
+  const fire = layout().fire
+  finger(4, "pen").down(fire.x, fire.y)
+  expect(c.touchActive).toBe(true)
+  expect(c.device).toBe("touch")
+  expect(c.isHeld("fire")).toBe(true)
+  finger(4, "pen").up(fire.x, fire.y)
+  expect(c.isHeld("fire")).toBe(false)
+})
+
 test("whichever device was used last is active, and switching clears held buttons", () => {
   const { c, finger, layout } = phone()
   const fire = layout().fire
@@ -476,6 +487,39 @@ test("the touch crouch and the keyboard's toggled crouch are one latch", () => {
   emit(winListeners, "keyup", { code: "KeyC" })
   expect(c.isHeld("crouch")).toBe(true)
   tap(layout().buttons.crouch) // touch takes over, and the same latch stands up
+  expect(c.isHeld("crouch")).toBe(false)
+})
+
+test("with crouch on hold, a crouch toggled on touch ends when another device takes over: nothing else could stand up", () => {
+  const { c, finger, layout, tap, view } = phone()
+  c.crouchMode = "hold"
+  c.track(player())
+  tap(layout().buttons.crouch)
+  expect(c.isHeld("crouch")).toBe(true)
+  // A mouse click: keyboard and mouse take over.
+  finger(9, "mouse").down(400, 200)
+  expect(c.isHeld("crouch")).toBe(false)
+  expect(view().crouch).toBe(false)
+  // Touch again, then the pad.
+  tap(layout().buttons.crouch)
+  expect(c.isHeld("crouch")).toBe(true)
+  pad.buttons[0] = { pressed: true, value: 1 }
+  c.poll(1 / 60)
+  pad.buttons[0] = { pressed: false, value: 0 }
+  c.poll(1 / 60)
+  expect(c.isHeld("crouch")).toBe(false)
+})
+
+test("with crouch on toggle, the crouch survives a switch: the other device's crouch button stands up", () => {
+  const { c, finger, layout, tap } = phone()
+  c.crouchMode = "toggle"
+  c.track(player())
+  tap(layout().buttons.crouch)
+  finger(9, "mouse").down(400, 200)
+  c.lock()
+  expect(c.isHeld("crouch")).toBe(true)
+  emit(winListeners, "keydown", { code: "KeyC", repeat: false })
+  emit(winListeners, "keyup", { code: "KeyC" })
   expect(c.isHeld("crouch")).toBe(false)
 })
 

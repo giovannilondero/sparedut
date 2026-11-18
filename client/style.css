@@ -5,6 +5,8 @@
   --ink: #f3e9d2;
   --muted: #b9a988;
   --gold: #e8b64c;
+  /* A dropdown's gold arrow: the browser's selects and UI SDK's select buttons. */
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23e8b64c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --gold-deep: #a8761f;
   --night: #14110f;
   --stone: rgba(28, 24, 20, 0.82);
@@ -64,23 +66,19 @@ button.big span { font-family: var(--serif); font-size: 21px; font-weight: 700; 
 button.big small { opacity: 0.75; font-size: 13px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
 .row > button { flex: 1; }
-.small-buttons button { font-size: 14px; padding: 8px 10px; }
 
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .field input { background: rgba(0, 0, 0, 0.35); border: 1px solid var(--stone-line); border-radius: 8px; padding: 8px 10px; color: var(--ink); font-size: 15px; }
-.field input[type="range"] { padding: 0; accent-color: var(--gold); }
 
 /* Selects: dark dropdown like the rest, gold arrow, long text truncated. */
 :root { color-scheme: dark; }
 select { appearance: none; min-inline-size: 0; max-inline-size: 100%; text-overflow: ellipsis; white-space: nowrap; overflow: clip; cursor: pointer;
-  background: rgba(0, 0, 0, 0.35) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23e8b64c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center / 12px 8px;
+  background: rgba(0, 0, 0, 0.35) var(--select-arrow) no-repeat right 10px center / 12px 8px;
   border: 1px solid var(--stone-line); border-radius: 8px; padding-block: 8px; padding-inline: 10px 32px; color: var(--ink); }
 select option { background: #1d1813; color: var(--ink); }
 select:focus-visible, button:focus-visible, input:focus-visible, ui-radio:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 @media (hover: hover) and (pointer: fine) { select:hover { border-color: rgba(232, 182, 76, 0.6); } }
 .field select { font-size: 15px; }
-.inline-field { display: inline-flex; align-items: center; gap: 6px; }
-.inline-field select { padding-block: 5px; font-size: 13px; }
 
 /* The look (Cumò, Vêr), in the header beside the language: after it, on a line of its own, on a narrow screen. */
 .look-switch { order: 1; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 999px;
@@ -104,9 +102,7 @@ select:focus-visible, button:focus-visible, input:focus-visible, ui-radio:focus-
 button kbd { margin-inline-start: 6px; opacity: 0.7; }
 .field b { color: var(--ink); font-weight: 600; }
 .check { display: flex; gap: 8px; align-items: center; font-size: 14px; }
-.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .field { min-inline-size: 0; }
-.code-input { font-family: var(--serif); font-size: 46px; letter-spacing: 0.4em; text-transform: uppercase; text-align: center; padding: 10px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--stone-line); border-radius: 10px; }
 
 .pw-input { font-size: 22px; text-align: center; padding: 10px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--stone-line); border-radius: 10px; color: var(--ink); }
 .form-msg { margin: 0; min-block-size: 1lh; font-size: 13px; color: #f08a6c; }
@@ -116,7 +112,7 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 .card { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 10px; }
 .card b { font-family: var(--serif); font-size: 17px; }
 .card small { font-size: 12px; opacity: 0.8; line-height: 1.3; }
-.card.selected, .card[data-checked] { border-color: var(--gold); background: rgba(232, 182, 76, 0.16); box-shadow: inset 0 0 0 1px var(--gold); }
+.card[data-checked] { border-color: var(--gold); background: rgba(232, 182, 76, 0.16); box-shadow: inset 0 0 0 1px var(--gold); }
 
 /* The armoury, in the menu and in a match: the primaries to choose from (a UI SDK radio group), then the weapons always carried. */
 .weapons { display: grid; gap: 14px; }
@@ -342,8 +338,8 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 .overlay > ui-dialog-title, .overlay .overlay-actions { flex: none; }
 .overlay-body { flex: 1 1 auto; min-block-size: 0; overflow-y: auto; overscroll-behavior: contain; }
 .overlay .overlay-actions > button { min-block-size: var(--tap); }
-/* A key hint on a button (the back button's Esc) means nothing on touch. */
-#hud.touch .overlay kbd { display: none; }
+/* A key hint (the back buttons' Esc) and the key legend mean nothing on touch, in the menu as in a match. */
+html[data-device="touch"] :is(#menu, #hud .overlay) kbd, html[data-device="touch"] .keys { display: none; }
 /* On touch the actions take two columns, resume across both, rather than a ragged row. */
 @media (pointer: coarse) {
   .overlay .overlay-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); }
@@ -376,18 +372,25 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 }
 .host-level { display: inline-flex; align-items: center; gap: 6px; }
 .overlay .host-level ui-select-trigger > button { display: inline-flex; align-items: center; gap: 8px; min-block-size: var(--tap); padding-block: 5px; padding-inline: 10px 30px; font-size: 13px;
-  background: rgba(0, 0, 0, 0.35) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23e8b64c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center / 12px 8px;
+  background: rgba(0, 0, 0, 0.35) var(--select-arrow) no-repeat right 10px center / 12px 8px;
   border-radius: 8px; }
 @media (pointer: coarse) { .overlay .host-level ui-select-trigger > button { flex: 1; font-size: 15px; } }
-/* The skill list: beside its button with a mouse, a sheet from the bottom on a small touch screen (UI SDK decides). */
-.level-list { min-inline-size: var(--anchor-width); max-block-size: var(--available-height); overflow-y: auto; margin: 0; padding: 4px; display: grid; gap: 2px;
-  background: #1d1813; color: var(--ink); border: 1px solid var(--gold); border-radius: 10px; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55); font-family: var(--sans); font-size: 14px; pointer-events: auto; }
-.level-list ui-select-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-block-size: var(--tap, 36px); padding: 8px 12px; border-radius: 7px; cursor: pointer; }
-.level-list ui-select-item[data-highlighted] { background: rgba(232, 182, 76, 0.16); }
-.level-list ui-select-item[data-selected] { color: var(--gold); }
-.level-list[data-modality="keyboard"] ui-select-item[data-highlighted] { outline: 2px solid var(--gold); outline-offset: -2px; }
-.level-list[data-presentation="sheet"] { inline-size: 100%; max-inline-size: none; border-radius: 16px 16px 0 0; border-block-end: 0; font-size: 17px;
-  padding: 10px 10px max(10px, env(safe-area-inset-bottom, 0px)); padding-inline: max(10px, env(safe-area-inset-left, 0px)) max(10px, env(safe-area-inset-right, 0px)); }
+/*
+ * A UI SDK select's list (creation's duration and bots, the host's bot skill): beside its button with
+ * a mouse, a sheet from the bottom on a small touch screen (UI SDK decides).
+ */
+.select-list { min-inline-size: var(--anchor-width); max-block-size: var(--available-height); overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 4px; display: grid; gap: 2px;
+  background: #1d1813; color: var(--ink); border: 1px solid var(--gold); border-radius: 10px; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55); font-family: var(--sans); pointer-events: auto; }
+.select-list ui-select-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-inline: 12px; border-radius: 8px; cursor: pointer; }
+.select-list ui-select-item[data-highlighted] { background: rgba(232, 182, 76, 0.16); }
+.select-list ui-select-item[data-selected] { color: var(--gold); }
+.select-list[data-modality="keyboard"] ui-select-item[data-highlighted] { outline: 2px solid var(--gold); outline-offset: -2px; }
+.select-list[data-presentation="sheet"] { inline-size: 100%; max-inline-size: none; border-radius: 16px 16px 0 0; border-block-end: 0;
+  padding: 8px max(8px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+/* The host's bot skill, in a match: smaller with a mouse, the size of a thumb on touch. */
+.level-list { font-size: 14px; }
+.level-list ui-select-item { min-block-size: var(--tap, 36px); padding-block: 8px; }
+.level-list[data-presentation="sheet"] { font-size: 17px; }
 .level-list[data-presentation="sheet"] ui-select-item { min-block-size: 48px; }
 
 /* The end screen. */
@@ -403,12 +406,14 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 
 /*
  * During a match a finger never zooms, scrolls, refreshes, selects or opens a callout. The canvas takes
- * the fingers (the HUD lets them through); the match menus still scroll, without zooming.
+ * the fingers (the HUD lets them through); the match menus still scroll, without zooming, and their
+ * text (the room code) can be selected. With a mouse nothing changes: selection is the page's own.
  */
 #view { touch-action: none; }
-html.in-match, html.in-match body { overscroll-behavior: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+html.in-match, html.in-match body { overscroll-behavior: none; }
+html.in-match[data-device="touch"] body { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 html.in-match .overlay { touch-action: pan-x pan-y; overscroll-behavior: contain; }
-html.in-match input { user-select: text; -webkit-user-select: text; }
+html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
 
 /* Touch controls: positions come from client/touch.ts through custom properties; moving them is a transform only. */
 #touch { position: absolute; inset: 0; pointer-events: none; }
@@ -428,7 +433,8 @@ html.in-match input { user-select: text; -webkit-user-select: text; }
   color: var(--ink); font: 700 calc(var(--r) * 0.8) / 1 var(--sans); opacity: 0.8; }
 .touch-btn.held { background: rgba(243, 233, 210, 0.35); opacity: 1; }
 .touch-btn.on { border-color: var(--gold); background: rgba(232, 182, 76, 0.45); opacity: 1; }
-#touch-use { font-size: 11px; letter-spacing: 0.02em; border-color: var(--gold); opacity: 1; }
+/* Its label is a word: a long one (Italian's "Mitragliatrice") breaks onto two lines inside the circle. */
+#touch-use { font-size: 11px; letter-spacing: 0.02em; border-color: var(--gold); opacity: 1; text-align: center; hyphens: auto; overflow-wrap: anywhere; padding: 4px; }
 #touch-weapon, #touch-picker > div { position: absolute; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--stone-line); background: var(--stone);
   font-family: var(--serif); font-size: 15px; color: var(--ink); overflow: hidden; white-space: nowrap; }
 #touch-weapon { left: var(--wx); top: var(--wy); width: var(--ww); height: var(--wh); }
@@ -519,10 +525,12 @@ html.in-match input { user-select: text; -webkit-user-select: text; }
 #toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); background: var(--stone); border: 1px solid var(--gold); padding: 10px 18px; border-radius: 10px; z-index: 10; animation: rise 0.2s; }
 
 /* ---------------- PERFORMANCE PANEL (F3) ---------------- */
-#perf { position: fixed; top: 10px; left: 10px; z-index: 20; pointer-events: none; display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 8px;
+#perf { position: fixed; top: max(10px, env(safe-area-inset-top, 0px)); left: max(10px, env(safe-area-inset-left, 0px)); z-index: 20; pointer-events: none; display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 8px;
   background: rgba(10, 8, 6, 0.78); border: 1px solid var(--stone-line); font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); min-width: 220px; }
 #perf b { font-size: 16px; }
 #perf small { color: var(--muted); margin-top: 2px; }
+/* A match on touch: in the HUD's free area, clear of the corner buttons and the notch. */
+html.in-match[data-device="touch"] #perf { top: var(--free-t); left: var(--free-l); min-width: 0; max-inline-size: var(--free-w); }
 
 /* ---------------- MENU: HOME ----------------
    Everything at once. One column on a narrow screen, the list after the actions; where there is
@@ -647,14 +655,11 @@ html.in-match input { user-select: text; -webkit-user-select: text; }
 /* Duration and bots: UI SDK selects, drawn like the game's dropdowns; a bottom sheet on a small touch screen. */
 .create-select { display: grid; gap: 4px; }
 .create-select button { inline-size: 100%; min-block-size: 44px; text-align: start; font-size: 15px; border-radius: 8px; padding-block: 8px; padding-inline: 10px 32px;
-  background: rgba(0, 0, 0, 0.35) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23e8b64c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center / 12px 8px; }
-.create-list { min-inline-size: var(--anchor-width); max-block-size: min(var(--available-height, 60dvh), 60dvh); overflow: auto; overscroll-behavior: contain; padding: 4px;
-  color: var(--ink); font-family: var(--sans); background: #1d1813; border: 1px solid var(--gold); border-radius: 10px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55); }
-.create-list ui-select-item { display: flex; align-items: center; min-block-size: 44px; padding-inline: 12px; border-radius: 8px; cursor: pointer; }
-.create-list ui-select-item[data-highlighted] { background: rgba(232, 182, 76, 0.16); }
-.create-list ui-select-item[data-selected] { color: var(--gold); font-weight: 700; }
-.create-list[data-presentation="sheet"] { inline-size: 100%; border-radius: 16px 16px 0 0; border-block-end: 0;
-  padding: 8px max(8px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+  background: rgba(0, 0, 0, 0.35) var(--select-arrow) no-repeat right 10px center / 12px 8px; }
+/* Creation's lists (the shared look is .select-list's): never taller than most of the screen. */
+.create-list { max-block-size: min(var(--available-height, 60dvh), 60dvh); }
+.create-list ui-select-item { min-block-size: 44px; }
+.create-list ui-select-item[data-selected] { font-weight: 700; }
 
 .create-go { grid-area: go; position: sticky; inset-block-end: 0; z-index: 1; display: grid; gap: 6px;
   padding-block: 16px max(10px, env(safe-area-inset-bottom, 0px)); background: linear-gradient(transparent, oklch(0.17 0.01 60 / 0.95) 22px); }

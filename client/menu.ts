@@ -1,10 +1,9 @@
 /**
- * The main menu: name, language, matches, armoury, settings, glossary. It draws the menu model
+ * The main menu: name, language, rooms, armoury, settings, glossary. It draws the menu model
  * and forwards the player's events to it; what a choice means is the model's to decide.
  */
-import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId } from "../shared/map.ts"
-import type { Access, Reach, RoomSummary } from "../shared/protocol.ts"
+import type { Access, RoomSummary } from "../shared/protocol.ts"
 import { PRIMARIES, WEAPON_IDS, WEAPONS, type PrimaryId, type WeaponId } from "../shared/weapons.ts"
 // UI SDK's radio group: one tab stop, arrow keys, the radio role. Markup and styling stay the game's.
 import "@ui-sdk/web/radio"
@@ -17,11 +16,12 @@ import "@ui-sdk/web/collapsible"
 import "@ui-sdk/web/switch"
 import "@ui-sdk/web/slider"
 import "@ui-sdk/web/field"
+import { alwaysChosen } from "./choice.ts"
 import type { GameAudio } from "./contracts.ts"
 import { esc } from "./hud.ts"
 import { onLangChange, setLang, t, type Lang } from "./i18n.ts"
 import { chooseLook, LOOK_IDS, LOOKS, type LookId } from "./looks.ts"
-import { MenuModel, SCREENS, type CreateOptions, type Outcome, type PasswordRefusal, type PromptProblem, type Refusal, type Screen } from "./menu-model.ts"
+import { focusOnScreen, MenuModel, SCREENS, type CreateOptions, type Outcome, type PasswordRefusal, type PromptProblem, type Refusal, type Screen } from "./menu-model.ts"
 import { oneTapRoom, type Settings } from "./settings.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -39,25 +39,32 @@ export interface MenuHandlers {
 type RadioGroup = HTMLElementTagNameMap["ui-radio-group"]
 type Select = HTMLElementTagNameMap["ui-select"]
 
+/** Each screen's first control, where focus lands when it opens; the vocabulary has none but its heading. */
+const FIRST_CONTROL: { readonly [S in Exclude<Screen, "home" | "password">]: () => void } = {
+  create: () => $<RadioGroup>("c-mode").api.focus(),
+  // Drawn again as it opens: its group takes focus once UI SDK has set it up.
+  armarie: () => requestAnimationFrame(() => $("armarie").querySelector<RadioGroup>("ui-radio-group")?.api.focus()),
+  settings: () => $<HTMLElementTagNameMap["ui-slider"]>("s-sens").api.focus(),
+  vocabolari: () => $("vocab-title").focus()
+}
+
 /**
  * Fills a UI SDK radio group with one card per value: one Tab stop, the arrow keys inside, the radio
  * role. `choose` hears the player's choice; the group never lets the choice go back to none.
  */
-function cardGroup(group: RadioGroup, values: readonly string[], choose: (value: string) => void) {
+function cardGroup<V extends string>(group: RadioGroup, values: readonly V[], choose: (value: V) => void) {
   group.innerHTML = values.map((v) => `<ui-radio class="card" value="${v}"><b></b><small></small></ui-radio>`).join("")
-  group.addEventListener("valuechange", (e) => {
-    if (e.detail.value === null) return e.preventDefault()
-    choose(e.detail.value as string)
-  })
+  // The group offers only these values: whatever it reports is one of them.
+  group.addEventListener("valuechange", alwaysChosen((v) => choose(v as V)))
 }
 
-/** Writes each card's name (HTML) and line (text) in the active language. */
-function cardTexts(group: RadioGroup, text: (value: string) => readonly [string, string]) {
-  for (const card of group.querySelectorAll<HTMLElement>("ui-radio")) {
-    const [name, line] = text(card.getAttribute("value")!)
+/** Writes each card's name (HTML) and line (text) in the active language; `values` as `cardGroup` was given them. */
+function cardTexts<V extends string>(group: RadioGroup, values: readonly V[], text: (value: V) => readonly [string, string]) {
+  group.querySelectorAll<HTMLElement>("ui-radio").forEach((card, i) => {
+    const [name, line] = text(values[i])
     card.querySelector("b")!.innerHTML = name
     card.querySelector("small")!.textContent = line
-  }
+  })
 }
 
 /** A UI SDK select over numbers: its items rewritten in the active language, keeping the chosen one. */
@@ -65,6 +72,9 @@ function selectItems(select: Select, values: readonly number[], label: (n: numbe
   select.querySelector("ui-select-content")!.innerHTML = values.map((n) => `<ui-select-item value="${n}">${label(n)}</ui-select-item>`).join("")
   select.value = String(chosen)
 }
+
+/** An access as creation names it: on its card and in the options' summary. */
+const accessLabel = (access: Access): string => (access === "password" ? `🔒 ${t().static.accessPassword}` : t().static.accessOpen)
 
 /** The element each screen shows: the password prompt opens over the home screen. */
 const SCREEN_ELEMENT = {
@@ -106,9 +116,8 @@ export class Menu {
     for (const el of document.querySelectorAll<HTMLButtonElement>("[data-lang]")) {
       el.addEventListener("click", () => {
         audio.play("ui_click")
-        settings.lang = el.dataset.lang as Lang
+        this.model.chooseLanguage(el.dataset.lang as Lang)
         setLang(settings.lang)
-        handlers.settingsChanged()
       })
     }
     this.bindLook()
@@ -172,9 +181,13 @@ export class Menu {
     $<HTMLElementTagNameMap["ui-switch"]>("s-info").checked = this.settings.showInfo
   }
 
+  /**
+   * Shows or hides the menu, back on the home screen either way. Hidden for a match, it closes the
+   * password prompt too: a modal dialog left open would keep the match inert under it.
+   */
   show(on: boolean) {
+    this.go("home")
     $("menu").classList.toggle("hidden", !on)
-    if (on) this.go("home")
   }
 
   status(text: string) {
@@ -235,9 +248,10 @@ export class Menu {
     if (screen === "password") this.renderPrompt()
     // Opened from code: UI SDK moves focus to the field and, on closing, back to what had it before.
     prompt.open = screen === "password"
-    // Creation opens on its first choice, and going back lands on the button that opened it.
-    if (from !== screen && screen === "create") $<RadioGroup>("c-mode").api.focus()
-    else if (from === "create" && screen === "home") document.querySelector<HTMLElement>('#menu-home [data-go="create"]')?.focus()
+    // A screen opens on its first control, and going back lands on the tile that opened it.
+    const focus = focusOnScreen(from, screen)
+    if (focus === "first" && screen !== "home" && screen !== "password") FIRST_CONTROL[screen]()
+    else if (focus !== null && focus !== "first") document.querySelector<HTMLElement>(`#menu-home [data-go="${focus}"]`)?.focus()
   }
 
   // ---------------------------------------------------------------- home
@@ -329,7 +343,7 @@ export class Menu {
     ;(same ?? box.querySelector<HTMLButtonElement>("button:not(:disabled)"))?.focus()
   }
 
-  // ---------------------------------------------------------------- create match
+  // ---------------------------------------------------------------- create a room
 
   /** Listeners only once: the cards are built here and only their texts change with the language. */
   private bindCreate() {
@@ -339,33 +353,32 @@ export class Menu {
       this.renderChoices()
     }
     cardGroup($("c-mode"), options.modes, (v) => {
-      this.model.chooseMode(v as ModeId)
+      this.model.chooseMode(v)
       chosen()
     })
     cardGroup($("c-map"), options.maps, (v) => {
-      this.model.chooseMap(v as MapId)
-      this.handlers.mapChanged(v as MapId)
+      this.model.chooseMap(v)
+      this.handlers.mapChanged(v)
       chosen()
     })
     cardGroup($("c-level"), options.levels, (v) => {
-      this.model.chooseLevel(v as BotLevel)
+      this.model.chooseLevel(v)
       chosen()
     })
     // An Offline room lives in this browser: what only the server offers (access, password) hides.
     cardGroup($("c-reach"), options.reaches, (v) => {
-      this.model.chooseReach(v as Reach)
+      this.model.chooseReach(v)
       chosen()
     })
     cardGroup($("c-access"), options.accesses, (v) => {
-      this.model.chooseAccess(v as Access)
+      this.model.chooseAccess(v)
       chosen()
     })
     const number = (id: string, choose: (n: number) => void) =>
-      $<Select>(id).addEventListener("valuechange", (e) => {
-        if (e.detail.value === null) return e.preventDefault()
-        choose(Number(e.detail.value))
+      $<Select>(id).addEventListener("valuechange", alwaysChosen((value) => {
+        choose(Number(value))
         this.renderChoices()
-      })
+      }))
     number("c-minutes", (n) => this.model.chooseMinutes(n))
     number("c-bots", (n) => this.model.chooseBots(n))
     const ff = $<HTMLInputElement>("c-ff")
@@ -400,11 +413,11 @@ export class Menu {
   private renderCreate() {
     const s = t()
     const { options, choices } = this.model
-    cardTexts($("c-mode"), (v) => [s.modes[v as ModeId].name, s.modes[v as ModeId].sub])
-    cardTexts($("c-map"), (v) => [s.maps[v as MapId].name, s.maps[v as MapId].sub])
-    cardTexts($("c-level"), (v) => [s.levels[v as BotLevel].name, s.levels[v as BotLevel].sub])
-    cardTexts($("c-reach"), (v) => [`<i class="chip ${v}">${s.menu.reach[v as Reach]}</i>`, s.menu.reachSub[v as Reach]])
-    cardTexts($("c-access"), (v) => [v === "password" ? `🔒 ${s.static.accessPassword}` : s.static.accessOpen, ""])
+    cardTexts($("c-mode"), options.modes, (v) => [s.modes[v].name, s.modes[v].sub])
+    cardTexts($("c-map"), options.maps, (v) => [s.maps[v].name, s.maps[v].sub])
+    cardTexts($("c-level"), options.levels, (v) => [s.levels[v].name, s.levels[v].sub])
+    cardTexts($("c-reach"), options.reaches, (v) => [`<i class="chip ${v}">${s.menu.reach[v]}</i>`, s.menu.reachSub[v]])
+    cardTexts($("c-access"), options.accesses, (v) => [accessLabel(v), ""])
     selectItems($("c-minutes"), options.minutes, s.menu.minutes, choices.minutes)
     selectItems($("c-bots"), options.bots, (n) => (n === 0 ? s.menu.botsNone : String(n)), choices.bots)
     this.renderChoices()
@@ -415,13 +428,12 @@ export class Menu {
     const s = t()
     const { choices, fields } = this.model
     $("c-rules").textContent = s.modes[choices.mode].rules
-    const access = choices.access === "password" ? `🔒 ${s.static.accessPassword}` : s.static.accessOpen
     $("c-summary").textContent = [
       s.menu.minutes(choices.minutes),
       s.menu.bots(choices.bots),
       s.levels[choices.level].name,
       s.menu.reach[choices.reach],
-      ...(fields.access ? [access] : []),
+      ...(fields.access ? [accessLabel(choices.access)] : []),
       ...(choices.ff ? [s.menu.ffOn] : [])
     ].join(" · ")
     $("c-access-field").hidden = !fields.access
@@ -458,14 +470,12 @@ export class Menu {
       <ul class="weapon-cards carried">${carried.map((id) => `<li class="weapon">${card(id)}</li>`).join("")}</ul>`
     const group = target.querySelector<HTMLElementTagNameMap["ui-radio-group"]>("ui-radio-group")!
     group.value = this.settings.primary
-    group.addEventListener("valuechange", (e) => {
-      // A primary is always chosen: a change to none is refused.
-      if (e.detail.value === null) return e.preventDefault()
-      this.settings.primary = e.detail.value as PrimaryId
-      this.handlers.settingsChanged()
+    // A primary is always chosen: a change to none is refused.
+    group.addEventListener("valuechange", alwaysChosen((primary) => {
+      this.model.choosePrimary(primary as PrimaryId)
       this.audio.play("switch")
       onPick?.(this.settings.primary)
-    })
+    }))
   }
 
   // ---------------------------------------------------------------- settings
@@ -481,11 +491,7 @@ export class Menu {
       const el = $<HTMLElementTagNameMap["ui-slider"]>(id)
       el.format = format
       el.value = s[key]
-      const set = (v: number) => {
-        if (v === s[key]) return
-        s[key] = v
-        this.handlers.settingsChanged()
-      }
+      const set = (v: number) => this.model.changeSetting(key, v)
       // Applied while dragging (the volume is heard, the field of view seen), saved with every step like the rest.
       el.addEventListener("valuechange", (e) => {
         if (typeof e.detail.value === "number") set(e.detail.value)
@@ -509,24 +515,14 @@ export class Menu {
     slider("s-music", "music", (v) => `${Math.round(v * 100)}%`)
     const q = $<HTMLSelectElement>("s-quality")
     q.value = s.quality
-    q.addEventListener("change", () => {
-      s.quality = q.value as Settings["quality"]
-      this.handlers.settingsChanged()
-    })
+    q.addEventListener("change", () => this.model.changeSetting("quality", q.value as Settings["quality"]))
     const crouch = $<HTMLSelectElement>("s-crouch")
     crouch.value = s.crouch
-    crouch.addEventListener("change", () => {
-      s.crouch = crouch.value as Settings["crouch"]
-      this.handlers.settingsChanged()
-    })
+    crouch.addEventListener("change", () => this.model.changeSetting("crouch", crouch.value as Settings["crouch"]))
     for (const [id, key] of [["s-autores", "autoRes"], ["s-info", "showInfo"], ["s-invert", "invertY"]] as const) {
       const box = $<HTMLElementTagNameMap["ui-switch"]>(id)
       box.checked = s[key]
-      box.addEventListener("checkedchange", (e) => {
-        if (e.detail.value === s[key]) return
-        s[key] = e.detail.value
-        this.handlers.settingsChanged()
-      })
+      box.addEventListener("checkedchange", (e) => this.model.changeSetting(key, e.detail.value))
     }
   }
 
@@ -540,7 +536,6 @@ export class Menu {
       b.textContent = LOOKS[id]
       b.dataset.look = id
       b.setAttribute("aria-pressed", String(id === this.look))
-      b.classList.toggle("selected", id === this.look)
       b.addEventListener("click", () => {
         if (id === this.look) return
         this.audio.play("ui_click")

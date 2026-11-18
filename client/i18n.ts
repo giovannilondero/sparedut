@@ -17,8 +17,8 @@ export type Lang = "fur" | "it"
 type Fn<A extends unknown[] = [string]> = (...args: A) => string
 
 /** Static HTML texts: `data-t="key"` (innerHTML) and `data-t-ph="key"` (placeholder). */
-export type StaticKey =
-  | "title" | "nameLabel" | "namePh" | "oneTap" | "oneTapSub" | "create" | "createSub" | "join" | "joinSub"
+type StaticKey =
+  | "title" | "nameLabel" | "namePh" | "oneTap" | "oneTapSub" | "create" | "createSub" | "join"
   | "roomsTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "reachLabel"
   | "ff" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
   | "qHigh" | "autoRes" | "showInfo" | "invert" | "keys" | "vocabTitle" | "connecting" | "chatPh" | "deathTitle" | "deathHint"
@@ -87,7 +87,8 @@ export interface Strings {
     readonly contested: string
     readonly hillOwned: Fn
     readonly hillFree: string
-    readonly warmup: Fn
+    /** `menu`: the active device's control for the match menu (`menuControl`). */
+    readonly warmup: Fn<[string, string]>
     readonly streak: Fn<[string, number]>
     readonly deathBy: Fn
     readonly deathSelf: string
@@ -155,6 +156,11 @@ export interface Strings {
     readonly start: string
     readonly restart: string
     readonly hostOnly: string
+    /** The host tools' label. */
+    readonly host: string
+    /** The host's buttons that add or remove a bot in a team (its short name). */
+    readonly addBot: Fn
+    readonly removeBot: Fn
     readonly level: string
     readonly switchTeam: Fn
     readonly leave: string
@@ -269,6 +275,10 @@ const WEAPON_NAMES = {
   mitraie: { name: "Mitraie de Postazion", short: "Mitraie" }
 } as const
 
+/** The labels on the touch "use" button, mounting and dismounting: the turret prompts on touch name them. */
+const FUR_TOUCH = { use: "Mitraie", leave: "Lasse" } as const
+const IT_TOUCH = { use: "Mitragliatrice", leave: "Lascia" } as const
+
 const fur: Strings = {
   static: {
     title: "Sparedût — Bataie tal Dom di Glemone",
@@ -279,7 +289,6 @@ const fur: Strings = {
     create: "Cree une partide",
     createSub: "Offline, te rêt locâl o in linie",
     join: "Jentre cul codiç",
-    joinSub: "Âstu un codiç di 4 letaris?",
     roomsTitle: "Partidis viertis <small>(prime la tô rêt, po in linie)</small>",
     armarie: "Armarie",
     settings: "Impostazions",
@@ -454,7 +463,7 @@ const fur: Strings = {
     contested: "Contindude!",
     hillOwned: (team) => `Plaçute: ${team}`,
     hillFree: "Plaçute libare",
-    warmup: (left) => `Riscjaldament: i ponts no contin. Si partìs tra ${left}, o l'host al fâs partî subite dal menù (<kbd>Esc</kbd>)`,
+    warmup: (left, menu) => `Riscjaldament: i ponts no contin. Si partìs tra ${left}, o l'host al fâs partî subite dal menù (${menu})`,
     streak: (name, n) => `${name} · ${n} di file`,
     deathBy: (name) => `Ti à fat fûr <b>${name}</b>`,
     deathSelf: "Tu ti sês fat mâl di bessôl",
@@ -515,14 +524,14 @@ const fur: Strings = {
       pad: "<div>Frache un boton par zuiâ</div><small>Options pal menù de partide</small>",
       touch: "<div>Tocje par zuiâ</div><small>o frache un boton dal controller</small>"
     },
-    turretUse: { keyboard: "<kbd>E</kbd> Mitraie", pad: "<kbd>⬇</kbd> Mitraie", touch: "Tocje <kbd>Mitraie</kbd>" },
+    turretUse: { keyboard: "<kbd>E</kbd> Mitraie", pad: "<kbd>⬇</kbd> Mitraie", touch: `Tocje <kbd>${FUR_TOUCH.use}</kbd>` },
     turretLeave: {
       keyboard: "<kbd>E</kbd> / <kbd>Spazi</kbd> lasse la mitraie",
       pad: "<kbd>⬇</kbd> / <kbd>✕</kbd> lasse la mitraie",
-      touch: "Tocje <kbd>Lasse</kbd> par lassâ la mitraie"
+      touch: `Tocje <kbd>${FUR_TOUCH.leave}</kbd> par lassâ la mitraie`
     },
-    touchUse: "Mitraie",
-    touchLeave: "Lasse",
+    touchUse: FUR_TOUCH.use,
+    touchLeave: FUR_TOUCH.leave,
     turretHeat: "Calôr",
     turretHot: "SCJALDADE!"
   },
@@ -564,6 +573,9 @@ const fur: Strings = {
     start: "Fâs partî la partide",
     restart: "Torne a scomençâ",
     hostOnly: "L'host (👑) al fâs partî la partide.",
+    host: "Host:",
+    addBot: (team) => `+ bot ${team}`,
+    removeBot: (team) => `− bot ${team}`,
     level: "Bravure",
     switchTeam: (team) => `Passe cui ${team}`,
     leave: "Va fûr · Mandi!"
@@ -630,7 +642,6 @@ const it: Strings = {
     create: "Crea una partita",
     createSub: "Offline, in rete locale o online",
     join: "Entra con codice",
-    joinSub: "Hai un codice di 4 lettere?",
     roomsTitle: "Partite aperte <small>(prima la tua rete, poi online)</small>",
     armarie: "Armeria",
     settings: "Impostazioni",
@@ -805,7 +816,7 @@ const it: Strings = {
     contested: "Contesa!",
     hillOwned: (team) => `Piazzetta: ${team}`,
     hillFree: "Piazzetta libera",
-    warmup: (left) => `Riscaldamento: i punti non contano. Si parte tra ${left}, o l'host fa partire subito dal menu (<kbd>Esc</kbd>)`,
+    warmup: (left, menu) => `Riscaldamento: i punti non contano. Si parte tra ${left}, o l'host fa partire subito dal menu (${menu})`,
     streak: (name, n) => `${name} · ${n} di fila`,
     deathBy: (name) => `Ti ha fatto fuori <b>${name}</b>`,
     deathSelf: "Ti sei fatto male da solo",
@@ -866,14 +877,14 @@ const it: Strings = {
       pad: "<div>Premi un tasto per giocare</div><small>Options per il menu della partita</small>",
       touch: "<div>Tocca per giocare</div><small>o premi un tasto del controller</small>"
     },
-    turretUse: { keyboard: "<kbd>E</kbd> Mitragliatrice", pad: "<kbd>⬇</kbd> Mitragliatrice", touch: "Tocca <kbd>Mitraglia</kbd>" },
+    turretUse: { keyboard: "<kbd>E</kbd> Mitragliatrice", pad: "<kbd>⬇</kbd> Mitragliatrice", touch: `Tocca <kbd>${IT_TOUCH.use}</kbd>` },
     turretLeave: {
       keyboard: "<kbd>E</kbd> / <kbd>Spazio</kbd> lascia la mitragliatrice",
       pad: "<kbd>⬇</kbd> / <kbd>✕</kbd> lascia la mitragliatrice",
-      touch: "Tocca <kbd>Lascia</kbd> per lasciare la mitragliatrice"
+      touch: `Tocca <kbd>${IT_TOUCH.leave}</kbd> per lasciare la mitragliatrice`
     },
-    touchUse: "Mitraglia",
-    touchLeave: "Lascia",
+    touchUse: IT_TOUCH.use,
+    touchLeave: IT_TOUCH.leave,
     turretHeat: "Calore",
     turretHot: "SURRISCALDATA!"
   },
@@ -926,6 +937,9 @@ const it: Strings = {
     start: "Fai partire la partita",
     restart: "Ricomincia",
     hostOnly: "L'host (👑) fa partire la partita.",
+    host: "Host:",
+    addBot: (team) => `+ bot ${team}`,
+    removeBot: (team) => `− bot ${team}`,
     level: "Bravura",
     switchTeam: (team) => `Passa con i ${team}`,
     leave: "Esci · Mandi!"

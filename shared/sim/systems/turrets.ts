@@ -4,8 +4,7 @@
  * on its own; when overheated it won't fire until it has cooled down. Firing is done by
  * `UseWeapons`, holding the body in the seat by `MovePlayers`.
  */
-import { Ops } from "@typeonce/ritmo"
-import { turretRestSeat } from "../../map.ts"
+import { freeTurretInReach } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
 import { TURRET } from "../../weapons.ts"
 import { Controls, Game, Life, Match, Motion, Out, Player, Rules, Turrets, type TurretState } from "../schema.ts"
@@ -55,18 +54,7 @@ export const MountTurrets = Game.System(
         }
         if (!justPressed(controls, "use")) continue
         // The nearest free turret, if standing behind it.
-        const body = data.motion.get(m).body
-        let best = -1
-        let bestD: number = TURRET.reach
-        spots.forEach((spot, i) => {
-          if (next[i].gunner !== null) return
-          const seat = turretRestSeat(spot)
-          const d = Ops.hypot(body.x - seat[0], body.z - seat[2])
-          if (d <= bestD && Math.abs(body.y - seat[1]) < 1.2) {
-            best = i
-            bestD = d
-          }
-        })
+        const best = freeTurretInReach(spots, next, data.motion.get(m).body)
         if (best >= 0) {
           next[best] = { ...next[best], gunner: session }
           events.out.emit({ t: "turret", i: best, s: session, a: "on" })

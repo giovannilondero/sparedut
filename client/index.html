@@ -40,7 +40,7 @@
     <div id="menu">
       <header class="brand">
         <h1 class="brand-title">Sparedût</h1>
-        <!-- The look the world is drawn in: chosen here only, never shown over a match. Its buttons come from client/looks.ts. -->
+        <!-- The look the world is drawn in: chosen here only, never shown over a match. Its buttons are built by Menu.bindLook (client/menu.ts). -->
         <div id="look-switch" class="look-switch" role="group" aria-labelledby="look-label"><span id="look-label"></span></div>
         <div class="lang" role="group" aria-labelledby="lang-label"><span id="lang-label" data-t="language"></span><button data-lang="fur">Furlan</button><button data-lang="it">Italiano</button></div>
       </header>
@@ -122,14 +122,14 @@
               <ui-select id="c-minutes" class="create-select" presentation="auto">
                 <ui-select-label data-t="minutesLabel"></ui-select-label>
                 <ui-select-trigger><button type="button"><ui-select-value></ui-select-value></button></ui-select-trigger>
-                <ui-select-content class="create-list"></ui-select-content>
+                <ui-select-content class="select-list create-list"></ui-select-content>
               </ui-select>
             </div>
             <div class="field">
               <ui-select id="c-bots" class="create-select" presentation="auto">
                 <ui-select-label data-t="botsLabel"></ui-select-label>
                 <ui-select-trigger><button type="button"><ui-select-value></ui-select-value></button></ui-select-trigger>
-                <ui-select-content class="create-list"></ui-select-content>
+                <ui-select-content class="select-list create-list"></ui-select-content>
               </ui-select>
             </div>
             <div class="field create-wide"><span id="c-level-label" data-t="levelLabel"></span><ui-radio-group id="c-level" class="create-cards" aria-labelledby="c-level-label"></ui-radio-group></div>
@@ -184,7 +184,7 @@
       </section>
 
       <section id="menu-vocabolari" class="panel wide hidden">
-        <h2 data-t="vocabTitle"></h2>
+        <h2 id="vocab-title" data-t="vocabTitle" tabindex="-1"></h2>
         <div id="vocabolari" class="vocab"></div>
         <div class="row screen-foot"><button data-go="home" data-t="back"></button></div>
       </section>

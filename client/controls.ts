@@ -5,10 +5,9 @@
  * Whichever device was used last is the active one; switching clears held buttons.
  */
 import { BUTTON, type ButtonName } from "../shared/input.ts"
-import { turretRestSeat, type TurretSpot } from "../shared/map.ts"
 import type { Snapshot } from "../shared/protocol.ts"
-import type { ArsenalValue, TurretState } from "../shared/sim/schema.ts"
-import { TURRET, type WeaponId } from "../shared/weapons.ts"
+import type { ArsenalValue } from "../shared/sim/schema.ts"
+import type { Slot, WeaponId } from "../shared/weapons.ts"
 import { pointerDevice, type Device } from "./device.ts"
 import { buttonBit, inCircle, inRect, NO_INSETS, pickerEntries, TOUCH_BUTTONS, touchLayout, type Insets, type TouchButton, type TouchLayout, type TouchView } from "./touch.ts"
 
@@ -76,7 +75,8 @@ interface Finger {
 /** The buttons held only while a finger is on them (aim and crouch are toggles, the rest act once). */
 const HELD_BUTTONS = ["jump", "reload", "bomb", "mine", "use"] as const satisfies readonly (TouchButton & ButtonName)[]
 const isHeldButton = (r: FingerRole): r is (typeof HELD_BUTTONS)[number] => HELD_BUTTONS.some((b) => b === r)
-const isButton = (r: FingerRole): r is TouchButton => r !== "stick" && r !== "look" && r !== "fire" && r !== "weapon" && r !== "spent"
+/** A round button: one of `TOUCH_BUTTONS`, the explicit set, so a new role is never a button by accident. */
+const isButton = (r: FingerRole): r is TouchButton => (TOUCH_BUTTONS as readonly FingerRole[]).includes(r)
 
 /** What the controls follow of the player, from one snapshot. */
 export interface Tracked {
@@ -93,23 +93,15 @@ export interface Tracked {
   readonly arsenal: ArsenalValue | null
 }
 
-/** The player `me` in a snapshot, as the controls follow it. */
-export const trackedIn = (s: Snapshot, me: string, mounted: boolean, nearTurret: boolean): Tracked | null =>
-  s.you && { alive: s.you.alive, mounted, spawned: s.ev.some((e) => e.t === "spawn" && e.s === me), nearTurret: nearTurret && !mounted, arsenal: s.you.arsenal }
-
-/** A free turret whose seat a body at `at` can reach: the one rule for the turret prompt and the touch "use" button. */
-export const freeTurretInReach = (spots: readonly TurretSpot[], turrets: readonly TurretState[], at: { readonly x: number; readonly y: number; readonly z: number } | null) => {
-  if (!at) return false
-  for (let i = 0; i < spots.length; i++) {
-    if (turrets[i]?.gunner !== null) continue
-    const seat = turretRestSeat(spots[i])
-    if (Math.hypot(at.x - seat[0], at.z - seat[2]) <= TURRET.reach && Math.abs(at.y - seat[1]) < 1.2) return true
-  }
-  return false
-}
+/**
+ * The player `me` in a snapshot, as the controls follow it. `at.mounted`: on a turret's seat;
+ * `at.freeTurret`: a free turret within reach (`freeTurretInReach`), which counts only on foot.
+ */
+export const trackedIn = (s: Snapshot, me: string, at: { readonly mounted: boolean; readonly freeTurret: boolean }): Tracked | null =>
+  s.you && { alive: s.you.alive, mounted: at.mounted, spawned: s.ev.some((e) => e.t === "spawn" && e.s === me), nearTurret: at.freeTurret && !at.mounted, arsenal: s.you.arsenal }
 
 export interface ControlsHandlers {
-  onSlot: (slot: 1 | 2 | 3 | 4) => void
+  onSlot: (slot: Slot) => void
   onLastWeapon: () => void
   onWheel: (dir: 1 | -1) => void
   onKey: (code: string, down: boolean) => void
@@ -282,8 +274,10 @@ export class Controls {
    * landed in the stick's region, else look.
    */
   private fingerDown(e: PointerEvent) {
-    if (e.pointerType === "mouse") return this.useTouch(false)
-    if (e.pointerType !== "touch" || !this.inMatch || !this.enabled || !this.playing) return
+    const device = pointerDevice(e.pointerType)
+    if (device === "keyboard") return this.useTouch(false)
+    // A finger or a pen: the same touch controls.
+    if (device !== "touch" || !this.inMatch || !this.enabled || !this.playing) return
     e.preventDefault()
     this.useTouch(true)
     // A finger that comes down again without an up in between (the up was lost) lets go first.
@@ -439,7 +433,14 @@ export class Controls {
   private useTouch(on: boolean) {
     if (on === this.touchActive) return
     this.touchActive = on
-    if (!on) return this.releaseTouch()
+    if (!on) {
+      // On "hold" only touch can set the crouch latch, and no other device could clear it.
+      if (this._crouchMode === "hold" && this.crouched) {
+        this.crouched = false
+        this.redraw()
+      }
+      return this.releaseTouch()
+    }
     this.padActive = false
     this.releaseKeys()
     this.releasePad()
@@ -511,7 +512,10 @@ export class Controls {
     this.keys.clear()
   }
 
-  /** Lets go of every finger and touch toggle (aim, the picker, a scoreboard a tap opened). The crouch latch is not touch's alone: it stays. */
+  /**
+   * Lets go of every finger and touch toggle (aim, the picker, a scoreboard a tap opened). The crouch
+   * latch is the keyboard's toggle too: `useTouch` decides whether it outlives touch.
+   */
   private releaseTouch() {
     const v = this.touchView
     if (this.fingers.size === 0 && this.touchHeld.size === 0 && !v.board && !v.picker) return

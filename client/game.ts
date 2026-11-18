@@ -6,17 +6,17 @@ import * as THREE from "three"
 import { BOT_LEVEL_IDS, QUICK_CHAT, TEAM_INFO, type BotLevel } from "../shared/folklore.ts"
 import { rayPose } from "../shared/hitbox.ts"
 import { BUTTON, IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
-import { turretAim, turretSeat, type MapId, type PickupKind, type Team } from "../shared/map.ts"
+import { freeTurretInReach, turretAim, turretSeat, type MapId, type PickupKind, type Team } from "../shared/map.ts"
 import { DISCO } from "../shared/maps/maran.ts"
 import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, seatedBody, sprinting } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
-import { outsideStorm, owned, RAISE_TICKS } from "../shared/sim/rules.ts"
-import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
+import { outsideStorm, owned, RAISE_TICKS, weaponInSlot } from "../shared/sim/rules.ts"
+import { WEAPONS, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
-import { Controls, freeTurretInReach, trackedIn } from "./controls.ts"
+import { Controls, trackedIn } from "./controls.ts"
 import { boardHtml, esc, Hud, rosterHtml } from "./hud.ts"
 import { t } from "./i18n.ts"
 import type { Look } from "./looks.ts"
@@ -31,17 +31,25 @@ import type { Settings } from "./settings.ts"
 import "@ui-sdk/web/dialog"
 // UI SDK's select, for the host's bot skill: opens on a tap or a key (never on hover), as a sheet on a small touch screen.
 import "@ui-sdk/web/select"
-import { afterEscape, endFocus, focusOnOpen, type MatchMenu } from "./match-menus.ts"
+import { alwaysChosen } from "./choice.ts"
+import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, type MatchMenu } from "./match-menus.ts"
+import { pickerEntries } from "./touch.ts"
 
 type DialogElement = HTMLElementTagNameMap["ui-dialog"]
 type SelectElement = HTMLElementTagNameMap["ui-select"]
 
-/** Each in-match menu's dialog and the content the game draws into it. */
+/**
+ * Each in-match menu's dialog and the content the game draws into it: the menus the player opens,
+ * and the end screen, which the match opens and no Esc step leads to.
+ */
 const MENU_PARTS = {
   pause: ["pause-dialog", "pause"],
   loadout: ["loadout-dialog", "loadout"],
-  settings: ["settings-dialog", "settings-ingame"]
-} as const satisfies Record<Exclude<MatchMenu, "none">, readonly [string, string]>
+  settings: ["settings-dialog", "settings-ingame"],
+  end: ["end-dialog", "endscreen"]
+} as const satisfies Record<Exclude<MatchMenu, "none"> | "end", readonly [string, string]>
+/** The contents of the menus the player opens, for `closest`: built once. */
+const OPENED_CONTENT = MATCH_MENUS.map((m) => `#${MENU_PARTS[m][1]}`).join(", ")
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 const INTERP_TICKS = 6
@@ -190,9 +198,10 @@ export class Game {
     }, matchMedia("(pointer: coarse)").matches ? "touch" : "keyboard")
     // Rotating the device re-lays the touch controls; fingers already down keep their control.
     addEventListener("resize", () => this.running && this.placeTouch())
-    // No context menu from a long press anywhere during a match (the canvas already refuses it).
+    // On touch, no context menu from a long press during a match (the canvas always refuses it), except
+    // in the match's menus: there, as on a desktop, the room code can be selected and copied.
     document.addEventListener("contextmenu", (e) => {
-      if (this.running) e.preventDefault()
+      if (this.running && this.controls.device === "touch" && !(e.target as Element).closest?.(".overlay")) e.preventDefault()
     })
     d.renderer.domElement.addEventListener("click", () => {
       if (this.running && this.overlay === "none" && !this.chatting) this.controls.lock()
@@ -271,7 +280,7 @@ export class Game {
     this.avatars.clear()
     this.hud.show(false)
     this.openOverlay("none")
-    $<DialogElement>("end-dialog").open = false
+    $<DialogElement>(MENU_PARTS.end[0]).open = false
     this.d.viewmodel.setVisible(false)
     if (document.pointerLockElement) document.exitPointerLock()
     this.controls.track(null)
@@ -375,6 +384,7 @@ export class Game {
       }
     }
     if (this.overlay === "pause") this.renderPause()
+    if (this.snap?.phase.tag === "Over") this.renderEnd()
   }
 
   private onSnapshot(s: Snapshot) {
@@ -419,7 +429,8 @@ export class Game {
       this.wasAlive = you.alive
       this.seated = you.alive && this.mounted() >= 0
       const mounted = this.mounted() >= 0
-      this.controls.track(trackedIn(s, this.me, mounted, you.alive && !mounted && freeTurretInReach(this.physics.map.turrets, s.turrets, this.predictor.body)))
+      const body = this.predictor.body
+      this.controls.track(trackedIn(s, this.me, { mounted, freeTurret: body !== null && freeTurretInReach(this.physics.map.turrets, s.turrets, body) >= 0 }))
       // The server has already seen my last weapon switch and holds a different one: it
       // switched it itself (lanciafrico pickup, armoury, respawn) or rejected the switch. Follow it.
       const server = you.arsenal.current
@@ -440,7 +451,7 @@ export class Game {
       if (document.pointerLockElement) document.exitPointerLock()
       this.renderEnd(true)
     } else {
-      $<DialogElement>("end-dialog").open = false
+      $<DialogElement>(MENU_PARTS.end[0]).open = false
       if (tag === "Live" && this.overlay === "none") this.controls.lock()
     }
     if (this.overlay === "pause") this.renderPause()
@@ -672,18 +683,17 @@ export class Game {
     this.d.audio.play("switch", { volume: 0.6 })
   }
 
-  private selectSlot(slot: 1 | 2 | 3 | 4) {
+  private selectSlot(slot: Slot) {
     if (this.quickOpen) return
     const you = this.you()
-    if (!you) return
-    const id: WeaponId = slot === 1 ? you.arsenal.primary : slot === 2 ? "mandi" : slot === 3 ? "lanciafrico" : "mescul"
-    this.selectWeapon(id)
+    const id = you && weaponInSlot(you.arsenal, slot)
+    if (id) this.selectWeapon(id)
   }
 
   private cycleWeapon(dir: 1 | -1) {
     const you = this.you()
     if (!you) return
-    const order = ([you.arsenal.primary, "mandi", "lanciafrico", "mescul"] as WeaponId[]).filter((id) => owned(you.arsenal, id))
+    const order = pickerEntries(you.arsenal).map((e) => e.id)
     const i = order.indexOf(this.wanted)
     this.selectWeapon(order[(i + dir + order.length) % order.length])
   }
@@ -779,7 +789,7 @@ export class Game {
     this.overlay = which
     if (which === "settings" && previous !== "settings") {
       // The same form as the main menu: same controls, saved and applied immediately.
-      this.drawMenu("settings-ingame", t().static.settings, `<div id="settings-slot" class="overlay-body"></div><div class="row overlay-actions"><button id="st-back">${t().static.back}</button></div>`)
+      this.drawMenu(MENU_PARTS.settings[1], t().static.settings, `<div id="settings-slot" class="overlay-body"></div><div class="row overlay-actions"><button id="st-back">${t().static.back}</button></div>`)
       $("settings-slot").append($("settings-form"))
       $("st-back").onclick = () => this.openOverlay("pause")
     } else if (which !== "settings") this.restoreSettings()
@@ -798,11 +808,11 @@ export class Game {
    */
   private showMenus(previous: MatchMenu) {
     const active = document.activeElement
-    for (const [menu, [dialog]] of Object.entries(MENU_PARTS)) {
-      if (menu !== this.overlay) $<DialogElement>(dialog).open = false
+    for (const menu of MATCH_MENUS) {
+      if (menu !== this.overlay) $<DialogElement>(MENU_PARTS[menu][0]).open = false
     }
     if (this.overlay === "none") {
-      if (active instanceof HTMLElement && active.closest("#pause, #loadout, #settings-ingame")) active.blur()
+      if (active instanceof HTMLElement && active.closest(OPENED_CONTENT)) active.blur()
       return
     }
     const [id, content] = MENU_PARTS[this.overlay]
@@ -842,7 +852,7 @@ export class Game {
 
   private renderLoadout() {
     const lo = t().loadout
-    this.drawMenu("loadout", lo.title, `<div class="overlay-body"><p class="muted">${lo.note}</p><div class="weapons" id="loadout-list"></div></div><div class="row overlay-actions"><button id="lo-close" class="primary">${lo.resume}</button></div>`)
+    this.drawMenu(MENU_PARTS.loadout[1], lo.title, `<div class="overlay-body"><p class="muted">${lo.note}</p><div class="weapons" id="loadout-list"></div></div><div class="row overlay-actions"><button id="lo-close" class="primary">${lo.resume}</button></div>`)
     this.d.menu.buildArmarie($("loadout-list"), (p) => {
       this.d.net.send({ t: "primary", p })
       // If I was holding the old primary, switch to the new one right away.
@@ -899,7 +909,7 @@ export class Game {
     const p = s.pause
     const ben = TEAM_INFO.benandanti.short
     const mal = TEAM_INFO.malandanti.short
-    this.drawMenu("pause", `${s.modes[room.mode].name} <small class="muted">· ${s.modes[room.mode].sub}</small>`, `
+    this.drawMenu(MENU_PARTS.pause[1], `${s.modes[room.mode].name} <small class="muted">· ${s.modes[room.mode].sub}</small>`, `
       <div class="overlay-body">
       ${
         // An Offline room has no code and no invite link: nobody else can come in.
@@ -913,16 +923,16 @@ export class Game {
       <div class="roster" id="p-roster"></div>
       ${
         host
-          ? `<div class="host-tools"><span class="host-label">👑 Host:</span>
+          ? `<div class="host-tools"><span class="host-label">👑 ${p.host}</span>
         <button id="p-start" class="primary"></button>
         <div class="host-bots">
-          <button data-bot="benandanti:1">+ bot ${ben}</button><button data-bot="benandanti:-1">− bot ${ben}</button>
-          <button data-bot="malandanti:1">+ bot ${mal}</button><button data-bot="malandanti:-1">− bot ${mal}</button>
+          <button data-bot="benandanti:1">${p.addBot(ben)}</button><button data-bot="benandanti:-1">${p.removeBot(ben)}</button>
+          <button data-bot="malandanti:1">${p.addBot(mal)}</button><button data-bot="malandanti:-1">${p.removeBot(mal)}</button>
         </div>
         <ui-select id="p-level" class="host-level" presentation="auto" default-value="${room.level}">
           <ui-select-label>${p.level}</ui-select-label>
           <ui-select-trigger><button><ui-select-value></ui-select-value></button></ui-select-trigger>
-          <ui-select-content class="level-list">${BOT_LEVEL_IDS.map((l) => `<ui-select-item value="${l}">${s.levels[l].name}<ui-select-item-indicator aria-hidden="true">✓</ui-select-item-indicator></ui-select-item>`).join("")}</ui-select-content>
+          <ui-select-content class="select-list level-list">${BOT_LEVEL_IDS.map((l) => `<ui-select-item value="${l}">${s.levels[l].name}<ui-select-item-indicator aria-hidden="true">✓</ui-select-item-indicator></ui-select-item>`).join("")}</ui-select-content>
         </ui-select>
       </div>`
           : `<div class="muted host-only">${p.hostOnly}</div>`
@@ -965,10 +975,9 @@ export class Game {
       }
     }
     // The room's update sets the value back from code ("imperative"): only the host's own choice is sent.
-    $<SelectElement>("p-level").addEventListener("valuechange", (e) => {
-      if (e.detail.value === null) return e.preventDefault()
-      if (e.detail.reason !== "imperative") this.d.net.send({ t: "level", level: e.detail.value as BotLevel })
-    })
+    $<SelectElement>("p-level").addEventListener("valuechange", alwaysChosen((level, reason) => {
+      if (reason !== "imperative") this.d.net.send({ t: "level", level: level as BotLevel })
+    }))
   }
 
   /** Did I win (my team, or me alone in Tampieste)? */
@@ -989,18 +998,23 @@ export class Game {
     if (full) {
       const title = winner === "pari" ? en.draw : this.won(winner) ? en.win : en.lose
       const color = winner === "pari" ? "var(--gold)" : typeof winner === "object" ? (this.won(winner) ? "var(--gold)" : "#9fd0ff") : TEAM_INFO[winner].color
-      this.drawMenu("endscreen", title, `
+      this.drawMenu(MENU_PARTS.end[1], title, `
       <div class="overlay-body"><div id="e-results"></div><p class="muted end-restart" id="e-restart"></p></div>
-      <div class="row overlay-actions"><button id="e-leave">${en.leave}</button>${host ? `<button id="e-again" class="primary">${en.again}</button>` : ""}</div>`, "end-title", color)
+      <div class="row overlay-actions"><button id="e-leave">${en.leave}</button><button id="e-again" class="primary"${host ? "" : " hidden"}>${en.again}</button></div>`, "end-title", color)
       $("e-leave").onclick = () => {
         this.d.net.send({ t: "leave" })
         this.d.onLeave()
       }
-      const again = document.getElementById("e-again")
-      if (again) again.onclick = () => this.d.net.send({ t: "start" })
+      $("e-again").onclick = () => this.d.net.send({ t: "start" })
     }
     // Not drawn yet (a scoreboard before the snapshot that ended the match): nothing to update.
     if (!document.getElementById("e-results")) return
+    // Only the host can start another match: a player who becomes host gets the button, without a redraw.
+    const again = $("e-again")
+    if (again.hidden === host) {
+      if (!host && document.activeElement === again) $("e-leave").focus()
+      again.hidden = !host
+    }
     const sub =
       winner === "pari" ? en.drawSub
       : typeof winner === "object" ? `${en.lastStanding(esc(winner.name))} · ${en.lastStandingSub}`
@@ -1023,7 +1037,7 @@ export class Game {
       </div>
       ${boardHtml(rows, this.me)}`
     $("e-restart").textContent = en.restartIn(Math.max(0, Math.ceil((s.phase.restarts - s.tick) / 60)))
-    if (full) this.openMenu("end-dialog", "endscreen", endFocus(host))
+    if (full) this.openMenu(...MENU_PARTS.end, endFocus(host))
   }
 
   // ---------------------------------------------------------------- fixed tick
@@ -1439,7 +1453,7 @@ export class Game {
       fx.projectiles(s.proj)
       const outside = !!s.storm && !!you?.alive && !!b && outsideStorm(s.storm, b)
       this.hud.spectating = mode === "tampieste" && s.phase.tag === "Live"
-      this.hud.top(s, mode ?? "bataie", this.names, outside)
+      this.hud.top(s, mode ?? "bataie", this.names, this.controls.device, outside)
       this.hud.death(you, this.names, Math.floor(this.seed / 7))
       if (s.phase.tag === "Over" && Math.floor(t) !== Math.floor(t - dt)) this.renderEnd()
     }
@@ -1461,6 +1475,11 @@ export class Game {
     this.hud.clickToPlay(!this.controls.active && free && !this.boardOpen, device)
     this.hud.layFor(device)
     this.hud.touchShown(this.controls.touchActive && free)
+  }
+
+  /** Out of a match, every frame: the page still follows the device the player holds (the menu's key hints). */
+  menuFrame() {
+    this.hud.layFor(this.controls.device)
   }
 
   render() {

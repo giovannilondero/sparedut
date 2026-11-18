@@ -6,9 +6,9 @@
  * `Controls.relayout` computes the layout once per canvas size, so rotating
  * the device re-lays the controls without dropping a finger already down.
  */
-import { owned } from "../shared/sim/rules.ts"
+import { weaponInSlot } from "../shared/sim/rules.ts"
 import type { ArsenalValue } from "../shared/sim/schema.ts"
-import type { WeaponId } from "../shared/weapons.ts"
+import { SLOTS, type Slot, type WeaponId } from "../shared/weapons.ts"
 
 /** A rectangle in CSS pixels from the canvas's top-left corner. */
 export interface Rect {
@@ -180,7 +180,7 @@ export const touchLayout = (size: { readonly width: number; readonly height: num
   const toRight = weapon.left + weapon.width / 2 < x0 + width / 2
   const step = weapon.height + gap / 1.5
   const pickerLeft = toRight ? weapon.left + weapon.width + gap : weapon.left - gap - weapon.width
-  const picker = [0, 1, 2, 3].map((i): Rect => ({ left: pickerLeft, top: weapon.top + i * step, width: weapon.width, height: weapon.height }))
+  const picker = SLOTS.map((_, i): Rect => ({ left: pickerLeft, top: weapon.top + i * step, width: weapon.width, height: weapon.height }))
   // The controls under the thumbs: the stick at rest, the fire buttons, the buttons around them and the name.
   const box = (c: Circle): Rect => ({ left: c.x - c.r, top: c.y - c.r, width: 2 * c.r, height: 2 * c.r })
   const all = [rest, fire, leftFire, ...TOUCH_BUTTONS.map((b) => buttons[b])].map(box).concat([weapon])
@@ -208,13 +208,16 @@ export const inRect = (r: Rect, x: number, y: number) => x >= r.left && x <= r.l
 
 /** One weapon the picker lists: the slot that selects it (as the number keys do) and the weapon. */
 export interface PickerEntry {
-  readonly slot: 1 | 2 | 3 | 4
+  readonly slot: Slot
   readonly id: WeaponId
 }
 
 /** What the picker lists: the weapons the player owns, in slot order. */
 export const pickerEntries = (a: ArsenalValue): readonly PickerEntry[] =>
-  ([{ slot: 1, id: a.primary }, { slot: 2, id: "mandi" }, { slot: 3, id: "lanciafrico" }, { slot: 4, id: "mescul" }] as const).filter((e) => owned(a, e.id))
+  SLOTS.flatMap((slot) => {
+    const id = weaponInSlot(a, slot)
+    return id ? [{ slot, id }] : []
+  })
 
 /** What the HUD draws of the touch controls; `Controls` updates it in place, so drawing allocates nothing. */
 export interface TouchView {

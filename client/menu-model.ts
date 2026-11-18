@@ -6,8 +6,10 @@
 import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "../shared/folklore.ts"
 import type { MapId } from "../shared/map.ts"
 import { MAP_IDS } from "../shared/maps/index.ts"
-import { ACCESSES, Password, REACHES, type Access, type ErrorCode, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
-import { oneTapRoom } from "./settings.ts"
+import { ACCESSES, MAX_BOTS, Password, REACHES, RoomCode, type Access, type ErrorCode, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
+import type { PrimaryId } from "../shared/weapons.ts"
+import type { Lang } from "./i18n.ts"
+import { oneTapRoom, type Settings } from "./settings.ts"
 
 export type CreateOptions = Reached<RoomAccess> & {
   readonly mode: ModeId
@@ -18,16 +20,11 @@ export type CreateOptions = Reached<RoomAccess> & {
   readonly ff: boolean
 }
 
-/** What the menu keeps between visits. The caller decides where it is stored. */
-export interface Remembered {
-  name: string
-  lastMode: ModeId
-  lastMap: MapId
-  lastMinutes: number
-  lastBots: number
-  lastLevel: BotLevel
-  lastFf: boolean
-}
+/** What the menu keeps between visits: the player's settings. The caller decides where they are stored. */
+export type Remembered = Settings
+
+/** The settings form's values: the same form in the menu and in a match. */
+export type FormSetting = "sensitivity" | "fov" | "master" | "music" | "quality" | "crouch" | "autoRes" | "showInfo" | "invertY"
 
 export const SCREENS = ["home", "create", "password", "armarie", "settings", "vocabolari"] as const
 export type Screen = (typeof SCREENS)[number]
@@ -78,8 +75,8 @@ export const MENU_OPTIONS = {
   reaches: [...REACHES].sort((a, b) => REACH_PLACE[a] - REACH_PLACE[b]),
   accesses: ACCESSES,
   minutes: [5, 10, 15, 20],
-  /** Bots per team: as many as the server accepts. */
-  bots: [0, 1, 2, 3, 4, 5, 6, 7]
+  /** Bots per team: none up to as many as the server accepts. */
+  bots: Array.from({ length: MAX_BOTS + 1 }, (_, n) => n)
 } as const satisfies Record<string, readonly unknown[]>
 
 /** Creation's choices as they stand. */
@@ -96,7 +93,17 @@ export interface Choices {
   readonly password: string
 }
 
-/** The screens a player cannot reach without a name: they start or join a match. */
+/**
+ * Where focus lands when the menu goes from one screen to another: `"first"`, the new screen's first
+ * control (or its heading when it has none); a screen, the home screen's tile that opens it; null,
+ * where it is. The password prompt is a dialog that moves focus in and back by itself.
+ */
+export function focusOnScreen(from: Screen, to: Screen): "first" | Screen | null {
+  if (from === to || from === "password" || to === "password") return null
+  return to === "home" ? from : "first"
+}
+
+/** The screens a player cannot reach without a name: they create or join a room. */
 const NEED_NAME: ReadonlySet<Screen> = new Set(["create", "password"])
 
 const NONE: Outcome = { kind: "none" }
@@ -168,6 +175,27 @@ export class MenuModel {
     this.save()
   }
 
+  chooseLanguage(lang: Lang) {
+    this.change("lang", lang)
+  }
+
+  /** The primary weapon, chosen in the armoury: the menu's or a match's. */
+  choosePrimary(primary: PrimaryId) {
+    this.change("primary", primary)
+  }
+
+  /** A value of the settings form: remembered, and applied by whoever `save` calls. */
+  changeSetting<K extends FormSetting>(key: K, value: Settings[K]) {
+    this.change(key, value)
+  }
+
+  /** Remembers a changed value; the value it already has saves nothing. */
+  private change<K extends keyof Settings>(key: K, value: Settings[K]) {
+    if (this.remembered[key] === value) return
+    this.remembered[key] = value
+    this.save()
+  }
+
   chooseMode(mode: ModeId) {
     this.mode = mode
   }
@@ -229,7 +257,7 @@ export class MenuModel {
     return { kind: "send", request: { t: "create", room, oneTap: false } }
   }
 
-  /** The home screen's "play against the bots": an Offline match in one tap, with the remembered values. */
+  /** The home screen's "play against the bots": an Offline room in one tap, with the remembered values, its match started at once. */
   oneTap(): Outcome {
     if (!this.remembered.name) return this.needName()
     return { kind: "send", request: { t: "create", room: oneTapRoom(this.remembered), oneTap: true } }
@@ -241,8 +269,8 @@ export class MenuModel {
 
   joinByCode(): Outcome {
     if (!this.remembered.name) return this.needName()
-    const code = this.code.trim().toUpperCase()
-    return code.length === 4 ? { kind: "send", request: { t: "join", code } } : refused("codeBad")
+    const code = RoomCode.safeParse(this.code)
+    return code.success ? { kind: "send", request: { t: "join", code: code.data } } : refused("codeBad")
   }
 
   /** The latest room list, in the order the host sent it: LAN rooms first, then Online. */
