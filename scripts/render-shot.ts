@@ -15,7 +15,7 @@ const [url, out, wait = "6", script] = process.argv.slice(2)
 if (!url || !out) throw new Error("usage: bun scripts/render-shot.ts <url> <out.png> [seconds] [js]")
 const browser = process.env.BROWSER ?? "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
 const port = 9300 + Math.floor(Math.random() * 500)
-const child = Bun.spawn([browser, "--headless=new", "--use-angle=metal", "--enable-gpu", "--hide-scrollbars", "--window-size=1280,720", `--remote-debugging-port=${port}`, `--user-data-dir=/tmp/render-shot-${port}`, url], { stdout: "ignore", stderr: "ignore" })
+const child = Bun.spawn([browser, "--headless=new", "--mute-audio", "--use-angle=metal", "--enable-gpu", "--hide-scrollbars", "--window-size=1280,720", `--remote-debugging-port=${port}`, `--user-data-dir=/tmp/render-shot-${port}`, url], { stdout: "ignore", stderr: "ignore" })
 try {
   let socket: WebSocket | null = null
   for (let i = 0; i < 50 && !socket; i++) {

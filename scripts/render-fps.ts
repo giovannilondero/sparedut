@@ -15,7 +15,7 @@ const warmup = Number(process.argv[3] ?? 5)
 const browser = process.env.BROWSER ?? "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
 const port = 9300 + Math.floor(Math.random() * 500)
 const child = Bun.spawn(
-  [browser, "--headless=new", "--use-angle=metal", "--enable-gpu", "--disable-frame-rate-limit", "--disable-gpu-vsync", "--force-device-scale-factor=2", "--window-size=1512,945", `--remote-debugging-port=${port}`, `--user-data-dir=/tmp/render-fps-${port}`, url],
+  [browser, "--headless=new", "--mute-audio", "--use-angle=metal", "--enable-gpu", "--disable-frame-rate-limit", "--disable-gpu-vsync", "--force-device-scale-factor=2", "--window-size=1512,945", `--remote-debugging-port=${port}`, `--user-data-dir=/tmp/render-fps-${port}`, url],
   { stdout: "ignore", stderr: "ignore" }
 )
 try {
