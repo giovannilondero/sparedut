@@ -10,9 +10,10 @@ import type { PrimaryId } from "../weapons.ts"
 import type { GameEvent } from "./events.ts"
 import { freshDoors, freshTurrets } from "./rules.ts"
 import { simulate } from "./schedule.ts"
-import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, StartMatch, Training, type PickupState, type PostValue } from "./schema.ts"
+import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, StartMatch, StepUnavailable, Training, type PickupState, type PostValue } from "./schema.ts"
 import type { InterfaceAction } from "../training/interface.ts"
-import { TRAINING } from "../training/index.ts"
+import { TRAINING, type StationId } from "../training/index.ts"
+import type { Device } from "../devices.ts"
 import { ReadOutbox, ViewWorld, type WorldView } from "./view.ts"
 
 export interface SimOptions {
@@ -78,6 +79,8 @@ export function createSim(options: SimOptions) {
     start: () => runtime.send(StartMatch, {}),
     /** The client's report of an interface step: only a training's current step that declares this action takes it. */
     report: (session: string, action: InterfaceAction) => runtime.send(ReportInterface, { session, action }),
+    /** The client's word that its active device has no control for a step: only a training takes it, for its current step, when the step table agrees. */
+    unavailable: (session: string, station: StationId, step: string, device: Device) => runtime.send(StepUnavailable, { session, station, step, device }),
     /** Advances one tick and returns the game events it produced. */
     step(): GameEvent[] {
       const ticked = runtime.tick(simulate)

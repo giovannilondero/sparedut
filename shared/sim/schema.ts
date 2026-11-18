@@ -14,6 +14,8 @@ import type { PhysicsWorld } from "../physics.ts"
 import type { ModeId, ObjectiveId } from "../folklore.ts"
 import type { PrimaryId, ProjectileKind, WeaponId } from "../weapons.ts"
 import type { InterfaceAction } from "../training/interface.ts"
+import type { StationId } from "../training/index.ts"
+import type { Device } from "../devices.ts"
 import type { GameEvent, KillCause } from "./events.ts"
 
 export const Root = Schema.defineRoot("Sparedut")
@@ -256,6 +258,8 @@ export const ChangePrimary = Descriptor.Event<{ readonly session: string; readon
 export const StartMatch = Descriptor.Event<{}>()("Sparedut/StartMatch")
 /** From the host, only in a training: the client's report of an interface step (`shared/training/interface.ts`). */
 export const ReportInterface = Descriptor.Event<{ readonly session: string; readonly action: InterfaceAction }>()("Sparedut/ReportInterface")
+/** From the host, only in a training: the client says its active device has no control for this step (`shared/training/controls.ts`). */
+export const StepUnavailable = Descriptor.Event<{ readonly session: string; readonly station: StationId; readonly step: string; readonly device: Device }>()("Sparedut/StepUnavailable")
 
 export interface DamageValue {
   readonly victim: string
@@ -288,7 +292,7 @@ export const Game = Schema.bind(
     components: { Player, TeamOf, Post, Motion, Controls, Life, Arsenal, Stats, Attackers, Projectile },
     requires: [Schema.requires(Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers)],
     resources: { Rules, Objective, Tick, Score, Flags, Hill, Cart, StormCourse, Pickups, Turrets, Doors, History, Rng },
-    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, ReportInterface, Damage, Heal, DoorHit, Out }
+    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, ReportInterface, StepUnavailable, Damage, Heal, DoorHit, Out }
   }),
   Root
 )

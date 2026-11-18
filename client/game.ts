@@ -16,6 +16,7 @@ import { outsideStorm, owned, RAISE_TICKS, weaponInSlot } from "../shared/sim/ru
 import { TRAINING } from "../shared/training/index.ts"
 import { closedGates, viewedStation } from "../shared/training/gates.ts"
 import type { InterfaceAction } from "../shared/training/interface.ts"
+import { UnavailableSteps } from "./training-unavailable.ts"
 import { WEAPONS, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
@@ -92,6 +93,8 @@ export interface GameDeps {
   readonly createAvatar: (team: Team, name: string) => Avatar
   readonly saveSettings: () => void
   readonly onLeave: () => void
+  /** Leaves the room, and once the host has let go of it starts the home screen's one-tap match (the training's completion screen). */
+  readonly leaveForOneTap: () => void
   /** Origin and path for invite links (the public address when playing from localhost). */
   readonly inviteBase: () => string
   /** The room's password, if this client knows it: it goes into the invite link's fragment. */
@@ -158,6 +161,10 @@ export class Game {
   private teams = new Map<string, Team>()
   private board: readonly BoardRow[] = []
   private boardOpen = false
+  /** A training's steps the active device cannot perform: the host hears of them (#50). */
+  private readonly unavailableSteps = new UnavailableSteps()
+  /** The training's completion screen is open: like a match's end, no menu opens over it and no command goes out. */
+  private trainingEnded = false
   private chatting = false
   private quickOpen = false
   private overlay: MatchMenu = "none"
@@ -219,7 +226,7 @@ export class Game {
       const locked = document.pointerLockElement === d.renderer.domElement
       if (!locked) this.unlockedAt = performance.now()
       // Touch taking over drops the lock: that is no reason to open the match menu.
-      if (!locked && !this.controls.touchActive && this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over") this.openOverlay("pause")
+      if (!locked && !this.controls.touchActive && this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over" && !this.trainingEnded) this.openOverlay("pause")
       if (locked && this.overlay !== "none") this.openOverlay("none")
     })
     $("quickchat").addEventListener("click", (e) => {
@@ -266,6 +273,7 @@ export class Game {
     this.shownWeapon = null
     this.ownReload = null
     this.sinceShot = Infinity
+    this.trainingEnded = false
     this.clock = new MatchClock(() => performance.now())
     this.applySettings()
     this.updateRoster(room)
@@ -686,8 +694,8 @@ export class Game {
           this.hud.announce(tr.stationDone, tr.stations[e.station])
           audio.play("bells", { volume: 0.7 })
         } else {
-          this.hud.announce(tr.complete, tr.completeSub)
           audio.play("victory")
+          this.showTrainingComplete()
         }
         return
       }
@@ -741,6 +749,8 @@ export class Game {
     if (code === "Tab") {
       // With a menu open, Tab moves through it: the scoreboard stays shut.
       const open = down && this.overlay === "none"
+      // Opening the scoreboard is a training's interface step: only a training takes the report.
+      if (open && !this.boardOpen && this.room?.mode === TRAINING.mode) this.d.net.send({ t: "report", a: "board" })
       this.boardOpen = open
       this.hud.board(this.board, this.me, open)
       return
@@ -750,7 +760,11 @@ export class Game {
     if (this.quickOpen && /^Digit\d$/.test(code)) {
       const n = Number(code.slice(5))
       const phrase = QUICK_CHAT[(n + 9) % 10]
-      if (phrase) this.d.net.send({ t: "chat", text: phrase })
+      if (phrase) {
+        this.d.net.send({ t: "chat", text: phrase })
+        // Sending a quick phrase is a training's interface step.
+        if (this.room?.mode === TRAINING.mode) this.d.net.send({ t: "report", a: "phrases" })
+      }
       this.toggleQuick(false)
       return
     }
@@ -1031,6 +1045,37 @@ export class Game {
   }
 
   /**
+   * The training's completion screen, in the end screen's dialog: three ways on. Home leaves the
+   * training; the one-tap match leaves it and starts the home screen's match at once; the station
+   * list opens the training's match menu, where the stations are listed (#51).
+   */
+  private showTrainingComplete() {
+    const tr = t().training
+    this.trainingEnded = true
+    if (document.pointerLockElement) document.exitPointerLock()
+    this.controls.releaseAll()
+    this.drawMenu(MENU_PARTS.end[1], tr.complete, `
+      <div class="overlay-body"><p class="end-sub">${tr.completeSub}</p></div>
+      <div class="row overlay-actions training-done">
+        <button id="c-home">${tr.done.home}</button>
+        <button id="c-stations">${tr.done.stations}</button>
+        <button id="c-play" class="primary">${t().static.oneTap}</button>
+      </div>`, "end-title", "var(--gold)")
+    const leave = () => {
+      this.d.net.send({ t: "leave" })
+      this.d.onLeave()
+    }
+    $("c-home").onclick = leave
+    $("c-play").onclick = () => this.d.leaveForOneTap()
+    $("c-stations").onclick = () => {
+      this.trainingEnded = false
+      $<DialogElement>(MENU_PARTS.end[0]).open = false
+      this.openOverlay("pause")
+    }
+    this.openMenu(...MENU_PARTS.end, "c-play")
+  }
+
+  /**
    * The end screen: drawn whole and opened when the match ends (`full`), then only its results and
    * countdown are redrawn (every second and on each scoreboard), so its buttons and focus stay.
    */
@@ -1299,7 +1344,7 @@ export class Game {
     if (this.offset !== null) this.renderTick = this.time * 60 + this.offset - INTERP_TICKS
 
     const paused = this.clock.paused
-    this.controls.poll(dt, this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over")
+    this.controls.poll(dt, this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over" && !this.trainingEnded)
     // Paused: no commands, no prediction, and the paused time never reaches the fixed tick.
     if (!paused) {
       this.acc += Math.min(dt, 0.25)
@@ -1502,6 +1547,9 @@ export class Game {
       this.hud.spectating = mode === "tampieste" && s.phase.tag === "Live"
       this.hud.top(s, mode ?? "bataie", this.names, this.controls.device, outside)
       this.hud.training(s.training, this.controls.device)
+      // A step this device cannot perform: shown as such, then the host is told, and completes it.
+      const unavailable = this.unavailableSteps.check(s.training, this.controls.device, performance.now())
+      if (unavailable) this.d.net.send(unavailable)
       this.hud.death(you, this.names, Math.floor(this.seed / 7))
       if (s.phase.tag === "Over" && Math.floor(t) !== Math.floor(t - dt)) this.renderEnd()
     }
@@ -1518,7 +1566,7 @@ export class Game {
       const px = (Math.tan(spread) / Math.tan(((camera.fov / 2) * Math.PI) / 180)) * (innerHeight / 2)
       this.hud.crosshair(Math.min(60, px * 1.6), view.crosshair)
     }
-    const free = this.overlay === "none" && !this.chatting && s?.phase.tag !== "Over"
+    const free = this.overlay === "none" && !this.chatting && s?.phase.tag !== "Over" && !this.trainingEnded
     const device = this.controls.device
     this.hud.clickToPlay(!this.controls.active && free && !this.boardOpen, device)
     this.hud.layFor(device)

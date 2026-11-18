@@ -188,6 +188,12 @@ export class Hub {
       room.sim.report(id, msg.a)
       return
     }
+    // A step the player's device cannot perform: only a training takes the word for it.
+    if (msg.t === "unavailable") {
+      if (!room?.training) return this.send(peer, { t: "error", code: "invalid" })
+      room.sim.unavailable(id, msg.station, msg.step, msg.device)
+      return
+    }
     if (!room) return
     // A training has no host tools, and its player stays a Benandante.
     if (room.training && (msg.t === "team" || msg.t === "start" || msg.t === "bot" || msg.t === "level")) return

@@ -50,6 +50,8 @@ export interface Strings {
     readonly completeSub: string
     /** The match menu's line in place of the room's reach. */
     readonly menuLine: string
+    /** The completion screen's ways on (the third, a one-tap match, is the home screen's own). */
+    readonly done: { readonly home: string; readonly stations: string }
   }
   readonly teams: Record<Team, { readonly name: string; readonly motto: string }>
   readonly modes: Record<ModeId, { readonly name: string; readonly sub: string; readonly rules: string }>
@@ -394,7 +396,8 @@ const fur: Strings = {
     stationDone: "Stazion finide",
     complete: "Dutrine finide!",
     completeSub: "Cumò tu sâs dut: va a zuiâ",
-    menuLine: "Dutrine · Offline, dome tu"
+    menuLine: "Dutrine · Offline, dome tu",
+    done: { home: "Torne al inizi", stations: "Liste des stazions" }
   },
   teams: {
     benandanti: { name: "Benandants", motto: "Pal racolt e pe glesie!" },
@@ -794,7 +797,8 @@ const it: Strings = {
     stationDone: "Stazione completata",
     complete: "Dutrine completata!",
     completeSub: "Ora sai tutto: vai a giocare",
-    menuLine: "Dutrine · Offline, solo tu"
+    menuLine: "Dutrine · Offline, solo tu",
+    done: { home: "Torna all'inizio", stations: "Elenco delle stazioni" }
   },
   teams: {
     benandanti: { name: "Benandanti", motto: "Per il raccolto e per la chiesa!" },

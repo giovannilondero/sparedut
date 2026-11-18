@@ -3,7 +3,7 @@
  * after respawn. Armor, deaths, kills, assists, streaks, points.
  */
 import { STREAK_AT } from "../../folklore.ts"
-import { spared, SPARED_HP } from "../../training/spared.ts"
+import { killsScore, spared, SPARED_HP } from "../../training/spared.ts"
 import type { KillCause } from "../events.ts"
 import { absorb, ASSIST_WINDOW_TICKS, hostile, MAX_HP, RESPAWN_TICKS } from "../rules.ts"
 import { Attackers, Damage, Game, Heal, Life, Match, Motion, Out, Player, Rules, Score, Stats, TeamOf, Tick, Training } from "../schema.ts"
@@ -52,6 +52,8 @@ export const ApplyDamage = Game.System(
     // The training spares the trainee (the one player who is not a bot) before the skirmish.
     const training = machines.training.get()
     const sparing = (training._tag === "Arriving" || training._tag === "Step") && spared(training.station)
+    // Kills score in a Bataie di Gnot, and in the training's skirmish, which is one.
+    const scoring = rules.mode === "bataie" || (training._tag === "Step" && killsScore(training.station))
 
     for (const h of heals) {
       const target = bySession.get(h.target)
@@ -113,12 +115,12 @@ export const ApplyDamage = Game.System(
           best: Math.max(ks.best, streak),
           score: ks.score + 100
         })
-        if (live && rules.mode === "bataie") {
+        if (live && scoring) {
           const team = data.team.get(killer)
           resources.score.update((s) => ({ ...s, [team]: s[team] + 1 }))
         }
         if (STREAK_AT.has(streak)) events.out.emit({ t: "streak", s: hit.attacker ?? "", n: streak })
-      } else if (live && rules.mode === "bataie" && (self || hit.weapon === "fall")) {
+      } else if (live && scoring && (self || hit.weapon === "fall")) {
         // Suicide: the point goes to the other team. The sbilf laughs.
         const other = victimTeam === "benandanti" ? "malandanti" : "benandanti"
         resources.score.update((s) => ({ ...s, [other]: s[other] + 1 }))

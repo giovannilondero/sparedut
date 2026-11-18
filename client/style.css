@@ -356,6 +356,8 @@ html[data-device="touch"] :is(#menu, #hud .overlay) kbd, html[data-device="touch
 @media (pointer: coarse) {
   .overlay .overlay-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); }
   @container overlay (inline-size <= 40rem) { #pause .overlay-actions > #p-resume { grid-column: 1 / -1; } }
+  /* The training's completion screen: the one-tap match first, across both columns. */
+  @container overlay (inline-size <= 40rem) { #endscreen .training-done > #c-play { grid-column: 1 / -1; order: -1; } }
   /* A wide, short menu (a phone on its side): the roster and the host tools side by side, so the host's controls show without scrolling. */
   @container overlay (inline-size > 40rem) {
     #pause .overlay-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 0 16px; }

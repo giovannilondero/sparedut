@@ -14,6 +14,8 @@ import type { StormValue } from "./sim/rules.ts"
 import type { CartView, PhaseView, TrainingView } from "./sim/view.ts"
 import { PRIMARIES, type PrimaryId, type ProjectileKind, type WeaponId } from "./weapons.ts"
 import { INTERFACE_ACTIONS } from "./training/interface.ts"
+import { STATION_IDS, stepsOf } from "./training/index.ts"
+import { DEVICES } from "./devices.ts"
 
 export const PROTOCOL_VERSION = 14
 export const MAX_PLAYERS = 16
@@ -114,7 +116,11 @@ export const ClientMessage = z.discriminatedUnion("t", [
   /** The match menu opened or closed, the tab hidden or shown. Only an Offline room pauses; the server ignores it. */
   z.object({ t: z.literal("pause"), paused: z.boolean() }),
   /** How the player did something the simulation cannot see (`shared/training/interface.ts`). Only a training accepts it. */
-  z.object({ t: z.literal("report"), a: z.enum(INTERFACE_ACTIONS) })
+  z.object({ t: z.literal("report"), a: z.enum(INTERFACE_ACTIONS) }),
+  /** The player's active device has no control for this step of the training (`shared/training/controls.ts`). Only a training accepts it. */
+  z
+    .object({ t: z.literal("unavailable"), station: z.enum(STATION_IDS), step: z.string(), device: z.enum(DEVICES) })
+    .refine((m) => (stepsOf(m.station) as readonly string[]).includes(m.step))
 ])
 export type ClientMessage = z.infer<typeof ClientMessage>
 

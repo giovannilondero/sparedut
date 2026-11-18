@@ -126,6 +126,38 @@ stick sinistro muoversi (analogico) · stick destro guardare · `R2` sparare · 
 `R3` mescul · `L1` bomba · `R1` mina · `Share` classifica · `Touchpad` armeria · `Options` menu di partita. Il pad vibra quando spari e quando ti colpiscono.
 I menu fuori dalla partita si usano ancora col mouse.
 
+## La Dutrine
+
+La **Dutrine** è l'allenamento: un giocatore solo, sempre offline (anche senza server), sulla sua piccola mappa, la **Sagre dal Frico**:
+una sagra di paese con le stazioni come bancarelle in fila lungo la strada e, in fondo, una piazzetta per le modalità e la scaramuccia.
+Si apre dalla schermata iniziale (*Impare a zuiâ*) e serve un nome, come per ogni stanza. Si gioca da Benandante, senza fuoco amico,
+senza riscaldamento, orologio né punteggio limite: finisce quando l'ultimo passo è fatto.
+
+Ogni stazione chiede alcuni passi, in ordine; il pannello dice la stazione, il passo con il comando del dispositivo in uso
+(tastiera, controller o touch) e quante volte manca. La strada verso la stazione dopo resta sbarrata finché la stazione non è finita.
+
+| | |
+|---|---|
+| 1. Cjale e cjamine | guardarsi attorno e camminare |
+| 2. Il percors | saltare la sbarra, passare accucciati sotto la trave, correre |
+| 3. Simpri cun te | la Mandi, mirare, ricaricare, il mescul, sfondare una porta |
+| 4. Gambiâ arme | per numero, l'arma precedente, con la rotella |
+| 5. Lis bancjarelis | le armi principali, una bancarella ciascuna (la Cassele è dal medico) |
+| 6. La armarie | scegliere la propria arma principale |
+| 7. Bombis e minis | la bomba di sgnape e la mina di Raibl |
+| 8. Robe di cjapâ sù | frico, gubane, sgnape, munizions |
+| 9. La mitraie e il Lanciafrico | salire sulla torretta, surriscaldarla, scendere; raccogliere e sparare il Lanciafrico |
+| 10. Il miedi | curare un compagno ferito con la Cassele dal Miedi |
+| 11. Lis modalitâts | portare a casa il frico, tenere la plaçute, spingere il cjar, restare dentro la tempesta |
+| 12. La scaramucie | vincere una breve Bataie di Gnot contro due bot che sparano, aprire la classifica, mandare una frase rapida |
+
+Prima della scaramuccia i bot delle stazioni non sparano e non si muore: un colpo che ucciderebbe lascia un punto di salute.
+Nella scaramuccia i bot sparano, alla bravura più bassa (Zovin), si muore davvero e si rinasce dalla parte della scaramuccia;
+la vincono i Benandanti a 5 punti, uno per nemico abbattuto, contati da quando comincia.
+Un passo che il dispositivo in uso non ha (le frasi rapide sul controller, l'arma precedente sul controller e sul touch)
+è segnato come non disponibile e si completa da solo.
+Alla fine la schermata della Dutrine offre tre strade: tornare all'inizio, l'elenco delle stazioni, una partita contro i bot in un tocco.
+
 ## Struttura
 
 Stack dalle linee guida (`giovannilondero/game-dev-guidelines`, 3D): **Ritmo** (ECS e simulazione) + **Three.js** + **Howler.js** + **Rapier 3D**.
@@ -137,6 +169,7 @@ Stack dalle linee guida (`giovannilondero/game-dev-guidelines`, 3D): **Ritmo** (
 - `shared/weapons.ts`, `shared/folklore.ts`: armi, squadre, modalità, bot (solo dati, senza lingua)
 - `client/i18n.ts`: tutti i testi in friulano e italiano: menu, HUD, battute, consigli, vocabolario
 - `shared/protocol.ts`: messaggi client ↔ server, validati con zod
+- `shared/training/`: la Dutrine come dati: stazioni e passi in ordine, cosa completa ogni passo, quali dispositivi hanno ogni comando; i testi sono in `client/training-text/`, il giocatore automatico dei test in `test/trainee/`
 - `server/`: server autoritativo Bun (stanze, rete locale, codici), bot e loro grafo di navigazione; `worker.ts` è lo stesso server in un Durable Object
 - `client/offline.ts`, `client/host.worker.ts`: le stanze offline, ospitate in un worker del browser dallo stesso `Hub` del server (vedi `docs/adr/0001-offline-rooms-hosted-in-the-browser.md`)
 - `server/nav-graphs.ts`: i grafi dei bot precalcolati (costano decine di secondi di CPU); `pnpm nav` li rifà quando cambia una mappa, il movimento o la fisica, e `test/nav.test.ts` controlla che siano aggiornati
