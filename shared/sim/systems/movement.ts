@@ -2,12 +2,11 @@
  * Movement of the living with the shared physics, and pose memory for
  * lag compensation.
  */
-import { BUTTON, type PlayerInput } from "../../input.ts"
+import { BUTTON } from "../../input.ts"
 import { turretAim, turretSeat } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
 import { seatedBody, stepBody } from "../../movement.ts"
-import { WEAPONS } from "../../weapons.ts"
-import { owned, SGNAPE_SPEED, turretOf } from "../rules.ts"
+import { speedScale, turretOf } from "../rules.ts"
 import { Arsenal, Controls, Damage, Flags, Game, History, Life, Match, Motion, Out, Physics, Player, Rules, Tick, Turrets, type PoseRecord } from "../schema.ts"
 
 const HISTORY_TICKS = 40
@@ -54,9 +53,7 @@ export const MovePlayers = Game.System(
         continue
       }
       const arsenal = data.arsenal.get(m)
-      const buff = (arsenal.sgnape > 0 ? SGNAPE_SPEED : 1) * (carriers.has(session) ? 0.9 : 1)
-      // Weapon weight is that of the one requested in the command (if you own it): the way prediction computes it.
-      const scaleFor = (input: PlayerInput) => WEAPONS[owned(arsenal, input.weapon) ? input.weapon : arsenal.current].moveScale * buff
+      const carrier = carriers.has(session)
       // One step per arrived command. Without commands for a while (stalled network), you fall
       // anyway: a standing step, no jump.
       const steps =
@@ -65,7 +62,7 @@ export const MovePlayers = Game.System(
         : []
       let body = data.motion.get(m).body
       for (const input of steps) {
-        const step = stepBody(body, input, services.physics, scaleFor(input))
+        const step = stepBody(body, input, services.physics, speedScale(arsenal, input.weapon, carrier))
         body = step.body
         if (step.launchedBy) events.out.emit({ t: "pad", s: session })
         if (step.fellOut) {

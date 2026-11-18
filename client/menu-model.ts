@@ -6,8 +6,8 @@
 import { BOT_LEVEL_IDS, ROOM_MODE_IDS, type BotLevel, type RoomModeId } from "../shared/folklore.ts"
 import { ROOM_MAP_IDS, type RoomMapId } from "../shared/maps/index.ts"
 import { ACCESSES, MAX_BOTS, Password, REACHES, RoomCode, type Access, type ErrorCode, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
-import type { PrimaryId } from "../shared/weapons.ts"
-import type { Lang } from "./i18n.ts"
+import { CLASSES, type PrimaryId } from "../shared/weapons.ts"
+import type { Lang, Strings } from "./i18n.ts"
 import type { TrainingStart } from "../shared/training/start.ts"
 import { oneTapRoom, trainingCompleted, trainingStart, type Settings, type TrainingInvitation } from "./settings.ts"
 
@@ -25,6 +25,12 @@ export type Remembered = Settings
 
 /** The settings form's values: the same form in the menu and in a match. */
 export type FormSetting = "sensitivity" | "fov" | "master" | "music" | "quality" | "crouch" | "autoRes" | "showInfo" | "invertY"
+
+/** A primary's class as the armoury and the Muster show it: its health, and its speed as a share of the walk. */
+export const classFigures = (s: Strings, primary: PrimaryId): readonly (readonly [label: string, value: string])[] => [
+  [s.menu.stat.health, `${CLASSES[primary].hp}`],
+  [s.menu.stat.speed, `${Math.round(CLASSES[primary].speed * 100)}%`]
+]
 
 export const SCREENS = ["home", "create", "password", "armarie", "settings", "vocabolari"] as const
 export type Screen = (typeof SCREENS)[number]

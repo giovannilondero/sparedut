@@ -230,6 +230,8 @@ export interface BoardRow {
   readonly name: string
   readonly team: Team
   readonly bot: boolean
+  /** Their primary, and so their class. */
+  readonly primary: PrimaryId
   readonly kills: number
   readonly deaths: number
   readonly assists: number

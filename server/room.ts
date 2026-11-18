@@ -22,7 +22,7 @@ import {
 } from "../shared/protocol.ts"
 import { createSim, type GameEvent, type PostValue, type Sim, type WorldView } from "../shared/sim/index.ts"
 import { isTraining, TRAINING, type StationId } from "../shared/training/index.ts"
-import type { StationBot } from "../shared/training/station.ts"
+import { STATION_BOT_PRIMARY, type StationBot } from "../shared/training/station.ts"
 import type { TrainingStart } from "../shared/training/start.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 import { BotBrain } from "./bot.ts"
@@ -35,8 +35,6 @@ const MAX_QUEUE = 20
 const STEPS_PER_TICK = 3
 /** Steps that can accumulate during lag, to be caught up afterwards. */
 const MAX_CREDIT = 12
-/** What a station's bot carries: a bot that fires uses it. */
-const STATION_BOT_PRIMARY: PrimaryId = "cramar"
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
 export interface Member {
@@ -355,6 +353,7 @@ export class Room {
       name: p.name,
       team: p.team,
       bot: p.bot,
+      primary: p.arsenal.primary,
       kills: p.stats.kills,
       deaths: p.stats.deaths,
       assists: p.stats.assists,

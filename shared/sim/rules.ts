@@ -3,10 +3,9 @@
  * the storm.
  */
 import type { MapDef, Spawn, Team } from "../map.ts"
-import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../weapons.ts"
+import { CLASSES, RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../weapons.ts"
 import type { Ammo, ArsenalValue, CartValue, FlagState, HillValue, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
 
-export const MAX_HP = 100
 export const MAX_ARMOR = 100
 export const RESPAWN_TICKS = 180
 /** After sprinting the weapon comes back up in this many ticks (server and client prediction). */
@@ -14,6 +13,14 @@ export const RAISE_TICKS = 12
 export const SHIELD_TICKS = 90
 export const SGNAPE_TICKS = 600
 export const SGNAPE_SPEED = 1.3
+/** Carrying the frico slows you down. */
+export const CARRIER_SPEED = 0.9
+
+/** A class's maximum health: what its player spawns with, and where every heal stops. */
+export const maxHp = (primary: PrimaryId) => CLASSES[primary].hp
+
+/** Health that a change of primary leaves: no more than the new class's maximum. */
+export const hpFor = (primary: PrimaryId, hp: number) => Math.min(hp, maxHp(primary))
 export const ASSIST_WINDOW_TICKS = 600
 export const OVER_TICKS = 15 * 60
 /** Warmup ends on its own 30 s after creation; the host can start earlier. */
@@ -119,8 +126,16 @@ export function freshArsenal(primary: PrimaryId): ArsenalValue {
 export const NO_STATS: StatsValue = { kills: 0, deaths: 0, assists: 0, caps: 0, score: 0, damage: 0, headshots: 0, streak: 0, best: 0 }
 
 /** The weapons the player can hold right now (the mitraie isn't held: you use the turret). */
-export const owned = (a: ArsenalValue, id: WeaponId) =>
+export const owned = (a: Pick<ArsenalValue, "primary" | "launcher">, id: WeaponId) =>
   id === "mescul" || id === "mandi" || id === a.primary || (id === "lanciafrico" && a.launcher)
+
+/**
+ * How fast a player moves, as a multiple of the walk: the class's base speed, times the multiplier
+ * of the weapon in hand (`requested`, if they own it; else the one they hold), times the sgnape and
+ * carrying the frico. The simulation and the client's prediction both move with it.
+ */
+export const speedScale = (a: Pick<ArsenalValue, "primary" | "current" | "launcher" | "sgnape">, requested: WeaponId, carrier: boolean) =>
+  CLASSES[a.primary].speed * WEAPONS[owned(a, requested) ? requested : a.current].moveScale * (a.sgnape > 0 ? SGNAPE_SPEED : 1) * (carrier ? CARRIER_SPEED : 1)
 
 /** The weapon a number key selects: the one in that slot the player owns (in slot 1, the primary), or null. */
 export const weaponInSlot = (a: ArsenalValue, slot: Slot): WeaponId | null => WEAPON_IDS.find((id) => WEAPONS[id].slot === slot && owned(a, id)) ?? null
