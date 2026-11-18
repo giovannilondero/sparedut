@@ -23,6 +23,7 @@ import { Link } from "./connection.ts"
 import { PerfMonitor } from "./perf.ts"
 import { loadSettings, saveSettings } from "./settings.ts"
 import type { WorldScene } from "./contracts.ts"
+import { touchLayoutFromUrl } from "./touch.ts"
 import { createViewmodel } from "./viewmodel.ts"
 import { createWorld } from "./world.ts"
 
@@ -37,6 +38,8 @@ renderer.toneMappingExposure = 1.05
 renderer.info.autoReset = false
 const perf = new PerfMonitor(renderer)
 const look = createLook(lookFromUrl(), renderer)
+/** The touch layout under trial (`?touch=a|b|c`), read once now: the address loses its query later (a room link replaces it). */
+const touchLayoutId = touchLayoutFromUrl(location.search)
 mountLookSwitcher(look.id)
 
 /** The maximum pixel ratio per quality; dynamic resolution goes down to `minRatio`. */
@@ -210,7 +213,8 @@ const physicsReady = initPhysics().then(() => {
     saveSettings: () => saveSettings(settings),
     onLeave: backToMenu,
     inviteBase,
-    roomPassword: () => roomPassword
+    roomPassword: () => roomPassword,
+    touchLayout: touchLayoutId
   })
   game.setQuality(quality)
 })
