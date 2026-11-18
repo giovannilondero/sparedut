@@ -172,9 +172,13 @@ export class Menu {
     $<HTMLElementTagNameMap["ui-switch"]>("s-info").checked = this.settings.showInfo
   }
 
+  /**
+   * Shows or hides the menu, back on the home screen either way. Hidden for a match, it closes the
+   * password prompt too: a modal dialog left open would keep the match inert under it.
+   */
   show(on: boolean) {
+    this.go("home")
     $("menu").classList.toggle("hidden", !on)
-    if (on) this.go("home")
   }
 
   status(text: string) {
