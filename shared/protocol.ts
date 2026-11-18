@@ -17,6 +17,8 @@ import { PRIMARIES, type PrimaryId, type ProjectileKind, type WeaponId } from ".
 export const PROTOCOL_VERSION = 13
 export const MAX_PLAYERS = 16
 export const SNAPSHOT_EVERY = 2 // ticks: 30 snapshots per second
+/** The longest round trip a client reports, in milliseconds. */
+export const RTT_MAX = 10_000
 
 const team = z.enum(["benandanti", "malandanti"])
 /** Control and text-direction characters (U+202E flips a name): stripped from names and chat. */
@@ -102,7 +104,7 @@ export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("start") }),
   z.object({ t: z.literal("bot"), team, delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ t: z.literal("level"), level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]) }),
-  z.object({ t: z.literal("ping"), c: z.number(), rtt: z.number().min(0).max(10000).optional() }),
+  z.object({ t: z.literal("ping"), c: z.number(), rtt: z.number().min(0).max(RTT_MAX).optional() }),
   /** The match menu opened or closed, the tab hidden or shown. Only an Offline room pauses; the server ignores it. */
   z.object({ t: z.literal("pause"), paused: z.boolean() })
 ])
