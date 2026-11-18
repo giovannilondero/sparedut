@@ -58,6 +58,8 @@ export interface Seen {
   readonly events: readonly GameEvent[]
   /** How many reports of the step's own interface action (`StepRule.report`) arrived this tick; 0 for a step without one. */
   readonly reported: number
+  /** Each team's score, which an objective in force raises (`PlayObjectives`). */
+  readonly score: Readonly<Record<Team, number>>
 }
 
 /** A step's progress: how many times its action happened, and a number the step keeps for itself. */
@@ -78,21 +80,23 @@ export interface StepRule {
   readonly target: number
   /** An interface step's action: the client's report of it reaches `advance` as `Seen.reported` (`./interface.ts`). */
   readonly report?: InterfaceAction
+  /** What the trainee is given, and the objective put in force, on the tick the step becomes current. */
+  readonly given?: StepGiven
   readonly begin: (seen: Seen) => StepProgress
   readonly advance: (seen: Seen, now: StepProgress) => StepProgress
-  /** What the trainee is given on the tick the step becomes current; a step without it changes nothing. */
-  readonly given?: StepGiven
 }
 
 /**
- * What a step gives the trainee as it begins. Giving a weapon refills every weapon's ammunition;
- * the primary chosen for the next respawn stays the trainee's own.
+ * What a step gives the trainee on the tick it becomes current. A step without it changes nothing:
+ * the objective in force stays the one before it (the station's, for its first step).
  */
 export interface StepGiven {
-  /** The primary carried for the step (station 5's stalls: one each). */
+  /** The primary carried for the step (station 5's stalls: one each). Giving a weapon refills every weapon's ammunition; the primary chosen for the next respawn stays the trainee's own. */
   readonly primary?: PrimaryId
   /** The weapon in hand as the step begins. */
   readonly hold?: WeaponId
+  /** The objective put in force, its state fresh (the frico at its bases, the plaçute free, the cjar at the start). */
+  readonly objective?: ObjectiveId
 }
 
 /**
@@ -130,6 +134,8 @@ export interface StationSetup {
   readonly ammo?: AmmoSetup
   /** Pickups put back on arrival (indices in the map's `pickups`), so they are there however recently they were taken. */
   readonly pickups?: readonly number[]
+  /** Bombs and mines given back whenever the last one is used while the station is current, so a miss never leaves a step undoable. */
+  readonly restock?: boolean
 }
 
 /**

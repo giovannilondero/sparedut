@@ -10,9 +10,9 @@
 import { SAGRE, SAGRE_STATIONS } from "../../maps/sagre.ts"
 import { STATION_IDS, STATIONS, stepRule, stepsOf } from "../../training/index.ts"
 import type { Seen, StepRule } from "../../training/station.ts"
-import { WEAPON_IDS } from "../../weapons.ts"
+import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS } from "../../weapons.ts"
 import { freshArsenal, freshDoors, MAX_HP } from "../rules.ts"
-import { Arsenal, Controls, Doors, Game, Life, Motion, Objective, Out, Pickups, Player, ReportInterface, Tick, Training, type ArsenalValue } from "../schema.ts"
+import { Arsenal, Cart, Controls, Doors, Flags, Game, Hill, Life, Motion, Objective, Out, Pickups, Player, ReportInterface, Score, Tick, Training, type ArsenalValue } from "../schema.ts"
 
 /** Where the trainee is after a station completes: at the next station's first step, or done. */
 type Next = { readonly _tag: "Step"; readonly station: number; readonly step: number; readonly count: number; readonly mark: number; readonly unlocked: number } | { readonly _tag: "Complete" }
@@ -42,7 +42,11 @@ export const PlayTraining = Game.System(
       tick: Game.System.readResource(Tick),
       objective: Game.System.writeResource(Objective),
       pickups: Game.System.writeResource(Pickups),
-      doors: Game.System.writeResource(Doors)
+      doors: Game.System.writeResource(Doors),
+      score: Game.System.readResource(Score),
+      flags: Game.System.writeResource(Flags),
+      hill: Game.System.writeResource(Hill),
+      cart: Game.System.writeResource(Cart)
     },
     events: { happened: Game.System.readEvent(Out), out: Game.System.writeEvent(Out), reports: Game.System.readEvent(ReportInterface) },
     machines: { training: Game.System.updateMachine(Training) },
@@ -84,18 +88,28 @@ export const PlayTraining = Game.System(
           arsenal: data.arsenal.get(trainee)
         },
         events: happened,
-        reported: rule ? reported(rule.report) : 0
+        reported: rule ? reported(rule.report) : 0,
+        score: resources.score.get()
       }
     }
 
-    /** What a step gives as it begins (`StepRule.given`): a primary and the weapon in hand, ammunition refilled. */
+    // A step's `given`, applied on the tick the step becomes current: a primary and the weapon in hand
+    // with ammunition refilled (#44, the stalls), the objective in force (#48).
     const give = (rule: StepRule) => {
       const given = rule.given
-      if (given?.primary === undefined && given?.hold === undefined) return
-      const now = data.arsenal.get(trainee)
-      const primary = given.primary ?? now.primary
-      const fresh = freshArsenal(primary)
-      data.arsenal.set(trainee, { ...fresh, nextPrimary: now.nextPrimary, launcher: now.launcher, current: given.hold ?? (given.primary ? primary : now.current) })
+      if (given === undefined) return
+      if (given.primary !== undefined || given.hold !== undefined) {
+        const now = data.arsenal.get(trainee)
+        const primary = given.primary ?? now.primary
+        const fresh = freshArsenal(primary)
+        data.arsenal.set(trainee, { ...fresh, nextPrimary: now.nextPrimary, launcher: now.launcher, current: given.hold ?? (given.primary ? primary : now.current) })
+      }
+      const objective = given.objective
+      if (objective === undefined) return
+      resources.objective.set(objective)
+      if (objective === "frico") resources.flags.set({ benandanti: { _tag: "base" }, malandanti: { _tag: "base" } })
+      if (objective === "placute") resources.hill.set({ owner: null, contested: false, ticks: 0 })
+      if (objective === "cjar") resources.cart.set({ d: 0, pushers: 0, contested: false, idle: 0 })
     }
 
     /** Arrives at station `from` (and past any station with no steps): its setup applied, its first step begun. */
@@ -108,6 +122,8 @@ export const PlayTraining = Game.System(
         open = Math.max(open, index + 1)
       }
       if (index >= STATION_IDS.length) {
+        // A completed training teaches no objective: none is left in force (#48).
+        resources.objective.set("none")
         events.out.emit({ t: "training", a: "complete" })
         return { _tag: "Complete" }
       }
@@ -157,6 +173,13 @@ export const PlayTraining = Game.System(
     const id = STATION_IDS[state.station]
     const steps = stepsOf(id)
     const rule = stepRule(id, steps[state.step])
+
+    // A station that restocks gives bombs and mines back as soon as the last one is used.
+    if (STATIONS[id].setup.restock) {
+      const a = data.arsenal.get(trainee)
+      if (a.bombs === 0 || a.mines === 0) data.arsenal.set(trainee, { ...a, bombs: a.bombs || SGNAPE_BOMB.perLife, mines: a.mines || RAIBL_MINE.perLife })
+    }
+
     const now = rule.advance(seen(rule), { count: state.count, mark: state.mark })
     const count = Math.min(rule.target, now.count)
     let next: Next

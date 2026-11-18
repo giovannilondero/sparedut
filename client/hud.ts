@@ -225,7 +225,7 @@ export class Hud {
       this.text("score-mal", "")
       this.text("clock", "")
       this.text("mode-label", `${s.modes[mode].name} · ${s.modes[mode].sub}`)
-      this.html("objective", "")
+      this.html("objective", this.objectiveLine(snap, names))
       this.html("banner", "")
       return
     }
@@ -239,8 +239,18 @@ export class Hud {
     const phase = snap.phase
     this.text("clock", phase.tag === "Live" ? fmtClock(phase.ends - snap.tick) : phase.tag === "Warmup" ? fmtClock(WARMUP_TICKS - snap.tick) : s.hud.over)
     this.text("mode-label", alone ? `${s.modes[mode].name} · ${s.modes[mode].sub}` : s.hud.modeLabel(s.modes[mode].name, MODES[mode].scoreLimit))
+    this.html("objective", this.objectiveLine(snap, names))
+    this.html(
+      "banner",
+      phase.tag === "Warmup" ? s.hud.warmup(fmtClock(WARMUP_TICKS - snap.tick), menuControl(device)) : outside ? `<b class="storm">${s.hud.stormOutside}</b>` : ""
+    )
+  }
+
+  /** The state of the objective in force (`snap.objective`), and nothing for any other: in a regular room it is its mode's, in a training the current step's. */
+  private objectiveLine(snap: Snapshot, names: Map<string, string>) {
+    const s = t()
     let obj = ""
-    if (mode === "frico") {
+    if (snap.objective === "frico") {
       obj = (["benandanti", "malandanti"] as const)
         .map((team) => {
           const f = snap.flags[team]
@@ -248,23 +258,19 @@ export class Hud {
           return `<span class="${team === "benandanti" ? "ben" : "mal"}">🧀 ${state}</span>`
         })
         .join(" · ")
-    } else if (mode === "culine") {
+    } else if (snap.objective === "placute") {
       const h = snap.hill
       const color = h.owner ? TEAM_INFO[h.owner].color : "#888"
       const label = h.contested ? s.hud.contested : h.owner ? s.hud.hillOwned(s.teams[h.owner].name) : s.hud.hillFree
       obj = `${label}<div class="hillbar"><i style="width:${((h.ticks % 60) / 60) * 100}%;background:${color}"></i></div>`
-    } else if (mode === "cjar" && snap.cart) {
+    } else if (snap.objective === "cjar" && snap.cart) {
       const c = snap.cart
       const pct = Math.floor(c.progress * 100)
       const state = c.contested ? s.hud.cartStop : c.pushers > 0 ? s.hud.cartPush(c.pushers) : c.back ? s.hud.cartBack : s.hud.cartIdle
       const color = c.contested ? "#ffb347" : TEAM_INFO.benandanti.color
       obj = `${s.hud.cart(pct)} · ${state}<div class="hillbar"><i style="width:${pct}%;background:${color}"></i></div>`
     }
-    this.html("objective", obj)
-    this.html(
-      "banner",
-      phase.tag === "Warmup" ? s.hud.warmup(fmtClock(WARMUP_TICKS - snap.tick), menuControl(device)) : outside ? `<b class="storm">${s.hud.stormOutside}</b>` : ""
-    )
+    return obj
   }
 
   killfeed(k: string | null, v: string, w: KillCause, head: boolean, names: Map<string, string>, teams: Map<string, Team>, me: string, seed: number) {
