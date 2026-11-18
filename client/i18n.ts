@@ -212,6 +212,10 @@ export interface Strings {
     readonly doorSub: string
     readonly panelTorn: Fn<[string]>
     readonly panelSub: string
+    /** The casot's panel taken from the ground; broken in my hands, gone for the match. */
+    readonly panelTaken: string
+    readonly panelBroken: string
+    readonly panelBrokenSub: string
     /** The gjaline's feathers in the eyes. */
     readonly plumis: string
   }
@@ -733,6 +737,9 @@ const fur: Strings = {
     doorSub: "Dentri e je fieste: i fenicotars a balin",
     panelTorn: (who) => `${who} al à gjavât vie il panel dal casot!`,
     panelSub: "Tal mûr e reste une buse: si pues tirâ traviers",
+    panelTaken: "Tu âs cjapât sù il panel",
+    panelBroken: "Il to panel al è lât in tocs!",
+    panelBrokenSub: "Nol torne fin ae prossime partide",
     plumis: "Plumis tai vôi!"
   },
   loadout: {
@@ -1195,6 +1202,9 @@ const it: Strings = {
     doorSub: "Dentro c'è festa: i fenicotteri ballano",
     panelTorn: (who) => `${who} ha strappato il pannello del capanno!`,
     panelSub: "Nel muro resta un buco: ci si spara attraverso",
+    panelTaken: "Hai raccolto il pannello",
+    panelBroken: "Il tuo pannello è andato in pezzi!",
+    panelBrokenSub: "Non torna fino alla prossima partita",
     plumis: "Piume negli occhi!"
   },
   loadout: {

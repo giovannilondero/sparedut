@@ -11,7 +11,7 @@ import type { GameEvent } from "./events.ts"
 import { freshDoors, freshPanels, freshPickups, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL } from "./rules.ts"
 import { simulate } from "./schedule.ts"
 import type { Device } from "../devices.ts"
-import { CancelCountdown, ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, GoToStation, StartMatch, StepUnavailable, Training, type PostValue, type RulesValue } from "./schema.ts"
+import { CancelCountdown, SetSingle, ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, GoToStation, StartMatch, StepUnavailable, Training, type PostValue, type RulesValue } from "./schema.ts"
 import type { InterfaceAction } from "../training/interface.ts"
 import { isTraining, STATION_IDS, type StationId, type StepId } from "../training/index.ts"
 import { arrival, FIRST_START, type TrainingStart } from "../training/start.ts"
@@ -89,6 +89,8 @@ export function createSim(options: SimOptions) {
     start: (now: boolean) => runtime.send(StartMatch, { now }),
     /** The host cancels the Muster's countdown. */
     cancelCountdown: () => runtime.send(CancelCountdown, {}),
+    /** The host sets single weapon (null: off): taken only in the Muster, and never in a training. */
+    single: (single: PrimaryId | null) => runtime.send(SetSingle, { single }),
     /** The client's report of an interface step: only a training's current step that declares this action takes it. */
     report: (session: string, action: InterfaceAction) => runtime.send(ReportInterface, { session, action }),
     /** The client's word that its active device has no control for a step: only a training takes it, for its current step, when the step table agrees. */

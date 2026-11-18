@@ -58,14 +58,16 @@ export const Respawn = Game.System(
       const post = data.post?.get(m)
       const spot = post ?? chooseSpawn(spawnsFor(map, rules, team), enemies, rng.next() * 1000)
       // Under single weapon the class is the setting's primary's, whatever the player prefers.
-      const primary = primaryOf(rules, data.arsenal.get(m).nextPrimary)
+      const own = data.arsenal.get(m).nextPrimary
+      const primary = primaryOf(rules, own)
       data.life.transition(m, { from: "Dead", to: "Alive", data: { hp: post?.hp ?? maxHp(primary), armor: 0, shield: SHIELD_TICKS } })
       data.motion.set(m, {
         body: { x: spot.at[0], y: spot.at[1], z: spot.at[2], vx: 0, vy: 0, vz: 0, grounded: true, crouch: false },
         yaw: spot.yaw,
         pitch: 0
       })
-      data.arsenal.set(m, freshArsenal(primary, kitOf(rules)))
+      // The player's own primary stays as the next one, for when single weapon is off.
+      data.arsenal.set(m, { ...freshArsenal(primary, kitOf(rules)), nextPrimary: own })
       data.controls.update(m, (c) => ({
         input: { ...IDLE_INPUT, seq: c.input.seq, view: c.input.view, yaw: spot.yaw, weapon: primary },
         previous: c.input.buttons,
