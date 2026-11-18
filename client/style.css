@@ -422,7 +422,12 @@ html[data-device="touch"] :is(#menu, #hud .overlay) kbd, html[data-device="touch
 /* The training's match menu: the station list in place of the roster. Its title is ruled off from the
    list, which scrolls under the rule on a phone, never under the title's words. */
 #pause:has(.station-list) > ui-dialog-title { border-block-end: 1px solid var(--stone-line); padding-block-end: 6px; margin-block-end: 2px; }
-.station-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap: 6px; }
+/* The stations read down each column, then on to the next: as many columns as fit, of even length. */
+.station-list { list-style: none; margin: 4px 0 0; padding: 0; columns: 15rem; column-gap: 6px; }
+.station-list > li { break-inside: avoid; }
+.station-list > li + li { margin-block-start: 6px; }
+/* A lock is a taller glyph than a tick: the mark never sets its row's height, so the columns' rows line up. */
+.station-mark { line-height: 1; block-size: 1em; }
 .station-entry { inline-size: 100%; min-block-size: var(--tap); display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: start; font-size: 14px; padding: 6px 10px; }
 .station-entry.is-current { border-color: var(--gold); color: var(--gold); }
 .station-entry.is-done .station-mark { color: var(--gold); }
