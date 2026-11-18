@@ -11,7 +11,7 @@ import type { GameEvent } from "./events.ts"
 import { freshDoors, freshPanels, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL } from "./rules.ts"
 import { simulate } from "./schedule.ts"
 import type { Device } from "../devices.ts"
-import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, GoToStation, StartMatch, StepUnavailable, Training, type PickupState, type PostValue } from "./schema.ts"
+import { CancelCountdown, ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, GoToStation, StartMatch, StepUnavailable, Training, type PickupState, type PostValue } from "./schema.ts"
 import type { InterfaceAction } from "../training/interface.ts"
 import { isTraining, STATION_IDS, type StationId, type StepId } from "../training/index.ts"
 import { arrival, FIRST_START, type TrainingStart } from "../training/start.ts"
@@ -61,7 +61,7 @@ export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: H
       Rng: Random.seed(options.seed)
     },
     machines: Game.Runtime.machines(
-      Game.Runtime.machine(Match, training ? { _tag: "Live", ends: 0 } : { _tag: "Muster" }),
+      Game.Runtime.machine(Match, training ? { _tag: "Live", ends: 0 } : { _tag: "Muster", starts: null }),
       Game.Runtime.machine(Training, training ? { _tag: "Arriving", station: first.station, unlocked: first.unlocked, completed: first.completed, place: "facingStart" } : { _tag: "Off" })
     ),
     ...(debug ? { debug } : {})
@@ -81,7 +81,10 @@ export function createSim(options: SimOptions) {
     input: (session: string, input: PlayerInput) => runtime.send(InputArrived, { session, input }),
     team: (session: string, team: Team) => runtime.send(ChangeTeam, { session, team }),
     primary: (session: string, primary: PrimaryId) => runtime.send(ChangePrimary, { session, primary }),
-    start: () => runtime.send(StartMatch, {}),
+    /** The host's start: in the Muster the countdown (restarted if running) or, `now`, the match at once; in a match, back to the Muster. */
+    start: (now: boolean) => runtime.send(StartMatch, { now }),
+    /** The host cancels the Muster's countdown. */
+    cancelCountdown: () => runtime.send(CancelCountdown, {}),
     /** The client's report of an interface step: only a training's current step that declares this action takes it. */
     report: (session: string, action: InterfaceAction) => runtime.send(ReportInterface, { session, action }),
     /** The client's word that its active device has no control for a step: only a training takes it, for its current step, when the step table agrees. */

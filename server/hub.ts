@@ -166,7 +166,7 @@ export class Hub {
           }
           limits.wrong = 0
         }
-        if (target.full && ![...target.members.values()].some((m) => m.bot)) return this.send(peer, { t: "error", code: "full" })
+        if (!target.admitsAnother) return this.send(peer, { t: "error", code: "full" })
         this.leave(peer)
         this.enter(peer, target, msg.primary)
         this.roomChanged(target)
@@ -203,7 +203,7 @@ export class Hub {
     }
     if (!room) return
     // A training has no host tools, and its player stays a Benandante.
-    if (room.training && (msg.t === "team" || msg.t === "start" || msg.t === "bot" || msg.t === "level")) return
+    if (room.training && (msg.t === "team" || msg.t === "start" || msg.t === "ready" || msg.t === "cancel" || msg.t === "bot" || msg.t === "level")) return
     switch (msg.t) {
       case "input":
         room.queueInput(id, msg.i)
@@ -216,14 +216,26 @@ export class Hub {
         this.roomChanged(room)
         return
       case "primary":
-        room.setPrimary(id, msg.p)
-        this.roomChanged(room)
+        if (room.setPrimary(id, msg.p)) this.roomChanged(room)
         return
       case "chat":
         room.chat(id, msg.text)
         return
       case "start":
-        if (room.hostId === id) room.start()
+        if (room.hostId !== id) return
+        room.start()
+        // The host's start is the host's ready mark too.
+        this.roomChanged(room)
+        return
+      case "ready":
+        room.setReady(id, msg.ready)
+        this.roomChanged(room)
+        return
+      case "cancel":
+        if (room.hostId === id) room.cancelCountdown()
+        return
+      case "enter":
+        if (room.enter(id)) this.roomChanged(room)
         return
       case "bot":
         if (room.hostId !== id) return

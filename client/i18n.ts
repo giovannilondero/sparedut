@@ -225,6 +225,9 @@ export interface Strings {
     readonly start: string
     readonly restart: string
     readonly hostOnly: string
+    /** The player's primary, read-only in a match: its label, and where it is changed. */
+    readonly primary: string
+    readonly primaryFixed: string
     /** The host tools' label. */
     readonly host: string
     /** The host's buttons that add or remove a bot in a team (its short name). */
@@ -261,6 +264,16 @@ export interface Strings {
     readonly primary: string
     readonly chat: string
     readonly chatPlaceholder: string
+    /** Joining a match already on: the confirm that puts the player on the map. */
+    readonly enter: string
+    /** Joining a Tampieste already on: entering now plays from the next match. */
+    readonly nextMatch: string
+    /** The ready mark: the toggle that sets and takes it back, and the mark beside a ready member. */
+    readonly ready: string
+    /** The host cancels the countdown. */
+    readonly cancel: string
+    /** The countdown: whole seconds left before the match. */
+    readonly countdown: Fn<[number]>
   }
   readonly perf: { readonly snaps: string; readonly players: string; readonly corrections: string; readonly hide: string; readonly menu: string; readonly dynRes: string }
   readonly tips: readonly string[]
@@ -728,6 +741,8 @@ const fur: Strings = {
     start: "Fâs partî la partide",
     restart: "Finìs la partide e torne ae Adunade",
     hostOnly: "L'host (👑) al fâs partî la partide.",
+    primary: "La tô arme principâl",
+    primaryFixed: "E reste chê par dute la partide: si le cambie te Adunade.",
     host: "Host:",
     addBot: (team) => `+ bot ${team}`,
     removeBot: (team) => `− bot ${team}`,
@@ -759,7 +774,12 @@ const fur: Strings = {
     title: "Adunade",
     primary: "Arme principâl",
     chat: "Cjacaris",
-    chatPlaceholder: "Scrîf ai altris e frache Invio"
+    chatPlaceholder: "Scrîf ai altris e frache Invio",
+    enter: "Jentre te partide",
+    nextMatch: "La Tampieste e je za scomençade: tu zuiarâs de prossime partide.",
+    ready: "Pront",
+    cancel: "Ferme la partence",
+    countdown: (s) => `La partide e partìs tra ${s} s`
   },
   perf: { snaps: "istantanis", players: "zuiadôrs", corrections: "corezions", hide: "F3 par platâ", menu: "menù", dynRes: "ris. dinamiche" },
   tips: [
@@ -1176,6 +1196,8 @@ const it: Strings = {
     start: "Fai partire la partita",
     restart: "Chiudi la partita e torna all'Adunata",
     hostOnly: "L'host (👑) fa partire la partita.",
+    primary: "La tua arma principale",
+    primaryFixed: "Resta quella per tutta la partita: si cambia all'Adunata.",
     host: "Host:",
     addBot: (team) => `+ bot ${team}`,
     removeBot: (team) => `− bot ${team}`,
@@ -1207,7 +1229,12 @@ const it: Strings = {
     title: "Adunata",
     primary: "Arma principale",
     chat: "Chiacchiere",
-    chatPlaceholder: "Scrivi agli altri e premi Invio"
+    chatPlaceholder: "Scrivi agli altri e premi Invio",
+    enter: "Entra in partita",
+    nextMatch: "La Tampieste è già cominciata: giocherai dalla prossima partita.",
+    ready: "Pronto",
+    cancel: "Ferma la partenza",
+    countdown: (s) => `La partita parte tra ${s} s`
   },
   perf: { snaps: "istantanee", players: "giocatori", corrections: "correzioni", hide: "F3 per nascondere", menu: "menu", dynRes: "ris. dinamica" },
   tips: [

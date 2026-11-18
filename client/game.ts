@@ -24,7 +24,7 @@ import { PANEL_HP, WEAPONS, type Slot, type WeaponId } from "../shared/weapons.t
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
 import { Controls, trackedIn } from "./controls.ts"
-import { boardHtml, esc, Hud, rosterHtml } from "./hud.ts"
+import { boardHtml, esc, fmtClock, Hud, primaryHtml, rosterHtml } from "./hud.ts"
 import { t } from "./i18n.ts"
 import type { Look } from "./looks.ts"
 import type { Menu } from "./menu.ts"
@@ -40,7 +40,7 @@ import "@ui-sdk/web/dialog"
 import "@ui-sdk/web/select"
 import { takeAwayDeparted } from "./bodies.ts"
 import { alwaysChosen } from "./choice.ts"
-import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, musterFocus, musterTeams, type MatchMenu } from "./match-menus.ts"
+import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, menuPrimary, musterCountdown, musterFocus, musterScreen, musterTeams, startsAtOnce, type MatchMenu, type MusterScreen } from "./match-menus.ts"
 import { pickerEntries } from "./touch.ts"
 import { onViewportChange } from "./viewport.ts"
 
@@ -188,6 +188,12 @@ export class Game {
   private pauseHost: boolean | null = null
   /** Whether the Muster was last drawn for the host (start and the host tools), null before it is drawn. */
   private musterHost: boolean | null = null
+  /** The Muster screen last drawn (the Muster, or joining a match already on), null before it is drawn. */
+  private musterDrawn: string | null = null
+  /** The match's score and time last written on the joining screen. */
+  private musterMatch = ""
+  /** The countdown's seconds last drawn in the Muster (null: none running), undefined before it is drawn. */
+  private musterLeft: number | null | undefined = undefined
   /** The room's last chat messages, drawn in the Muster. */
   private musterChat: string[] = []
   /** Where the armoury was opened from: Esc goes back there. */
@@ -300,6 +306,8 @@ export class Game {
     this.entering = false
     this.lastPhase = ""
     this.musterHost = null
+    this.musterDrawn = null
+    this.musterMatch = ""
     this.musterChat = []
     this.clock = new MatchClock(() => performance.now())
     this.applySettings()
@@ -310,8 +318,9 @@ export class Game {
     this.controls.inMatch = true
     document.documentElement.classList.add("in-match")
     this.placeTouch()
-    // A room opens on its Muster: the pointer stays free for its screen, which the first snapshot opens.
-    if (room.phase === "Muster") return
+    // A room opens on its Muster, and a match already on on the Muster screen until the player
+    // enters: the pointer stays free for its screen, which the first snapshot opens.
+    if (musterScreen(room, me, room.phase).tag !== "closed") return
     if (!this.choosing) this.controls.lock()
     this.hud.announce(t().modes[room.mode].name, t().modes[room.mode].rules)
   }
@@ -434,12 +443,29 @@ export class Game {
     }
     if (this.overlay === "pause") this.renderPause()
     if (this.snap?.phase.tag === "Over") this.renderEnd()
-    if (this.inMuster) this.renderMuster()
+    // Having entered a match already on closes the Muster screen; its roster changes redraw it.
+    const was = this.musterDrawn !== null
+    this.syncMusterScreen()
+    if (this.inMuster) this.renderMuster(!was)
   }
 
-  /** The room is in its Muster: nobody on the map, its screen open. */
+  /** The Muster screen this player sees: the room's Muster, joining a match already on, or none. */
+  private get musterView(): MusterScreen {
+    return this.snap && this.room ? musterScreen(this.room, this.me, this.snap.phase.tag) : { tag: "closed" }
+  }
+
+  /** The Muster screen is open: nobody on the map in the Muster, and not this player while they choose before entering. */
   private get inMuster() {
-    return this.snap?.phase.tag === "Muster"
+    return this.musterView.tag !== "closed"
+  }
+
+  /** The Muster screen stands in for the world: the HUD's readouts go, and the world is not drawn (`render`). */
+  private syncMusterScreen() {
+    const open = this.inMuster
+    document.documentElement.classList.toggle("in-muster", open)
+    if (open) return
+    $<DialogElement>(MENU_PARTS.muster[0]).open = false
+    this.musterDrawn = null
   }
 
   private onSnapshot(s: Snapshot) {
@@ -513,6 +539,8 @@ export class Game {
     }
     for (const e of s.ev) this.event(e)
     if (prev?.phase.tag !== s.phase.tag) this.phaseChanged(s)
+    if (this.musterView.tag === "joining") this.renderMusterMatch(s)
+    if (this.inMuster) this.drawCountdown(s)
     // Entered with progress: the station list, as soon as the trainee is there. Opening it pauses the training.
     if (this.choosing && you?.alive && s.training?.tag === "station") {
       this.choosing = false
@@ -527,16 +555,16 @@ export class Game {
     const tag = s.phase.tag
     if (tag === this.lastPhase) return
     this.lastPhase = tag
-    // The Muster's screen stands in for the world: the HUD's readouts go, and the world is not drawn (`render`).
-    document.documentElement.classList.toggle("in-muster", tag === "Muster")
-    if (tag !== "Muster") $<DialogElement>(MENU_PARTS.muster[0]).open = false
+    this.syncMusterScreen()
     if (tag === "Over") {
       if (document.pointerLockElement) document.exitPointerLock()
       this.renderEnd(true)
     } else {
       $<DialogElement>(MENU_PARTS.end[0]).open = false
-      if (tag === "Live" && this.overlay === "none" && !this.choosing) this.controls.lock()
+      if (tag === "Live" && this.overlay === "none" && !this.choosing && !this.inMuster) this.controls.lock()
     }
+    // Joined a match already on: the Muster screen, to choose before entering.
+    if (tag === "Live" && this.inMuster) this.renderMuster(true)
     if (tag === "Muster") {
       if (document.pointerLockElement) document.exitPointerLock()
       if (this.chatting) this.closeChat()
@@ -888,7 +916,8 @@ export class Game {
     const playing = this.controls.active && this.overlay === "none"
     if (code === "KeyV" && playing) this.toggleQuick(!this.quickOpen)
     if ((code === "Enter" || code === "KeyT") && playing) this.openChat()
-    if (code === "KeyB") this.openOverlay(this.overlay === "loadout" ? "none" : "loadout")
+    // The armoury opens only where the primary can change: in a training.
+    if (code === "KeyB" && this.room !== null && menuPrimary(this.room, this.me).tag === "armoury") this.openOverlay(this.overlay === "loadout" ? "none" : "loadout")
     return false
   }
 
@@ -1064,6 +1093,7 @@ export class Game {
     const p = s.pause
     // A training's menu has its station list in place of the roster.
     if (training) return
+    $("p-primary").innerHTML = primaryHtml(menuPrimary(room, this.me))
     $("p-roster").innerHTML = rosterHtml(room, this.me)
     $("p-team").textContent = p.switchTeam(s.teams[this.otherTeam()].name)
     if (host) this.syncLevel("p", room)
@@ -1143,7 +1173,7 @@ export class Game {
           ? `<div class="muted pause-reach">${this.entering ? s.training.chooseStation : s.training.menuLine}</div>`
           : this.roomCodeHtml("p", room)
       }
-      ${training ? stationListHtml(stationEntries(this.snap?.training ?? null), s, this.entering ? entryChoice(this.snap?.training ?? null).continues : null) : `<div class="roster" id="p-roster"></div>`}
+      ${training ? stationListHtml(stationEntries(this.snap?.training ?? null), s, this.entering ? entryChoice(this.snap?.training ?? null).continues : null) : `<div class="pause-primary" id="p-primary"></div><div class="roster" id="p-roster"></div>`}
       ${
         training
           ? ""
@@ -1158,7 +1188,7 @@ export class Game {
       <div class="row overlay-actions">
         <button id="p-resume" class="primary">${s.loadout.resume}</button>
         ${training ? `<button id="p-restart"${this.snap?.training?.tag === "station" ? "" : " disabled"}>${s.training.restart}</button><button id="p-over">${s.training.startOver}</button>` : `<button id="p-team"></button>`}
-        <button id="p-loadout">${s.loadout.title}</button>
+        ${training ? `<button id="p-loadout">${s.loadout.title}</button>` : ""}
         <button id="p-settings">${s.static.settings}</button>
         <button id="p-leave">${p.leave}</button>
       </div>`)
@@ -1168,7 +1198,8 @@ export class Game {
     }
     const team = document.getElementById("p-team")
     if (team) team.onclick = () => this.d.net.send({ t: "team", team: this.otherTeam() })
-    $("p-loadout").onclick = () => this.openOverlay("loadout")
+    const loadout = document.getElementById("p-loadout")
+    if (loadout) loadout.onclick = () => this.openOverlay("loadout")
     $("p-leave").onclick = () => {
       this.d.net.send({ t: "leave" })
       this.d.onLeave()
@@ -1191,33 +1222,69 @@ export class Game {
    */
   private renderMuster(full = false) {
     const room = this.room
-    if (!room || !this.inMuster) return
+    const view = this.musterView
+    if (!room || view.tag === "closed") return
     const host = room.hostId === this.me
-    if (full || host !== this.musterHost) this.buildMuster(room, host)
+    const drawn = JSON.stringify(view)
+    if (full || host !== this.musterHost || drawn !== this.musterDrawn) this.buildMuster(room, host, view)
     const s = t()
     const teams = musterTeams(room)
     $("m-roster").innerHTML = (["benandanti", "malandanti"] as const)
       .map(
         (team) =>
           `<ul><li style="color:${TEAM_INFO[team].color};font-family:var(--serif)"><b>${s.teams[team].name}</b></li>${teams[team]
-            .map((m) => `<li${m.id === this.me ? ' style="color:var(--gold)"' : ""}>${esc(m.name)}${m.bot ? " 🤖" : ""}${m.host ? " 👑" : ""} <span class="muted">· ${s.weapons[m.primary].name}</span></li>`)
+            .map((m) => `<li${m.id === this.me ? ' style="color:var(--gold)"' : ""}>${esc(m.name)}${m.bot ? " 🤖" : ""}${m.host ? " 👑" : ""} <span class="muted">· ${s.weapons[m.primary].name}</span>${!m.bot && m.ready ? ` <span class="ready-mark" role="img" aria-label="${s.muster.ready}" title="${s.muster.ready}">✓</span>` : ""}</li>`)
             .join("")}</ul>`
       )
       .join("")
     $("m-team").textContent = s.pause.switchTeam(s.teams[this.otherTeam()].name)
+    // Joining a match already on has no ready mark: the confirm is the member's own.
+    document.getElementById("m-ready")?.setAttribute("aria-pressed", String(this.readyMark()))
     if (host) this.syncLevel("m", room)
   }
 
-  private buildMuster(room: RoomInfo, host: boolean) {
+  /** My own ready mark, as the roster has it. */
+  private readyMark(): boolean {
+    return this.room?.roster.find((r) => r.id === this.me)?.ready ?? false
+  }
+
+  /**
+   * The Muster's countdown, redrawn only when its whole seconds change; for the host, start while
+   * none runs and cancel while it does, focus following from one to the other.
+   */
+  private drawCountdown(s: Snapshot) {
+    const left = musterCountdown(s.phase, s.tick)
+    if (left === this.musterLeft) return
+    const was = this.musterLeft
+    this.musterLeft = left
+    const shown = document.getElementById("m-countdown")
+    if (shown) shown.textContent = left === null ? "" : t().muster.countdown(left)
+    if (was !== undefined && (was === null) === (left === null)) return
+    const start = document.getElementById("m-start")
+    const cancel = document.getElementById("m-cancel")
+    if (!start || !cancel) return
+    const focused = document.activeElement === start || document.activeElement === cancel
+    start.hidden = left !== null
+    cancel.hidden = left === null
+    if (focused) (left === null ? start : cancel).focus()
+  }
+
+  private buildMuster(room: RoomInfo, host: boolean, view: Exclude<MusterScreen, { tag: "closed" }>) {
     const wasOpen = $<DialogElement>(MENU_PARTS.muster[0]).open
     this.musterHost = host
+    this.musterDrawn = JSON.stringify(view)
+    this.musterMatch = ""
+    const joining = view.tag === "joining"
     const s = t()
     const p = s.pause
     const m = s.muster
+    this.musterLeft = undefined
     this.drawMenu(MENU_PARTS.muster[1], m.title, `
       <div class="overlay-body">
+        <div id="m-countdown" class="muster-countdown" role="timer"></div>
         <div class="muted pause-reach">${s.modes[room.mode].name} · ${s.maps[room.map].name} · ${s.menu.minutes(room.minutes)}</div>
         ${this.roomCodeHtml("m", room)}
+        ${joining ? `<div class="muster-match" id="m-match" aria-live="off"></div>${view.nextMatch ? `<p class="muster-note">${m.nextMatch}</p>` : ""}` : ""}
         <div class="roster" id="m-roster"></div>
         ${host ? `<div class="host-tools"><span class="host-label">👑 ${p.host}</span>${this.botToolsHtml("m", room)}</div>` : `<div class="muted host-only">${p.hostOnly}</div>`}
         <h3>${m.primary}</h3>
@@ -1227,7 +1294,8 @@ export class Game {
         <input id="m-chat" class="muster-chat-input" maxlength="120" placeholder="${m.chatPlaceholder}" aria-label="${m.chat}" />
       </div>
       <div class="row overlay-actions">
-        ${host ? `<button id="m-start" class="primary">${p.start}</button>` : ""}
+        ${joining ? `<button id="m-enter" class="primary">${m.enter}</button>` : host ? `<button id="m-start" class="primary">${p.start}</button><button id="m-cancel" hidden>${m.cancel}</button>` : ""}
+        ${joining ? "" : `<button id="m-ready" aria-pressed="false">${m.ready}</button>`}
         <button id="m-team"></button>
         <button id="m-leave">${p.leave}</button>
       </div>`)
@@ -1246,19 +1314,48 @@ export class Game {
       chat.value = ""
     })
     $("m-team").onclick = () => this.d.net.send({ t: "team", team: this.otherTeam() })
+    const ready = document.getElementById("m-ready")
+    if (ready) ready.onclick = () => this.d.net.send({ t: "ready", ready: !this.readyMark() })
     $("m-leave").onclick = () => {
       this.d.net.send({ t: "leave" })
       this.d.onLeave()
     }
-    if (host) {
-      this.bindBotTools(el, "m")
-      $("m-start").onclick = () => {
-        this.d.net.send({ t: "start" })
+    if (joining) {
+      $("m-enter").onclick = () => {
+        this.d.net.send({ t: "enter" })
         // Still inside the press: the one moment the browser grants the pointer lock the match needs.
         this.controls.lock()
       }
+      if (this.snap) this.renderMusterMatch(this.snap)
+    }
+    if (host) this.bindBotTools(el, "m")
+    if (host && !joining) {
+      $("m-start").onclick = () => {
+        this.d.net.send({ t: "start" })
+        // A start that goes live at once: still inside the press, the one moment the browser grants
+        // the pointer lock the match needs. A countdown keeps the pointer free for the Muster.
+        if (this.room && startsAtOnce(this.room, this.me)) this.controls.lock()
+      }
+      $("m-cancel").onclick = () => this.d.net.send({ t: "cancel" })
     }
     if (!wasOpen) this.openMenu(...MENU_PARTS.muster, musterFocus({ host, reach: room.reach }))
+  }
+
+  /** Joining a match already on: its score and the time left, written only when they change. */
+  private renderMusterMatch(snap: Snapshot) {
+    const el = document.getElementById("m-match")
+    const room = this.room
+    if (!el || !room || snap.phase.tag !== "Live") return
+    const s = t()
+    const clock = fmtClock(snap.phase.ends - snap.tick)
+    const pct = room.mode === "cjar" ? "%" : ""
+    const text =
+      room.mode === "tampieste"
+        ? `${s.hud.alive(snap.players.filter((p) => p.f & FLAG_BIT.alive).length)} · ${clock}`
+        : `${s.teams.benandanti.name} ${snap.score.benandanti}${pct} – ${snap.score.malandanti} ${s.teams.malandanti.name} · ${clock}`
+    if (text === this.musterMatch) return
+    this.musterMatch = text
+    el.textContent = text
   }
 
   private renderMusterChat() {
@@ -1408,7 +1505,7 @@ export class Game {
     let buttons = c.buttons()
     const you = this.you()
     // Outside a live match (the Muster, the results) nobody moves or fires.
-    const over = this.snap?.phase.tag !== "Live"
+    const over = this.snap?.phase.tag !== "Live" || this.inMuster
     if (over || this.overlay !== "none") buttons = 0
     // At the turret the view stays within the arc the gun can turn through.
     const turret = you?.alive ? this.mounted() : -1
@@ -1839,7 +1936,7 @@ export class Game {
       const px = (Math.tan(spread) / Math.tan(((camera.fov / 2) * Math.PI) / 180)) * (innerHeight / 2)
       this.hud.crosshair(Math.min(60, px * 1.6), view.crosshair)
     }
-    const free = this.overlay === "none" && !this.chatting && s?.phase.tag === "Live" && !this.trainingEnded
+    const free = this.overlay === "none" && !this.chatting && s?.phase.tag === "Live" && !this.trainingEnded && !this.inMuster
     const device = this.controls.device
     this.hud.clickToPlay(!this.controls.active && free && !this.boardOpen, device)
     this.hud.layFor(device)

@@ -45,7 +45,7 @@ interface Member {
 function match(members: Member[]) {
   const sim = createSim({ mode: "bataie", minutes: 5, seed: 3, physics: maran })
   for (const m of members) sim.join(m.id, m.id, m.team ?? "benandanti", m.bot ?? false, m.primary ?? "cramar", { at: m.at, yaw: m.yaw, hp: m.hp ?? 100 })
-  sim.start()
+  sim.start(true)
   for (let i = 0; i < SHIELD_TICKS + 5; i++) sim.step()
   return sim
 }
@@ -281,10 +281,10 @@ describe("carrying the panel", () => {
     const sim = match([{ id: "a", at: inside(), yaw: FACING }])
     expect(torn(hold(sim, "a", PANEL_TEAR_TICKS + 5, useHeld), "a")).toBe(true)
     // The host ends the match (back to the Muster), then starts the next one.
-    sim.start()
+    sim.start(true)
     hold(sim, "a", 10, { yaw: FACING })
     expect(sim.view().phase.tag).toBe("Muster")
-    sim.start()
+    sim.start(true)
     hold(sim, "a", 10, { yaw: FACING })
     expect(sim.view().phase.tag).toBe("Live")
     expect(sim.view().panels).toEqual([{ tag: "wall" }])

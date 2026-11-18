@@ -24,6 +24,8 @@ export const maxHp = (primary: PrimaryId) => CLASSES[primary].hp
 export const hpFor = (primary: PrimaryId, hp: number) => Math.min(hp, maxHp(primary))
 export const ASSIST_WINDOW_TICKS = 600
 export const OVER_TICKS = 15 * 60
+/** The Muster's countdown, from the host's start to the match going live. */
+export const COUNTDOWN_TICKS = 10 * 60
 export const FLAG_RETURN_TICKS = 30 * 60
 
 export const otherTeam = (team: Team): Team => (team === "benandanti" ? "malandanti" : "benandanti")

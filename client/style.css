@@ -359,8 +359,15 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 /* The Muster stands in for the world: the HUD's readouts go, and a plain ground covers the canvas, which is not drawn. */
 html.in-muster #hud { background: var(--night); }
 html.in-muster #hud-free, html.in-muster #death, html.in-muster #board { visibility: hidden; }
+#muster .muster-countdown { font-family: var(--serif); font-size: clamp(20px, 3vw, 28px); color: var(--gold); text-align: center; }
+#muster .muster-countdown:empty { display: none; }
+#muster .ready-mark { color: var(--gold); font-weight: bold; }
+#muster [aria-pressed="true"] { outline: 2px solid var(--gold); outline-offset: -2px; }
+#muster [aria-pressed="true"]::before { content: "✓ "; }
 #muster .muster-chat { max-block-size: 9rem; overflow-y: auto; font-size: 14px; padding: 4px 0; }
 #muster .muster-chat-input { inline-size: 100%; min-block-size: var(--tap); margin-block-start: 4px; }
+#muster .muster-match { font-family: var(--serif); font-size: 1.15rem; font-variant-numeric: tabular-nums; margin-block: 6px; }
+#muster .muster-note { color: var(--gold); margin-block: 4px; }
 
 .end-title { display: block; font-family: var(--serif); font-size: clamp(36px, 5vw, 64px); text-align: center; margin: 0; }
 .awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 10px; margin: 14px 0; }
@@ -426,7 +433,7 @@ html[data-device="touch"] :is(#menu, #hud .overlay) kbd, html[data-device="touch
   /* A wide, short menu (a phone on its side): the roster and the host tools side by side, so the host's controls show without scrolling. */
   @container overlay (inline-size > 40rem) {
     #pause .overlay-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 0 16px; }
-    #pause .overlay-body > :is(.pause-reach, .pause-code) { grid-column: 1 / -1; }
+    #pause .overlay-body > :is(.pause-reach, .pause-code, .pause-primary) { grid-column: 1 / -1; }
     #pause .overlay-body > :is(.host-tools, .host-only) { margin-block-start: 10px; }
     /* The four bot buttons on one row, so the bot skill stays in view too. */
     #pause .host-bots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -458,6 +465,12 @@ html[data-device="touch"] :is(#menu, #hud .overlay) kbd, html[data-device="touch
 .pause-share { text-align: end; }
 .pause-share button { min-block-size: var(--tap); }
 .pause-reach { font-size: 12px; margin-block-start: 4px; }
+/* The player's primary in the match menu: read-only, fixed until the Muster. */
+.pause-primary { margin-block-start: 10px; font-size: 12px; }
+.pause-primary:empty { display: none; }
+.pause-primary-name { font: 600 16px/1.3 var(--serif); color: var(--ink); }
+.pause-primary-figures { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.pause-primary p { margin: 4px 0 0; }
 .overlay .invite { font-size: clamp(32px, 1rem + 3vw, 44px); }
 .host-only { margin-block-start: 8px; }
 .host-label { white-space: nowrap; }
