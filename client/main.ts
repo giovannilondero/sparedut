@@ -12,7 +12,8 @@ import { createAvatar, setDetailedWeapon } from "./avatars.ts"
 import { createFx } from "./fx.ts"
 import { isLocalHost } from "../shared/hosts.ts"
 import { Game } from "./game.ts"
-import { inviteLink, readInvite } from "./invite.ts"
+import { inviteLink } from "./invite.ts"
+import { decideOpening, readOpening } from "./opening.ts"
 import { t } from "./i18n.ts"
 import { createLook, lookFromUrl } from "./looks.ts"
 import { loadDetailed } from "./models/detailed.ts"
@@ -360,6 +361,25 @@ const reconnect = (ms: number) => {
   retry = window.setTimeout(connect, ms)
 }
 
+/** Acts on how the page was opened (`client/opening.ts`): never over a match in progress (an Offline room counts). */
+function answerOpening() {
+  const action = decideOpening(readOpening(location.search, location.hash), {
+    playing: Boolean(game?.active) || offline(),
+    named: Boolean(settings.name),
+  })
+  switch (action.kind) {
+    case "join":
+      menu.status(t().net.invite(action.code))
+      sendJoin(action.code, action.password ?? undefined)
+      return
+    case "askName":
+      toast(t().net.inviteNeedName(action.opening.invite.code))
+      return
+    case "nothing":
+      return
+  }
+}
+
 async function connect() {
   clearTimeout(retry)
   if (connecting || net.open) return
@@ -370,12 +390,7 @@ async function connect() {
     connecting = false
     menu.status(t().net.connected(settings.name || t().net.stranger))
     net.send({ t: "list" })
-    // An invite joins on its own only from the menu: never over a room in progress.
-    const invite = game?.active || offline() ? null : readInvite(location.search, location.hash)
-    if (invite && settings.name) {
-      menu.status(t().net.invite(invite.code))
-      sendJoin(invite.code, invite.password ?? undefined)
-    } else if (invite) toast(t().net.inviteNeedName(invite.code))
+    answerOpening()
   } catch {
     connecting = false
     menu.status(t().net.retry)
