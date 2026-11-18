@@ -5,20 +5,22 @@
  *
  * - install: fills this build's cache with the whole list, or fails and leaves the old worker in place;
  * - activate: deletes the previous builds' caches and takes control of the open pages;
- * - fetch: `routeOf` decides; the page and the listed files come from this build's cache.
+ * - fetch: `routeOf` decides; the page and the listed files come from this build's cache, the
+ *   Vêr look's files from the Vêr cache, which keeps them the first time they are fetched.
  *
  * A new worker waits until no page runs the old build (a page keeps the files of its own build),
  * or until a page asks it to take over (`TAKE_OVER`, see `./update.ts`).
  */
-import { cacheName, staleCaches } from "./caches.ts"
-import { routeOf, type Route } from "./route.ts"
+import { cacheName, staleCaches, staleVerCaches, verCacheName } from "./caches.ts"
+import { routeOf, storable, type Route } from "./route.ts"
 import { TAKE_OVER } from "./update.ts"
 
 declare const self: ServiceWorkerGlobalScope
 /** Written in front of the bundle by the build. */
-declare const PRECACHE: { readonly version: string; readonly urls: readonly string[] }
+declare const PRECACHE: { readonly version: string; readonly urls: readonly string[]; readonly ver: string }
 
 const CACHE = cacheName(PRECACHE.version)
+const VER_CACHE = verCacheName(PRECACHE.ver)
 const LISTED: ReadonlySet<string> = new Set(PRECACHE.urls)
 /** The page every navigation inside the game is answered with. */
 const PAGE = "/"
@@ -30,9 +32,22 @@ const cached = (key: string, request: Request) =>
     .then((cache) => cache.match(key))
     .then((hit) => hit ?? fetch(request))
 
+/** From the Vêr cache; else from the network, and kept if whole (`storable`) before it is answered. */
+const firstUse = (request: Request) => {
+  const key = new URL(request.url).pathname
+  return caches.open(VER_CACHE).then(async (cache) => {
+    const hit = await cache.match(key)
+    if (hit) return hit
+    const response = await fetch(request)
+    if (storable(response)) await cache.put(key, response.clone()).catch(() => {})
+    return response
+  })
+}
+
 const answers = {
   page: (request) => cached(PAGE, request),
   precached: (request) => cached(new URL(request.url).pathname, request),
+  "first-use": firstUse,
   network: null
 } satisfies Record<Route, ((request: Request) => Promise<Response>) | null>
 
@@ -45,7 +60,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((names) => Promise.all(staleCaches(names, CACHE).map((name) => caches.delete(name))))
+      .then((names) => Promise.all([...staleCaches(names, CACHE), ...staleVerCaches(names, VER_CACHE)].map((name) => caches.delete(name))))
       .then(() => self.clients.claim())
   )
 })

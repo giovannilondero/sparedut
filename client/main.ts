@@ -20,6 +20,7 @@ import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
 import { BrowserHostConnection } from "./offline.ts"
 import { registerServiceWorker } from "./offline-cache/register.ts"
+import { keepVerFilesOnceControlled, lookToShow, verState } from "./offline-cache/ver.ts"
 import { SelfUpdate } from "./offline-cache/self-update.ts"
 import { keepStorage, runsInstalled } from "./installed.ts"
 import { Link } from "./connection.ts"
@@ -40,7 +41,16 @@ renderer.toneMappingExposure = 1.05
 // The draw call and triangle count covers world and weapon: the frame resets it.
 renderer.info.autoReset = false
 const perf = new PerfMonitor(renderer)
-const look = createLook(lookFromUrl(), renderer)
+const chosenLook = lookFromUrl()
+// Vêr chosen with no network and never fetched: Cumò for this page, and the saved choice kept,
+// so Vêr comes back by itself once it can load (`client/offline-cache/ver.ts`). Asked only when
+// the browser says it is offline: online, the boot waits for nothing (and the `load` listeners
+// below are added before the page's `load`, which a top-level await can let pass).
+const shownLook = lookToShow(
+  chosenLook,
+  chosenLook === "ver" && !navigator.onLine ? await verState({ caches: "caches" in globalThis ? caches : undefined, fetch: (url, init) => fetch(url, init) }) : "reachable"
+)
+const look = createLook(shownLook.look, renderer)
 
 /** The maximum pixel ratio per quality; dynamic resolution goes down to `minRatio`. */
 const maxRatio = () => Math.min(devicePixelRatio, settings.quality === "alta" ? 2 : settings.quality === "media" ? 1.5 : 1)
@@ -98,6 +108,14 @@ if (look.id === "ver")
     }
     viewmodel.remodel(id, model)
   })
+// On the first visit Vêr's files arrive before the service worker controls the page: kept once it does.
+if (look.id === "ver" && import.meta.env.PROD)
+  keepVerFilesOnceControlled({
+    container: navigator.serviceWorker as ServiceWorkerContainer | undefined,
+    fetched: () => performance.getEntriesByType("resource").map((entry) => entry.name),
+    fetch: (url) => fetch(url),
+    origin: location.origin
+  })
 const audio = createAudio()
 audio.setVolumes(settings.master, settings.music)
 onViewportChange(() => viewport() !== sized && resize())
@@ -134,9 +152,12 @@ const offline = () => link.uses(browserHostConnection)
 // build only, after the page has loaded so the worker's downloads don't compete with the boot.
 // `navigator.serviceWorker` is missing over plain http on a LAN address: the game plays as before.
 const serviceWorkers = navigator.serviceWorker as ServiceWorkerContainer | undefined
-const registration = new Promise<ServiceWorkerRegistration | null>((resolve) =>
-  addEventListener("load", () => resolve(registerServiceWorker({ production: import.meta.env.PROD, container: serviceWorkers })), { once: true })
-)
+const registration = new Promise<ServiceWorkerRegistration | null>((resolve) => {
+  const register = () => resolve(registerServiceWorker({ production: import.meta.env.PROD, container: serviceWorkers }))
+  // The top-level await for Vêr with no network (above) can let `load` pass before this line.
+  if (document.readyState === "complete") register()
+  else addEventListener("load", register, { once: true })
+})
 /** A cached game too old for the server updates itself; a match or an Offline room is never cut. */
 const selfUpdate = new SelfUpdate({
   registration,
@@ -209,6 +230,7 @@ const menu = new Menu(settings, audio, {
   },
   settingsChanged: persist
 }, look.id)
+if (shownLook.fellBack) toast(t().net.verOffline)
 
 /** Public address announced by the server: used for invite links when playing from localhost. */
 let publicUrl: string | null = null
