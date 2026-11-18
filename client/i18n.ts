@@ -18,7 +18,7 @@ type Fn<A extends unknown[] = [string]> = (...args: A) => string
 
 /** Static HTML texts: `data-t="key"` (innerHTML) and `data-t-ph="key"` (placeholder). */
 export type StaticKey =
-  | "title" | "nameLabel" | "namePh" | "oneTap" | "oneTapSub" | "create" | "createSub" | "join" | "joinSub"
+  | "title" | "nameLabel" | "namePh" | "oneTap" | "oneTapSub" | "create" | "createSub" | "join"
   | "roomsTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "reachLabel"
   | "ff" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
   | "qHigh" | "autoRes" | "showInfo" | "invert" | "keys" | "vocabTitle" | "connecting" | "chatPh" | "deathTitle" | "deathHint"
@@ -280,7 +280,6 @@ const fur: Strings = {
     create: "Cree une partide",
     createSub: "Offline, te rêt locâl o in linie",
     join: "Jentre cul codiç",
-    joinSub: "Âstu un codiç di 4 letaris?",
     roomsTitle: "Partidis viertis <small>(prime la tô rêt, po in linie)</small>",
     armarie: "Armarie",
     settings: "Impostazions",
@@ -631,7 +630,6 @@ const it: Strings = {
     create: "Crea una partita",
     createSub: "Offline, in rete locale o online",
     join: "Entra con codice",
-    joinSub: "Hai un codice di 4 lettere?",
     roomsTitle: "Partite aperte <small>(prima la tua rete, poi online)</small>",
     armarie: "Armeria",
     settings: "Impostazioni",
