@@ -42,7 +42,8 @@ type Select = HTMLElementTagNameMap["ui-select"]
 /** Each screen's first control, where focus lands when it opens; the vocabulary has none but its heading. */
 const FIRST_CONTROL: { readonly [S in Exclude<Screen, "home" | "password">]: () => void } = {
   create: () => $<RadioGroup>("c-mode").api.focus(),
-  armarie: () => $("armarie").querySelector<RadioGroup>("ui-radio-group")?.api.focus(),
+  // Drawn again as it opens: its group takes focus once UI SDK has set it up.
+  armarie: () => requestAnimationFrame(() => $("armarie").querySelector<RadioGroup>("ui-radio-group")?.api.focus()),
   settings: () => $<HTMLElementTagNameMap["ui-slider"]>("s-sens").api.focus(),
   vocabolari: () => $("vocab-title").focus()
 }
