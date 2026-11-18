@@ -129,6 +129,22 @@ describe("single weapon in the room list", () => {
   })
 })
 
+describe("single weapon for a member joining a match already on", () => {
+  test("they enter the map with the setting's primary, whatever they asked for", () => {
+    const { connect, play } = harness(HOSTS[0].make)
+    const host = connect()
+    host.say({ t: "create", mode: "bataie", map: "glemone", minutes: 10, reach: "online", access: { kind: "open" }, bots: 1, level: "pari", ff: false, primary: "cramar", single: "gjalinis" })
+    host.say({ t: "start" })
+    play(10)
+    const other = connect()
+    other.say({ t: "join", code: host.last("joined")!.room.code, primary: "mulin" })
+    other.say({ t: "primary", p: "doplete" })
+    other.say({ t: "enter" })
+    play(200)
+    expect(other.last("snap")!.you?.arsenal.primary).toBe("gjalinis")
+  })
+})
+
 // --- The simulation ------------------------------------------------------------------------
 
 /** A match with one player, past the spawn shield; `single`, the room's setting. */
