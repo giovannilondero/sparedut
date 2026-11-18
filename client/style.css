@@ -287,6 +287,21 @@ html.in-match input { user-select: text; -webkit-user-select: text; }
 #touch-fire { position: absolute; left: var(--fire-x); top: var(--fire-y); width: calc(var(--fire-r) * 2); height: calc(var(--fire-r) * 2); transform: translate(-50%, -50%);
   border-radius: 50%; border: 2px solid rgba(232, 182, 76, 0.75); background: radial-gradient(circle, rgba(232, 182, 76, 0.55) 0 22%, rgba(10, 8, 6, 0.3) 24%); }
 #touch-fire.held { background: radial-gradient(circle, rgba(232, 182, 76, 0.9) 0 26%, rgba(232, 182, 76, 0.25) 28%); }
+/* The other buttons: `--x`, `--y`, `--r` per button, set once per size by the HUD. */
+.touch-btn { position: absolute; left: var(--x); top: var(--y); width: calc(var(--r) * 2); height: calc(var(--r) * 2); transform: translate(-50%, -50%);
+  display: grid; place-items: center; border-radius: 50%; border: 2px solid rgba(243, 233, 210, 0.4); background: rgba(10, 8, 6, 0.32);
+  color: var(--ink); font: 700 calc(var(--r) * 0.8) / 1 var(--sans); opacity: 0.8; }
+.touch-btn.held { background: rgba(243, 233, 210, 0.35); opacity: 1; }
+.touch-btn.on { border-color: var(--gold); background: rgba(232, 182, 76, 0.45); opacity: 1; }
+#touch-use { font-size: 11px; letter-spacing: 0.02em; border-color: var(--gold); opacity: 1; }
+#touch-weapon, #touch-picker > div { position: absolute; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--stone-line); background: var(--stone);
+  font-family: var(--serif); font-size: 15px; color: var(--ink); overflow: hidden; white-space: nowrap; }
+#touch-weapon { left: var(--wx); top: var(--wy); width: var(--ww); height: var(--wh); }
+#touch-picker > div.on { border-color: var(--gold); color: var(--gold); }
+#quickchat.tap { pointer-events: auto; top: 76px; bottom: auto; left: 12px; max-width: calc(100% - 24px); max-height: calc(100% - 90px); overflow-y: auto; touch-action: pan-y; font-size: 15px; gap: 0; }
+#quickchat.tap div { padding: 7px 4px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+#quickchat.tap div:first-child { border-top: 0; }
+#quickchat.tap kbd { display: none; }
 
 #toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); background: var(--stone); border: 1px solid var(--gold); padding: 10px 18px; border-radius: 10px; z-index: 10; animation: rise 0.2s; }
 

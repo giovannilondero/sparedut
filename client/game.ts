@@ -6,18 +6,17 @@ import * as THREE from "three"
 import { BOT_LEVEL_IDS, QUICK_CHAT, TEAM_INFO, type BotLevel } from "../shared/folklore.ts"
 import { rayPose } from "../shared/hitbox.ts"
 import { BUTTON, IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
-import { turretAim, turretRestSeat, turretSeat, type MapId, type PickupKind, type Team } from "../shared/map.ts"
+import { turretAim, turretSeat, type MapId, type PickupKind, type Team } from "../shared/map.ts"
 import { DISCO } from "../shared/maps/maran.ts"
 import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, seatedBody, sprinting } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
 import { outsideStorm, owned, RAISE_TICKS } from "../shared/sim/rules.ts"
-import { TURRET, WEAPONS, type WeaponId } from "../shared/weapons.ts"
+import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
-import { Controls, trackedIn } from "./controls.ts"
-import { touchLayout } from "./touch.ts"
+import { Controls, freeTurretInReach, trackedIn } from "./controls.ts"
 import { boardHtml, esc, Hud, rosterHtml } from "./hud.ts"
 import { t } from "./i18n.ts"
 import type { Look } from "./looks.ts"
@@ -188,6 +187,10 @@ export class Game {
       if (!locked && !this.controls.touchActive && this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over") this.openOverlay("pause")
       if (locked && this.overlay !== "none") this.openOverlay("none")
     })
+    $("quickchat").addEventListener("click", (e) => {
+      const n = (e.target as HTMLElement).closest<HTMLElement>("[data-n]")?.dataset.n
+      if (n) this.key(`Digit${n}`, true)
+    })
     const chat = $<HTMLInputElement>("chat-input")
     chat.addEventListener("keydown", (e) => {
       e.stopPropagation()
@@ -256,7 +259,7 @@ export class Game {
 
   private placeTouch() {
     const canvas = this.d.renderer.domElement
-    this.hud.placeTouch(touchLayout({ width: canvas.clientWidth, height: canvas.clientHeight }))
+    this.hud.placeTouch(this.controls.relayout({ width: canvas.clientWidth, height: canvas.clientHeight }))
   }
 
   get active() {
@@ -383,7 +386,8 @@ export class Game {
       }
       this.wasAlive = you.alive
       this.seated = you.alive && this.mounted() >= 0
-      this.controls.track(trackedIn(s, this.me, this.mounted() >= 0))
+      const mounted = this.mounted() >= 0
+      this.controls.track(trackedIn(s, this.me, mounted, you.alive && !mounted && freeTurretInReach(this.physics.map.turrets, s.turrets, this.predictor.body)))
       // The server has already seen my last weapon switch and holds a different one: it
       // switched it itself (lanciafrico pickup, armoury, respawn) or rejected the switch. Follow it.
       const server = you.arsenal.current
@@ -697,7 +701,9 @@ export class Game {
     const q = $("quickchat")
     q.classList.toggle("hidden", !on)
     const gloss = t().game.quickGloss
-    if (on) q.innerHTML = QUICK_CHAT.map((p, i) => `<div><kbd>${(i + 1) % 10}</kbd>${esc(p)}${gloss ? ` <span class="muted">· ${gloss[i]}</span>` : ""}</div>`).join("")
+    // On touch the list takes taps: each row says the phrase as its number key would.
+    q.classList.toggle("tap", on && this.controls.touchActive)
+    if (on) q.innerHTML = QUICK_CHAT.map((p, i) => `<div data-n="${(i + 1) % 10}"><kbd>${(i + 1) % 10}</kbd>${esc(p)}${gloss ? ` <span class="muted">· ${gloss[i]}</span>` : ""}</div>`).join("")
   }
 
   private openChat() {
@@ -1316,15 +1322,9 @@ export class Game {
 
     if (you) {
       this.hud.vitals(you, { owned: (id) => owned(you.arsenal, id) }, this.wanted === you.arsenal.current ? this.localMag : null, turret >= 0)
-      // At the turret: the heat. Near a free one: the key to mount it.
+      // At the turret: the heat. Near a free one: the key to mount it (the same decision as the touch "use" button).
       const gun = turret >= 0 ? s?.turrets[turret] ?? null : null
-      const near =
-        turret < 0 && you.alive && !!b && !!s &&
-        this.physics.map.turrets.some((spot, i) => {
-          const seat = turretRestSeat(spot)
-          return s.turrets[i]?.gunner === null && Math.hypot(b.x - seat[0], b.z - seat[2]) <= TURRET.reach && Math.abs(b.y - seat[1]) < 1.2
-        })
-      this.hud.turret(gun ? { heat: gun.heat, jammed: gun.jammed } : null, near)
+      this.hud.turret(gun ? { heat: gun.heat, jammed: gun.jammed } : null, this.controls.turretControl === "use")
       const speed = b ? Math.hypot(b.vx, b.vz) : 0
       const spread = aiming ? def.spread.aimed : speed > 1.5 || !b?.grounded ? def.spread.moving : def.spread.still
       const px = (Math.tan(spread) / Math.tan(((camera.fov / 2) * Math.PI) / 180)) * (innerHeight / 2)

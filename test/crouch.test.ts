@@ -145,19 +145,19 @@ test("with toggle, the crouch is cleared on respawn, on mounting a turret and on
       c.buttons()
       expect(c.isHeld("crouch")).toBe(true)
     }
-    c.track({ alive: true, mounted: false, spawned: false })
+    c.track({ alive: true, mounted: false, spawned: false, nearTurret: false, arsenal: null })
 
     crouchOn()
-    c.track({ alive: true, mounted: false, spawned: false })
+    c.track({ alive: true, mounted: false, spawned: false, nearTurret: false, arsenal: null })
     expect(c.isHeld("crouch")).toBe(true) // nothing happened: still crouched
-    c.track({ alive: false, mounted: false, spawned: false })
-    c.track({ alive: true, mounted: false, spawned: false })
+    c.track({ alive: false, mounted: false, spawned: false, nearTurret: false, arsenal: null })
+    c.track({ alive: true, mounted: false, spawned: false, nearTurret: false, arsenal: null })
     expect(crouched(c.buttons())).toBe(false)
 
     crouchOn()
-    c.track({ alive: true, mounted: true, spawned: false })
+    c.track({ alive: true, mounted: true, spawned: false, nearTurret: false, arsenal: null })
     expect(crouched(c.buttons())).toBe(false)
-    c.track({ alive: true, mounted: false, spawned: false })
+    c.track({ alive: true, mounted: false, spawned: false, nearTurret: false, arsenal: null })
 
     crouchOn()
     c.track(null)
@@ -225,7 +225,7 @@ test("with toggle, the crouch is cleared when a match start respawns everyone, t
       for (const m of got.splice(0)) {
         if (m.t !== "snap") continue
         deadSeen.push(m.you?.alive === false)
-        c.track(trackedIn(m, joined, false))
+        c.track(trackedIn(m, joined, false, false))
       }
     }
   }

@@ -206,10 +206,22 @@
       <div id="endscreen" class="hidden overlay"></div>
       <div id="clickplay" class="hidden"><div class="for-mouse" data-t="clickplay"></div><div class="for-touch" data-t="tapplay"></div></div>
 
-      <!-- Touch controls (layout A): drawn where client/touch.ts places them; the canvas below takes the fingers. -->
+      <!-- Touch controls (layout A): drawn where client/touch.ts places them; the canvas below takes the fingers. No text chat on touch. -->
       <div id="touch" class="hidden" aria-hidden="true">
         <div id="touch-stick"><i id="touch-knob"></i></div>
         <div id="touch-fire"></div>
+        <div class="touch-btn" id="touch-aim">◎</div>
+        <div class="touch-btn" id="touch-crouch">▼</div>
+        <div class="touch-btn" id="touch-jump">▲</div>
+        <div class="touch-btn" id="touch-reload">↻</div>
+        <div class="touch-btn" id="touch-bomb">🍶</div>
+        <div class="touch-btn" id="touch-mine">💣</div>
+        <div class="touch-btn hidden" id="touch-use"></div>
+        <div class="touch-btn" id="touch-menu">☰</div>
+        <div class="touch-btn" id="touch-board">🏆</div>
+        <div class="touch-btn" id="touch-phrases">💬</div>
+        <div id="touch-weapon"></div>
+        <div id="touch-picker" class="hidden"></div>
       </div>
     </div>
 

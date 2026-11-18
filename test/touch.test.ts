@@ -1,5 +1,11 @@
 import { beforeAll, expect, test } from "bun:test"
 import { BUTTON } from "../shared/input.ts"
+import { freshArsenal } from "../shared/sim/rules.ts"
+import type { ArsenalValue } from "../shared/sim/schema.ts"
+import type { WeaponId } from "../shared/weapons.ts"
+import { firstPerson } from "../client/firstperson.ts"
+import type { Tracked } from "../client/controls.ts"
+import type { Circle, TouchView } from "../client/touch.ts"
 
 type Listener = (e: Record<string, unknown>) => void
 
@@ -42,11 +48,12 @@ const pad = {
 
 let Controls: typeof import("../client/controls.ts").Controls
 let touchLayout: typeof import("../client/touch.ts").touchLayout
+let TOUCH_BUTTONS: typeof import("../client/touch.ts").TOUCH_BUTTONS
 beforeAll(async () => {
   Object.assign(globalThis, { document: doc, window: { addEventListener: on(winListeners) } })
   Object.defineProperty(globalThis.navigator, "getGamepads", { value: () => [pad], configurable: true })
   ;({ Controls } = await import("../client/controls.ts"))
-  ;({ touchLayout } = await import("../client/touch.ts"))
+  ;({ touchLayout, TOUCH_BUTTONS } = await import("../client/touch.ts"))
 })
 
 /** A player in a match on a phone; each finger is a pointer of type "touch". */
@@ -56,12 +63,14 @@ const phone = () => {
   size.width = 844
   size.height = 390
   const calls: string[] = []
+  const views: TouchView[] = []
   const c = new Controls(element as unknown as HTMLElement, {
     onSlot: (s) => calls.push(`slot${s}`),
-    onLastWeapon() {},
-    onWheel() {},
+    onLastWeapon: () => calls.push("last"),
+    onWheel: (d) => calls.push(`wheel${d}`),
     onKey: (code, down) => calls.push(`${code}:${down ? "down" : "up"}`),
-    onPause() {}
+    onPause: () => calls.push("pause"),
+    onTouch: (v) => views.push(v)
   })
   c.inMatch = true
   const finger = (pointerId: number, pointerType = "touch") => ({
@@ -71,7 +80,13 @@ const phone = () => {
     cancel: () => emit(elListeners, "pointercancel", { pointerId, pointerType, clientX: 0, clientY: 0 })
   })
   const layout = () => touchLayout(size)
-  return { c, calls, finger, layout }
+  /** A quick tap with its own finger on a control of the layout. */
+  const tap = (at: Circle, pointerId = 7) => {
+    finger(pointerId).down(at.x, at.y)
+    finger(pointerId).up(at.x, at.y)
+  }
+  const view = () => views.at(-1) ?? c.touchView
+  return { c, calls, finger, layout, tap, view }
 }
 
 test("the left thumb's stick moves analogically, from wherever it lands", () => {
@@ -295,4 +310,267 @@ test("rotating the device re-lays the controls without dropping a finger already
   expect(portrait.fire.y).toBeGreaterThan((844 * 2) / 3)
   finger(3).down(portrait.fire.x, portrait.fire.y)
   expect(c.isHeld("fire")).toBe(true)
+})
+
+/** The player as the controls follow it from a snapshot: alive, on foot, away from turrets. */
+const player = (over: Partial<Tracked> = {}): Tracked => ({ alive: true, mounted: false, spawned: false, nearTurret: false, arsenal: freshArsenal("cramar"), ...over })
+const centre = (r: { left: number; top: number; width: number; height: number }): Circle => ({ x: r.left + r.width / 2, y: r.top + r.height / 2, r: 0 })
+
+for (const [width, height] of [[390, 844], [844, 390], [360, 640], [640, 360], [768, 1024], [1024, 768]]) {
+  test(`at ${width}x${height} every control fits on the canvas and none covers another`, () => {
+    const l = touchLayout({ width, height })
+    const circles: [string, Circle][] = [["stick", l.stick.rest], ["fire", l.fire], ...Object.entries(l.buttons)]
+    const boxes: [string, { left: number; top: number; width: number; height: number }][] = [
+      ...circles.map(([n, c]): [string, { left: number; top: number; width: number; height: number }] => [n, { left: c.x - c.r, top: c.y - c.r, width: 2 * c.r, height: 2 * c.r }]),
+      ["weapon", l.weapon]
+    ]
+    for (const [name, b] of [...boxes, ...l.picker.map((p, i): [string, typeof p] => [`picker${i}`, p])]) {
+      expect({ name, inside: b.left >= 0 && b.top >= 0 && b.left + b.width <= width && b.top + b.height <= height }).toEqual({ name, inside: true })
+    }
+    const apart = (a: Circle, b: Circle) => Math.hypot(a.x - b.x, a.y - b.y) >= a.r + b.r
+    for (const [i, [na, a]] of circles.entries()) for (const [nb, b] of circles.slice(i + 1)) expect({ na, nb, apart: apart(a, b) }).toEqual({ na, nb, apart: true })
+    const w = l.weapon
+    for (const [name, c] of circles) {
+      const nx = Math.max(w.left, Math.min(c.x, w.left + w.width))
+      const ny = Math.max(w.top, Math.min(c.y, w.top + w.height))
+      expect({ name, clear: Math.hypot(c.x - nx, c.y - ny) >= c.r }).toEqual({ name, clear: true })
+    }
+    // The picker's entries don't cover each other or the name they open from.
+    for (const [i, p] of l.picker.entries()) for (const q of [w, ...l.picker.slice(i + 1)]) expect(p.top + p.height <= q.top || q.top + q.height <= p.top || p.left + p.width <= q.left || q.left + q.width <= p.left).toBe(true)
+  })
+}
+
+test("the layout is computed once per canvas size and shared by the input and the HUD", () => {
+  const { c } = phone()
+  const first = c.relayout(size)
+  expect(c.relayout({ width: 844, height: 390 })).toBe(first)
+  const turned = c.relayout({ width: 390, height: 844 })
+  expect(turned).not.toBe(first)
+  expect(turned.portrait).toBe(true)
+})
+
+for (const b of ["jump", "reload", "bomb", "mine"] as const) {
+  test(`the ${b} button is held while the finger is on it, and a quick tap still reaches the tick`, () => {
+    const { c, finger, layout, tap } = phone()
+    const at = layout().buttons[b]
+    finger(5).down(at.x, at.y)
+    expect(c.buttons() & BUTTON[b]).toBe(BUTTON[b])
+    expect(c.isHeld(b)).toBe(true)
+    finger(5).up(at.x, at.y)
+    expect(c.isHeld(b)).toBe(false)
+    expect(c.buttons() & BUTTON[b]).toBe(0)
+    tap(at)
+    expect(c.buttons() & BUTTON[b]).toBe(BUTTON[b])
+    expect(c.buttons() & BUTTON[b]).toBe(0)
+    expect(c.yaw).toBe(0) // a button is no look
+  })
+}
+
+test("aim is a toggle: with the Cjampanili a tap shows the scope, the next tap leaves it", () => {
+  const { c, layout, tap, view } = phone()
+  const scope = () => firstPerson({ chosen: "cjampanili", mount: null, alive: true, aim: c.isHeld("aim") ? 1 : 0, baseFov: 90, aspect: 844 / 390, look: { yaw: 0, pitch: 0 }, sinceShot: Infinity, mag: 3, reserve: 15, reload: null }).scope
+  expect(scope()).toBe(false)
+  tap(layout().buttons.aim)
+  expect(c.isHeld("aim")).toBe(true) // the finger is gone, aim stays
+  expect(c.buttons() & BUTTON.aim).toBe(BUTTON.aim)
+  expect(view().aim).toBe(true)
+  expect(scope()).toBe(true)
+  tap(layout().buttons.aim)
+  expect(c.isHeld("aim")).toBe(false)
+  expect(view().aim).toBe(false)
+  expect(scope()).toBe(false)
+})
+
+test("aim lets go when the player dies", () => {
+  const { c, layout, tap } = phone()
+  c.track(player())
+  tap(layout().buttons.aim)
+  c.track(player({ alive: false }))
+  expect(c.isHeld("aim")).toBe(false)
+})
+
+for (const mode of ["hold", "toggle"] as const) {
+  test(`crouch is a toggle on touch with the crouch setting on ${mode}, and stays on after the finger lifts`, () => {
+    const { c, layout, tap, view } = phone()
+    c.crouchMode = mode
+    c.track(player())
+    tap(layout().buttons.crouch)
+    expect(c.isHeld("crouch")).toBe(true)
+    expect(c.buttons() & BUTTON.crouch).toBe(BUTTON.crouch)
+    expect(c.buttons() & BUTTON.crouch).toBe(BUTTON.crouch)
+    expect(view().crouch).toBe(true)
+    tap(layout().buttons.crouch)
+    expect(c.isHeld("crouch")).toBe(false)
+    expect(view().crouch).toBe(false)
+  })
+}
+
+test("the touch crouch is cleared by what clears the toggled crouch on keyboard and controller", () => {
+  const { c, finger, layout, tap, view } = phone()
+  c.crouchMode = "hold"
+  const crouch = () => {
+    tap(layout().buttons.crouch)
+    expect(c.isHeld("crouch")).toBe(true)
+  }
+  c.track(player())
+  crouch()
+  tap(layout().buttons.jump)
+  expect(c.isHeld("crouch")).toBe(false) // jumping stands up
+
+  crouch()
+  const r = layout().stick.radius
+  finger(1).down(150, 250)
+  finger(1).move(150, 250 - r)
+  expect(c.isHeld("crouch")).toBe(false) // sprinting stands up
+  finger(1).up()
+
+  crouch()
+  c.track(player())
+  expect(c.isHeld("crouch")).toBe(true) // nothing happened
+  c.track(player({ alive: false }))
+  expect(c.isHeld("crouch")).toBe(false)
+  expect(view().crouch).toBe(false) // the HUD learns it without a touch
+
+  crouch()
+  c.track(player({ spawned: true }))
+  expect(c.isHeld("crouch")).toBe(false)
+
+  crouch()
+  c.track(player({ mounted: true }))
+  expect(c.isHeld("crouch")).toBe(false)
+  c.track(player())
+
+  crouch()
+  c.track(null)
+  expect(c.isHeld("crouch")).toBe(false)
+
+  crouch()
+  c.crouchMode = "toggle" // changing the setting
+  expect(c.isHeld("crouch")).toBe(false)
+})
+
+test("the touch crouch and the keyboard's toggled crouch are one latch", () => {
+  const { c, layout, tap } = phone()
+  c.crouchMode = "toggle"
+  c.lock()
+  emit(winListeners, "keydown", { code: "KeyC", repeat: false })
+  emit(winListeners, "keyup", { code: "KeyC" })
+  expect(c.isHeld("crouch")).toBe(true)
+  tap(layout().buttons.crouch) // touch takes over, and the same latch stands up
+  expect(c.isHeld("crouch")).toBe(false)
+})
+
+test("a tap on the weapon's name is the next weapon", () => {
+  const { calls, layout, tap } = phone()
+  tap(centre(layout().weapon))
+  expect(calls).toEqual(["wheel1"])
+})
+
+const arsenal = (launcher: boolean): ArsenalValue => ({ ...freshArsenal("cjampanili"), launcher })
+
+for (const launcher of [false, true]) {
+  test(`a long press on the name opens a picker of the owned weapons${launcher ? ", with a picked-up Lanciafrico" : ""}, and each one switches`, () => {
+    const { c, calls, finger, layout, view } = phone()
+    c.track(player({ arsenal: arsenal(launcher) }))
+    const owned: WeaponId[] = launcher ? ["cjampanili", "mandi", "lanciafrico", "mescul"] : ["cjampanili", "mandi", "mescul"]
+    const slots = launcher ? ["slot1", "slot2", "slot3", "slot4"] : ["slot1", "slot2", "slot4"]
+    for (const [i, slot] of slots.entries()) {
+      const name = centre(layout().weapon)
+      finger(6).down(name.x, name.y)
+      c.poll(0.2)
+      expect(view().picker).toBe(null) // not yet a long press
+      c.poll(0.3)
+      expect(view().picker?.map((e) => e.id)).toEqual(owned)
+      finger(6).up(name.x, name.y) // lifted on the name: the picker stays open
+      expect(calls).toEqual([])
+      const entry = centre(layout().picker[i])
+      finger(8).down(entry.x, entry.y)
+      finger(8).up(entry.x, entry.y)
+      expect(calls).toEqual([slot])
+      expect(view().picker).toBe(null)
+      expect(c.isHeld("fire")).toBe(false) // the tap only picked
+      calls.length = 0
+    }
+  })
+}
+
+test("sliding from the name onto an entry and lifting picks it; a tap elsewhere closes the picker and does its own job", () => {
+  const { c, calls, finger, layout, view } = phone()
+  c.track(player({ arsenal: arsenal(true) }))
+  const name = centre(layout().weapon)
+  const mescul = centre(layout().picker[3])
+  finger(6).down(name.x, name.y)
+  c.poll(0.6)
+  finger(6).move(mescul.x, mescul.y)
+  finger(6).up(mescul.x, mescul.y)
+  expect(calls).toEqual(["slot4"])
+  expect(c.yaw).toBe(0)
+
+  finger(6).down(name.x, name.y)
+  c.poll(0.6)
+  finger(6).up(name.x, name.y)
+  const fire = layout().fire
+  finger(3).down(fire.x, fire.y)
+  expect(view().picker).toBe(null)
+  expect(c.isHeld("fire")).toBe(true)
+})
+
+test("the use button: absent away from turrets, mounts near a free one, dismounts while mounted", () => {
+  const { c, layout, tap, view } = phone()
+  const use = layout().buttons.use
+  c.track(player())
+  expect(c.turretControl).toBe(null)
+  expect(view().use).toBe(null)
+  tap(use)
+  expect(c.buttons() & BUTTON.use).toBe(0) // nothing there: the touch only looks
+
+  c.track(player({ nearTurret: true }))
+  expect(c.turretControl).toBe("use")
+  expect(view().use).toBe("use")
+  tap(use)
+  expect(c.buttons() & BUTTON.use).toBe(BUTTON.use)
+
+  c.track(player({ mounted: true }))
+  expect(c.turretControl).toBe("dismount")
+  expect(view().use).toBe("dismount")
+  tap(use)
+  expect(c.buttons() & BUTTON.use).toBe(BUTTON.use)
+
+  c.track(player({ nearTurret: true, alive: false }))
+  expect(c.turretControl).toBe(null)
+  c.track(null)
+  expect(view().use).toBe(null)
+})
+
+test("the match menu, the scoreboard (a toggle) and the quick phrases go through the keyboard's and the controller's paths", () => {
+  const { calls, layout, tap, view } = phone()
+  tap(layout().buttons.menu)
+  expect(calls).toEqual(["pause"])
+  calls.length = 0
+  tap(layout().buttons.board)
+  expect(calls).toEqual(["Tab:down"])
+  expect(view().board).toBe(true)
+  tap(layout().buttons.board)
+  expect(calls).toEqual(["Tab:down", "Tab:up"])
+  expect(view().board).toBe(false)
+  calls.length = 0
+  tap(layout().buttons.phrases)
+  expect(calls).toEqual(["KeyV:down", "KeyV:up"])
+})
+
+test("a button is drawn pressed only while a finger is on it", () => {
+  const { finger, layout, view } = phone()
+  const jump = layout().buttons.jump
+  finger(5).down(jump.x, jump.y)
+  expect(view().pressed).toBe(1 << TOUCH_BUTTONS.indexOf("jump"))
+  finger(5).up(jump.x, jump.y)
+  expect(view().pressed).toBe(0)
+})
+
+test("no touch control opens the text chat", () => {
+  const { c, calls, layout, tap } = phone()
+  c.track(player({ nearTurret: true }))
+  for (const b of TOUCH_BUTTONS) tap(layout().buttons[b])
+  tap(centre(layout().weapon))
+  expect(calls.filter((k) => k.startsWith("Enter") || k.startsWith("KeyT"))).toEqual([])
 })
