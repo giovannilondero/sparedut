@@ -23,6 +23,9 @@ function pngSize(url: string): [number, number] | null {
   return [bytes.readUInt32BE(16), bytes.readUInt32BE(20)]
 }
 
+/** The width and height in a manifest's `sizes` (one size, `WxH`). */
+const declared = (sizes: string) => sizes.split("x").map(Number) as [number, number]
+
 interface Icon {
   src: string
   sizes: string
@@ -75,8 +78,7 @@ test("every icon of the manifest is a PNG of the size it declares", () => {
   expect(icons.length).toBeGreaterThan(0)
   for (const icon of icons) {
     expect(icon.type).toBe("image/png")
-    const [w, h] = icon.sizes.split("x").map(Number)
-    expect([icon.src, pngSize(icon.src)]).toEqual([icon.src, [w!, h!]])
+    expect([icon.src, pngSize(icon.src)]).toEqual([icon.src, declared(icon.sizes)])
   }
 })
 
@@ -110,7 +112,7 @@ test("the install prompt shows phone and desktop screenshots, each with a Friuli
 test("every screenshot is a PNG of the size it declares, within what Chrome shows", () => {
   for (const shot of screenshots) {
     expect(shot.type).toBe("image/png")
-    const [w, h] = shot.sizes.split("x").map(Number) as [number, number]
+    const [w, h] = declared(shot.sizes)
     expect([shot.src, pngSize(shot.src)]).toEqual([shot.src, [w, h]])
     // Chrome: each side from 320 to 3840 pixels, the long one at most 2.3 times the short one.
     expect([shot.src, Math.min(w, h) >= 320, Math.max(w, h) <= 3840, Math.max(w, h) <= 2.3 * Math.min(w, h)]).toEqual([shot.src, true, true, true])
@@ -120,7 +122,7 @@ test("every screenshot is a PNG of the size it declares, within what Chrome show
 test("the screenshots of a form factor share one aspect ratio, as Chrome asks", () => {
   for (const form of ["narrow", "wide"]) {
     const ratios = new Set(ofForm(form).map((shot) => {
-      const [w, h] = shot.sizes.split("x").map(Number) as [number, number]
+      const [w, h] = declared(shot.sizes)
       return (w / h).toFixed(3)
     }))
     expect([form, ratios.size]).toEqual([form, 1])
@@ -293,7 +295,7 @@ test("a long press on the installed game's icon offers the home screen's button,
   const url = new URL(shortcuts[0]!.url, "https://sparedut.example")
   expect(url.pathname).toBe("/")
   expect(readOpening(url.search, url.hash)).toEqual({ kind: "shortcut" })
-  for (const icon of shortcuts[0]!.icons ?? []) expect(pngSize(icon.src)).toEqual(icon.sizes.split("x").map(Number) as [number, number])
+  for (const icon of shortcuts[0]!.icons ?? []) expect(pngSize(icon.src)).toEqual(declared(icon.sizes))
 })
 
 test("opening the installed game again brings the open game to the front instead of a new window", () => {
