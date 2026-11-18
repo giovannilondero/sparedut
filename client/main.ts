@@ -24,6 +24,7 @@ import { PerfMonitor } from "./perf.ts"
 import { loadSettings, saveSettings } from "./settings.ts"
 import type { WorldScene } from "./contracts.ts"
 import { createViewmodel } from "./viewmodel.ts"
+import { onViewportChange } from "./viewport.ts"
 import { createWorld } from "./world.ts"
 
 const settings = loadSettings()
@@ -49,7 +50,11 @@ const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera(settings.fov, innerWidth / innerHeight, 0.05, 2500)
 camera.rotation.order = "YXZ"
 
+/** The size the canvas was last drawn for: resizing it clears it, so a change that moved nothing leaves it alone. */
+let sized = ""
+const viewport = () => `${innerWidth}x${innerHeight}@${devicePixelRatio}`
 const resize = () => {
+  sized = viewport()
   renderer.setPixelRatio(pixelRatio())
   renderer.setSize(innerWidth, innerHeight, false)
   camera.aspect = innerWidth / innerHeight
@@ -92,7 +97,7 @@ if (look.id === "ver")
   })
 const audio = createAudio()
 audio.setVolumes(settings.master, settings.music)
-addEventListener("resize", resize)
+onViewportChange(() => viewport() !== sized && resize())
 resize()
 
 let quality = settings.quality

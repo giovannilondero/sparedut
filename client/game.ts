@@ -34,6 +34,7 @@ import "@ui-sdk/web/select"
 import { alwaysChosen } from "./choice.ts"
 import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, type MatchMenu } from "./match-menus.ts"
 import { pickerEntries } from "./touch.ts"
+import { onViewportChange } from "./viewport.ts"
 
 type DialogElement = HTMLElementTagNameMap["ui-dialog"]
 type SelectElement = HTMLElementTagNameMap["ui-select"]
@@ -197,7 +198,7 @@ export class Game {
       onTouch: (view) => this.hud.drawTouch(view)
     }, matchMedia("(pointer: coarse)").matches ? "touch" : "keyboard")
     // Rotating the device re-lays the touch controls; fingers already down keep their control.
-    addEventListener("resize", () => this.running && this.placeTouch())
+    onViewportChange(() => this.running && this.placeTouch())
     // On touch, no context menu from a long press during a match (the canvas always refuses it), except
     // in the match's menus: there, as on a desktop, the room code can be selected and copied.
     document.addEventListener("contextmenu", (e) => {
