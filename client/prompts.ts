@@ -5,7 +5,7 @@
  * asks every frame, and nothing is allocated.
  */
 import type { TrainingView } from "../shared/sim/view.ts"
-import { stepRule } from "../shared/training/index.ts"
+import { stepRule, type StationId } from "../shared/training/index.ts"
 import type { ControlId } from "../shared/training/station.ts"
 import type { Device } from "./device.ts"
 import type { Strings } from "./i18n.ts"
@@ -25,8 +25,10 @@ export const turretPrompt = (s: Strings, device: Device, mounted: boolean): stri
  * controller's button, the on-screen control. Null when the device has no control for it
  * (`CONTROL_DEVICES` in `shared/training/controls.ts`).
  */
-export const trainingControl = (s: Strings, control: ControlId, device: Device): string | null =>
-  (s.training.controls[control] as Readonly<Partial<Record<Device, string>>>)[device] ?? null
+export const trainingControl = (s: Strings, control: ControlId, device: Device): string | null => {
+  const controls: Readonly<Record<ControlId, Readonly<Partial<Record<Device, string>>>>> = s.training.controls
+  return controls[control][device] ?? null
+}
 
 /**
  * The current step's line in the training panel, for the active device: its instruction naming
@@ -38,6 +40,7 @@ export const trainingPrompt = (s: Strings, view: TrainingView, device: Device): 
   if (view.tag !== "station" || view.step === null) return ""
   const control = trainingControl(s, stepRule(view.station, view.step).control, device)
   if (control === null) return `<span class="unavailable">${s.training.unavailable}</span>`
-  const instruction = (s.training.steps[view.station] as Readonly<Record<string, StepText>>)[view.step]
+  const steps: Readonly<Record<StationId, Readonly<Record<string, StepText>>>> = s.training.steps
+  const instruction = steps[view.station][view.step]
   return `${instruction?.(control) ?? ""}${view.target > 1 ? ` <b class="count">${s.training.count(view.count, view.target)}</b>` : ""}`
 }

@@ -51,7 +51,11 @@ export type StepOf<S extends StationId> = keyof (typeof STATIONS)[S]["steps"] & 
 export type StepId = { [S in StationId]: StepOf<S> }[StationId]
 
 /** A station's steps, in order. */
+// `Object.keys` is typed `string[]`; a station's keys are its steps by construction (`StepOf`).
 export const stepsOf = <S extends StationId>(station: S): readonly StepOf<S>[] => Object.keys(STATIONS[station].steps) as StepOf<S>[]
 
+/** Every station's steps by id, as the rules see them. */
+const STEP_RULES: Readonly<Record<StationId, StationDef>> = STATIONS
+
 /** The rule of one step of a station. */
-export const stepRule = (station: StationId, step: StepId): StepRule => (STATIONS[station].steps as Readonly<Record<string, StepRule>>)[step]
+export const stepRule = (station: StationId, step: StepId): StepRule => STEP_RULES[station].steps[step]
