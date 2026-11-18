@@ -5,7 +5,7 @@
 import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId } from "../shared/map.ts"
 import type { Access, Reach, RoomSummary } from "../shared/protocol.ts"
-import { PRIMARIES, WEAPON_IDS, WEAPONS, type PrimaryId } from "../shared/weapons.ts"
+import { PRIMARIES, WEAPON_IDS, WEAPONS, type PrimaryId, type WeaponId } from "../shared/weapons.ts"
 // UI SDK's radio group: one tab stop, arrow keys, the radio role. Markup and styling stay the game's.
 import "@ui-sdk/web/radio"
 // UI SDK's dialog, for the password prompt: focus moved in and back, Tab kept inside, Esc and outside presses close it.
@@ -13,9 +13,14 @@ import "@ui-sdk/web/dialog"
 // UI SDK's select (a bottom sheet on a small touch screen) and collapsible (creation's "options").
 import "@ui-sdk/web/select"
 import "@ui-sdk/web/collapsible"
+// The settings: UI SDK's switch for the on-off ones, its slider for the numbers, its field to name the slider's thumb.
+import "@ui-sdk/web/switch"
+import "@ui-sdk/web/slider"
+import "@ui-sdk/web/field"
 import type { GameAudio } from "./contracts.ts"
 import { esc } from "./hud.ts"
 import { onLangChange, setLang, t, type Lang } from "./i18n.ts"
+import { chooseLook, LOOK_IDS, LOOKS, type LookId } from "./looks.ts"
 import { MenuModel, SCREENS, type CreateOptions, type Outcome, type PasswordRefusal, type PromptProblem, type Refusal, type Screen } from "./menu-model.ts"
 import { oneTapRoom, type Settings } from "./settings.ts"
 
@@ -86,7 +91,8 @@ export class Menu {
   private readonly model: MenuModel
   private tipIndex = Math.floor(Math.random() * 100)
 
-  constructor(private readonly settings: Settings, private readonly audio: GameAudio, private readonly handlers: MenuHandlers) {
+  /** `look`: the look this page was drawn with, shown chosen in the header. */
+  constructor(private readonly settings: Settings, private readonly audio: GameAudio, private readonly handlers: MenuHandlers, private readonly look: LookId) {
     this.model = new MenuModel(settings, handlers.settingsChanged)
     for (const el of document.querySelectorAll<HTMLElement>("[data-go]")) {
       el.addEventListener("click", () => {
@@ -105,6 +111,7 @@ export class Menu {
         handlers.settingsChanged()
       })
     }
+    this.bindLook()
     document.addEventListener("mouseover", (e) => {
       if ((e.target as HTMLElement).closest?.("#menu button")) audio.play("ui_hover", { volume: 0.4 })
     })
@@ -140,6 +147,7 @@ export class Menu {
       el.classList.toggle("selected", el.dataset.lang === this.settings.lang)
       el.setAttribute("aria-pressed", String(el.dataset.lang === this.settings.lang))
     }
+    $("look-label").textContent = t().menu.look
     this.renderCreate()
     this.renderOneTap()
     this.renderPrompt()
@@ -159,9 +167,9 @@ export class Menu {
     }, 400)
   }
 
-  /** Syncs the checkboxes with settings changed from outside (F3). */
+  /** Syncs the switches with settings changed from outside (F3). */
   syncSettings() {
-    $<HTMLInputElement>("s-info").checked = this.settings.showInfo
+    $<HTMLElementTagNameMap["ui-switch"]>("s-info").checked = this.settings.showInfo
   }
 
   show(on: boolean) {
@@ -221,6 +229,8 @@ export class Menu {
     const shown = SCREEN_ELEMENT[screen]
     for (const s of SCREENS) $(SCREEN_ELEMENT[s]).classList.toggle("hidden", SCREEN_ELEMENT[s] !== shown)
     if (screen === "home") this.renderOneTap()
+    // The primary may have changed in a match's armoury since this one was drawn.
+    if (screen === "armarie") this.buildArmarie()
     const prompt = $<HTMLElementTagNameMap["ui-dialog"]>("pw-dialog")
     if (screen === "password") this.renderPrompt()
     // Opened from code: UI SDK moves focus to the field and, on closing, back to what had it before.
@@ -421,55 +431,82 @@ export class Menu {
 
   // ---------------------------------------------------------------- armoury
 
+  /**
+   * The weapons: the primaries first, as one group of cards to choose from (UI SDK's radio group: one
+   * tab stop, arrow keys, the radio role), then the ones always carried or picked up, to read only.
+   * Drawn into the menu's armoury and, with `onPick`, into a match's.
+   */
   buildArmarie(target: HTMLElement = $("armarie"), onPick?: (p: PrimaryId) => void) {
     const max = { damage: 110, rate: 10, range: 400, mag: 30 }
-    const render = () => {
-      const s = t()
-      // The mitraie can't be carried: it stays on the turrets.
-      target.innerHTML = WEAPON_IDS.filter((id) => id !== "mitraie").map((id) => {
-        const w = WEAPONS[id]
-        const text = s.weapons[id]
-        const primary = (PRIMARIES as readonly string[]).includes(id)
-        const rate = 60 / w.cooldownTicks
-        const bar = (label: string, v: number) => `<div class="stat">${label}<i style="width:${Math.min(100, v * 100)}%"></i></div>`
-        const tag = primary ? s.menu.tag.primary : id === "lanciafrico" ? s.menu.tag.power : id === "mescul" ? s.menu.tag.melee : s.menu.tag.pistol
-        return `<button class="weapon${id === this.settings.primary ? " selected" : ""}${primary ? "" : " locked"}" data-w="${id}">
-          <span class="tag">${w.slot} · ${tag}</span><b>${text.name}</b><span class="blurb">${text.blurb}</span>
-          ${bar(s.menu.stat.damage, (w.damage * w.pellets) / max.damage)}${bar(s.menu.stat.rate, rate / max.rate)}${bar(s.menu.stat.range, (w.range || 120) / max.range)}${bar(s.menu.stat.mag, Math.max(w.magazine, 1) / max.mag)}
-        </button>`
-      }).join("")
-      for (const b of target.querySelectorAll<HTMLButtonElement>("button.weapon:not(.locked)")) {
-        b.addEventListener("click", () => {
-          this.settings.primary = b.dataset.w as PrimaryId
-          this.handlers.settingsChanged()
-          this.audio.play("switch")
-          onPick?.(this.settings.primary)
-          render()
-        })
-      }
+    const s = t()
+    const bar = (label: string, v: number) => `<span class="stat">${label}<i style="width:${Math.min(100, v * 100)}%"></i></span>`
+    const isPrimary = (id: WeaponId) => (PRIMARIES as readonly string[]).includes(id)
+    /** The card's text; its name and blurb name and describe the radio. */
+    const card = (id: WeaponId) => {
+      const w = WEAPONS[id]
+      const text = s.weapons[id]
+      const rate = 60 / w.cooldownTicks
+      const tag = isPrimary(id) ? s.menu.tag.primary : id === "lanciafrico" ? s.menu.tag.power : id === "mescul" ? s.menu.tag.melee : s.menu.tag.pistol
+      return `<span class="tag">${w.slot} · ${tag}</span><b id="${target.id}-${id}">${text.name}</b><span class="blurb" id="${target.id}-${id}-blurb">${text.blurb}</span>
+        <span class="stats">${bar(s.menu.stat.damage, (w.damage * w.pellets) / max.damage)}${bar(s.menu.stat.rate, rate / max.rate)}${bar(s.menu.stat.range, (w.range || 120) / max.range)}${bar(s.menu.stat.mag, Math.max(w.magazine, 1) / max.mag)}</span>`
     }
-    render()
+    // The mitraie can't be carried: it stays on the turrets.
+    const carried = WEAPON_IDS.filter((id) => id !== "mitraie" && !isPrimary(id))
+    target.innerHTML = `<ui-radio-group class="weapon-cards" aria-label="${s.static.armarieTitle.replace(/<[^>]*>/g, "")}">${PRIMARIES.map(
+      (id) => `<ui-radio class="weapon" value="${id}" aria-labelledby="${target.id}-${id}" aria-describedby="${target.id}-${id}-blurb">${card(id)}</ui-radio>`
+    ).join("")}</ui-radio-group>
+      <ul class="weapon-cards carried">${carried.map((id) => `<li class="weapon">${card(id)}</li>`).join("")}</ul>`
+    const group = target.querySelector<HTMLElementTagNameMap["ui-radio-group"]>("ui-radio-group")!
+    group.value = this.settings.primary
+    group.addEventListener("valuechange", (e) => {
+      // A primary is always chosen: a change to none is refused.
+      if (e.detail.value === null) return e.preventDefault()
+      this.settings.primary = e.detail.value as PrimaryId
+      this.handlers.settingsChanged()
+      this.audio.play("switch")
+      onPick?.(this.settings.primary)
+    })
   }
 
   // ---------------------------------------------------------------- settings
 
+  /**
+   * The settings form, one for the menu and the match. Numbers on UI SDK sliders (drag, tap on the
+   * track, arrow keys, Page Up/Down, Home/End), on and off on UI SDK switches, the choices among
+   * named options on the browser's own selects (a phone opens its own picker for them).
+   */
   private bindSettings() {
     const s = this.settings
-    const bind = (id: string, key: "sensitivity" | "fov" | "master" | "music", fmt: (v: number) => string) => {
-      const input = $<HTMLInputElement>(id)
-      const label = $(`${id}-v`)
-      input.value = String(s[key])
-      label.textContent = fmt(s[key])
-      input.addEventListener("input", () => {
-        s[key] = Number(input.value)
-        label.textContent = fmt(s[key])
+    const slider = (id: string, key: "sensitivity" | "fov" | "master" | "music", format: (v: number) => string) => {
+      const el = $<HTMLElementTagNameMap["ui-slider"]>(id)
+      el.format = format
+      el.value = s[key]
+      const set = (v: number) => {
+        if (v === s[key]) return
+        s[key] = v
         this.handlers.settingsChanged()
+      }
+      // Applied while dragging (the volume is heard, the field of view seen), saved with every step like the rest.
+      el.addEventListener("valuechange", (e) => {
+        if (typeof e.detail.value === "number") set(e.detail.value)
+      })
+      // A finger that lands on the track moves the knob there at once; if the browser then takes the touch to
+      // scroll the form (style.css lets it pan vertically), it was not meant for the slider: the value goes back.
+      const control = el.querySelector("ui-slider-control")!
+      let before = s[key]
+      control.addEventListener("pointerdown", () => (before = s[key]), { capture: true })
+      control.addEventListener("pointercancel", () => {
+        // After UI SDK's own handling of the cancel, which ends the drag on the value it last had.
+        setTimeout(() => {
+          el.value = before
+          set(before)
+        })
       })
     }
-    bind("s-sens", "sensitivity", (v) => v.toFixed(2))
-    bind("s-fov", "fov", (v) => `${v}°`)
-    bind("s-master", "master", (v) => `${Math.round(v * 100)}%`)
-    bind("s-music", "music", (v) => `${Math.round(v * 100)}%`)
+    slider("s-sens", "sensitivity", (v) => v.toFixed(2))
+    slider("s-fov", "fov", (v) => `${v}°`)
+    slider("s-master", "master", (v) => `${Math.round(v * 100)}%`)
+    slider("s-music", "music", (v) => `${Math.round(v * 100)}%`)
     const q = $<HTMLSelectElement>("s-quality")
     q.value = s.quality
     q.addEventListener("change", () => {
@@ -483,12 +520,33 @@ export class Menu {
       this.handlers.settingsChanged()
     })
     for (const [id, key] of [["s-autores", "autoRes"], ["s-info", "showInfo"], ["s-invert", "invertY"]] as const) {
-      const box = $<HTMLInputElement>(id)
+      const box = $<HTMLElementTagNameMap["ui-switch"]>(id)
       box.checked = s[key]
-      box.addEventListener("change", () => {
-        s[key] = box.checked
+      box.addEventListener("checkedchange", (e) => {
+        if (e.detail.value === s[key]) return
+        s[key] = e.detail.value
         this.handlers.settingsChanged()
       })
+    }
+  }
+
+  // ---------------------------------------------------------------- look
+
+  /** The look's two buttons in the header. Choosing the other one reloads the page with it. */
+  private bindLook() {
+    const box = $("look-switch")
+    for (const id of LOOK_IDS) {
+      const b = document.createElement("button")
+      b.textContent = LOOKS[id]
+      b.dataset.look = id
+      b.setAttribute("aria-pressed", String(id === this.look))
+      b.classList.toggle("selected", id === this.look)
+      b.addEventListener("click", () => {
+        if (id === this.look) return
+        this.audio.play("ui_click")
+        chooseLook(id)
+      })
+      box.append(b)
     }
   }
 }
