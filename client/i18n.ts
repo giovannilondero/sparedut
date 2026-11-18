@@ -50,6 +50,14 @@ export interface Strings {
     readonly completeSub: string
     /** The match menu's line in place of the room's reach. */
     readonly menuLine: string
+    /** The match menu's station list and its actions (ticket #51). */
+    readonly stationList: string
+    readonly here: string
+    readonly locked: string
+    readonly restart: string
+    readonly startOver: string
+    /** The second press that confirms starting over: the saved progress is lost. */
+    readonly startOverSure: string
   }
   readonly teams: Record<Team, { readonly name: string; readonly motto: string }>
   readonly modes: Record<ModeId, { readonly name: string; readonly sub: string; readonly rules: string }>
@@ -394,7 +402,13 @@ const fur: Strings = {
     stationDone: "Stazion finide",
     complete: "Dutrine finide!",
     completeSub: "Cumò tu sâs dut: va a zuiâ",
-    menuLine: "Dutrine · Offline, dome tu"
+    menuLine: "Dutrine · Offline, dome tu",
+    stationList: "Lis stazions",
+    here: "Tu sês culì",
+    locked: "Ancjemò sierade",
+    restart: "Torne a tacâ la stazion",
+    startOver: "Torne a tacâ dal principi",
+    startOverSure: "Sigûr? Tu pierdis dut ce che tu âs fat"
   },
   teams: {
     benandanti: { name: "Benandants", motto: "Pal racolt e pe glesie!" },
@@ -794,7 +808,13 @@ const it: Strings = {
     stationDone: "Stazione completata",
     complete: "Dutrine completata!",
     completeSub: "Ora sai tutto: vai a giocare",
-    menuLine: "Dutrine · Offline, solo tu"
+    menuLine: "Dutrine · Offline, solo tu",
+    stationList: "Le stazioni",
+    here: "Sei qui",
+    locked: "Ancora chiusa",
+    restart: "Ricomincia la stazione",
+    startOver: "Ricomincia da capo",
+    startOverSure: "Sicuro? Perdi tutti i progressi"
   },
   teams: {
     benandanti: { name: "Benandanti", motto: "Per il raccolto e per la chiesa!" },

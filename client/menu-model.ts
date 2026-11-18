@@ -8,7 +8,8 @@ import { ROOM_MAP_IDS, type RoomMapId } from "../shared/maps/index.ts"
 import { ACCESSES, MAX_BOTS, Password, REACHES, RoomCode, type Access, type ErrorCode, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 import type { Lang } from "./i18n.ts"
-import { oneTapRoom, type Settings } from "./settings.ts"
+import type { TrainingStart } from "../shared/training/start.ts"
+import { oneTapRoom, trainingStart, type Settings } from "./settings.ts"
 
 export type CreateOptions = Reached<RoomAccess> & {
   readonly mode: RoomModeId
@@ -35,7 +36,7 @@ export type MenuRequest =
   /** `password` only once the player typed one. */
   | { readonly t: "join"; readonly code: string; readonly password?: string }
   /** The training: always Offline, its map and mode fixed. */
-  | { readonly t: "training" }
+  | { readonly t: "training"; readonly start: TrainingStart }
   /** The browser's own install prompt, opened from the install entry. */
   | { readonly t: "install" }
   /** The waiting new version takes over and the page reloads into it. */
@@ -291,10 +292,10 @@ export class MenuModel {
     return { kind: "send", request: { t: "create", room: oneTapRoom(this.remembered), oneTap: true } }
   }
 
-  /** The home screen's training: one tap, nothing to choose; like any room it needs a name. */
+  /** The home screen's training: one tap, nothing to choose; like any room it needs a name. It resumes at the first station not completed. */
   training(): Outcome {
     if (!this.remembered.name) return this.needName()
-    return { kind: "send", request: { t: "training" } }
+    return { kind: "send", request: { t: "training", start: trainingStart(this.remembered.training) } }
   }
 
   typeCode(text: string) {

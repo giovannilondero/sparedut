@@ -23,6 +23,7 @@ import {
 import { createSim, type GameEvent, type Sim, type WorldView } from "../shared/sim/index.ts"
 import { TRAINING, type StationId } from "../shared/training/index.ts"
 import type { StationBot } from "../shared/training/station.ts"
+import type { TrainingStart } from "../shared/training/start.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 import { BotBrain } from "./bot.ts"
 import { navGraph } from "./nav.ts"
@@ -88,11 +89,13 @@ export class Room {
     public hostId: string,
     public hostName: string,
     readonly networkKey: string,
-    readonly settings: RoomSettings
+    readonly settings: RoomSettings,
+    /** A training's start, from its request (`shared/training/start.ts`). */
+    start?: TrainingStart
   ) {
     this.level = settings.level
     this.physics = createPhysicsWorld(MAPS[settings.map])
-    this.sim = createSim({ mode: settings.mode, minutes: settings.minutes, friendlyFire: settings.ff, seed: Math.floor(Math.random() * 2 ** 31), physics: this.physics })
+    this.sim = createSim({ mode: settings.mode, minutes: settings.minutes, friendlyFire: settings.ff, seed: Math.floor(Math.random() * 2 ** 31), physics: this.physics, ...(start ? { training: start } : {}) })
     this.world = this.sim.view()
   }
 

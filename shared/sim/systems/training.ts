@@ -12,7 +12,30 @@ import { STATION_IDS, STATIONS, stepRule, stepsOf } from "../../training/index.t
 import type { Seen, StepRule } from "../../training/station.ts"
 import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS } from "../../weapons.ts"
 import { freshArsenal, freshDoors, MAX_HP, stormOnCourse } from "../rules.ts"
-import { Arsenal, Cart, Controls, Doors, Flags, Game, Hill, Life, Motion, Objective, Out, Pickups, Player, ReportInterface, Score, StormCourse, Tick, Training, type ArsenalValue } from "../schema.ts"
+import {
+  Arsenal,
+  Cart,
+  Controls,
+  Doors,
+  Flags,
+  Game,
+  GoToStation,
+  Hill,
+  Life,
+  Motion,
+  Objective,
+  Out,
+  Pickups,
+  Player,
+  ReportInterface,
+  Score,
+  StormCourse,
+  Tick,
+  Training,
+  Turrets,
+  type ArrivalPlace,
+  type ArsenalValue
+} from "../schema.ts"
 
 /** Where the trainee is after a station completes: at the next station's first step, or done. */
 type Next = { readonly _tag: "Step"; readonly station: number; readonly step: number; readonly count: number; readonly mark: number; readonly unlocked: number } | { readonly _tag: "Complete" }
@@ -47,18 +70,36 @@ export const PlayTraining = Game.System(
       flags: Game.System.writeResource(Flags),
       hill: Game.System.writeResource(Hill),
       cart: Game.System.writeResource(Cart),
-      stormCourse: Game.System.writeResource(StormCourse)
+      stormCourse: Game.System.writeResource(StormCourse),
+      turrets: Game.System.writeResource(Turrets)
     },
-    events: { happened: Game.System.readEvent(Out), out: Game.System.writeEvent(Out), reports: Game.System.readEvent(ReportInterface) },
+    events: { happened: Game.System.readEvent(Out), out: Game.System.writeEvent(Out), reports: Game.System.readEvent(ReportInterface), goTo: Game.System.readEvent(GoToStation) },
     machines: { training: Game.System.updateMachine(Training) },
     nextMachines: { training: Game.System.nextState(Training) }
   },
   ({ queries, resources, events, machines, nextMachines }) => {
     // Reports are read every tick, so that one never waits for a later tick: outside a training's step they are ignored.
     const reports = events.reports.all()
+    const goes = events.goTo.all()
     const state = machines.training.get()
-    if (state._tag === "Off" || state._tag === "Complete") return
+    if (state._tag === "Off") return
     const { data } = queries.players
+
+    // Going to a station (the current one: restarting it) or starting over: the next tick arrives
+    // there, placed at its start. A locked station is refused. The last intent of the tick wins.
+    let go: (typeof goes)[number]["to"] | null = null
+    for (const g of goes) if (queries.players.each().some((m) => !data.player.get(m).bot && data.player.get(m).session === g.session)) go = g.to
+    if (go !== null) {
+      const unlocked = state._tag === "Complete" ? STATION_IDS.length : state.unlocked
+      const to = go._tag === "startOver" ? { station: 0, unlocked: 1, place: "keepingLook" as const } : go.station >= 0 && go.station < unlocked ? { station: go.station, unlocked, place: "keepingLook" as const } : null
+      if (to !== null) {
+        if (state._tag === "Arriving") machines.training.update({ state: "Arriving", data: () => to })
+        else if (state._tag === "Step") nextMachines.training.transition({ from: "Step", to: "Arriving", data: to })
+        else nextMachines.training.transition({ from: "Complete", to: "Arriving", data: to })
+        return
+      }
+    }
+    if (state._tag === "Complete") return
     const trainee = queries.players.each().find((m) => !data.player.get(m).bot && data.life.get(m)._tag === "Alive")
     if (trainee === undefined) return
     const happened = events.happened.all()
@@ -124,7 +165,7 @@ export const PlayTraining = Game.System(
     }
 
     /** Arrives at station `from` (and past any station with no steps): its setup applied, its first step begun. */
-    const arrive = (from: number, unlocked: number, place: boolean): Next => {
+    const arrive = (from: number, unlocked: number, place: ArrivalPlace): Next => {
       let index = from
       let open = unlocked
       while (index < STATION_IDS.length && stepsOf(STATION_IDS[index]).length === 0) {
@@ -152,12 +193,15 @@ export const PlayTraining = Game.System(
         resources.pickups.set(resources.pickups.get().map((p, i) => (back.includes(i) ? { _tag: "up" as const } : p)))
       }
       data.life.update(trainee, { state: "Alive", data: (alive) => ({ hp: setup.hp ?? MAX_HP, armor: setup.armor ?? 0, shield: alive.shield }) })
-      if (place) {
+      if (place !== "walked") {
+        // Placed away from a turret it was manning (restarting the turret's station): off it.
+        if (resources.turrets.get().some((t) => t.gunner === session)) resources.turrets.set(resources.turrets.get().map((t) => (t.gunner === session ? { ...t, gunner: null } : t)))
         const start = SAGRE_STATIONS[index].start
+        const motion = data.motion.get(trainee)
         data.motion.set(trainee, {
           body: { x: start.at[0], y: start.at[1], z: start.at[2], vx: 0, vy: 0, vz: 0, grounded: true, crouch: false },
-          yaw: start.yaw,
-          pitch: 0
+          yaw: place === "facingStart" ? start.yaw : motion.yaw,
+          pitch: place === "facingStart" ? 0 : motion.pitch
         })
       }
       const first = stepRule(id, stepsOf(id)[0])
@@ -207,7 +251,7 @@ export const PlayTraining = Game.System(
         next = { _tag: "Step", station: state.station, step: state.step + 1, count: begun.count, mark: begun.mark, unlocked: state.unlocked }
       } else {
         events.out.emit({ t: "training", a: "station", station: id })
-        next = arrive(state.station + 1, Math.max(state.unlocked, state.station + 2), false)
+        next = arrive(state.station + 1, Math.max(state.unlocked, state.station + 2), "walked")
       }
     }
     if (next._tag === "Complete") nextMachines.training.transition({ from: "Step", to: "Complete" })
