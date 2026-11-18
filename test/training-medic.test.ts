@@ -149,3 +149,24 @@ describe("the automatic player", () => {
     expect(events).toContainEqual({ t: "training", a: "station", station: "medic" })
   })
 })
+
+describe("restarting the station", () => {
+  test("puts the teammate back at their post with their wounds, so the step can still be completed", () => {
+    const { me, snap, teammate, drive, heal, play } = atMedic()
+    const counted = () => {
+      const view = snap().training
+      return view?.tag === "station" ? view.count : 0
+    }
+    drive(60 * 10, heal(4), () => counted() >= 30)
+    expect(teammate()!.hp).toBeGreaterThan(WOUNDED_HP)
+    me.say({ t: "goTo", station: "medic" })
+    play(4)
+    expect(snap().training).toMatchObject({ station: "medic", step: "heal", count: 0, target: TO_RESTORE })
+    const mate = teammate()!
+    expect(mate.hp).toBe(WOUNDED_HP)
+    expect(Math.hypot(mate.x - WOUNDED[0], mate.z - WOUNDED[2])).toBeLessThan(0.5)
+    const events = drive(60 * 30, heal(4), (e) => steps(e).length > 0)
+    expect(steps(events)).toEqual(["heal"])
+    expect(events).toContainEqual({ t: "training", a: "station", station: "medic" })
+  })
+})

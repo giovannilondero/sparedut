@@ -28,6 +28,7 @@ import {
   Out,
   Pickups,
   Player,
+  Post,
   ReportInterface,
   Score,
   StepUnavailable,
@@ -56,6 +57,7 @@ export const PlayTraining = Game.System(
       players: Game.Query({
         selection: {
           player: Game.Query.read(Player),
+          post: Game.Query.optional(Post),
           controls: Game.Query.read(Controls),
           motion: Game.Query.write(Motion),
           life: Game.Query.write(Life),
@@ -212,6 +214,19 @@ export const PlayTraining = Game.System(
           yaw: place === "facingStart" ? start.yaw : motion.yaw,
           pitch: place === "facingStart" ? 0 : motion.pitch
         })
+      }
+      // Placed at a station (restarting it included), its bots are back at their posts with their
+      // starting health: the scene is set again. A dead one comes back at its post next tick. Walking
+      // in, the bots there are still the last station's, and the host replaces them.
+      if (place !== "walked") for (const m of queries.players.each()) {
+        const post = data.post?.get(m)
+        if (post === undefined) continue
+        if (data.life.get(m)._tag === "Dead") {
+          data.life.update(m, { state: "Dead", data: (dead) => ({ respawn: 1, killer: dead.killer }) })
+          continue
+        }
+        data.life.update(m, { state: "Alive", data: (alive) => ({ hp: post.hp, armor: 0, shield: alive.shield }) })
+        data.motion.set(m, { body: { x: post.at[0], y: post.at[1], z: post.at[2], vx: 0, vy: 0, vz: 0, grounded: true, crouch: false }, yaw: post.yaw, pitch: 0 })
       }
       const first = stepRule(id, stepsOf(id)[0])
       give(first)
