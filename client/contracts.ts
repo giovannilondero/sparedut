@@ -164,7 +164,6 @@ export type SoundName =
   | "shot_cjampanili"
   | "shot_mulin"
   | "spin_mulin"
-  | "cut_motosee"
   | "beam_miedi"
   | "launch_gjaline"
   | "boom_gjaline"
@@ -224,4 +223,21 @@ export interface GameAudio {
    * muffled if the door is closed. `null` turns it off.
    */
   disco(at: P3 | null, open: boolean): void
+  /**
+   * Every Motosee in hand, every frame: each one's engine runs for as long as it is in this list,
+   * idling, revving and cutting as it says, and stops when it leaves it. Only the nearest are heard.
+   */
+  motosees(engines: readonly MotoseeEngine[]): void
+}
+
+/** A Motosee in someone's hand, as its engine sounds. */
+export interface MotoseeEngine {
+  /** Whose it is: the same id frame after frame keeps the same engine running. */
+  readonly id: string
+  /** Where it is; null for your own, heard in your hands. */
+  readonly at: P3 | null
+  /** How far the engine has been revved, 0 (idle) to 1 (full). */
+  readonly rev: number
+  /** Whether the chain is biting: full rev with the trigger held. */
+  readonly cutting: boolean
 }

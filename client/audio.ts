@@ -3,11 +3,11 @@
  * and played with Howler. Positional in 3D when they have a point in the world.
  */
 import { Howl, Howler } from "howler"
-import type { GameAudio, P3, SoundName } from "./contracts.ts"
-import { wav } from "./audio/dsp.ts"
+import type { GameAudio, MotoseeEngine, P3, SoundName } from "./contracts.ts"
+import { SR, wav } from "./audio/dsp.ts"
 import { renderTechno } from "./audio/techno.ts"
 import { renderVillotta } from "./audio/music.ts"
-import { SFX, renderSound } from "./audio/sfx.ts"
+import { renderMotosee, SFX, renderSound } from "./audio/sfx.ts"
 
 type Range = "far" | "mid" | "near"
 
@@ -17,6 +17,30 @@ const RANGES: Record<Range, { distanceModel: "inverse" | "linear"; refDistance: 
   mid: { distanceModel: "inverse", refDistance: 4, rolloffFactor: 1.1, maxDistance: 10000 },
   near: { distanceModel: "linear", refDistance: 2, rolloffFactor: 1, maxDistance: 26 }
 }
+
+/**
+ * The Motosee's engine, every number in one place. It carries farther than a gunshot ("far":
+ * reference 10 m, roll-off 0.55): at 100 m a shot has fallen to 17% of its level, the Motosee
+ * to 38%. Only the nearest `voices` engines are heard (your own always among them), and together
+ * they go through one bus that gives way as more join and a compressor that keeps them from
+ * swamping the shots and the steps.
+ */
+export const MOTOSEE_SOUND = {
+  refDistance: 16,
+  rolloffFactor: 0.3,
+  voices: 3,
+  /** Engine level and playback rate at idle and at full rev. */
+  idle: { gain: 0.3, rate: 1 },
+  full: { gain: 0.55, rate: 2.7 },
+  /** While cutting: the engine bogs down a little under the load and the grind comes in. */
+  cutting: { rate: 2.35, grind: 0.6 },
+  /** Your own engine, in your hands: a little lower, as it never goes away. */
+  own: 0.7,
+  /** Seconds for the engine to follow a change: slower up (a rev takes a moment) than down. */
+  rise: 0.1,
+  fall: 0.18,
+  fade: 0.06
+} as const
 
 interface Spec {
   readonly range: Range
@@ -36,7 +60,6 @@ const SPECS: Record<SoundName, Spec> = {
   shot_cjampanili: spec("far", 3, 1, 0.02),
   shot_mulin: spec("far", 10, 0.55, 0.05),
   spin_mulin: spec("mid", 2, 0.6, 0.02),
-  cut_motosee: spec("far", 3, 0.5, 0.05),
   beam_miedi: spec("mid", 4, 0.45, 0.06),
   launch_gjaline: spec("far", 3, 0.85, 0.06),
   boom_gjaline: spec("far", 4, 0.9, 0.08),
@@ -202,7 +225,120 @@ export function createAudio(): GameAudio {
     })
   }
 
+  // The Motosee's engines: two loops per engine (the engine and the grind), on Web Audio directly
+  // so that rev and grind glide; synthesized now, turned into buffers once the context exists.
+  const sawPcm = renderMotosee()
+  type Engine = { engine: AudioBufferSourceNode; rate: number; gain: number; grind: number; engineGain: GainNode; cutGain: GainNode; panner: PannerNode | null }
+  let saw: { engine: AudioBuffer; cut: AudioBuffer; bus: GainNode; shown: number } | null = null
+  const engines = new Map<string, Engine & { cut: AudioBufferSourceNode; out: AudioNode }>()
+  const sawBus = () => {
+    if (saw) return saw
+    const ctx = Howler.ctx
+    const buf = (pcm: Float32Array) => {
+      const b = ctx.createBuffer(1, pcm.length, SR)
+      b.copyToChannel(pcm as Float32Array<ArrayBuffer>, 0)
+      return b
+    }
+    const bus = ctx.createGain()
+    const squeeze = ctx.createDynamicsCompressor()
+    squeeze.threshold.value = -20
+    squeeze.ratio.value = 4
+    bus.connect(squeeze).connect(Howler.masterGain)
+    saw = { engine: buf(sawPcm.engine), cut: buf(sawPcm.cut), bus, shown: 0 }
+    return saw
+  }
+  const glide = (p: AudioParam, from: number, to: number, now: number) => {
+    if (Math.abs(from - to) < 0.005) return from
+    p.cancelScheduledValues(now)
+    p.setTargetAtTime(to, now, to > from ? MOTOSEE_SOUND.rise : MOTOSEE_SOUND.fall)
+    return to
+  }
+  const startEngine = (s: NonNullable<typeof saw>, own: boolean) => {
+    const ctx = Howler.ctx
+    const now = ctx.currentTime
+    const loop = (b: AudioBuffer) => {
+      const n = ctx.createBufferSource()
+      n.buffer = b
+      n.loop = true
+      return n
+    }
+    const engine = loop(s.engine)
+    const cut = loop(s.cut)
+    const engineGain = ctx.createGain()
+    const cutGain = ctx.createGain()
+    engineGain.gain.value = 0
+    cutGain.gain.value = 0
+    const out = ctx.createGain()
+    out.gain.value = own ? MOTOSEE_SOUND.own : 1
+    engine.connect(engineGain).connect(out)
+    cut.connect(cutGain).connect(out)
+    let panner: PannerNode | null = null
+    if (own) out.connect(s.bus)
+    else {
+      panner = new PannerNode(ctx, { panningModel: "HRTF", distanceModel: "inverse", refDistance: MOTOSEE_SOUND.refDistance, rolloffFactor: MOTOSEE_SOUND.rolloffFactor, maxDistance: 10000 })
+      out.connect(panner).connect(s.bus)
+    }
+    // each engine from its own point in the loop: two saws never beat in step
+    engine.start(now, Math.random() * s.engine.duration)
+    cut.start(now, Math.random() * s.cut.duration)
+    return { engine, cut, out, engineGain, cutGain, panner, rate: 1, gain: 0, grind: 0 }
+  }
+  const stopEngine = (e: Engine & { cut: AudioBufferSourceNode }) => {
+    const now = Howler.ctx.currentTime
+    for (const g of [e.engineGain.gain, e.cutGain.gain]) {
+      g.cancelScheduledValues(now)
+      g.setTargetAtTime(0, now, MOTOSEE_SOUND.fade)
+    }
+    e.engine.stop(now + MOTOSEE_SOUND.fade * 5)
+    e.cut.stop(now + MOTOSEE_SOUND.fade * 5)
+  }
+  /** The engines heard: your own first, then the nearest to the listener. */
+  const heard = (list: readonly MotoseeEngine[]) => {
+    const [p] = listener
+    const far = (e: MotoseeEngine) => (e.at ? (e.at[0] - p[0]) ** 2 + (e.at[1] - p[1]) ** 2 + (e.at[2] - p[2]) ** 2 : -1)
+    return list.length <= MOTOSEE_SOUND.voices ? list : [...list].sort((a, b) => far(a) - far(b)).slice(0, MOTOSEE_SOUND.voices)
+  }
+
   return {
+    motosees(list) {
+      if (!list.length && !engines.size) return
+      ensure()
+      const ctx = Howler.ctx
+      if (!ctx || ctx.state !== "running") return
+      const s = sawBus()
+      const now = ctx.currentTime
+      const chosen = heard(list)
+      for (const [id, e] of engines)
+        if (!chosen.some((c) => c.id === id)) {
+          stopEngine(e)
+          engines.delete(id)
+        }
+      const { idle, full, cutting } = MOTOSEE_SOUND
+      for (const c of chosen) {
+        let e = engines.get(c.id)
+        if (!e) {
+          e = startEngine(s, c.at === null)
+          engines.set(c.id, e)
+        }
+        const rev = Math.max(0, Math.min(1, c.rev))
+        e.rate = glide(e.engine.playbackRate, e.rate, c.cutting ? cutting.rate : idle.rate + (full.rate - idle.rate) * rev, now)
+        e.gain = glide(e.engineGain.gain, e.gain, idle.gain + (full.gain - idle.gain) * rev, now)
+        e.grind = glide(e.cutGain.gain, e.grind, c.cutting ? cutting.grind : 0, now)
+        if (e.panner && c.at) {
+          e.panner.positionX.value = c.at[0]
+          e.panner.positionY.value = c.at[1]
+          e.panner.positionZ.value = c.at[2]
+        }
+      }
+      // more engines, each a little lower: three saws are louder than one, not three times as loud
+      const shown = engines.size ? 1 / Math.sqrt(engines.size) : 1
+      if (shown !== s.shown) {
+        s.bus.gain.cancelScheduledValues(now)
+        s.bus.gain.setTargetAtTime(shown, now, 0.1)
+        s.shown = shown
+      }
+    },
+
     unlock() {
       ensure()
       if (Howler.ctx && Howler.ctx.state !== "running") void Howler.ctx.resume()
