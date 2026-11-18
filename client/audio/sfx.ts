@@ -73,6 +73,14 @@ const spinMulin: Recipe = r => {
   return done(b, 0.6)
 }
 
+const cutMotosee: Recipe = r => {
+  // a stand-in for the Motosee's teeth: a short two-stroke buzz with grit, one per bite
+  const b = buffer(0.09)
+  voice(b, { dur: 0.08, wave: "saw", f: t => 150 + 30 * Math.sin(t * 300), amp: 0.5, a: 0.004, d: 0.02, lp: 2200 })
+  voice(b, { dur: 0.07, wave: "noise", bp: 1800, q: 1, amp: 0.35, a: 0.004, d: 0.02, rnd: r })
+  return done(b, 0.6)
+}
+
 const beamMiedi: Recipe = r => {
   // the sbrufadôr: a soft spray with a trickle of bubbles
   const b = buffer(0.22)
@@ -606,6 +614,7 @@ export const SFX: Record<SoundName, readonly [Recipe, number]> = {
   shot_cjampanili: [shotCjampanili, 1],
   shot_mulin: [shotMulin, 3],
   spin_mulin: [spinMulin, 1],
+  cut_motosee: [cutMotosee, 2],
   beam_miedi: [beamMiedi, 2],
   launch_gjaline: [launchGjaline, 2],
   boom_gjaline: [boomGjaline, 2],

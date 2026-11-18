@@ -5,7 +5,7 @@ import { MODES, pick, TEAM_INFO, type ModeId } from "../shared/folklore.ts"
 import type { Team } from "../shared/map.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type SnapSelf, type Snapshot } from "../shared/protocol.ts"
 import type { KillCause } from "../shared/sim/events.ts"
-import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
+import { usesAmmo, type WeaponId } from "../shared/weapons.ts"
 import { maxHp } from "../shared/sim/rules.ts"
 import type { TrainingView } from "../shared/sim/view.ts"
 import { STATION_IDS } from "../shared/training/index.ts"
@@ -152,8 +152,7 @@ export class Hud {
     this.style("vitals", "--hp", String(share))
     this.style("vitals", "--armor", String(you.armor))
     const a = you.arsenal
-    const def = WEAPONS[a.current]
-    const endless = def.mode === "melee" || turret
+    const endless = !usesAmmo(a.current) || turret
     this.inHand = turret ? "mitraie" : a.current
     this.text("weapon-name", t().weapons[this.inHand].name)
     const ammo = a.ammo[a.current]
@@ -200,6 +199,15 @@ export class Hud {
     if (!prompt) return
     this.html("panel-label", panelPrompt(t(), device))
     this.style("panel-tear", "width", `${Math.round(progress * 100)}%`)
+  }
+
+  /** Carrying the casot's panel: how much it can still take, from 1 (whole) down; null when not carrying it. */
+  panelHealth(left: number | null) {
+    this.toggle("panel-hud", "hidden", left === null)
+    if (left === null) return
+    this.text("panel-hp-label", t().weapons.panel.name)
+    this.style("panel-hp", "width", `${Math.round(left * 100)}%`)
+    this.toggle("panel-hud", "low", left < 0.3)
   }
 
   /** Feathers in the eyes (the gjaline): vision is covered for `seconds` and then slowly clears. */

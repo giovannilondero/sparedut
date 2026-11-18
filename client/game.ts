@@ -12,7 +12,7 @@ import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, seatedBody, sprinting } from 
 import type { PhysicsWorld } from "../shared/physics.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
-import { outsideStorm, owned, RAISE_TICKS, speedScale, weaponInSlot } from "../shared/sim/rules.ts"
+import { outsideStorm, owned, panelOnWall, RAISE_TICKS, speedScale, weaponInSlot } from "../shared/sim/rules.ts"
 import { isTraining } from "../shared/training/index.ts"
 import { closedGates, viewedStation } from "../shared/training/gates.ts"
 import type { InterfaceAction } from "../shared/training/interface.ts"
@@ -20,7 +20,7 @@ import { UnavailableSteps } from "./training-unavailable.ts"
 import type { StationId } from "../shared/training/index.ts"
 import { FRESH_TRAINING, trainingProgressed } from "./settings.ts"
 import { entryChoice, listOnEntry, stationButtonId, stationEntries, stationListHtml } from "./training-menu.ts"
-import { PRIMARIES, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../shared/weapons.ts"
+import { PANEL_HP, PRIMARIES, usesAmmo, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
 import { Controls, trackedIn } from "./controls.ts"
@@ -65,6 +65,8 @@ const OPENED_CONTENT = MATCH_MENUS.map((m) => `#${MENU_PARTS[m][1]}`).join(", ")
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 const INTERP_TICKS = 6
+/** The keys of the quick phrases, in order: the number row, then the key after 0. */
+const PHRASE_KEYS = [..."1234567890".split("").map((d) => ({ code: `Digit${d}`, label: d })), { code: "Minus", label: "-" }]
 const SHOT_SOUND: Partial<Record<WeaponId, SoundName>> = {
   mandi: "shot_mandi",
   cramar: "shot_cramar",
@@ -257,7 +259,7 @@ export class Game {
     })
     $("quickchat").addEventListener("click", (e) => {
       const n = (e.target as HTMLElement).closest<HTMLElement>("[data-n]")?.dataset.n
-      if (n) this.key(`Digit${n}`, true)
+      if (n) this.key(PHRASE_KEYS[Number(n)].code, true)
     })
     const chat = $<HTMLInputElement>("chat-input")
     chat.addEventListener("keydown", (e) => {
@@ -489,7 +491,7 @@ export class Game {
     // Broken-down doors no longer stop predicted movement or shots.
     this.physics.setDoors(s.doors.map((hp) => hp > 0))
     // A panel torn off leaves its gap: predicted shots pass through it (bodies still cannot).
-    this.physics.setPanels(s.panels.map((p) => p.tag !== "off"))
+    this.physics.setPanels(s.panels.map(panelOnWall))
     // The training's closed ways stop predicted movement as they stop it on the host.
     const gates = this.physics.map.gates?.length ?? 0
     const at = viewedStation(s.training)
@@ -700,10 +702,26 @@ export class Game {
       case "panel": {
         const panel = this.physics.map.panels?.[e.i]
         if (!panel) return
-        const at: P3 = [(panel.min[0] + panel.max[0]) / 2, (panel.min[1] + panel.max[1]) / 2, (panel.min[2] + panel.max[2]) / 2]
-        fx.splinters(at, true)
-        audio.play("door_break", { at })
-        this.hud.announce(t().game.panelTorn(this.names.get(e.s) ?? "?"), t().game.panelSub)
+        if (e.a === "torn") {
+          const at: P3 = [(panel.min[0] + panel.max[0]) / 2, (panel.min[1] + panel.max[1]) / 2, (panel.min[2] + panel.max[2]) / 2]
+          fx.splinters(at, true)
+          audio.play("door_break", { at })
+          this.hud.announce(t().game.panelTorn(this.names.get(e.s) ?? "?"), t().game.panelSub)
+          return
+        }
+        // Taken from the ground, a blow it took, broken: at its carrier.
+        const at = this.posOf(e.s)
+        const mine = e.s === me
+        const where = mine || !at ? {} : { at }
+        if (e.a === "taken") {
+          audio.play("pickup_lanciafrico", where)
+          if (mine) this.hud.announce(t().game.panelTaken)
+        } else if (e.a === "blocked") audio.play("door_hit", where)
+        else {
+          if (at) fx.splinters(at, true)
+          audio.play("door_break", where)
+          if (mine) this.hud.announce(t().game.panelBroken, t().game.panelBrokenSub)
+        }
         return
       }
       case "bounce":
@@ -822,7 +840,7 @@ export class Game {
 
   /** The turret I'm using, or -1. */
   /**
-   * The panel holding "use" would tear off now, as the simulation decides it (`TearPanels`): on its
+   * The panel holding "use" would tear off now, as the simulation decides it (`PlayPanels`): on its
    * wall or being torn by me, faced from inside with slot 3 free. -1 when none.
    */
   private panelToTear(s: Snapshot, body: { readonly x: number; readonly y: number; readonly z: number }): number {
@@ -887,9 +905,8 @@ export class Game {
       this.escape()
       return false
     }
-    if (this.quickOpen && /^Digit\d$/.test(code)) {
-      const n = Number(code.slice(5))
-      const phrase = QUICK_CHAT[(n + 9) % 10]
+    if (this.quickOpen && PHRASE_KEYS.some((k) => k.code === code)) {
+      const phrase = QUICK_CHAT[PHRASE_KEYS.findIndex((k) => k.code === code)]
       if (phrase) {
         this.d.net.send({ t: "chat", text: phrase })
         // Sending a quick phrase is a training's interface step.
@@ -937,7 +954,7 @@ export class Game {
     const gloss = t().game.quickGloss
     // On touch the list takes taps: each row says the phrase as its number key would.
     q.classList.toggle("tap", on && this.controls.touchActive)
-    if (on) q.innerHTML = QUICK_CHAT.map((p, i) => `<div data-n="${(i + 1) % 10}"><kbd>${(i + 1) % 10}</kbd>${esc(p)}${gloss ? ` <span class="muted">· ${gloss[i]}</span>` : ""}</div>`).join("")
+    if (on) q.innerHTML = QUICK_CHAT.map((p, i) => `<div data-n="${i}"><kbd>${PHRASE_KEYS[i].label}</kbd>${esc(p)}${gloss ? ` <span class="muted">· ${gloss[i]}</span>` : ""}</div>`).join("")
   }
 
   private openChat() {
@@ -1595,14 +1612,14 @@ export class Game {
       this.localSpin = turning ? Math.min(def.spinTicks, this.localSpin + 1) : Math.max(0, this.localSpin - 2)
     } else this.localSpin = 0
     const mag = this.localMag ?? you.arsenal.ammo[this.wanted].mag
-    const trigger = (def.mode === "auto" || def.mode === "beam" ? fire : pressedFire) && this.localSpin >= def.spinTicks
+    const trigger = (def.mode === "auto" || def.mode === "beam" || def.mode === "held" ? fire : pressedFire) && this.localSpin >= def.spinTicks
     if (trigger && this.localCooldown === 0 && !busy && you.arsenal.current === this.wanted) {
-      if (def.mode !== "melee" && mag <= 0) {
+      if (usesAmmo(def.id) && mag <= 0) {
         if (pressedFire) this.d.audio.play("dry")
       } else {
         this.localShot(def.id, input)
         this.localCooldown = def.cooldownTicks
-        if (def.mode !== "melee") {
+        if (usesAmmo(def.id)) {
           this.shots.push(input.seq)
           this.localMag = mag - 1
         }
@@ -1630,6 +1647,10 @@ export class Game {
     this.controls.rumble(def.kick * 4, 0.15 + def.kick * 3, def.mode === "melee" ? 90 : 60)
     if (def.mode === "melee") {
       audio.play("melee_swing")
+      return
+    }
+    if (def.mode === "held") {
+      audio.play("cut_motosee")
       return
     }
     if (def.mode === "projectile") {
@@ -1919,7 +1940,8 @@ export class Game {
           }
         }),
         doors: s.doors.map((hp, i) => hp / (this.physics.map.doors[i]?.hp ?? 1)),
-        panels: s.panels.map((p) => (p.tag === "off" ? null : p.tag === "tearing" ? p.progress : 0)),
+        panels: s.panels.map((p) => (p.tag === "wall" ? 0 : p.tag === "tearing" ? p.progress : null)),
+        lyingPanels: s.panels.map((p) => (p.tag === "lying" ? p.at : null)),
         gates: this.gates,
         camera
       })
@@ -1948,6 +1970,9 @@ export class Game {
       // Facing the casot's panel: the control to hold, and how far my tear has got (the same decision as the touch "use" button).
       const tearing = s?.panels.find((p) => p.tag === "tearing" && p.by === this.me)
       this.hud.panel(this.controls.turretControl === "tear", tearing?.tag === "tearing" ? tearing.progress : 0, this.controls.device)
+      // Carrying it: how much it can still take.
+      const held = you.alive ? s?.panels.find((p) => p.tag === "carried" && p.by === this.me) : undefined
+      this.hud.panelHealth(held?.tag === "carried" ? held.hp / PANEL_HP : null)
       const speed = b ? Math.hypot(b.vx, b.vz) : 0
       const spread = aiming ? def.spread.aimed : speed > 1.5 || !b?.grounded ? def.spread.moving : def.spread.still
       const px = (Math.tan(spread) / Math.tan(((camera.fov / 2) * Math.PI) / 180)) * (innerHeight / 2)

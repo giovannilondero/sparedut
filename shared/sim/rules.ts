@@ -2,8 +2,9 @@
  * Pure simulation rules: loadout, respawn, damage, who is whose enemy,
  * the storm.
  */
+import { Ops } from "@typeonce/ritmo"
 import type { MapDef, Spawn, Team } from "../map.ts"
-import { CLASSES, RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../weapons.ts"
+import { CLASSES, PANEL_ARC, RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../weapons.ts"
 import type { Ammo, ArsenalValue, CartValue, FlagState, HillValue, Kit, PanelState, PickupState, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
 
 export const MAX_ARMOR = 100
@@ -182,9 +183,31 @@ export const freshTurrets = (map: MapDef): TurretState[] => map.turrets.map(() =
 export const freshDoors = (map: MapDef): number[] => map.doors.map((d) => d.hp)
 /** Every panel on its wall: how they are at match start. */
 export const freshPanels = (map: MapDef): PanelState[] => (map.panels ?? []).map(() => ({ _tag: "wall" }))
+/** Whether a panel still closes its wall (on it, or being torn off): the physics and the client's prediction follow it. */
+export const panelOnWall = (state: { readonly _tag: PanelState["_tag"] } | { readonly tag: PanelState["_tag"] }) => {
+  const tag = "_tag" in state ? state._tag : state.tag
+  return tag === "wall" || tag === "tearing"
+}
+
+const PANEL_ARC_COS = Ops.cos(PANEL_ARC / 2)
+/**
+ * Whether damage coming from `from` reaches a body standing at `at` and looking along `yaw` from
+ * within the panel's frontal arc (`PANEL_ARC`), seen from above. Damage from no point, or from
+ * the body's own place, is never in front of it.
+ */
+export const fromTheFront = (at: { readonly x: number; readonly z: number }, yaw: number, from: { readonly x: number; readonly z: number } | null): boolean => {
+  if (from === null) return false
+  const dx = from.x - at.x
+  const dz = from.z - at.z
+  const d = Math.sqrt(dx * dx + dz * dz)
+  if (d < 0.05) return false
+  return (-Ops.sin(yaw) * dx + -Ops.cos(yaw) * dz) / d >= PANEL_ARC_COS
+}
 
 /** Breakable doors take more from kicks (the mescul) than from pellets. */
 export const DOOR_MELEE_SCALE = 1.6
+/** And from the Motosee's teeth, so that a door falls in about a second of cutting. Starting value. */
+export const DOOR_CUT_SCALE = 1.2
 
 /** The turret `session` is using, if any. */
 export const turretOf = (turrets: ReadonlyArray<TurretState>, session: string): number => turrets.findIndex((t) => t.gunner === session)

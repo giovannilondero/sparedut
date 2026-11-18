@@ -34,7 +34,9 @@ const HOLD: Record<WeaponId, Hold> = {
   // the casot's panel: low and to the right, its top edge under the crosshair, turned a little inwards
   panel: { hip: [0.34, -0.56, -0.62], rot: [0.12, -0.3, 0.04], aim: null, kickZ: 0, kickR: 0, flash: 0 },
   // at the turret: the gun sits in front, centred, held with both hands
-  mitraie: { hip: [0.09, -0.25, -0.34], rot: [0, 0, 0], aim: null, kickZ: 0.008, kickR: 0.01, flash: 0.18 }
+  mitraie: { hip: [0.09, -0.25, -0.34], rot: [0, 0, 0], aim: null, kickZ: 0.008, kickR: 0.01, flash: 0.18 },
+  // held low with both hands, the bar forward; no aiming
+  motosee: { hip: [0.16, -0.22, -0.36], rot: [0.04, 0.06, 0], aim: null, kickZ: 0.004, kickR: 0.01, flash: 0 }
 }
 
 const SWITCH_DOWN = 0.16
@@ -473,6 +475,11 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
       spinA += f.spin * dt * 38
       s.model.parts.spinner!.rotation.z = spinA
       A.px += f.spin * Math.sin(t * 70) * 0.0015
+    }
+    // the Motosee shakes as it revs and cuts
+    if (s.id === "motosee") {
+      A.px += f.spin * Math.sin(t * 90) * 0.002
+      A.py += f.spin * Math.sin(t * 77) * 0.0015
     }
     if (s.id === "miedi" && fireT < 0.12) s.model.parts.pouch!.position.y += 0.012 * Math.sin(fireT * 50)
 

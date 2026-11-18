@@ -38,6 +38,8 @@ export interface WorldFrame {
   readonly doors: readonly number[]
   /** One per `map.panels`: how far it is torn off its wall, from 0 (at rest) to 1, or null once off (its gap open). */
   readonly panels: readonly (number | null)[]
+  /** One per `map.panels`: where it lies on the ground, fallen from its carrier, or null. */
+  readonly lyingPanels: readonly (P3 | null)[]
   /** One per `map.gates`: true while the gate closes the way (the training's way to the next station). */
   readonly gates: readonly boolean[]
   readonly camera: THREE.PerspectiveCamera
@@ -164,6 +166,7 @@ export type SoundName =
   | "shot_cjampanili"
   | "shot_mulin"
   | "spin_mulin"
+  | "cut_motosee"
   | "beam_miedi"
   | "launch_gjaline"
   | "boom_gjaline"
