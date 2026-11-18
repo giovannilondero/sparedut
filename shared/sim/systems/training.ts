@@ -12,7 +12,7 @@ import { STATION_IDS, STATIONS, stepRule, stepsOf } from "../../training/index.t
 import type { Seen, StepRule } from "../../training/station.ts"
 import { WEAPON_IDS } from "../../weapons.ts"
 import { freshArsenal, freshDoors, MAX_HP } from "../rules.ts"
-import { Arsenal, Controls, Doors, Game, Life, Motion, Objective, Out, Pickups, Player, ReportInterface, Tick, Training, type ArsenalValue } from "../schema.ts"
+import { Arsenal, Cart, Controls, Doors, Flags, Game, Hill, Life, Motion, Objective, Out, Pickups, Player, ReportInterface, Score, Tick, Training, type ArsenalValue } from "../schema.ts"
 
 /** Where the trainee is after a station completes: at the next station's first step, or done. */
 type Next = { readonly _tag: "Step"; readonly station: number; readonly step: number; readonly count: number; readonly mark: number; readonly unlocked: number } | { readonly _tag: "Complete" }
@@ -42,7 +42,11 @@ export const PlayTraining = Game.System(
       tick: Game.System.readResource(Tick),
       objective: Game.System.writeResource(Objective),
       pickups: Game.System.writeResource(Pickups),
-      doors: Game.System.writeResource(Doors)
+      doors: Game.System.writeResource(Doors),
+      score: Game.System.readResource(Score),
+      flags: Game.System.writeResource(Flags),
+      hill: Game.System.writeResource(Hill),
+      cart: Game.System.writeResource(Cart)
     },
     events: { happened: Game.System.readEvent(Out), out: Game.System.writeEvent(Out), reports: Game.System.readEvent(ReportInterface) },
     machines: { training: Game.System.updateMachine(Training) },
@@ -84,8 +88,19 @@ export const PlayTraining = Game.System(
           arsenal: data.arsenal.get(trainee)
         },
         events: happened,
-        reported: rule ? reported(rule.report) : 0
+        reported: rule ? reported(rule.report) : 0,
+        score: resources.score.get()
       }
+    }
+
+    // A step's `given` (#48: the objective in force), applied on the tick the step becomes current.
+    const give = (rule: StepRule) => {
+      const objective = rule.given?.objective
+      if (objective === undefined) return
+      resources.objective.set(objective)
+      if (objective === "frico") resources.flags.set({ benandanti: { _tag: "base" }, malandanti: { _tag: "base" } })
+      if (objective === "placute") resources.hill.set({ owner: null, contested: false, ticks: 0 })
+      if (objective === "cjar") resources.cart.set({ d: 0, pushers: 0, contested: false, idle: 0 })
     }
 
     /** Arrives at station `from` (and past any station with no steps): its setup applied, its first step begun. */
@@ -98,6 +113,8 @@ export const PlayTraining = Game.System(
         open = Math.max(open, index + 1)
       }
       if (index >= STATION_IDS.length) {
+        // A completed training teaches no objective: none is left in force (#48).
+        resources.objective.set("none")
         events.out.emit({ t: "training", a: "complete" })
         return { _tag: "Complete" }
       }
@@ -122,7 +139,9 @@ export const PlayTraining = Game.System(
           pitch: 0
         })
       }
-      const begun = stepRule(id, stepsOf(id)[0]).begin(seen(null))
+      const first = stepRule(id, stepsOf(id)[0])
+      give(first)
+      const begun = first.begin(seen(null))
       return { _tag: "Step", station: index, step: 0, count: begun.count, mark: begun.mark, unlocked: Math.min(STATION_IDS.length, open) }
     }
 
@@ -154,7 +173,9 @@ export const PlayTraining = Game.System(
     } else {
       events.out.emit({ t: "training", a: "step", station: id, step: steps[state.step] })
       if (state.step + 1 < steps.length) {
-        const begun = stepRule(id, steps[state.step + 1]).begin(seen(null))
+        const following = stepRule(id, steps[state.step + 1])
+        give(following)
+        const begun = following.begin(seen(null))
         next = { _tag: "Step", station: state.station, step: state.step + 1, count: begun.count, mark: begun.mark, unlocked: state.unlocked }
       } else {
         events.out.emit({ t: "training", a: "station", station: id })

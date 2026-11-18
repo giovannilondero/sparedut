@@ -618,7 +618,8 @@ export class Game {
         return
       }
       case "hill":
-        if (this.room?.mode === "culine") this.hud.announce(e.team ? t().game.hillTaken(t().teams[e.team].name) : t().hud.hillFree)
+        // Only the plaçute in force publishes it: a culine room, or the training's plaçute step.
+        this.hud.announce(e.team ? t().game.hillTaken(t().teams[e.team].name) : t().hud.hillFree)
         return
       case "pad": {
         const at = this.posOf(e.s)
@@ -1471,8 +1472,9 @@ export class Game {
       }
       world.update(dt, t, {
         pickups: [...s.pickups].map((ch) => ch === "1"),
-        flags: mode === "frico" ? { benandanti: flagPos("benandanti"), malandanti: flagPos("malandanti") } : null,
-        hill: mode === "culine" ? { owner: s.hill.owner, contested: s.hill.contested } : null,
+        // The markers of the objective in force only: the mode's in a room, the current step's in a training.
+        flags: s.objective === "frico" ? { benandanti: flagPos("benandanti"), malandanti: flagPos("malandanti") } : null,
+        hill: s.objective === "placute" ? { owner: s.hill.owner, contested: s.hill.contested } : null,
         cart: s.cart ? { at: s.cart.at, yaw: s.cart.yaw, contested: s.cart.contested, pushers: s.cart.pushers } : null,
         storm: s.storm,
         turrets: s.turrets.map((tu, i): TurretVisual => {

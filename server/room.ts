@@ -293,6 +293,7 @@ export class Room {
       t: "snap",
       tick: w.tick,
       phase: w.phase,
+      objective: w.objective,
       score: w.score,
       flags: w.flags,
       hill: w.hill,

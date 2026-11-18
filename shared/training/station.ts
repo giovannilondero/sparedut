@@ -58,6 +58,8 @@ export interface Seen {
   readonly events: readonly GameEvent[]
   /** How many reports of the step's own interface action (`StepRule.report`) arrived this tick; 0 for a step without one. */
   readonly reported: number
+  /** Each team's score, which an objective in force raises (`PlayObjectives`). */
+  readonly score: Readonly<Record<Team, number>>
 }
 
 /** A step's progress: how many times its action happened, and a number the step keeps for itself. */
@@ -78,8 +80,19 @@ export interface StepRule {
   readonly target: number
   /** An interface step's action: the client's report of it reaches `advance` as `Seen.reported` (`./interface.ts`). */
   readonly report?: InterfaceAction
+  /** What the trainee is given, and the objective put in force, on the tick the step becomes current. */
+  readonly given?: StepGiven
   readonly begin: (seen: Seen) => StepProgress
   readonly advance: (seen: Seen, now: StepProgress) => StepProgress
+}
+
+/**
+ * What a step gives the trainee on the tick it becomes current. A step without it changes nothing:
+ * the objective in force stays the one before it (the station's, for its first step).
+ */
+export interface StepGiven {
+  /** The objective put in force, its state fresh (the frico at its bases, the plaçute free, the cjar at the start). */
+  readonly objective?: ObjectiveId
 }
 
 /**
