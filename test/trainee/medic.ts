@@ -5,7 +5,7 @@ import { SAGRE_STATIONS } from "../../shared/maps/sagre.ts"
 import type { Drivers } from "./moves.ts"
 import { alongTheStreet } from "./pickups.ts"
 
-const WOUNDED = SAGRE_STATIONS[9].wounded.at
+const WOUNDED = SAGRE_STATIONS.medic.wounded.at
 /** Close enough to keep the beam (9 m) on them, and inside the medic's aura too. */
 const BESIDE = 3
 

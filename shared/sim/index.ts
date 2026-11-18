@@ -8,12 +8,12 @@ import type { Team } from "../map.ts"
 import type { PhysicsWorld } from "../physics.ts"
 import type { PrimaryId } from "../weapons.ts"
 import type { GameEvent } from "./events.ts"
-import { freshDoors, freshTurrets } from "./rules.ts"
+import { freshDoors, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL } from "./rules.ts"
 import { simulate } from "./schedule.ts"
 import type { Device } from "../devices.ts"
 import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, GoToStation, StartMatch, StepUnavailable, Training, type PickupState, type PostValue } from "./schema.ts"
 import type { InterfaceAction } from "../training/interface.ts"
-import { STATION_IDS, TRAINING, type StationId } from "../training/index.ts"
+import { isTraining, STATION_IDS, type StationId, type StepId } from "../training/index.ts"
 import { arrival, FIRST_START, type TrainingStart } from "../training/start.ts"
 import { ReadOutbox, ViewWorld, type WorldView } from "./view.ts"
 
@@ -34,7 +34,7 @@ export type Sim = ReturnType<typeof createSim>
 /** The room's Ritmo runtime; `debug` is used by the devtools (lint, sessions). */
 export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: HostClock.HostClock }) {
   // The training has no warm-up and no clock: it is live from the start, at its first station.
-  const training = options.mode === TRAINING.mode
+  const training = isTraining(options.mode)
   const first = arrival(options.training ?? FIRST_START)
   const made = Game.Runtime.make({
     services: Game.Runtime.services(Game.Runtime.service(Physics, options.physics)),
@@ -49,9 +49,9 @@ export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: H
       Objective: MODE_OBJECTIVE[options.mode],
       Tick: 0,
       Score: { benandanti: 0, malandanti: 0 },
-      Flags: { benandanti: { _tag: "base" }, malandanti: { _tag: "base" } },
-      Hill: { owner: null, contested: false, ticks: 0 },
-      Cart: { d: 0, pushers: 0, contested: false, idle: 0 },
+      Flags: FRESH_FLAGS,
+      Hill: FRESH_HILL,
+      Cart: FRESH_CART,
       StormCourse: null,
       Pickups: options.physics.map.pickups.map((): PickupState => ({ _tag: "up" })),
       Turrets: freshTurrets(options.physics.map),
@@ -84,7 +84,7 @@ export function createSim(options: SimOptions) {
     /** The client's report of an interface step: only a training's current step that declares this action takes it. */
     report: (session: string, action: InterfaceAction) => runtime.send(ReportInterface, { session, action }),
     /** The client's word that its active device has no control for a step: only a training takes it, for its current step, when the step table agrees. */
-    unavailable: (session: string, station: StationId, step: string, device: Device) => runtime.send(StepUnavailable, { session, station, step, device }),
+    unavailable: (session: string, station: StationId, step: StepId, device: Device) => runtime.send(StepUnavailable, { session, station, step, device }),
     /** The trainee goes to a station: only an unlocked one is reached (the current one restarts). */
     goTo: (session: string, station: StationId) => runtime.send(GoToStation, { session, to: { _tag: "station", station: STATION_IDS.indexOf(station) } }),
     /** The trainee starts the training over: station 1, the others locked again. */

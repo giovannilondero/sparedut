@@ -8,6 +8,7 @@ import { describe, expect, test } from "bun:test"
 import * as THREE from "three"
 import type { Block } from "../shared/map.ts"
 import { SAGRE, SAGRE_STATIONS } from "../shared/maps/sagre.ts"
+import { STATION_IDS } from "../shared/training/index.ts"
 import { CROUCH_HEIGHT, STAND_HEIGHT } from "../shared/physics.ts"
 import { MOVE } from "../shared/movement.ts"
 import { cylBetween, face, Inst, orient, sphere, type V } from "../client/world/geo.ts"
@@ -110,7 +111,7 @@ describe("the fair's scenery", () => {
   const drawn = dress()
 
   test("every station is dressed, the square's two halves included", () => {
-    const bare = SAGRE_STATIONS.flatMap((s, i) => {
+    const bare = STATION_IDS.map((id) => SAGRE_STATIONS[id]).flatMap((s, i) => {
       const { area } = s
       const inside = drawn.filter(({ box }) => {
         const c = box.getCenter(new THREE.Vector3())
@@ -130,7 +131,7 @@ describe("the fair's scenery", () => {
   })
 
   test("the beam is drawn as it collides: room to crouch under it, not to stand", () => {
-    const { beam } = SAGRE_STATIONS[1]
+    const { beam } = SAGRE_STATIONS.course
     expect(beam.min[1]).toBeGreaterThan(CROUCH_HEIGHT)
     expect(beam.min[1]).toBeLessThan(STAND_HEIGHT)
     const under = drawn.filter(({ box }) => box.max.y > FLOOR && box.min.y < beam.min[1] - 0.01 && box.max.x > beam.min[0] && box.min.x < beam.max[0] && box.max.z > -5.9 && box.min.z < 5.9)

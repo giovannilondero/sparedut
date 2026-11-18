@@ -13,7 +13,7 @@ import type { PhysicsWorld } from "../shared/physics.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
 import { outsideStorm, owned, RAISE_TICKS, weaponInSlot } from "../shared/sim/rules.ts"
-import { TRAINING } from "../shared/training/index.ts"
+import { isTraining } from "../shared/training/index.ts"
 import { closedGates, viewedStation } from "../shared/training/gates.ts"
 import type { InterfaceAction } from "../shared/training/interface.ts"
 import { UnavailableSteps } from "./training-unavailable.ts"
@@ -727,7 +727,7 @@ export class Game {
     const you = this.you()
     if (!you || !owned(you.arsenal, id) || id === this.wanted) return
     // Ahead of the input that carries the new weapon. Only a training takes it.
-    if (this.room?.mode === TRAINING.mode) this.d.net.send({ t: "report", a: how })
+    if (this.room !== null && isTraining(this.room.mode)) this.d.net.send({ t: "report", a: how })
     this.lastWeapon = this.wanted
     this.wanted = id
     this.wantedSeq = this.seq + 1
@@ -759,7 +759,7 @@ export class Game {
       // With a menu open, Tab moves through it: the scoreboard stays shut.
       const open = down && this.overlay === "none"
       // Opening the scoreboard is a training's interface step: only a training takes the report.
-      if (open && !this.boardOpen && this.room?.mode === TRAINING.mode) this.d.net.send({ t: "report", a: "board" })
+      if (open && !this.boardOpen && this.room !== null && isTraining(this.room.mode)) this.d.net.send({ t: "report", a: "board" })
       this.boardOpen = open
       this.hud.board(this.board, this.me, open)
       return
@@ -772,7 +772,7 @@ export class Game {
       if (phrase) {
         this.d.net.send({ t: "chat", text: phrase })
         // Sending a quick phrase is a training's interface step.
-        if (this.room?.mode === TRAINING.mode) this.d.net.send({ t: "report", a: "phrases" })
+        if (this.room !== null && isTraining(this.room.mode)) this.d.net.send({ t: "report", a: "phrases" })
       }
       this.toggleQuick(false)
       return
@@ -946,7 +946,7 @@ export class Game {
     const room = this.room
     if (!room) return
     // A training has no host tools and no teams to switch: its player is the host of nothing.
-    const training = room.mode === TRAINING.mode
+    const training = isTraining(room.mode)
     const host = room.hostId === this.me && !training
     if (full || host !== this.pauseHost) this.buildPause(room, host)
     const s = t()
@@ -967,7 +967,7 @@ export class Game {
 
   private buildPause(room: RoomInfo, host: boolean) {
     this.pauseHost = host
-    const training = room.mode === TRAINING.mode
+    const training = isTraining(room.mode)
     const el = $("pause")
     const s = t()
     const p = s.pause

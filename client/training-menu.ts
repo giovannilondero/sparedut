@@ -33,15 +33,21 @@ export function stationEntries(view: TrainingView | null): readonly StationEntry
   }))
 }
 
-/** What each state shows after the station's name. */
+/** What each state shows after the station's name, and what it says to a screen reader (none for an open one). */
 const MARK = { current: "▸", done: "✓", open: "", locked: "🔒" } as const satisfies Record<StationEntryState, string>
+const NOTE = {
+  current: (tr: Strings["training"]) => tr.here,
+  done: (tr: Strings["training"]) => tr.stationDone,
+  open: () => "",
+  locked: (tr: Strings["training"]) => tr.locked
+} as const satisfies Record<StationEntryState, (tr: Strings["training"]) => string>
 
 /** The list's markup: one button per station, `data-station` on those that can be chosen. */
 export function stationListHtml(entries: readonly StationEntry[], s: Strings): string {
   const tr = s.training
   const items = entries.map(({ station, n, state }) => {
     const label = `${n}. ${tr.stations[station]}`
-    const note = state === "current" ? tr.here : state === "locked" ? tr.locked : state === "done" ? tr.stationDone : ""
+    const note = NOTE[state](tr)
     const attrs = state === "locked" ? " disabled" : ` data-station="${station}"`
     return `<li><button class="station-entry is-${state}"${attrs}${state === "current" ? ' aria-current="step"' : ""}><span>${label}</span><span class="station-mark" aria-hidden="true">${MARK[state]}</span>${note ? `<span class="station-note">${note}</span>` : ""}</button></li>`
   })

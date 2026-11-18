@@ -82,7 +82,7 @@
               <button class="big home-tile training-entry" data-go="training">
                 <span data-t="training"></span><small data-t="trainingSub"></small>
                 <i class="invite-ribbon" id="invite-ribbon" hidden></i>
-                <i class="training-done" id="training-done" hidden></i>
+                <i class="training-done" id="training-completed" hidden></i>
               </button>
               <button class="invite-close" id="invite-close" hidden>×</button>
             </div>
@@ -254,7 +254,7 @@
       <div id="announce"></div>
       <div id="banner"></div>
       <!-- The training: the station, the step to do, the confirmation of a step done. -->
-      <div id="training" class="hidden" role="status"><div id="training-station"></div><div id="training-step"></div><div id="training-done"></div></div>
+      <div id="training" class="hidden" role="status"><div class="training-head"><div id="training-station"></div><span id="training-steps"></span></div><div id="training-step"></div><div id="training-done"></div></div>
 
       <div id="hud-status">
       <div id="vitals">

@@ -5,6 +5,7 @@ import type { PrimaryId } from "../shared/weapons.ts"
 import type { GameEvent } from "../shared/sim/events.ts"
 import { STATION_IDS } from "../shared/training/index.ts"
 import type { TrainingStart } from "../shared/training/start.ts"
+import { z } from "zod"
 import type { CrouchMode } from "./controls.ts"
 import type { Lang } from "./i18n.ts"
 import type { CreateOptions } from "./menu-model.ts"
@@ -45,14 +46,24 @@ export interface Settings {
  * Whether the invitation was dismissed is kept beside it (`Settings.trainingInvitation`).
  */
 export interface TrainingProgress {
-  /** How many stations, from the first, are unlocked: 1 to all of them. */
-  readonly unlocked: number
-  /** The training has been completed once: every station stays unlocked. */
-  readonly completed: boolean
+  /**
+   * How many stations, from the first, are completed: 0 to all of them. The stations unlock in
+   * order, so the next one is unlocked too; all of them completed is the training completed.
+   */
+  readonly done: number
 }
 
 /** A training never started, and what starting over goes back to. */
-export const FRESH_TRAINING: TrainingProgress = { unlocked: 1, completed: false }
+export const FRESH_TRAINING: TrainingProgress = { done: 0 }
+
+/** The saved progress as this version writes it; anything else (an older shape, a broken value) is a first training. */
+const TrainingProgressSchema = z.object({ done: z.number().int().min(0).max(STATION_IDS.length) })
+
+/** The training has been completed once: every station stays unlocked. */
+export const trainingCompleted = (p: TrainingProgress): boolean => p.done === STATION_IDS.length
+
+/** How many stations, from the first, can be chosen: the completed ones and the next. */
+const unlockedOf = (p: TrainingProgress): number => Math.min(STATION_IDS.length, p.done + 1)
 
 /**
  * The home screen's invitation to the training: `open` on a first visit, until the player
@@ -60,6 +71,7 @@ export const FRESH_TRAINING: TrainingProgress = { unlocked: 1, completed: false 
  */
 export const TRAINING_INVITATIONS = ["open", "dismissed", "started"] as const
 export type TrainingInvitation = (typeof TRAINING_INVITATIONS)[number]
+const TrainingInvitationSchema = z.enum(TRAINING_INVITATIONS)
 
 const KEY = "sparedut.settings"
 const DEFAULTS: Settings = {
@@ -94,33 +106,26 @@ export function loadSettings(): Settings {
     if (!ROOM_MODE_IDS.includes(s.lastMode)) s.lastMode = DEFAULTS.lastMode
     if (s.crouch !== "hold" && s.crouch !== "toggle") s.crouch = DEFAULTS.crouch
     if (typeof s.lastFf !== "boolean") s.lastFf = DEFAULTS.lastFf
-    if (!validProgress(s.training)) s.training = DEFAULTS.training
+    s.training = TrainingProgressSchema.safeParse(saved.training).data ?? DEFAULTS.training
     // Saved before the invitation existed (or broken): a player who has progress has started the training.
-    if (!(TRAINING_INVITATIONS as readonly unknown[]).includes(saved.trainingInvitation)) s.trainingInvitation = s.training.completed || s.training.unlocked > 1 ? "started" : "open"
+    s.trainingInvitation = TrainingInvitationSchema.safeParse(saved.trainingInvitation).data ?? (s.training.done > 0 ? "started" : "open")
     return s
   } catch {
     return { ...DEFAULTS }
   }
 }
 
-const validProgress = (p: unknown): p is TrainingProgress => {
-  if (typeof p !== "object" || p === null) return false
-  const { unlocked, completed } = p as Record<string, unknown>
-  return Number.isInteger(unlocked) && (unlocked as number) >= 1 && (unlocked as number) <= STATION_IDS.length && typeof completed === "boolean"
-}
-
 /** Where a new training starts: the first station not completed, or station 1 once it has all been completed. */
 export function trainingStart(p: TrainingProgress): TrainingStart {
-  if (p.completed) return { unlocked: STATION_IDS.length, from: STATION_IDS[0] }
-  return { unlocked: p.unlocked, from: STATION_IDS[p.unlocked - 1] }
+  const unlocked = unlockedOf(p)
+  return { unlocked, from: trainingCompleted(p) ? STATION_IDS[0] : STATION_IDS[unlocked - 1] }
 }
 
 /** The progress after a training event: a station completed unlocks the next, the training completed unlocks all. */
 export function trainingProgressed(p: TrainingProgress, e: GameEvent): TrainingProgress {
   if (e.t !== "training" || e.a === "step") return p
-  if (e.a === "complete") return { unlocked: STATION_IDS.length, completed: true }
-  const unlocked = Math.min(STATION_IDS.length, Math.max(p.unlocked, STATION_IDS.indexOf(e.station) + 2))
-  return unlocked === p.unlocked ? p : { ...p, unlocked }
+  const done = e.a === "complete" ? STATION_IDS.length : Math.max(p.done, STATION_IDS.indexOf(e.station) + 1)
+  return done === p.done ? p : { done }
 }
 
 export function saveSettings(s: Settings) {

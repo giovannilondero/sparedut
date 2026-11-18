@@ -9,7 +9,7 @@ import { ACCESSES, MAX_BOTS, Password, REACHES, RoomCode, type Access, type Erro
 import type { PrimaryId } from "../shared/weapons.ts"
 import type { Lang } from "./i18n.ts"
 import type { TrainingStart } from "../shared/training/start.ts"
-import { oneTapRoom, trainingStart, type Settings, type TrainingInvitation } from "./settings.ts"
+import { oneTapRoom, trainingCompleted, trainingStart, type Settings, type TrainingInvitation } from "./settings.ts"
 
 export type CreateOptions = Reached<RoomAccess> & {
   readonly mode: RoomModeId
@@ -321,7 +321,7 @@ export class MenuModel {
   }
 
   get trainingEntry(): TrainingEntry {
-    return { invitation: INVITATION[this.remembered.trainingInvitation], completed: this.remembered.training.completed }
+    return { invitation: INVITATION[this.remembered.trainingInvitation], completed: trainingCompleted(this.remembered.training) }
   }
 
   typeCode(text: string) {

@@ -19,7 +19,7 @@ import { Trainee } from "./trainee/index.ts"
 beforeAll(() => initPhysics())
 
 const browser = (clock: Clock) => createBrowserHost(clock)
-const ALWAYS = SAGRE_STATIONS[2]
+const ALWAYS = SAGRE_STATIONS.always
 const BOTS = STATIONS.always.setup.bots
 
 type Started = ReturnType<typeof started>

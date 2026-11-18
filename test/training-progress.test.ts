@@ -16,7 +16,7 @@ import { Trainee } from "./trainee/index.ts"
 beforeAll(() => initPhysics())
 
 const ALL = STATION_IDS.length
-const startOf = (station: StationId) => SAGRE_STATIONS[STATION_IDS.indexOf(station)].start
+const startOf = (station: StationId) => SAGRE_STATIONS[station].start
 
 /** A training on the in-browser host, as the browser asks for it, played until the trainee is alive. */
 function started(request: { unlocked?: number; from?: StationId } = {}) {

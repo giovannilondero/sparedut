@@ -24,7 +24,7 @@ const remembered = (over: Partial<Remembered> = {}): Remembered => ({
   lastBots: 4,
   lastLevel: "pari",
   lastFf: false,
-  training: { unlocked: 1, completed: false },
+  training: { done: 0 },
   trainingInvitation: "open",
   ...over
 })

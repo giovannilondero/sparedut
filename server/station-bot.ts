@@ -7,7 +7,7 @@ import { IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
 import type { V3 } from "../shared/map.ts"
 import { SAGRE_STATIONS } from "../shared/maps/sagre.ts"
 import type { PostValue, WorldView } from "../shared/sim/index.ts"
-import { STATION_IDS, STATIONS, type StationId } from "../shared/training/index.ts"
+import { STATIONS, type StationId } from "../shared/training/index.ts"
 import { MAX_STATION_BOTS, type StationBot } from "../shared/training/station.ts"
 import type { NavGraph } from "./nav.ts"
 
@@ -31,13 +31,13 @@ export const botsOf = (station: StationId): readonly StationBot[] => STATIONS[st
  */
 export const postOf = (station: StationId, bot: StationBot): PostValue => {
   const [first, second] = bot.route
-  const start = SAGRE_STATIONS[STATION_IDS.indexOf(station)].start.at
+  const start = SAGRE_STATIONS[station].start.at
   const facing = second ?? start
   return { at: first, yaw: yawFrom(first, facing), hp: bot.hp }
 }
 
-/** Each station's part of the map's bot graph, made once. */
-const stationGraphs = new Map<StationId, NavGraph>()
+/** Each station's part of a bot graph, made once per graph. */
+const stationGraphs = new WeakMap<NavGraph, Map<StationId, NavGraph>>()
 
 /**
  * The part of the bot graph inside a station's area: a station's bot that fires (the skirmish's)
@@ -45,15 +45,17 @@ const stationGraphs = new Map<StationId, NavGraph>()
  * respawn. It still walks straight at a trainee it sees outside.
  */
 export const stationGraph = (graph: NavGraph, station: StationId): NavGraph => {
-  const made = stationGraphs.get(station)
+  let parts = stationGraphs.get(graph)
+  if (!parts) stationGraphs.set(graph, (parts = new Map()))
+  const made = parts.get(station)
   if (made) return made
-  const { area } = SAGRE_STATIONS[STATION_IDS.indexOf(station)]
+  const { area } = SAGRE_STATIONS[station]
   const kept = graph.points.flatMap((p, i) => (p[0] >= area.minX && p[0] <= area.maxX && p[2] >= area.minZ && p[2] <= area.maxZ ? [i] : []))
   const index = new Map(kept.map((old, i) => [old, i]))
   const part: NavGraph = { points: kept.map((i) => graph.points[i]), edges: kept.map((i) => graph.edges[i].flatMap((j) => (index.has(j) ? [index.get(j)!] : []))) }
   // A station with no point of the graph in it keeps the whole graph.
   const chosen = part.points.length > 0 ? part : graph
-  stationGraphs.set(station, chosen)
+  parts.set(station, chosen)
   return chosen
 }
 

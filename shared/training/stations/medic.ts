@@ -12,7 +12,7 @@ export const WOUNDED_HP = 30
 /** How much health the trainee must restore to the teammate: from `WOUNDED_HP` to full. */
 export const TO_RESTORE = MAX_HP - WOUNDED_HP
 
-const PLACE = SAGRE_STATIONS[9]
+const PLACE = SAGRE_STATIONS.medic
 
 /**
  * Health the trainee restored to a teammate this tick, by the beam or by standing near (both are the

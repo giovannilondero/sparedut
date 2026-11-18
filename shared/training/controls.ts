@@ -4,7 +4,7 @@
  * active device lacks cannot be performed on it: the HUD says so, and it completes itself (#50).
  */
 import { DEVICES, type Device } from "../devices.ts"
-import { stepRule, type StationId, type StepId, type StepOf } from "./index.ts"
+import { stepRule, type StationId, type StepId } from "./index.ts"
 import type { ControlId } from "./station.ts"
 
 const EVERY = DEVICES
@@ -37,7 +37,8 @@ export const CONTROL_DEVICES = {
 export type DevicesWith<C extends ControlId> = (typeof CONTROL_DEVICES)[C][number]
 
 /** Whether `device` has a control for `control`. Allocates nothing: the HUD may ask every frame. */
-export const hasControl = (control: ControlId, device: Device): boolean => (CONTROL_DEVICES[control] as readonly Device[]).includes(device)
+const DEVICES_OF: Readonly<Record<ControlId, readonly Device[]>> = CONTROL_DEVICES
+export const hasControl = (control: ControlId, device: Device): boolean => DEVICES_OF[control].includes(device)
 
 /** Whether a step can be performed on `device`: false means it is shown as not available there. */
-export const stepAvailable = <S extends StationId>(station: S, step: StepOf<S>, device: Device): boolean => hasControl(stepRule(station, step as StepId).control, device)
+export const stepAvailable = (station: StationId, step: StepId, device: Device): boolean => hasControl(stepRule(station, step).control, device)

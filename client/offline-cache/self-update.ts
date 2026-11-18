@@ -5,7 +5,10 @@
 import { FINE, tooOld, type Effect, type Notice, type TooOld, type TooOldEvent } from "./too-old.ts"
 import { checkForUpdate, takeOver, type RegistrationLike } from "./update.ts"
 
-/** Set just before the automatic reload; `sessionStorage` keeps it for this tab across the reload. */
+/**
+ * Set just before the automatic reload; `sessionStorage` keeps it for this tab across the reload.
+ * Removed once the server accepts the page, so a later refusal in the same tab gets its own update.
+ */
 export const RELOADED_KEY = "sparedut.reloadedForUpdate"
 /** How long a check may take, the new version's download included, before the player is told. */
 const CHECK_MS = 60_000
@@ -17,7 +20,7 @@ export interface SelfUpdateDeps {
   readonly registration: Promise<RegistrationLike | null>
   /** Where `controllerchange` fires; missing without service worker support. */
   readonly container: { addEventListener(type: "controllerchange", listener: () => void): void } | undefined
-  readonly session: Pick<Storage, "getItem" | "setItem">
+  readonly session: Pick<Storage, "getItem" | "setItem" | "removeItem">
   readonly reload: () => void
   readonly tell: (notice: Notice) => void
   /** A match, the training or an Offline room is in progress, or starting. */
@@ -27,6 +30,8 @@ export interface SelfUpdateDeps {
 export class SelfUpdate {
   private state: TooOld = FINE
   private timer = 0
+  /** The server refused this page since its last `welcome`: that welcome answers a refused hello. */
+  private refusedSinceWelcome = false
 
   constructor(private readonly d: SelfUpdateDeps) {
     d.container?.addEventListener("controllerchange", () => this.dispatch({ t: "tookOver" }))
@@ -34,7 +39,15 @@ export class SelfUpdate {
 
   /** The server answered `error version`. */
   refused() {
+    this.refusedSinceWelcome = true
     this.dispatch({ t: "refused" })
+  }
+
+  /** The server answered a hello with `welcome`; with no version error before it, it accepts this page. */
+  welcomed() {
+    const refused = this.refusedSinceWelcome
+    this.refusedSinceWelcome = false
+    if (!refused) this.dispatch({ t: "accepted" })
   }
 
   /** The player is back in the menu. */
@@ -71,6 +84,9 @@ export class SelfUpdate {
         return
       case "tell":
         this.d.tell(effect.say)
+        return
+      case "forget":
+        this.d.session.removeItem(RELOADED_KEY)
         return
     }
   }

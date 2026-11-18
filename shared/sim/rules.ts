@@ -4,7 +4,7 @@
  */
 import type { MapDef, Spawn, Team } from "../map.ts"
 import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../weapons.ts"
-import type { Ammo, ArsenalValue, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
+import type { Ammo, ArsenalValue, CartValue, FlagState, HillValue, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
 
 export const MAX_HP = 100
 export const MAX_ARMOR = 100
@@ -124,6 +124,15 @@ export const owned = (a: ArsenalValue, id: WeaponId) =>
 
 /** The weapon a number key selects: the one in that slot the player owns (in slot 1, the primary), or null. */
 export const weaponInSlot = (a: ArsenalValue, slot: Slot): WeaponId | null => WEAPON_IDS.find((id) => WEAPONS[id].slot === slot && owned(a, id)) ?? null
+
+/** Each objective's state as a match starts it, and as the training puts it in force: both frico at their bases, the plaçute free, the cjar at the start of its track. */
+export const FRESH_FLAGS: Readonly<Record<Team, FlagState>> = { benandanti: { _tag: "base" }, malandanti: { _tag: "base" } }
+export const FRESH_HILL: HillValue = { owner: null, contested: false, ticks: 0 }
+export const FRESH_CART: CartValue = { d: 0, pushers: 0, contested: false, idle: 0 }
+
+/** The station the trainee is at, arriving or on one of its steps (an index in `STATION_IDS`); null outside a training or once it is complete. */
+export const currentStation = (training: { readonly _tag: "Off" | "Complete" } | { readonly _tag: "Arriving" | "Step"; readonly station: number }): number | null =>
+  training._tag === "Arriving" || training._tag === "Step" ? training.station : null
 
 /** Cool, free turrets and intact doors: how they are at match start. */
 export const freshTurrets = (map: MapDef): TurretState[] => map.turrets.map(() => ({ gunner: null, heat: 0, jammed: false, cooldown: 0 }))

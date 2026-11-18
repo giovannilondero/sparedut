@@ -7,9 +7,9 @@ import type { ObjectiveId } from "../folklore.ts"
 import type { Team, V3 } from "../map.ts"
 import type { Body } from "../movement.ts"
 import type { GameEvent } from "../sim/events.ts"
-import type { StormValue } from "../sim/rules.ts"
+import { MAX_HP, type StormValue } from "../sim/rules.ts"
 import type { ArsenalValue, ControlsValue } from "../sim/schema.ts"
-import type { PrimaryId, WeaponId } from "../weapons.ts"
+import type { PrimaryId, ProjectileKind, WeaponId } from "../weapons.ts"
 import type { InterfaceAction } from "./interface.ts"
 
 /**
@@ -65,7 +65,7 @@ export interface Seen {
   readonly storm: StormValue | null
 }
 
-/** A step's progress: how many times its action happened, and a number the step keeps for itself. */
+/** A step's progress: how many times its action happened, and a number the step keeps for itself, whose meaning is the step's own (see `Training.Step` in `shared/sim/schema.ts`). */
 export interface StepProgress {
   readonly count: number
   readonly mark: number
@@ -102,6 +102,8 @@ export interface StepGiven {
   readonly objective?: ObjectiveId
   /** The storm's course, when the objective is the storm: it starts closing on the tick the step becomes current. */
   readonly storm?: StormClosing
+  /** Pickups (indices in the map's list) put back on the tick the step becomes current: one taken out of turn never makes its step wait for it. */
+  readonly pickups?: readonly number[]
 }
 
 /**
@@ -171,7 +173,8 @@ export const station = <const Steps extends Readonly<Record<string, StepRule>>>(
 
 // --- Step helpers: the usual shapes of a completion rule ----------------------------------
 
-const NOTHING_YET: StepProgress = { count: 0, mark: 0 }
+/** A step begun with nothing done and nothing kept. */
+export const NOTHING_YET: StepProgress = { count: 0, mark: 0 }
 
 /** A step whose action is counted each tick: `performed` says how many times it happened this tick. */
 export const counted = (control: ControlId, target: number, performed: (seen: Seen) => number): StepRule => ({
@@ -183,6 +186,21 @@ export const counted = (control: ControlId, target: number, performed: (seen: Se
 
 /** A step done by one tick in which `happened` holds. */
 export const once = (control: ControlId, happened: (seen: Seen) => boolean): StepRule => counted(control, 1, (seen) => (happened(seen) ? 1 : 0))
+
+/** Counts the Benandanti's points since the step began: `mark` is their score then. */
+export const pointsSince = (control: ControlId, target: number): StepRule => ({
+  control,
+  target,
+  begin: (seen) => ({ count: 0, mark: seen.score.benandanti }),
+  advance: (seen, now) => ({ count: seen.score.benandanti - now.mark, mark: now.mark })
+})
+
+/** Whether something of `kind` went off this tick and hurt someone other than the trainee, by the trainee's hand. */
+export const blastHit = (seen: Seen, kind: ProjectileKind) =>
+  seen.events.some((e) => e.t === "boom" && e.k === kind) && seen.events.some((e) => e.t === "hit" && e.a === seen.me.session && e.v !== seen.me.session)
+
+/** A target: a Malandant at full health that stands, or walks its route, and never fires. */
+export const harmlessFoe = (route: StationBot["route"]): StationBot => ({ team: "malandanti", route, fires: false, hp: MAX_HP })
 
 /** Whether the trainee stands within `radius` metres of `at`, horizontally. */
 export const near = (seen: Seen, at: V3, radius: number) => {

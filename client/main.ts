@@ -311,6 +311,8 @@ link.on((msg: ServerMessage) => {
   switch (msg.t) {
     case "welcome":
       publicUrl = msg.publicUrl
+      // Only the game server's word counts: the in-browser host is this very build, it always accepts.
+      if (!offline()) selfUpdate.welcomed()
       return
     case "public":
       publicUrl = msg.url

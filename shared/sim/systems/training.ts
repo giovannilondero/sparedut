@@ -7,12 +7,13 @@
  * It is not gated on the `Training` machine: it reads `Out`, and a reader that never ran would
  * keep a regular room's events waiting for it.
  */
-import { SAGRE, SAGRE_STATIONS } from "../../maps/sagre.ts"
-import { STATION_IDS, STATIONS, stepRule, stepsOf } from "../../training/index.ts"
+import { MAPS } from "../../maps/index.ts"
+import { SAGRE_STATIONS } from "../../maps/sagre.ts"
+import { STATION_IDS, STATIONS, stepRule, stepsOf, TRAINING } from "../../training/index.ts"
 import type { Seen, StepRule } from "../../training/station.ts"
 import { hasControl } from "../../training/controls.ts"
 import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS } from "../../weapons.ts"
-import { freshArsenal, freshDoors, MAX_HP, stormOnCourse } from "../rules.ts"
+import { freshArsenal, freshDoors, FRESH_CART, FRESH_FLAGS, FRESH_HILL, MAX_HP, stormOnCourse } from "../rules.ts"
 import {
   Arsenal,
   Cart,
@@ -28,6 +29,7 @@ import {
   Out,
   Pickups,
   Player,
+  Post,
   ReportInterface,
   Score,
   StepUnavailable,
@@ -56,6 +58,7 @@ export const PlayTraining = Game.System(
       players: Game.Query({
         selection: {
           player: Game.Query.read(Player),
+          post: Game.Query.optional(Post),
           controls: Game.Query.read(Controls),
           motion: Game.Query.write(Motion),
           life: Game.Query.write(Life),
@@ -162,12 +165,16 @@ export const PlayTraining = Game.System(
         const fresh = freshArsenal(primary)
         data.arsenal.set(trainee, { ...fresh, nextPrimary: now.nextPrimary, launcher: now.launcher, current: given.hold ?? (given.primary ? primary : now.current) })
       }
+      if (given.pickups) {
+        const back = given.pickups
+        resources.pickups.set(resources.pickups.get().map((p, i) => (back.includes(i) ? { _tag: "up" as const } : p)))
+      }
       const objective = given.objective
       if (objective === undefined) return
       resources.objective.set(objective)
-      if (objective === "frico") resources.flags.set({ benandanti: { _tag: "base" }, malandanti: { _tag: "base" } })
-      if (objective === "placute") resources.hill.set({ owner: null, contested: false, ticks: 0 })
-      if (objective === "cjar") resources.cart.set({ d: 0, pushers: 0, contested: false, idle: 0 })
+      if (objective === "frico") resources.flags.set(FRESH_FLAGS)
+      if (objective === "placute") resources.hill.set(FRESH_HILL)
+      if (objective === "cjar") resources.cart.set(FRESH_CART)
       // #49: the storm starts closing on its course now.
       const course = objective === "storm" ? given.storm : undefined
       resources.stormCourse.set(course ? { x: course.at[0], z: course.at[2], from: course.from, to: course.to, start: resources.tick.get(), ticks: course.ticks } : null)
@@ -205,13 +212,26 @@ export const PlayTraining = Game.System(
       if (place !== "walked") {
         // Placed away from a turret it was manning (restarting the turret's station): off it.
         if (resources.turrets.get().some((t) => t.gunner === session)) resources.turrets.set(resources.turrets.get().map((t) => (t.gunner === session ? { ...t, gunner: null } : t)))
-        const start = SAGRE_STATIONS[index].start
+        const start = SAGRE_STATIONS[id].start
         const motion = data.motion.get(trainee)
         data.motion.set(trainee, {
           body: { x: start.at[0], y: start.at[1], z: start.at[2], vx: 0, vy: 0, vz: 0, grounded: true, crouch: false },
           yaw: place === "facingStart" ? start.yaw : motion.yaw,
           pitch: place === "facingStart" ? 0 : motion.pitch
         })
+      }
+      // Placed at a station (restarting it included), its bots are back at their posts with their
+      // starting health: the scene is set again. A dead one comes back at its post next tick. Walking
+      // in, the bots there are still the last station's, and the host replaces them.
+      if (place !== "walked") for (const m of queries.players.each()) {
+        const post = data.post?.get(m)
+        if (post === undefined) continue
+        if (data.life.get(m)._tag === "Dead") {
+          data.life.update(m, { state: "Dead", data: (dead) => ({ respawn: 1, killer: dead.killer }) })
+          continue
+        }
+        data.life.update(m, { state: "Alive", data: (alive) => ({ hp: post.hp, armor: 0, shield: alive.shield }) })
+        data.motion.set(m, { body: { x: post.at[0], y: post.at[1], z: post.at[2], vx: 0, vy: 0, vz: 0, grounded: true, crouch: false }, yaw: post.yaw, pitch: 0 })
       }
       const first = stepRule(id, stepsOf(id)[0])
       give(first)
@@ -224,7 +244,7 @@ export const PlayTraining = Game.System(
     // that asks for one broken never lacks it.
     const standDoors = (all: boolean) => {
       const hp = resources.doors.get()
-      if (hp.some((left) => all || left <= 0)) resources.doors.set(freshDoors(SAGRE).map((full, i) => (all || (hp[i] ?? 0) <= 0 ? full : hp[i])))
+      if (hp.some((left) => all || left <= 0)) resources.doors.set(freshDoors(MAPS[TRAINING.map]).map((full, i) => (all || (hp[i] ?? 0) <= 0 ? full : hp[i])))
     }
 
     if (state._tag === "Arriving") {

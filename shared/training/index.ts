@@ -9,7 +9,6 @@
  */
 import type { MapId } from "../map.ts"
 import type { ModeId } from "../folklore.ts"
-import { SAGRE_STATIONS } from "../maps/sagre.ts"
 import type { StationDef, StepRule } from "./station.ts"
 import { ALWAYS_STATION } from "./stations/always.ts"
 import { ARMOURY_STATION } from "./stations/armoury.ts"
@@ -27,7 +26,10 @@ import { TURRET_STATION } from "./stations/turret.ts"
 /** The training's mode and map: fixed by the training request, never chosen by a regular room. */
 export const TRAINING = { mode: "dutrine", map: "sagre" } as const satisfies { readonly mode: ModeId; readonly map: MapId }
 
-/** The stations, in the order a first run goes through them. Index `i` is station `i + 1` and `SAGRE_STATIONS[i]` on the map. */
+/** Whether a room's mode is the training's: its rules, its requests and its menu. */
+export const isTraining = (mode: ModeId): boolean => mode === TRAINING.mode
+
+/** The stations, in the order a first run goes through them. Index `i` is station `i + 1`; its place on the map is `SAGRE_STATIONS[id]`. */
 export const STATION_IDS = ["look", "course", "always", "switch", "stalls", "armoury", "throw", "pickups", "turret", "medic", "modes", "skirmish"] as const
 export type StationId = (typeof STATION_IDS)[number]
 
@@ -51,12 +53,21 @@ export type StepOf<S extends StationId> = keyof (typeof STATIONS)[S]["steps"] & 
 /** Any step of any station. */
 export type StepId = { [S in StationId]: StepOf<S> }[StationId]
 
-/** Every station has its place on the fair: one entry of `SAGRE_STATIONS` per station, in the same order. */
-const _placed: (typeof SAGRE_STATIONS)["length"] = STATION_IDS.length
-void _placed
-
 /** A station's steps, in order. */
+// `Object.keys` is typed `string[]`; a station's keys are its steps by construction (`StepOf`).
 export const stepsOf = <S extends StationId>(station: S): readonly StepOf<S>[] => Object.keys(STATIONS[station].steps) as StepOf<S>[]
 
+/** Whether `step` is one of `station`'s steps. */
+export const isStepOf = (station: StationId, step: string): boolean => {
+  const steps: readonly string[] = stepsOf(station)
+  return steps.includes(step)
+}
+
+/** Whether a value is the id of some station's step: what a client's word about a step is checked against. */
+export const isStepId = (value: unknown): value is StepId => typeof value === "string" && STATION_IDS.some((station) => isStepOf(station, value))
+
+/** Every station's steps by id, as the rules see them. */
+const STEP_RULES: Readonly<Record<StationId, StationDef>> = STATIONS
+
 /** The rule of one step of a station. */
-export const stepRule = (station: StationId, step: StepId): StepRule => (STATIONS[station].steps as Readonly<Record<string, StepRule>>)[step]
+export const stepRule = (station: StationId, step: StepId): StepRule => STEP_RULES[station].steps[step]

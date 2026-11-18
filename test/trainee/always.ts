@@ -5,7 +5,7 @@ import { SAGRE_STATIONS } from "../../shared/maps/sagre.ts"
 import { FLAG_BIT, type SnapOther } from "../../shared/protocol.ts"
 import { walkTo, yawTo, type Act, type Drivers, type Sight } from "./moves.ts"
 
-const PLACE = SAGRE_STATIONS[2]
+const PLACE = SAGRE_STATIONS.always
 /** Close enough to the mescul's target to swing (the mescul reaches 2.4 m). */
 const SWING_FROM = 1.6
 

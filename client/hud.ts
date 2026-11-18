@@ -12,6 +12,7 @@ import { STATION_IDS } from "../shared/training/index.ts"
 import type { Device } from "./device.ts"
 import { t } from "./i18n.ts"
 import { menuControl, playPrompt, trainingPrompt, turretPrompt } from "./prompts.ts"
+import { stepMarksHtml } from "./training-panel.ts"
 import { buttonBit, TOUCH_BUTTONS, type Insets, type PickerEntry, type TouchLayout, type TouchView } from "./touch.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -80,8 +81,9 @@ export class Hud {
   private trainingDoneTimer = 0
 
   /**
-   * The training's panel: the station and its number out of the total, the current step's
-   * instruction naming its control, and its count when it has one. Hidden outside a training.
+   * The training's panel: the station and its number out of the total, its steps as marks (done,
+   * current, to do), the current step's instruction naming its control, and its count when it has
+   * one. Hidden outside a training.
    */
   training(view: TrainingView | null, device: Device) {
     this.toggle("training", "hidden", view === null)
@@ -95,10 +97,12 @@ export class Hud {
     this.trainingShown = { strings: s, station, step, count, device }
     if (view.tag === "complete") {
       this.text("training-station", s.training.complete)
+      this.html("training-steps", "")
       this.html("training-step", "")
       return
     }
     this.text("training-station", s.training.station(STATION_IDS.indexOf(view.station) + 1, STATION_IDS.length, s.training.stations[view.station]))
+    this.html("training-steps", stepMarksHtml(view, s))
     this.html("training-step", trainingPrompt(s, view, device))
   }
 

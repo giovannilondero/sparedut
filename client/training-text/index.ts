@@ -2,7 +2,7 @@
  * The instruction of every training step, in both languages, one file per station. `i18n.ts` puts
  * them in `Strings.training.steps`.
  */
-import { STATION_IDS, type StationId } from "../../shared/training/index.ts"
+import type { StationId } from "../../shared/training/index.ts"
 import type { Lang } from "../i18n.ts"
 import { ALWAYS_TEXT } from "./always.ts"
 import { ARMOURY_TEXT } from "./armoury.ts"
@@ -36,6 +36,19 @@ const TEXTS: { readonly [S in StationId]: StepTexts<S> } = {
 /** Every station's step instructions in one language. */
 export type StepsIn = { readonly [S in StationId]: StepTexts<S>[Lang] }
 
-export const stepsIn = (lang: Lang): StepsIn => Object.fromEntries(STATION_IDS.map((s) => [s, TEXTS[s][lang]])) as unknown as StepsIn
+export const stepsIn = (lang: Lang): StepsIn => ({
+  look: TEXTS.look[lang],
+  course: TEXTS.course[lang],
+  always: TEXTS.always[lang],
+  switch: TEXTS.switch[lang],
+  stalls: TEXTS.stalls[lang],
+  armoury: TEXTS.armoury[lang],
+  throw: TEXTS.throw[lang],
+  pickups: TEXTS.pickups[lang],
+  turret: TEXTS.turret[lang],
+  medic: TEXTS.medic[lang],
+  modes: TEXTS.modes[lang],
+  skirmish: TEXTS.skirmish[lang]
+})
 
 export type { StepText, StepTexts } from "./types.ts"

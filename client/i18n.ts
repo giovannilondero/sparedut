@@ -35,6 +35,8 @@ export interface Strings {
   readonly training: {
     /** Station `n` of `total`, with its name: the head of the training's panel. */
     readonly station: Fn<[n: number, total: number, name: string]>
+    /** Which step of the station the player is on, beside the station's step marks. */
+    readonly step: Fn<[n: number, total: number]>
     readonly stations: Record<StationId, string>
     readonly steps: StepsIn
     /** Each control a step names, as each device that has it shows it (markup): `client/training-text/controls.ts`. */
@@ -393,6 +395,7 @@ const fur: Strings = {
   },
   training: {
     station: (n, total, name) => `Stazion ${n} di ${total} · ${name}`,
+    step: (n, total) => `Pas ${n} di ${total}`,
     stations: {
       look: "Cjale e cjamine",
       course: "Il percors",
@@ -402,7 +405,7 @@ const fur: Strings = {
       armoury: "La armarie",
       throw: "Bombis e minis",
       pickups: "Robe di cjapâ sù",
-      turret: "La mitraie e il Lanciafrico",
+      turret: "La torete e il Lanciafrico",
       medic: "Il miedi",
       modes: "Lis modalitâts",
       skirmish: "La scaramucie"
@@ -808,6 +811,7 @@ const it: Strings = {
   },
   training: {
     station: (n, total, name) => `Stazione ${n} di ${total} · ${name}`,
+    step: (n, total) => `Passo ${n} di ${total}`,
     stations: {
       look: "Guarda e cammina",
       course: "Il percorso",
@@ -817,7 +821,7 @@ const it: Strings = {
       armoury: "L'armeria",
       throw: "Bombe e mine",
       pickups: "Cose da raccogliere",
-      turret: "La mitragliatrice e il Lanciafrico",
+      turret: "La torretta e il Lanciafrico",
       medic: "Il medico",
       modes: "Le modalità",
       skirmish: "La scaramuccia"

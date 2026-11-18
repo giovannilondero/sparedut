@@ -4,6 +4,7 @@
  * moves, so a restore, or a trainee sent to another station, finds the gates right by themselves.
  */
 import { closedGates } from "../../training/gates.ts"
+import { currentStation } from "../rules.ts"
 import { Game, Physics, Training } from "../schema.ts"
 
 export const CloseGates = Game.System(
@@ -16,7 +17,7 @@ export const CloseGates = Game.System(
     const count = services.physics.map.gates?.length ?? 0
     if (count === 0) return
     const state = machines.training.get()
-    const station = state._tag === "Arriving" || state._tag === "Step" ? state.station : null
+    const station = currentStation(state)
     services.physics.setGates(closedGates(count, station))
   }
 )

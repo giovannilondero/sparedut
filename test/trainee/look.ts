@@ -4,5 +4,5 @@ import { turn, walkTo, type Drivers } from "./moves.ts"
 
 export const LOOK: Drivers<"look"> = {
   lookAround: (sight) => turn(sight, 0.05),
-  walkToMarker: (sight) => walkTo(sight, SAGRE_STATIONS[0].marker)
+  walkToMarker: (sight) => walkTo(sight, SAGRE_STATIONS.look.marker)
 }

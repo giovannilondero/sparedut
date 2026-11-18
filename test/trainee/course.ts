@@ -5,7 +5,7 @@ import { SAGRE_STATIONS } from "../../shared/maps/sagre.ts"
 import { MOVE } from "../../shared/movement.ts"
 import { walkTo, type Act, type Drivers, type Sight } from "./moves.ts"
 
-const { bar, sprintFrom, sprintLine } = SAGRE_STATIONS[1]
+const { bar, sprintFrom, sprintLine } = SAGRE_STATIONS.course
 /** Past the line, down the middle of the street. */
 const BEYOND: V3 = [sprintLine + 4, 0, 0]
 

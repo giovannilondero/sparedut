@@ -16,7 +16,7 @@ import { alongTheStreet } from "./trainee/pickups.ts"
 
 beforeAll(() => initPhysics())
 
-const PLACE = SAGRE_STATIONS[6]
+const PLACE = SAGRE_STATIONS.throw
 
 /** A training on the in-browser host, played by the automatic player until `station` is the current one. */
 function reach(station: StationId) {

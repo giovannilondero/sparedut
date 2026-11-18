@@ -9,11 +9,10 @@
  */
 import { SAGRE_STATIONS } from "../../maps/sagre.ts"
 import { held } from "../../sim/controls.ts"
-import { MAX_HP } from "../../sim/rules.ts"
 import { WEAPONS, type PrimaryId } from "../../weapons.ts"
-import { counted, station, type ControlId, type Seen, type StationBot, type StepProgress, type StepRule } from "../station.ts"
+import { blastHit, counted, harmlessFoe, NOTHING_YET, station, type ControlId, type Seen, type StationBot, type StepRule } from "../station.ts"
 
-const PLACE = SAGRE_STATIONS[4]
+const PLACE = SAGRE_STATIONS.stalls
 
 /** A stall: one per primary that shoots. Its id is its weapon's. */
 export type StallId = Exclude<PrimaryId, "miedi">
@@ -41,8 +40,8 @@ export const CJAMPANILI_FAR = 30
  */
 export const SCOPED_AFTER_TICKS = 10
 
-/** A target: a Malandant that walks its route, or stands, and never fires. */
-const target = (stall: StallId): StationBot => ({ team: "malandanti", route: PLACE.stalls[stall].target, fires: false, hp: MAX_HP })
+/** A stall's target: a Malandant on its route that never fires. */
+const target = (stall: StallId): StationBot => harmlessFoe(PLACE.stalls[stall].target)
 
 /**
  * How many players the trainee hit this tick with a shot of `weapon` whose distance passes `within`
@@ -67,14 +66,8 @@ const shotHits = (seen: Seen, weapon: StallId, within: (metres: number) => boole
   return n
 }
 
-/** Whether a hen burst this tick on someone other than the trainee and hurt them. */
-const henBurst = (seen: Seen) =>
-  seen.events.some((e) => e.t === "boom" && e.k === "gjaline") && seen.events.some((e) => e.t === "hit" && e.a === seen.me.session && e.v !== seen.me.session)
-
 /** A stall's step: its weapon given as it begins. */
 const stall = (weapon: StallId, rule: StepRule): StepRule => ({ ...rule, given: { primary: weapon, hold: weapon } })
-
-const NOTHING_YET: StepProgress = { count: 0, mark: 0 }
 
 /** The Cjampanili's step: `mark` counts the ticks the aim has been held without a break. */
 const throughTheScope = (control: ControlId): StepRule => ({
@@ -99,6 +92,6 @@ export const STALLS_STATION = station({
     cjampanili: stall("cjampanili", throughTheScope("aim")),
     // The Mulin fires only once spun up: a hit with it is a hit after the spin-up.
     mulin: stall("mulin", counted("fire", MULIN_HITS, (seen) => (seen.me.arsenal.spin >= WEAPONS.mulin.spinTicks ? shotHits(seen, "mulin") : 0))),
-    gjalinis: stall("gjalinis", counted("fire", 1, (seen) => (henBurst(seen) ? 1 : 0)))
+    gjalinis: stall("gjalinis", counted("fire", 1, (seen) => (blastHit(seen, "gjaline") ? 1 : 0)))
   }
 })

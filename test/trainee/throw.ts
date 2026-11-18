@@ -6,7 +6,7 @@ import { SGNAPE_BOMB } from "../../shared/weapons.ts"
 import { yawTo, type Drivers, type Sight } from "./moves.ts"
 import { alongTheStreet } from "./pickups.ts"
 
-const PLACE = SAGRE_STATIONS[6]
+const PLACE = SAGRE_STATIONS.throw
 /** Where the trainee stands to plant: just west of the walker's crossing; looking down at it, the mine lands on it. */
 const PLANT_FROM: V3 = [PLACE.mineAt[0] - 0.8, 0, PLACE.mineAt[2]]
 const LOOK_DOWN = -1.2

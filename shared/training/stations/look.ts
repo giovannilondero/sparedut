@@ -8,7 +8,7 @@ export const LOOK_AROUND_TURN = Math.PI / 2
 /** How close to the marker counts as reaching it (metres). */
 export const MARKER_RADIUS = 1.5
 
-const PLACE = SAGRE_STATIONS[0]
+const PLACE = SAGRE_STATIONS.look
 
 /** The angle between two yaws, from 0 to π. */
 const turned = (from: number, to: number) => {

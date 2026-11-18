@@ -19,7 +19,7 @@ import { alongTheStreet } from "./trainee/pickups.ts"
 
 beforeAll(() => initPhysics())
 
-const WOUNDED = SAGRE_STATIONS[9].wounded.at
+const WOUNDED = SAGRE_STATIONS.medic.wounded.at
 
 /** A training on the in-browser host, played by the automatic player until the medic is the current station and the teammate is there. */
 function atMedic() {
@@ -145,6 +145,27 @@ describe("the automatic player", () => {
       for (const m of me.got.slice(before)) if (m.t === "snap") events.push(...m.ev.filter((e) => e.t === "training"))
       if (events.some((e) => e.t === "training" && e.a === "station" && e.station === "medic")) break
     }
+    expect(steps(events)).toEqual(["heal"])
+    expect(events).toContainEqual({ t: "training", a: "station", station: "medic" })
+  })
+})
+
+describe("restarting the station", () => {
+  test("puts the teammate back at their post with their wounds, so the step can still be completed", () => {
+    const { me, snap, teammate, drive, heal, play } = atMedic()
+    const counted = () => {
+      const view = snap().training
+      return view?.tag === "station" ? view.count : 0
+    }
+    drive(60 * 10, heal(4), () => counted() >= 30)
+    expect(teammate()!.hp).toBeGreaterThan(WOUNDED_HP)
+    me.say({ t: "goTo", station: "medic" })
+    play(4)
+    expect(snap().training).toMatchObject({ station: "medic", step: "heal", count: 0, target: TO_RESTORE })
+    const mate = teammate()!
+    expect(mate.hp).toBe(WOUNDED_HP)
+    expect(Math.hypot(mate.x - WOUNDED[0], mate.z - WOUNDED[2])).toBeLessThan(0.5)
+    const events = drive(60 * 30, heal(4), (e) => steps(e).length > 0)
     expect(steps(events)).toEqual(["heal"])
     expect(events).toContainEqual({ t: "training", a: "station", station: "medic" })
   })

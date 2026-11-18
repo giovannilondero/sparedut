@@ -48,10 +48,8 @@ export function precacheOf(files: readonly BuiltFile[]): Precache {
     .map((file) => ({ ...file, url: urlOf(file.path) }))
     .filter((file) => !left(file.url))
     .sort((a, b) => (a.url < b.url ? -1 : a.url > b.url ? 1 : 0))
-  const digest = createHash("sha256")
-  for (const file of kept) digest.update(`${file.url}\0${file.hash}\n`)
   return {
-    version: digest.digest("hex").slice(0, 12),
+    version: versionOf(kept),
     urls: kept.map((file) => file.url),
     bytes: kept.reduce((sum, file) => sum + file.bytes, 0),
     ver: versionOf(files.map((file) => ({ ...file, url: urlOf(file.path) })).filter((file) => isVerFile(file.url) && !/\.(md|map)$/.test(file.url)))
