@@ -6,9 +6,9 @@ import * as THREE from "three"
 import { BOT_LEVEL_IDS, QUICK_CHAT, TEAM_INFO, type BotLevel } from "../shared/folklore.ts"
 import { rayPose } from "../shared/hitbox.ts"
 import { BUTTON, IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
-import { turretAim, turretSeat, type MapId, type PickupKind, type Team } from "../shared/map.ts"
+import { turretAim, turretRestSeat, turretSeat, type MapId, type PickupKind, type Team } from "../shared/map.ts"
 import { DISCO } from "../shared/maps/maran.ts"
-import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, sprinting } from "../shared/movement.ts"
+import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, seatedBody, sprinting } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
@@ -137,6 +137,8 @@ export class Game {
   private stepAcc = 0
   private wasGrounded = true
   private wasAlive = false
+  /** The predictor holds me in a turret's seat (the last snapshot had me alive on one). */
+  private seated = false
   private shake = 0
   private aimBlend = 0
   private kickPitch = 0
@@ -349,11 +351,16 @@ export class Game {
         this.wanted = you.arsenal.current
         this.localMag = null
       } else if (you.alive) {
-        if (this.mounted() >= 0) this.predictor.pin(you.body)
-        else if (!this.predictor.body) this.predictor.body = you.body
+        const turret = this.mounted()
+        if (turret >= 0) {
+          // On the turret the seat follows my own look, not the body the server sent: see `fixedStep`.
+          this.predictor.ack(you.seq)
+          if (!this.seated) this.predictor.sit(seatedBody(turretSeat(this.physics.map.turrets[turret], this.controls.yaw)))
+        } else if (!this.predictor.body) this.predictor.body = you.body
         else this.predictor.reconcile(you.body, you.seq, true)
       }
       this.wasAlive = you.alive
+      this.seated = you.alive && this.mounted() >= 0
       this.controls.track(trackedIn(s, this.me, this.mounted() >= 0))
       // The server has already seen my last weapon switch and holds a different one: it
       // switched it itself (lanciafrico pickup, armoury, respawn) or rejected the switch. Follow it.
@@ -902,7 +909,9 @@ export class Game {
     if (!you || !you.alive || over) return
 
     if (turret >= 0) {
-      // Held in place (the server says so); mitraie shots are predicted like any other.
+      // In the seat behind the gun for this command's look, where the server puts me too: the eye
+      // turns with the look at once, and mitraie shots leave from it, predicted like any other.
+      this.predictor.hold(seatedBody(turretSeat(this.physics.map.turrets[turret], input.yaw)), input, this.speedScale())
       if (this.turretCooldown > 0) this.turretCooldown--
       const gun = this.snap?.turrets[turret]
       if ((buttons & BUTTON.fire) !== 0 && gun && !gun.jammed && this.turretCooldown === 0) {
@@ -1187,7 +1196,9 @@ export class Game {
     viewmodel.setVisible(view.drawWeapon)
 
     const b = this.predictor.body
-    const drawn = this.predictor.render(this.acc / DT)
+    // On a turret the eye sits in the seat for this frame's look; on foot, between the last two predicted ticks.
+    const seat = view.mitraie?.seat
+    const drawn = seat ? { x: seat[0], y: seat[1], z: seat[2] } : this.predictor.render(this.acc / DT)
     if (you?.alive && b && drawn) {
       this.eye += ((b.crouch ? EYE_CROUCH : EYE_STAND) - this.eye) * Math.min(1, dt * 14)
       const sm = this.predictor.smooth
@@ -1287,7 +1298,7 @@ export class Game {
       const near =
         turret < 0 && you.alive && !!b && !!s &&
         this.physics.map.turrets.some((spot, i) => {
-          const seat = turretSeat(spot)
+          const seat = turretRestSeat(spot)
           return s.turrets[i]?.gunner === null && Math.hypot(b.x - seat[0], b.z - seat[2]) <= TURRET.reach && Math.abs(b.y - seat[1]) < 1.2
         })
       this.hud.turret(gun ? { heat: gun.heat, jammed: gun.jammed } : null, near)

@@ -5,7 +5,7 @@
  * `UseWeapons`, holding the body in the seat by `MovePlayers`.
  */
 import { Ops } from "@typeonce/ritmo"
-import { turretSeat } from "../../map.ts"
+import { turretRestSeat } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
 import { TURRET } from "../../weapons.ts"
 import { Controls, Game, Life, Match, Motion, Out, Player, Rules, Turrets, type TurretState } from "../schema.ts"
@@ -60,7 +60,7 @@ export const MountTurrets = Game.System(
         let bestD: number = TURRET.reach
         spots.forEach((spot, i) => {
           if (next[i].gunner !== null) return
-          const seat = turretSeat(spot)
+          const seat = turretRestSeat(spot)
           const d = Ops.hypot(body.x - seat[0], body.z - seat[2])
           if (d <= bestD && Math.abs(body.y - seat[1]) < 1.2) {
             best = i

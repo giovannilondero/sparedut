@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, test } from "bun:test"
 import { BUTTON, IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
-import { turretSeat } from "../shared/map.ts"
+import { turretRestSeat, turretSeat, type TurretSpot } from "../shared/map.ts"
 import { MAP_IDS, MAPS } from "../shared/maps/index.ts"
 import { CASOT, MARAN } from "../shared/maps/maran.ts"
 import { GLEMONE } from "../shared/maps/glemone.ts"
-import { eyeHeight, lookDir, stepBody, type Body } from "../shared/movement.ts"
+import { EYE_STAND, lookDir, stepBody, type Body } from "../shared/movement.ts"
 import { createPhysicsWorld, initPhysics, type PhysicsWorld } from "../shared/physics.ts"
 import type { GameEvent } from "../shared/sim/events.ts"
 import { createSim, type Sim } from "../shared/sim/index.ts"
@@ -55,32 +55,74 @@ function still(sim: Sim, id: string, extra: Partial<PlayerInput>): PlayerInput {
   return toward(sim, id, p.body.x, p.body.z, extra)
 }
 
+/** Aims from one end of a turret's arc to the other, ends included. */
+const acrossArc = (spot: TurretSpot, steps = 54) => Array.from({ length: steps + 1 }, (_, i) => spot.yaw - TURRET.arc + (2 * TURRET.arc * i) / steps)
+/** Walks one way from the given body for a second: how far it got horizontally, and where. */
+function walkFrom(physics: PhysicsWorld, from: Body, yaw: number) {
+  let body = from
+  for (let i = 0; i < 60; i++) body = stepBody(body, { ...IDLE_INPUT, mz: 1, yaw }, physics, 1).body
+  return { body, moved: Math.hypot(body.x - from.x, body.z - from.z) }
+}
+
 describe("turrets", () => {
   for (const id of MAP_IDS) {
-    test(`on ${id} every turret has a seat you can stand on and fires unobstructed ahead`, () => {
+    test(`on ${id} every turret's rest seat is standable and fires unobstructed ahead`, () => {
       const map = MAPS[id]
       const physics = createPhysicsWorld(map)
       expect(map.turrets.length).toBeGreaterThan(0)
       for (const spot of map.turrets) {
-        const [x, y, z] = turretSeat(spot)
-        // The seat: resting on the floor, without falling or getting stuck.
-        let body: Body = { x, y: y + 0.05, z, vx: 0, vy: 0, vz: 0, grounded: false, crouch: false }
-        for (let i = 0; i < 30; i++) body = stepBody(body, IDLE_INPUT, physics, 1).body
-        expect(Math.abs(body.y - y)).toBeLessThan(0.2)
-        expect(Math.hypot(body.x - x, body.z - z)).toBeLessThan(0.1)
-        expect(physics.canStand(body)).toBe(true)
+        const [x, y, z] = turretRestSeat(spot)
+        expect(turretSeat(spot, spot.yaw)).toEqual([x, y, z])
         // Ahead, at eye height: at least 10 m clear.
-        const eye = { x, y: y + eyeHeight(body), z }
+        const eye = { x, y: y + EYE_STAND, z }
         const hit = physics.raycast(eye, lookDir(spot.yaw, 0), 10)
         expect(hit).toBeNull()
       }
     })
+
+    test(`on ${id} every turret's seat is standable across its whole arc, and you can walk away from either end`, () => {
+      const map = MAPS[id]
+      const physics = createPhysicsWorld(map)
+      map.turrets.forEach((spot, i) => {
+        for (const yaw of acrossArc(spot)) {
+          const [x, y, z] = turretSeat(spot, yaw)
+          // Resting on the floor, without falling, getting stuck or sitting inside anything.
+          let body: Body = { x, y: y + 0.05, z, vx: 0, vy: 0, vz: 0, grounded: false, crouch: false }
+          for (let k = 0; k < 30; k++) body = stepBody(body, IDLE_INPUT, physics, 1).body
+          const where = `${id} turret ${i} aim ${(yaw - spot.yaw).toFixed(2)}`
+          expect({ where, dy: Math.abs(body.y - y) < 0.2, dxz: Math.hypot(body.x - x, body.z - z) < 0.1, stands: physics.canStand(body) }).toEqual({ where, dy: true, dxz: true, stands: true })
+        }
+        // Dismounted at either end, some way out of the seat is open.
+        for (const end of [spot.yaw - TURRET.arc, spot.yaw + TURRET.arc]) {
+          const [x, y, z] = turretSeat(spot, end)
+          const seat: Body = { x, y, z, vx: 0, vy: 0, vz: 0, grounded: true, crouch: false }
+          const ways = Array.from({ length: 8 }, (_, k) => walkFrom(physics, seat, (k * Math.PI) / 4))
+          const out = ways.some((w) => w.moved > 2 && Math.abs(w.body.y - y) < 1.5)
+          expect({ where: `${id} turret ${i} end ${(end - spot.yaw).toFixed(2)}`, out }).toEqual({ where: `${id} turret ${i} end ${(end - spot.yaw).toFixed(2)}`, out: true })
+        }
+      })
+    })
   }
+
+  test("the seat is 1 m from the pivot, opposite the clamped aim, at the turret's foot level", () => {
+    const spot: TurretSpot = { at: [10, 4, -20], yaw: 0.7 }
+    for (const look of [...acrossArc(spot), spot.yaw + 2, spot.yaw - 2, spot.yaw + 0.3 + 2 * Math.PI]) {
+      const [x, y, z] = turretSeat(spot, look)
+      const d = look - spot.yaw - Math.round((look - spot.yaw) / (2 * Math.PI)) * 2 * Math.PI
+      const aim = spot.yaw + Math.max(-TURRET.arc, Math.min(TURRET.arc, d))
+      expect(Math.hypot(x - spot.at[0], z - spot.at[2])).toBeCloseTo(TURRET.seat, 9)
+      expect(y).toBe(spot.at[1])
+      // Behind the gun: from the seat, the pivot lies straight along the aim.
+      const ahead = lookDir(aim, 0)
+      expect((spot.at[0] - x) / TURRET.seat).toBeCloseTo(ahead.x, 9)
+      expect((spot.at[2] - z) / TURRET.seat).toBeCloseTo(ahead.z, 9)
+    }
+  })
 
   test("you mount it, stay put, it overheats until it stops, cools down and you dismount", () => {
     const sim = match(maran, [["a", "malandanti", "cramar"]])
     const spot = MARAN.turrets[1]
-    const [sx, , sz] = turretSeat(spot)
+    const [sx, , sz] = turretRestSeat(spot)
     const start = me(sim, "a").body
     const route: [number, number][] =
       start.z < 73 ? [[start.x, 66], [sx, 66], [sx, sz]] : [[start.x, 82], [-22, 82], [-22, 66], [sx, 66], [sx, sz]]
@@ -92,7 +134,7 @@ describe("turrets", () => {
     expect(events.some((e) => e.t === "turret" && e.a === "on" && e.s === "a")).toBe(true)
     expect(sim.view().turrets[1].gunner).toBe("a")
 
-    // Push forward and fire: the body stays in the seat, the look stays within the arc.
+    // Push forward and fire: the body stays in the seat (behind the gun at the end of its arc), the look stays within the arc.
     const shots: number[] = []
     let hotAt = -1
     for (let i = 0; i < 600 && (hotAt < 0 || i < hotAt + 120); i++) {
@@ -106,7 +148,8 @@ describe("turrets", () => {
       }
     }
     const b = me(sim, "a").body
-    expect(Math.hypot(b.x - sx, b.z - sz)).toBeLessThan(0.01)
+    const [ex, , ez] = turretSeat(spot, spot.yaw + TURRET.arc)
+    expect(Math.hypot(b.x - ex, b.z - ez)).toBeLessThan(0.01)
     expect(Math.abs(me(sim, "a").yaw - spot.yaw)).toBeLessThanOrEqual(TURRET.arc + 1e-6)
     // Overheats after 2-5 seconds of continuous fire, then stays silent until it has cooled down.
     expect(hotAt).toBeGreaterThan(120)
@@ -133,10 +176,95 @@ describe("turrets", () => {
     expect(me(sim, "a").body.z).toBeGreaterThan(sz + 2)
   })
 
+  /** Walks A from the spawn to turret 1 of Maran and mounts it. */
+  function mountMaran(sim: Sim) {
+    const spot = MARAN.turrets[1]
+    const [sx, , sz] = turretRestSeat(spot)
+    const start = me(sim, "a").body
+    expect(walk(sim, "a", start.z < 73 ? [[start.x, 66], [sx, 66], [sx, sz]] : [[start.x, 82], [-22, 82], [-22, 66], [sx, 66], [sx, sz]])).toBe(true)
+    sim.input("a", still(sim, "a", { buttons: BUTTON.use }))
+    sim.step()
+    expect(sim.view().turrets[1].gunner).toBe("a")
+    return spot
+  }
+
+  test("mounted, the gunner's body turns around the pivot with the aim, and the shots leave from its eye along the aim", () => {
+    const sim = match(maran, [["a", "malandanti", "cramar"]])
+    const spot = mountMaran(sim)
+    // From past one end of the arc to past the other, firing all the way (it overheats only after ~3 s).
+    const looks = Array.from({ length: 121 }, (_, i) => spot.yaw - 1.8 + (3.6 * i) / 120)
+    let shots = 0
+    for (const [i, look] of looks.entries()) {
+      const pitch = 0.3 * Math.sin(i / 10)
+      sim.input("a", { ...still(sim, "a", { yaw: look, pitch, buttons: BUTTON.fire }), mx: 1, mz: 1 })
+      const events = sim.step()
+      const p = me(sim, "a")
+      const aim = Math.max(spot.yaw - TURRET.arc, Math.min(spot.yaw + TURRET.arc, look))
+      const ahead = lookDir(aim, 0)
+      // 1 m behind the pivot, opposite the aim, at the foot of the turret.
+      expect(p.body.x).toBeCloseTo(spot.at[0] - ahead.x * TURRET.seat, 6)
+      expect(p.body.z).toBeCloseTo(spot.at[2] - ahead.z * TURRET.seat, 6)
+      expect(p.body.y).toBeCloseTo(spot.at[1], 6)
+      expect(p.yaw).toBeCloseTo(aim, 6)
+      for (const e of events) {
+        if (e.t !== "shot" || e.s !== "a") continue
+        shots++
+        expect(e.w).toBe("mitraie")
+        expect(e.o[0]).toBeCloseTo(p.body.x, 1)
+        expect(e.o[1]).toBeCloseTo(p.body.y + EYE_STAND, 1)
+        expect(e.o[2]).toBeCloseTo(p.body.z, 1)
+        // Along the clamped aim, within the mitraie's spread.
+        const [ex, , ez] = e.e[0]
+        const shotYaw = Math.atan2(-(ex - e.o[0]), -(ez - e.o[2]))
+        const off = shotYaw - aim - Math.round((shotYaw - aim) / (2 * Math.PI)) * 2 * Math.PI
+        expect(Math.abs(off)).toBeLessThan(0.02)
+      }
+    }
+    expect(shots).toBeGreaterThan(20)
+  })
+
+  for (const side of [1, -1]) {
+    test(`dismounted at the ${side > 0 ? "left" : "right"} end of the arc, you stand where the seat was and walk away`, () => {
+      const sim = match(maran, [["a", "malandanti", "cramar"]])
+      const spot = mountMaran(sim)
+      const end = spot.yaw + side * TURRET.arc
+      for (let i = 0; i < 10; i++) {
+        sim.input("a", still(sim, "a", { yaw: end + side * 0.4 }))
+        sim.step()
+      }
+      const [x, y, z] = turretSeat(spot, end)
+      sim.input("a", still(sim, "a", { yaw: end, buttons: BUTTON.use }))
+      expect(sim.step().some((e) => e.t === "turret" && e.a === "off")).toBe(true)
+      const b = me(sim, "a").body
+      expect(Math.hypot(b.x - x, b.z - z)).toBeLessThan(0.05)
+      expect(Math.abs(b.y - y)).toBeLessThan(0.1)
+      // Away from the gun, the way the gunner's back was turned.
+      const back = lookDir(end + Math.PI, 0)
+      for (let i = 0; i < 60; i++) {
+        sim.input("a", toward(sim, "a", x + back.x * 6, z + back.z * 6))
+        sim.step()
+      }
+      const after = me(sim, "a").body
+      expect(Math.hypot(after.x - x, after.z - z)).toBeGreaterThan(2)
+    })
+  }
+
+  test("you mount from behind the gun at rest, whichever way you look", () => {
+    const sim = match(maran, [["a", "malandanti", "cramar"]])
+    const spot = MARAN.turrets[1]
+    const [sx, , sz] = turretRestSeat(spot)
+    const start = me(sim, "a").body
+    expect(walk(sim, "a", start.z < 73 ? [[start.x, 66], [sx, 66], [sx, sz]] : [[start.x, 82], [-22, 82], [-22, 66], [sx, 66], [sx, sz]])).toBe(true)
+    // Looking far to one side does not move the place you mount from.
+    sim.input("a", still(sim, "a", { yaw: spot.yaw + 2.5, buttons: BUTTON.use }))
+    sim.step()
+    expect(sim.view().turrets[1].gunner).toBe("a")
+  })
+
   test("the mitraie hits whoever passes in front of it", () => {
     const sim = match(maran, [["a", "malandanti", "cramar"], ["b", "benandanti", "cramar"]])
     const spot = MARAN.turrets[1]
-    const [sx, , sz] = turretSeat(spot)
+    const [sx, , sz] = turretRestSeat(spot)
     const start = me(sim, "a").body
     walk(sim, "a", start.z < 73 ? [[start.x, 66], [sx, 66], [sx, sz]] : [[start.x, 82], [-22, 82], [-22, 66], [sx, 66], [sx, sz]], ["b"])
     sim.input("a", still(sim, "a", { buttons: BUTTON.use }))

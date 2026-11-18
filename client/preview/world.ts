@@ -1,7 +1,7 @@
 // World preview: map with ?map=osoppo, look with ?look=ver, quality with ?q=alta, menu camera (or fixed with ?cam=x,y,z,lx,ly,lz), mode with ?mode=frico|culine|cjar|tampieste.
 // A turret's gunner's view with ?gunner=<turret>&aim=<yaw from its facing>,<pitch> (radians, clamped to the arc) and ?shot=<seconds since a shot>.
 import * as THREE from "three"
-import { trackLength, trackPoint, turretSeat, type MapId } from "../../shared/map.ts"
+import { trackLength, trackPoint, type MapId } from "../../shared/map.ts"
 import { EYE_STAND } from "../../shared/movement.ts"
 import { firstPerson } from "../firstperson.ts"
 import { MAP_IDS, MAPS } from "../../shared/maps/index.ts"
@@ -68,7 +68,8 @@ const gunner = gunnerSpot
   : null
 const gunnerCamera = () => {
   if (!gunnerSpot || !gunner?.mitraie) return false
-  const seat = turretSeat(gunnerSpot)
+  // The seat turns with the aim, as in a match: the gunner sits behind the gun.
+  const seat = gunner.mitraie.seat
   camera.fov = gunner.fov
   camera.updateProjectionMatrix()
   camera.position.set(seat[0], seat[1] + EYE_STAND, seat[2])

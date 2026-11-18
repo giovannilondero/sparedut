@@ -58,11 +58,32 @@ export class Predictor {
     this.body = body
   }
 
-  /** Pinned where the server says (on the turret): nothing to predict or replay. */
-  pin(server: Body) {
-    this.body = server
-    this.prev = server
-    this.pending = []
+  /**
+   * On a turret: the body sits in the seat my own look puts it in, never where the server last
+   * put it, which is a round trip behind the look. The command is kept like any other, so if the
+   * server has let me off the turret meanwhile, `reconcile` replays it from where I got off.
+   */
+  hold(seated: Body, input: PlayerInput, scale: number) {
+    this.pending.push({ input, scale })
+    if (this.pending.length > 120) this.pending.shift()
+    this.body = seated
+    this.prev = seated
+  }
+
+  /** Just mounted: from wherever I was predicted to the seat, with the drawn eye gliding there rather than jumping. */
+  sit(seated: Body) {
+    if (this.body) {
+      this.smooth.x += this.body.x - seated.x
+      this.smooth.y += this.body.y - seated.y
+      this.smooth.z += this.body.z - seated.z
+    }
+    this.body = seated
+    this.prev = seated
+  }
+
+  /** Still on the turret, the server has run my commands up to `ackSeq`: they need no replay. */
+  ack(ackSeq: number) {
+    this.pending = this.pending.filter((p) => p.input.seq > ackSeq)
   }
 
   decay(dt: number) {
