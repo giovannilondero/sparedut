@@ -32,6 +32,8 @@ export interface WeaponDef {
   readonly falloff: number
   /** Field of view when aiming (degrees). */
   readonly aimFov: number
+  /** Fully aimed, a scope overlay replaces the view (the first-person view decides when). */
+  readonly scope: boolean
   /** Vertical view kick per shot (radians). */
   readonly kick: number
   /** Movement speed multiplier with the weapon in hand. */
@@ -59,6 +61,7 @@ export const WEAPONS = {
     range: 2.4,
     falloff: 1,
     aimFov: 75,
+    scope: false,
     kick: 0.02,
     moveScale: 1.12,
     slot: 4,
@@ -79,6 +82,7 @@ export const WEAPONS = {
     range: 120,
     falloff: 0.6,
     aimFov: 60,
+    scope: false,
     kick: 0.025,
     moveScale: 1.05,
     slot: 2,
@@ -99,6 +103,7 @@ export const WEAPONS = {
     range: 160,
     falloff: 0.65,
     aimFov: 55,
+    scope: false,
     kick: 0.012,
     moveScale: 1,
     slot: 1,
@@ -119,6 +124,7 @@ export const WEAPONS = {
     range: 45,
     falloff: 0.25,
     aimFov: 65,
+    scope: false,
     kick: 0.07,
     moveScale: 1.02,
     slot: 1,
@@ -139,6 +145,7 @@ export const WEAPONS = {
     range: 400,
     falloff: 1,
     aimFov: 20,
+    scope: true,
     kick: 0.06,
     moveScale: 0.9,
     slot: 1,
@@ -159,6 +166,7 @@ export const WEAPONS = {
     range: 110,
     falloff: 0.55,
     aimFov: 68,
+    scope: false,
     kick: 0.006,
     moveScale: 0.78,
     slot: 1,
@@ -179,6 +187,7 @@ export const WEAPONS = {
     range: 9,
     falloff: 1,
     aimFov: 72,
+    scope: false,
     kick: 0,
     moveScale: 1.06,
     slot: 1,
@@ -199,6 +208,7 @@ export const WEAPONS = {
     range: 0,
     falloff: 1,
     aimFov: 70,
+    scope: false,
     kick: 0.09,
     moveScale: 0.92,
     slot: 3,
@@ -220,6 +230,7 @@ export const WEAPONS = {
     range: 0,
     falloff: 1,
     aimFov: 68,
+    scope: false,
     kick: 0.06,
     moveScale: 0.96,
     slot: 1,
@@ -244,6 +255,7 @@ export const WEAPONS = {
     range: 220,
     falloff: 0.7,
     aimFov: 50,
+    scope: false,
     kick: 0.004,
     moveScale: 1,
     slot: 1,
