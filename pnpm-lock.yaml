@@ -20,6 +20,12 @@ importers:
       '@typeonce/ritmo-browser':
         specifier: ^0.24.0
         version: 0.24.0(typescript@7.0.2)
+      '@ui-sdk/core':
+        specifier: 0.1.0-beta.7
+        version: 0.1.0-beta.7
+      '@ui-sdk/web':
+        specifier: 0.1.0-beta.7
+        version: 0.1.0-beta.7(@ui-sdk/core@0.1.0-beta.7)
       howler:
         specifier: ^2.2.4
         version: 2.2.4
@@ -1040,6 +1046,14 @@ packages:
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [win32]
+
+  '@ui-sdk/core@0.1.0-beta.7':
+    resolution: {integrity: sha512-f6Dotk5kwwiH2BRT6THRrn/Lv7eoG6Y+TWboCl9rQ4fHw4h3OliOSHF4kl4PzJEgaLyWSQFczRMvGm+YCpn77Q==}
+
+  '@ui-sdk/web@0.1.0-beta.7':
+    resolution: {integrity: sha512-4nPhHOfcnN6244g+m/D7ZugkorHKPsE4m25WMixPZrjGXBEFQx98COl+osK7VRwyqdUYPdwrK9m518AnOTHgJw==}
+    peerDependencies:
+      '@ui-sdk/core': ^0.1.0-beta.7
 
   '@vitest/mocker@5.1.0':
     resolution: {integrity: sha512-5umB9/jlWcqVS6fsrFmv5Gdnpu6wAUio/lEOwAmvB7v+lFo/IW2B9FhAD0p19GCULTgMzLCdUmuCDCnAzWgppQ==}
@@ -2172,6 +2186,12 @@ snapshots:
 
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
+
+  '@ui-sdk/core@0.1.0-beta.7': {}
+
+  '@ui-sdk/web@0.1.0-beta.7(@ui-sdk/core@0.1.0-beta.7)':
+    dependencies:
+      '@ui-sdk/core': 0.1.0-beta.7
 
   '@vitest/mocker@5.1.0(vite@8.3.8(@types/node@26.6.6)(yaml@2.9.1))':
     dependencies:

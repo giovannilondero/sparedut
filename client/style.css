@@ -1,3 +1,6 @@
+/* UI SDK adds its few behaviour rules in this layer: declared first, so the game's own styles win. */
+@layer ui-sdk;
+
 :root {
   --ink: #f3e9d2;
   --muted: #b9a988;
@@ -42,9 +45,9 @@ kbd { font-family: var(--sans); font-size: 0.78em; padding: 0.1em 0.45em; border
 .panel h2 small { color: var(--muted); font-size: 15px; font-weight: 400; }
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
-button { cursor: pointer; border: 1px solid var(--stone-line); background: rgba(255, 255, 255, 0.04); border-radius: 10px; padding: 10px 14px; transition: background 0.15s, border-color 0.15s, transform 0.08s; }
-button:hover { background: rgba(232, 182, 76, 0.12); border-color: rgba(232, 182, 76, 0.6); }
-button:active { transform: translateY(1px); }
+button, ui-radio { cursor: pointer; border: 1px solid var(--stone-line); background: rgba(255, 255, 255, 0.04); border-radius: 10px; padding: 10px 14px; transition: background 0.15s, border-color 0.15s, transform 0.08s; }
+button:hover, ui-radio:hover { background: rgba(232, 182, 76, 0.12); border-color: rgba(232, 182, 76, 0.6); }
+button:active, ui-radio:active { transform: translateY(1px); }
 button.primary { background: linear-gradient(180deg, #f0c45d, #c68c27); color: #1d1408; border-color: #f7d483; font-weight: 700; }
 button.primary:hover { background: linear-gradient(180deg, #ffd673, #d49a30); }
 button.big { display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 12px 16px; }
@@ -64,7 +67,7 @@ select { appearance: none; min-inline-size: 0; max-inline-size: 100%; text-overf
   background: rgba(0, 0, 0, 0.35) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23e8b64c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center / 12px 8px;
   border: 1px solid var(--stone-line); border-radius: 8px; padding-block: 8px; padding-inline: 10px 32px; color: var(--ink); }
 select option { background: #1d1813; color: var(--ink); }
-select:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+select:focus-visible, button:focus-visible, input:focus-visible, ui-radio:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 @media (hover: hover) and (pointer: fine) { select:hover { border-color: rgba(232, 182, 76, 0.6); } }
 .field select { font-size: 15px; }
 .inline-field { display: inline-flex; align-items: center; gap: 6px; }
@@ -104,7 +107,7 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 .card { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 10px; }
 .card b { font-family: var(--serif); font-size: 17px; }
 .card small { font-size: 12px; opacity: 0.8; line-height: 1.3; }
-.card.selected { border-color: var(--gold); background: rgba(232, 182, 76, 0.16); box-shadow: inset 0 0 0 1px var(--gold); }
+.card.selected, .card[data-checked] { border-color: var(--gold); background: rgba(232, 182, 76, 0.16); box-shadow: inset 0 0 0 1px var(--gold); }
 
 .weapons { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
 .weapon { text-align: left; display: flex; flex-direction: column; gap: 6px; }

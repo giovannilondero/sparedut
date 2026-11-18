@@ -7,6 +7,8 @@
     "@dimforge/rapier3d-compat": "^0.21.0",
     "@typeonce/ritmo": "^0.24.0",
     "@typeonce/ritmo-browser": "^0.24.0",
+    "@ui-sdk/core": "0.1.0-beta.7",
+    "@ui-sdk/web": "0.1.0-beta.7",
     "howler": "^2.2.4",
     "three": "^0.187.0",
     "zod": "^4.6.7"

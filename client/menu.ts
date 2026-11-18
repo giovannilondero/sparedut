@@ -6,6 +6,8 @@ import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId } from "../shared/map.ts"
 import type { Access, Reach, RoomSummary } from "../shared/protocol.ts"
 import { PRIMARIES, WEAPON_IDS, WEAPONS, type PrimaryId } from "../shared/weapons.ts"
+// UI SDK's radio group: one tab stop, arrow keys, the radio role. Markup and styling stay the game's.
+import "@ui-sdk/web/radio"
 import type { GameAudio } from "./contracts.ts"
 import { esc } from "./hud.ts"
 import { onLangChange, setLang, t, type Lang, type StaticKey } from "./i18n.ts"
@@ -196,7 +198,8 @@ export class Menu {
   /** Listeners only once: the cards are redrawn on every choice and every language change. */
   private bindCreate() {
     const options = this.model.options
-    $("c-reach").innerHTML = options.reaches.map((r) => `<option value="${r}" data-t="${REACH_LABEL[r]}"></option>`).join("")
+    const reach = $<HTMLElementTagNameMap["ui-radio-group"]>("c-reach")
+    reach.innerHTML = options.reaches.map((r) => `<ui-radio class="card" value="${r}"><b data-t="${REACH_LABEL[r]}"></b></ui-radio>`).join("")
     $("c-access").innerHTML = options.accesses.map((a) => `<option value="${a}" data-t="${ACCESS_LABEL[a]}"></option>`).join("")
     $("mode-cards").addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-mode]")
@@ -228,9 +231,11 @@ export class Menu {
     const ff = $<HTMLInputElement>("c-ff")
     ff.addEventListener("change", () => this.model.chooseFriendlyFire(ff.checked))
     // An Offline room lives in this browser: what only the server offers (access, password) hides.
-    const reach = $<HTMLSelectElement>("c-reach")
-    reach.addEventListener("change", () => {
-      this.model.chooseReach(reach.value as Reach)
+    reach.addEventListener("valuechange", (e) => {
+      // The group allows no value; the model always holds one, so a change to none is refused.
+      if (e.detail.value === null) return e.preventDefault()
+      this.model.chooseReach(e.detail.value as Reach)
+      this.audio.play("ui_click")
       this.renderFields()
     })
     const access = $<HTMLSelectElement>("c-access")
