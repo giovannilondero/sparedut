@@ -301,4 +301,4 @@ html.in-match input { user-select: text; -webkit-user-select: text; }
 #perf b { font-size: 16px; }
 #perf small { color: var(--muted); margin-top: 2px; }
 /* The create form: settings that only a room on the server has (access, password) hide for Offline. */
-#menu-create[data-reach="offline"] .needs-server { display: none; }
+#menu-create:not([data-access-applies]) .needs-server { display: none; }

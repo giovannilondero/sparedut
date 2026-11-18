@@ -3,7 +3,7 @@
  * The types say so, so a room that breaks the rule does not compile, wherever it is written.
  */
 import { expect, test } from "bun:test"
-import type { CreateOptions } from "../client/menu.ts"
+import type { CreateOptions } from "../client/menu-model.ts"
 import type { RoomSettings } from "../server/room.ts"
 import { ClientMessage, type RoomInfo, type RoomSummary } from "../shared/protocol.ts"
 
