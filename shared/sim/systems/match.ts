@@ -1,13 +1,15 @@
 /**
- * Match flow: Muster → live → over → Muster again. The host's start begins the match from the
- * Muster; during a live match it ends it and sends the room back to the Muster.
+ * Match flow: Muster → live → over → Muster again. In the Muster the host's start begins a
+ * countdown, at whose end the match goes live, or the match at once when the room says everybody
+ * is ready; the host can cancel the countdown. During a live match the start ends it and sends
+ * the room back to the Muster.
  * Each mode decides when it ends and who wins.
  */
 import { TEAMS } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
 import type { Winner } from "../events.ts"
-import { freshDoors, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL, NO_STATS, OVER_TICKS, RESPAWN_TICKS, START_GRACE_TICKS } from "../rules.ts"
-import { Attackers, Cart, Doors, Flags, Game, Hill, Life, Match, Out, Pickups, Player, Rules, Score, StartMatch, Stats, Tick, Turrets } from "../schema.ts"
+import { COUNTDOWN_TICKS, freshDoors, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL, NO_STATS, OVER_TICKS, RESPAWN_TICKS, START_GRACE_TICKS } from "../rules.ts"
+import { Attackers, CancelCountdown, Cart, Doors, Flags, Game, Hill, Life, Match, Out, Pickups, Player, Rules, Score, StartMatch, Stats, Tick, Turrets } from "../schema.ts"
 
 export const AdvanceTick = Game.System(
   "Sparedut/AdvanceTick",
@@ -41,8 +43,8 @@ export const MatchFlow = Game.System(
       turrets: Game.System.writeResource(Turrets),
       doors: Game.System.writeResource(Doors)
     },
-    events: { start: Game.System.readEvent(StartMatch), out: Game.System.writeEvent(Out) },
-    machines: { match: Game.System.machine(Match) },
+    events: { start: Game.System.readEvent(StartMatch), cancel: Game.System.readEvent(CancelCountdown), out: Game.System.writeEvent(Out) },
+    machines: { match: Game.System.updateMachine(Match) },
     nextMachines: { match: Game.System.nextState(Match) }
   },
   ({ queries, resources, events, machines, nextMachines }) => {
@@ -50,7 +52,8 @@ export const MatchFlow = Game.System(
     const tick = resources.tick.get()
     const rules = resources.rules.get()
     const match = machines.match.get()
-    const startRequested = events.start.all().length > 0
+    const starts = events.start.all()
+    const startRequested = starts.length > 0
 
     const begin = () => {
       resources.score.set({ benandanti: 0, malandanti: 0 })
@@ -82,7 +85,7 @@ export const MatchFlow = Game.System(
         if (data.life.get(m)._tag === "Alive") data.life.transition(m, { from: "Alive", to: "Dead", data: off })
         else data.life.update(m, { state: "Dead", data: () => off })
       }
-      nextMachines.match.transition({ from, to: "Muster" })
+      nextMachines.match.transition({ from, to: "Muster", data: { starts: null } })
     }
 
     /** The winner if the match ended this tick, otherwise null. */
@@ -123,10 +126,15 @@ export const MatchFlow = Game.System(
     }
 
     switch (match._tag) {
-      case "Muster":
+      case "Muster": {
         // Only the host's start begins a match: the Muster never ends by itself.
-        if (startRequested) begin()
+        if (starts.some((s) => s.now)) return begin()
+        // A start while a countdown runs restarts it; a cancel in the same tick wins.
+        const countdown = events.cancel.all().length > 0 ? null : startRequested ? tick + COUNTDOWN_TICKS : match.starts
+        if (countdown !== null && tick >= countdown) return begin()
+        if (countdown !== match.starts) machines.match.update({ state: "Muster", data: () => ({ starts: countdown }) })
         return
+      }
       case "Live": {
         const winner = verdict(match.ends)
         if (winner) {

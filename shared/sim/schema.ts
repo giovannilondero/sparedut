@@ -254,8 +254,13 @@ export const Leave = Descriptor.Event<{ readonly session: string }>()("Sparedut/
 export const InputArrived = Descriptor.Event<{ readonly session: string; readonly input: PlayerInput }>()("Sparedut/InputArrived")
 export const ChangeTeam = Descriptor.Event<{ readonly session: string; readonly team: Team }>()("Sparedut/ChangeTeam")
 export const ChangePrimary = Descriptor.Event<{ readonly session: string; readonly primary: PrimaryId }>()("Sparedut/ChangePrimary")
-/** The host starts (or restarts) the match. */
-export const StartMatch = Descriptor.Event<{}>()("Sparedut/StartMatch")
+/**
+ * The host's start. In the Muster it begins the countdown (again from the beginning, if one is
+ * running) or, `now`, the match at once; during a match it sends the room back to the Muster.
+ */
+export const StartMatch = Descriptor.Event<{ readonly now: boolean }>()("Sparedut/StartMatch")
+/** The host cancels the Muster's countdown. */
+export const CancelCountdown = Descriptor.Event<{}>()("Sparedut/CancelCountdown")
 /** From the host, only in a training: the client's report of an interface step (`shared/training/interface.ts`). */
 export const ReportInterface = Descriptor.Event<{ readonly session: string; readonly action: InterfaceAction }>()("Sparedut/ReportInterface")
 /** From the host, only in a training: the client says its active device has no control for this step (`shared/training/controls.ts`). */
@@ -294,7 +299,7 @@ export const Game = Schema.bind(
     components: { Player, TeamOf, Post, Motion, Controls, Life, Arsenal, Stats, Attackers, Projectile },
     requires: [Schema.requires(Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers)],
     resources: { Rules, Objective, Tick, Score, Flags, Hill, Cart, StormCourse, Pickups, Turrets, Doors, History, Rng },
-    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, ReportInterface, GoToStation, StepUnavailable, Damage, Heal, DoorHit, Out }
+    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, CancelCountdown, ReportInterface, GoToStation, StepUnavailable, Damage, Heal, DoorHit, Out }
   }),
   Root
 )
@@ -304,7 +309,8 @@ export const Game = Schema.bind(
  * over (the results, until tick `restarts`, then the Muster again).
  */
 export const Match = Game.StateMachine("Sparedut/Match", {
-  Muster: {},
+  /** `starts`: the tick the countdown ends and the match goes live; null while no countdown runs. */
+  Muster: z.object({ starts: z.number().int().nullable() }),
   Live: z.object({ ends: z.number().int() }),
   /** The winner: a team, nobody, or (La Tampieste) the last one standing. */
   Over: z.object({

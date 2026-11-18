@@ -40,7 +40,7 @@ import "@ui-sdk/web/dialog"
 import "@ui-sdk/web/select"
 import { takeAwayDeparted } from "./bodies.ts"
 import { alwaysChosen } from "./choice.ts"
-import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, musterFocus, musterTeams, type MatchMenu } from "./match-menus.ts"
+import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, musterCountdown, musterFocus, musterTeams, startsAtOnce, type MatchMenu } from "./match-menus.ts"
 import { pickerEntries } from "./touch.ts"
 import { onViewportChange } from "./viewport.ts"
 
@@ -188,6 +188,8 @@ export class Game {
   private pauseHost: boolean | null = null
   /** Whether the Muster was last drawn for the host (start and the host tools), null before it is drawn. */
   private musterHost: boolean | null = null
+  /** The countdown's seconds last drawn in the Muster (null: none running), undefined before it is drawn. */
+  private musterLeft: number | null | undefined = undefined
   /** The room's last chat messages, drawn in the Muster. */
   private musterChat: string[] = []
   /** Where the armoury was opened from: Esc goes back there. */
@@ -505,6 +507,7 @@ export class Game {
     }
     for (const e of s.ev) this.event(e)
     if (prev?.phase.tag !== s.phase.tag) this.phaseChanged(s)
+    if (this.inMuster) this.drawCountdown(s)
     // Entered with progress: the station list, as soon as the trainee is there. Opening it pauses the training.
     if (this.choosing && you?.alive && s.training?.tag === "station") {
       this.choosing = false
@@ -1154,12 +1157,39 @@ export class Game {
       .map(
         (team) =>
           `<ul><li style="color:${TEAM_INFO[team].color};font-family:var(--serif)"><b>${s.teams[team].name}</b></li>${teams[team]
-            .map((m) => `<li${m.id === this.me ? ' style="color:var(--gold)"' : ""}>${esc(m.name)}${m.bot ? " 🤖" : ""}${m.host ? " 👑" : ""} <span class="muted">· ${s.weapons[m.primary].name}</span></li>`)
+            .map((m) => `<li${m.id === this.me ? ' style="color:var(--gold)"' : ""}>${esc(m.name)}${m.bot ? " 🤖" : ""}${m.host ? " 👑" : ""} <span class="muted">· ${s.weapons[m.primary].name}</span>${!m.bot && m.ready ? ` <span class="ready-mark" role="img" aria-label="${s.muster.ready}" title="${s.muster.ready}">✓</span>` : ""}</li>`)
             .join("")}</ul>`
       )
       .join("")
     $("m-team").textContent = s.pause.switchTeam(s.teams[this.otherTeam()].name)
+    $("m-ready").setAttribute("aria-pressed", String(this.readyMark()))
     if (host) this.syncLevel("m", room)
+  }
+
+  /** My own ready mark, as the roster has it. */
+  private readyMark(): boolean {
+    return this.room?.roster.find((r) => r.id === this.me)?.ready ?? false
+  }
+
+  /**
+   * The Muster's countdown, redrawn only when its whole seconds change; for the host, start while
+   * none runs and cancel while it does, focus following from one to the other.
+   */
+  private drawCountdown(s: Snapshot) {
+    const left = musterCountdown(s.phase, s.tick)
+    if (left === this.musterLeft) return
+    const was = this.musterLeft
+    this.musterLeft = left
+    const shown = document.getElementById("m-countdown")
+    if (shown) shown.textContent = left === null ? "" : t().muster.countdown(left)
+    if (was !== undefined && (was === null) === (left === null)) return
+    const start = document.getElementById("m-start")
+    const cancel = document.getElementById("m-cancel")
+    if (!start || !cancel) return
+    const focused = document.activeElement === start || document.activeElement === cancel
+    start.hidden = left !== null
+    cancel.hidden = left === null
+    if (focused) (left === null ? start : cancel).focus()
   }
 
   private buildMuster(room: RoomInfo, host: boolean) {
@@ -1168,8 +1198,10 @@ export class Game {
     const s = t()
     const p = s.pause
     const m = s.muster
+    this.musterLeft = undefined
     this.drawMenu(MENU_PARTS.muster[1], m.title, `
       <div class="overlay-body">
+        <div id="m-countdown" class="muster-countdown" role="timer"></div>
         <div class="muted pause-reach">${s.modes[room.mode].name} · ${s.maps[room.map].name} · ${s.menu.minutes(room.minutes)}</div>
         ${this.roomCodeHtml("m", room)}
         <div class="roster" id="m-roster"></div>
@@ -1181,7 +1213,8 @@ export class Game {
         <input id="m-chat" class="muster-chat-input" maxlength="120" placeholder="${m.chatPlaceholder}" aria-label="${m.chat}" />
       </div>
       <div class="row overlay-actions">
-        ${host ? `<button id="m-start" class="primary">${p.start}</button>` : ""}
+        ${host ? `<button id="m-start" class="primary">${p.start}</button><button id="m-cancel" hidden>${m.cancel}</button>` : ""}
+        <button id="m-ready" aria-pressed="false">${m.ready}</button>
         <button id="m-team"></button>
         <button id="m-leave">${p.leave}</button>
       </div>`)
@@ -1200,6 +1233,7 @@ export class Game {
       chat.value = ""
     })
     $("m-team").onclick = () => this.d.net.send({ t: "team", team: this.otherTeam() })
+    $("m-ready").onclick = () => this.d.net.send({ t: "ready", ready: !this.readyMark() })
     $("m-leave").onclick = () => {
       this.d.net.send({ t: "leave" })
       this.d.onLeave()
@@ -1208,9 +1242,11 @@ export class Game {
       this.bindBotTools(el, "m")
       $("m-start").onclick = () => {
         this.d.net.send({ t: "start" })
-        // Still inside the press: the one moment the browser grants the pointer lock the match needs.
-        this.controls.lock()
+        // A start that goes live at once: still inside the press, the one moment the browser grants
+        // the pointer lock the match needs. A countdown keeps the pointer free for the Muster.
+        if (this.room && startsAtOnce(this.room, this.me)) this.controls.lock()
       }
+      $("m-cancel").onclick = () => this.d.net.send({ t: "cancel" })
     }
     if (!wasOpen) this.openMenu(...MENU_PARTS.muster, musterFocus({ host, reach: room.reach }))
   }

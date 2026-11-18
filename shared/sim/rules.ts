@@ -16,6 +16,8 @@ export const SGNAPE_TICKS = 600
 export const SGNAPE_SPEED = 1.3
 export const ASSIST_WINDOW_TICKS = 600
 export const OVER_TICKS = 15 * 60
+/** The Muster's countdown, from the host's start to the match going live. */
+export const COUNTDOWN_TICKS = 10 * 60
 export const FLAG_RETURN_TICKS = 30 * 60
 
 export const otherTeam = (team: Team): Team => (team === "benandanti" ? "malandanti" : "benandanti")

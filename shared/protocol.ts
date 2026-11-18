@@ -120,6 +120,10 @@ export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("primary"), p: z.enum(PRIMARIES) }),
   z.object({ t: z.literal("chat"), text: visible(120) }),
   z.object({ t: z.literal("start") }),
+  /** A member's own ready mark in the Muster, set or taken back. */
+  z.object({ t: z.literal("ready"), ready: z.boolean() }),
+  /** The host cancels the Muster's countdown. */
+  z.object({ t: z.literal("cancel") }),
   z.object({ t: z.literal("bot"), team, delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ t: z.literal("level"), level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]) }),
   z.object({ t: z.literal("ping"), c: z.number(), rtt: z.number().min(0).max(RTT_MAX).optional() }),
@@ -144,6 +148,8 @@ export interface RosterEntry {
   readonly team: Team
   /** The primary the member enters the next match with (the one in hand in a live match). */
   readonly primary: PrimaryId
+  /** Marked ready in the Muster; a bot always is. */
+  readonly ready: boolean
   readonly bot: boolean
   readonly away: boolean
 }

@@ -5,6 +5,8 @@
  */
 import type { Team } from "../shared/map.ts"
 import type { Reach, RoomInfo } from "../shared/protocol.ts"
+import { TICK_RATE } from "../shared/movement.ts"
+import type { PhaseView } from "../shared/sim/view.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 
 /** The menus a player opens over the match: the match menu, the loadout, the settings. */
@@ -39,6 +41,8 @@ export interface MusterMember {
   readonly id: string
   readonly name: string
   readonly primary: PrimaryId
+  /** Marked ready (a bot always is). */
+  readonly ready: boolean
   readonly bot: boolean
   readonly host: boolean
 }
@@ -46,7 +50,7 @@ export interface MusterMember {
 /** The Muster's two teams, from the room's roster: who is in each, in the roster's order, with their primary. */
 export function musterTeams(room: Pick<RoomInfo, "hostId" | "roster">): Record<Team, MusterMember[]> {
   const teams: Record<Team, MusterMember[]> = { benandanti: [], malandanti: [] }
-  for (const r of room.roster) teams[r.team].push({ id: r.id, name: r.name, primary: r.primary, bot: r.bot, host: r.id === room.hostId })
+  for (const r of room.roster) teams[r.team].push({ id: r.id, name: r.name, primary: r.primary, ready: r.ready, bot: r.bot, host: r.id === room.hostId })
   return teams
 }
 
@@ -56,3 +60,15 @@ export function musterTeams(room: Pick<RoomInfo, "hostId" | "roster">): Record<T
  * does not start a match others are still choosing for.
  */
 export const musterFocus = (who: { readonly host: boolean; readonly reach: Reach }): string | null => (who.host && who.reach === "offline" ? "m-start" : null)
+
+/** The Muster's countdown in whole seconds left, rounded up so that it never reads 0 before the start; null while none runs. */
+export function musterCountdown(phase: PhaseView, tick: number): number | null {
+  if (phase.tag !== "Muster" || phase.starts === null) return null
+  return Math.max(1, Math.ceil((phase.starts - tick) / TICK_RATE))
+}
+
+/**
+ * Whether the host's start, which counts as the host's ready mark, goes live at once: every other
+ * human member is ready. Then the press that starts is the one that takes the pointer for the match.
+ */
+export const startsAtOnce = (room: Pick<RoomInfo, "roster">, me: string): boolean => room.roster.every((r) => r.bot || r.id === me || r.ready)

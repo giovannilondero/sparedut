@@ -252,6 +252,12 @@ export interface Strings {
     readonly primary: string
     readonly chat: string
     readonly chatPlaceholder: string
+    /** The ready mark: the toggle that sets and takes it back, and the mark beside a ready member. */
+    readonly ready: string
+    /** The host cancels the countdown. */
+    readonly cancel: string
+    /** The countdown: whole seconds left before the match. */
+    readonly countdown: Fn<[number]>
   }
   readonly perf: { readonly snaps: string; readonly players: string; readonly corrections: string; readonly hide: string; readonly menu: string; readonly dynRes: string }
   readonly tips: readonly string[]
@@ -733,7 +739,10 @@ const fur: Strings = {
     title: "Adunade",
     primary: "Arme principâl",
     chat: "Cjacaris",
-    chatPlaceholder: "Scrîf ai altris e frache Invio"
+    chatPlaceholder: "Scrîf ai altris e frache Invio",
+    ready: "Pront",
+    cancel: "Ferme la partence",
+    countdown: (s) => `La partide e partìs tra ${s} s`
   },
   perf: { snaps: "istantanis", players: "zuiadôrs", corrections: "corezions", hide: "F3 par platâ", menu: "menù", dynRes: "ris. dinamiche" },
   tips: [
@@ -1165,7 +1174,10 @@ const it: Strings = {
     title: "Adunata",
     primary: "Arma principale",
     chat: "Chiacchiere",
-    chatPlaceholder: "Scrivi agli altri e premi Invio"
+    chatPlaceholder: "Scrivi agli altri e premi Invio",
+    ready: "Pronto",
+    cancel: "Ferma la partenza",
+    countdown: (s) => `La partita parte tra ${s} s`
   },
   perf: { snaps: "istantanee", players: "giocatori", corrections: "correzioni", hide: "F3 per nascondere", menu: "menu", dynRes: "ris. dinamica" },
   tips: [
