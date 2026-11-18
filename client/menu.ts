@@ -2,9 +2,8 @@
  * The main menu: name, language, rooms, armoury, settings, glossary. It draws the menu model
  * and forwards the player's events to it; what a choice means is the model's to decide.
  */
-import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId } from "../shared/map.ts"
-import type { Access, Reach, RoomSummary } from "../shared/protocol.ts"
+import type { Access, RoomSummary } from "../shared/protocol.ts"
 import { PRIMARIES, WEAPON_IDS, WEAPONS, type PrimaryId, type WeaponId } from "../shared/weapons.ts"
 // UI SDK's radio group: one tab stop, arrow keys, the radio role. Markup and styling stay the game's.
 import "@ui-sdk/web/radio"
@@ -52,18 +51,19 @@ const FIRST_CONTROL: { readonly [S in Exclude<Screen, "home" | "password">]: () 
  * Fills a UI SDK radio group with one card per value: one Tab stop, the arrow keys inside, the radio
  * role. `choose` hears the player's choice; the group never lets the choice go back to none.
  */
-function cardGroup(group: RadioGroup, values: readonly string[], choose: (value: string) => void) {
+function cardGroup<V extends string>(group: RadioGroup, values: readonly V[], choose: (value: V) => void) {
   group.innerHTML = values.map((v) => `<ui-radio class="card" value="${v}"><b></b><small></small></ui-radio>`).join("")
-  group.addEventListener("valuechange", alwaysChosen(choose))
+  // The group offers only these values: whatever it reports is one of them.
+  group.addEventListener("valuechange", alwaysChosen((v) => choose(v as V)))
 }
 
-/** Writes each card's name (HTML) and line (text) in the active language. */
-function cardTexts(group: RadioGroup, text: (value: string) => readonly [string, string]) {
-  for (const card of group.querySelectorAll<HTMLElement>("ui-radio")) {
-    const [name, line] = text(card.getAttribute("value")!)
+/** Writes each card's name (HTML) and line (text) in the active language; `values` as `cardGroup` was given them. */
+function cardTexts<V extends string>(group: RadioGroup, values: readonly V[], text: (value: V) => readonly [string, string]) {
+  group.querySelectorAll<HTMLElement>("ui-radio").forEach((card, i) => {
+    const [name, line] = text(values[i])
     card.querySelector("b")!.innerHTML = name
     card.querySelector("small")!.textContent = line
-  }
+  })
 }
 
 /** A UI SDK select over numbers: its items rewritten in the active language, keeping the chosen one. */
@@ -352,25 +352,25 @@ export class Menu {
       this.renderChoices()
     }
     cardGroup($("c-mode"), options.modes, (v) => {
-      this.model.chooseMode(v as ModeId)
+      this.model.chooseMode(v)
       chosen()
     })
     cardGroup($("c-map"), options.maps, (v) => {
-      this.model.chooseMap(v as MapId)
-      this.handlers.mapChanged(v as MapId)
+      this.model.chooseMap(v)
+      this.handlers.mapChanged(v)
       chosen()
     })
     cardGroup($("c-level"), options.levels, (v) => {
-      this.model.chooseLevel(v as BotLevel)
+      this.model.chooseLevel(v)
       chosen()
     })
     // An Offline room lives in this browser: what only the server offers (access, password) hides.
     cardGroup($("c-reach"), options.reaches, (v) => {
-      this.model.chooseReach(v as Reach)
+      this.model.chooseReach(v)
       chosen()
     })
     cardGroup($("c-access"), options.accesses, (v) => {
-      this.model.chooseAccess(v as Access)
+      this.model.chooseAccess(v)
       chosen()
     })
     const number = (id: string, choose: (n: number) => void) =>
@@ -412,11 +412,11 @@ export class Menu {
   private renderCreate() {
     const s = t()
     const { options, choices } = this.model
-    cardTexts($("c-mode"), (v) => [s.modes[v as ModeId].name, s.modes[v as ModeId].sub])
-    cardTexts($("c-map"), (v) => [s.maps[v as MapId].name, s.maps[v as MapId].sub])
-    cardTexts($("c-level"), (v) => [s.levels[v as BotLevel].name, s.levels[v as BotLevel].sub])
-    cardTexts($("c-reach"), (v) => [`<i class="chip ${v}">${s.menu.reach[v as Reach]}</i>`, s.menu.reachSub[v as Reach]])
-    cardTexts($("c-access"), (v) => [accessLabel(v as Access), ""])
+    cardTexts($("c-mode"), options.modes, (v) => [s.modes[v].name, s.modes[v].sub])
+    cardTexts($("c-map"), options.maps, (v) => [s.maps[v].name, s.maps[v].sub])
+    cardTexts($("c-level"), options.levels, (v) => [s.levels[v].name, s.levels[v].sub])
+    cardTexts($("c-reach"), options.reaches, (v) => [`<i class="chip ${v}">${s.menu.reach[v]}</i>`, s.menu.reachSub[v]])
+    cardTexts($("c-access"), options.accesses, (v) => [accessLabel(v), ""])
     selectItems($("c-minutes"), options.minutes, s.menu.minutes, choices.minutes)
     selectItems($("c-bots"), options.bots, (n) => (n === 0 ? s.menu.botsNone : String(n)), choices.bots)
     this.renderChoices()
