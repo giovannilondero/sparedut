@@ -37,9 +37,9 @@ kbd { font-family: var(--sans); font-size: 0.78em; padding: 0.1em 0.45em; border
   --pad: clamp(14px, 3vw, 40px);
   padding-block: max(var(--pad), env(safe-area-inset-top, 0px)) max(var(--pad), env(safe-area-inset-bottom, 0px));
   padding-inline: max(var(--pad), env(safe-area-inset-left, 0px)) max(var(--pad), env(safe-area-inset-right, 0px));
-  background:
-    radial-gradient(120% 90% at 85% 40%, transparent 30%, oklch(0.14 0.01 60 / 0.55) 70%),
-    linear-gradient(90deg, oklch(0.15 0.01 60 / 0.86) 0%, oklch(0.15 0.01 60 / 0.5) 38%, transparent 62%); }
+  /* The page spans the whole width, so the shade is the same from side to side: darker behind the
+     header and the footer, whose text sits straight on the map, lighter in between. */
+  background: linear-gradient(180deg, oklch(0.15 0.01 60 / 0.82) 0%, oklch(0.15 0.01 60 / 0.3) 30%, oklch(0.15 0.01 60 / 0.3) 65%, oklch(0.15 0.01 60 / 0.88) 100%); }
 #menu > * { grid-column: 2; }
 /* The prompt's root holds no box of its own: its parts open in the top layer. */
 #menu > ui-dialog { position: absolute; }
