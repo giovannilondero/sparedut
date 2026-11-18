@@ -2,7 +2,7 @@
  * How the client talks to whoever hosts its room: the game server (`Net`) or the host in the
  * player's own browser (`BrowserHostConnection`, to the host `client/host.ts` builds). Both speak the same protocol; the game only sees this.
  */
-import type { ClientMessage, ServerMessage } from "../shared/protocol.ts"
+import { RTT_MAX, type ClientMessage, type ServerMessage } from "../shared/protocol.ts"
 
 export type Listener = (msg: ServerMessage) => void
 
@@ -50,7 +50,8 @@ export abstract class HostConnection implements Connection {
   /** A message from the host, as its transport delivered it. */
   protected receive(data: string) {
     const msg = JSON.parse(data) as ServerMessage
-    if (msg.t === "pong") this.rtt = smoothRtt(this.rtt, performance.now() - msg.c)
+    // A pong that waited while the page was asleep is not a round trip: unbounded, it would make every later ping one the host refuses.
+    if (msg.t === "pong") this.rtt = smoothRtt(this.rtt, Math.min(performance.now() - msg.c, RTT_MAX))
     this.listeners.tell(msg)
   }
 

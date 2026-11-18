@@ -4,6 +4,10 @@
  * Chromium browser (`BROWSER` overrides the binary).
  *
  *   bun scripts/render-shot.ts "http://localhost:5173/preview/models.html?look=ver&w=cramar&still" out.png [seconds] [js to run first]
+ *
+ * `SIZE=390x844` emulates a viewport of that size (a headless window cannot be narrower than
+ * 500 px, so a phone needs it); below 1000 px wide it is a mobile one. `SCALE=2` sets the
+ * device pixel ratio.
  */
 export {}
 
@@ -11,7 +15,7 @@ const [url, out, wait = "6", script] = process.argv.slice(2)
 if (!url || !out) throw new Error("usage: bun scripts/render-shot.ts <url> <out.png> [seconds] [js]")
 const browser = process.env.BROWSER ?? "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
 const port = 9300 + Math.floor(Math.random() * 500)
-const child = Bun.spawn([browser, "--headless=new", "--use-angle=metal", "--enable-gpu", "--hide-scrollbars", "--window-size=1280,720", `--remote-debugging-port=${port}`, `--user-data-dir=/tmp/render-shot-${port}`, url], { stdout: "ignore", stderr: "ignore" })
+const child = Bun.spawn([browser, "--headless=new", "--mute-audio", "--use-angle=metal", "--enable-gpu", "--hide-scrollbars", "--window-size=1280,720", `--remote-debugging-port=${port}`, `--user-data-dir=/tmp/render-shot-${port}`, url], { stdout: "ignore", stderr: "ignore" })
 try {
   let socket: WebSocket | null = null
   for (let i = 0; i < 50 && !socket; i++) {
@@ -36,6 +40,11 @@ try {
       ws.addEventListener("message", on)
       ws.send(JSON.stringify({ id, method, params }))
     })
+  const size = process.env.SIZE?.match(/^(\d+)x(\d+)$/)
+  if (size) {
+    const [width, height] = [Number(size[1]), Number(size[2])]
+    await call("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: Number(process.env.SCALE ?? 1), mobile: width < 1000 })
+  }
   await Bun.sleep(Number(wait) * 1000)
   if (script) {
     await call("Runtime.evaluate", { expression: script })
@@ -46,4 +55,7 @@ try {
   console.log(out)
 } finally {
   child.kill()
+  await child.exited
+  // The profile is never reused: left behind, every run keeps about 100 MB of /tmp.
+  await Bun.$`rm -rf /tmp/render-shot-${port}`.quiet()
 }

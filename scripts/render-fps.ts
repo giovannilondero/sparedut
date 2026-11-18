@@ -15,7 +15,7 @@ const warmup = Number(process.argv[3] ?? 5)
 const browser = process.env.BROWSER ?? "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
 const port = 9300 + Math.floor(Math.random() * 500)
 const child = Bun.spawn(
-  [browser, "--headless=new", "--use-angle=metal", "--enable-gpu", "--disable-frame-rate-limit", "--disable-gpu-vsync", "--force-device-scale-factor=2", "--window-size=1512,945", `--remote-debugging-port=${port}`, `--user-data-dir=/tmp/render-fps-${port}`, url],
+  [browser, "--headless=new", "--mute-audio", "--use-angle=metal", "--enable-gpu", "--disable-frame-rate-limit", "--disable-gpu-vsync", "--force-device-scale-factor=2", "--window-size=1512,945", `--remote-debugging-port=${port}`, `--user-data-dir=/tmp/render-fps-${port}`, url],
   { stdout: "ignore", stderr: "ignore" }
 )
 try {
@@ -54,4 +54,7 @@ try {
   console.log(`${await evaluate(`const c = document.querySelector("canvas"); c.width + "x" + c.height`)}  fps ${fps.join(" ")}  =>  ${(1000 / mean).toFixed(1)} ms/frame`)
 } finally {
   child.kill()
+  await child.exited
+  // The profile is never reused: left behind, every run keeps about 100 MB of /tmp.
+  await Bun.$`rm -rf /tmp/render-fps-${port}`.quiet()
 }

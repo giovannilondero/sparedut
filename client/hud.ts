@@ -7,7 +7,10 @@ import { FLAG_BIT, type BoardRow, type RoomInfo, type SnapSelf, type Snapshot } 
 import type { KillCause } from "../shared/sim/events.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { WARMUP_TICKS } from "../shared/sim/rules.ts"
+import type { Device } from "./device.ts"
 import { t } from "./i18n.ts"
+import { menuControl, playPrompt, turretPrompt } from "./prompts.ts"
+import { buttonBit, TOUCH_BUTTONS, type Insets, type PickerEntry, type TouchLayout, type TouchView } from "./touch.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -45,6 +48,19 @@ export class Hud {
     $(id).style.setProperty(prop, value)
   }
 
+  /** A custom property on the page's root, for elements outside the HUD too. */
+  private pageStyle(prop: string, value: string) {
+    if (this.written.get(`page:s:${prop}`) === value) return
+    this.written.set(`page:s:${prop}`, value)
+    document.documentElement.style.setProperty(prop, value)
+  }
+
+  private data(id: string, key: string, value: string) {
+    if (this.written.get(`${id}:d:${key}`) === value) return
+    this.written.set(`${id}:d:${key}`, value)
+    $(id).dataset[key] = value
+  }
+
   private toggleOn(el: Element, key: string, cls: string, on: boolean) {
     if (this.written.get(`${key}:c:${cls}`) === on) return
     this.written.set(`${key}:c:${cls}`, on)
@@ -70,15 +86,26 @@ export class Hud {
     this.toggleOn($("hp").parentElement!, "hp-low", "low", hp < 30 && you.alive)
     this.text("armor", String(you.armor))
     this.style("armor-bar", "width", `${you.armor}%`)
+    // The touch HUD draws the two as rings around their icons.
+    this.style("vitals", "--hp", String(hp))
+    this.style("vitals", "--armor", String(you.armor))
     const a = you.arsenal
     const def = WEAPONS[a.current]
     const endless = def.mode === "melee" || turret
-    this.text("weapon-name", t().weapons[turret ? "mitraie" : a.current].name)
+    this.inHand = turret ? "mitraie" : a.current
+    this.text("weapon-name", t().weapons[this.inHand].name)
     const ammo = a.ammo[a.current]
-    this.text("mag", endless ? "∞" : String(localMag ?? ammo.mag))
+    const mag = endless ? "∞" : String(localMag ?? ammo.mag)
+    this.text("mag", mag)
     this.text("reserve", endless ? "" : String(ammo.reserve))
     this.toggleOn($("reserve").previousElementSibling!, "slash", "hidden", endless)
     this.text("bombs", `${t().bomb}: ${"🍶".repeat(a.bombs) || "—"} · ${t().mine}: ${"💣".repeat(a.mines) || "—"}`)
+    // On touch the weapon's control carries the rounds and the name, the bomb and mine buttons how many are left.
+    this.text("touch-weapon-name", t().weapons[this.inHand].name)
+    this.text("touch-mag", mag)
+    this.text("touch-reserve", endless ? "" : `/ ${ammo.reserve}`)
+    this.data("touch-bomb", "n", String(a.bombs))
+    this.data("touch-mine", "n", String(a.mines))
     const slots: [string, WeaponId][] = [["1", a.primary], ["2", "mandi"], ["3", "lanciafrico"], ["4", "mescul"]]
     this.html("slots", slots
       .map(([k, id]) => `<span class="${id === a.current ? "on" : slot.owned(id) ? "" : "off"}">${k} ${t().weapons[id].short}</span>`)
@@ -90,11 +117,11 @@ export class Hud {
     this.toggle("sgnape-fx", "on", a.sgnape > 0)
   }
 
-  /** On the turret: the mitraie's heat. Near a free one: the key to use it. */
-  turret(gun: { readonly heat: number; readonly jammed: boolean } | null, prompt: boolean) {
+  /** On the turret: the mitraie's heat. Near a free one: the active device's control to use it. */
+  turret(gun: { readonly heat: number; readonly jammed: boolean } | null, prompt: boolean, device: Device) {
     this.toggle("turret-hud", "hidden", !gun)
     this.toggle("turret-prompt", "hidden", !prompt && !gun)
-    this.html("turret-prompt", gun ? t().hud.turretLeave : t().hud.turretUse)
+    this.html("turret-prompt", turretPrompt(t(), device, !!gun))
     if (!gun) return
     this.style("turret-heat", "width", `${Math.round(gun.heat * 100)}%`)
     this.toggle("turret-hud", "jammed", gun.jammed)
@@ -147,8 +174,8 @@ export class Hud {
     }
   }
 
-  /** `outside`: I'm alive and outside the Tampieste circle. */
-  top(snap: Snapshot, mode: ModeId, names: Map<string, string>, outside = false) {
+  /** `outside`: I'm alive and outside the Tampieste circle. `device`: the active one, whose controls the banner names. */
+  top(snap: Snapshot, mode: ModeId, names: Map<string, string>, device: Device, outside = false) {
     const s = t()
     const alone = mode === "tampieste"
     const alive = snap.players.filter((p) => p.f & FLAG_BIT.alive).length
@@ -184,7 +211,7 @@ export class Hud {
     this.html("objective", obj)
     this.html(
       "banner",
-      phase.tag === "Warmup" ? s.hud.warmup(fmtClock(WARMUP_TICKS - snap.tick)) : outside ? `<b class="storm">${s.hud.stormOutside}</b>` : ""
+      phase.tag === "Warmup" ? s.hud.warmup(fmtClock(WARMUP_TICKS - snap.tick), menuControl(device)) : outside ? `<b class="storm">${s.hud.stormOutside}</b>` : ""
     )
   }
 
@@ -249,8 +276,132 @@ export class Hud {
   }
 
 
-  clickToPlay(on: boolean) {
+  /** The prompt to start playing, naming the active device's control: "tap", "click" or a controller's button. */
+  clickToPlay(on: boolean, device: Device) {
     this.toggle("clickplay", "hidden", !on)
+    if (on) this.html("clickplay", playPrompt(t(), device))
+  }
+
+  /**
+   * The HUD's layout: around the touch controls while touch is the active device, the desktop one
+   * otherwise. The page's `data-device` says the same to the menus' CSS (key hints, touch gestures).
+   */
+  layFor(device: Device) {
+    this.toggle("hud", "touch", device === "touch")
+    if (this.written.get("page:device") === device) return
+    this.written.set("page:device", device)
+    document.documentElement.dataset.device = device
+  }
+
+  /** The screen's safe-area insets (notch, home indicator), as CSS resolves them: read on resize, never per frame. */
+  safeInsets(): Insets {
+    const s = getComputedStyle($("safe-area"))
+    return { top: parseFloat(s.paddingTop) || 0, right: parseFloat(s.paddingRight) || 0, bottom: parseFloat(s.paddingBottom) || 0, left: parseFloat(s.paddingLeft) || 0 }
+  }
+
+  /** The touch controls are shown only while touch is the active device and nothing covers the match. */
+  touchShown(on: boolean) {
+    this.toggle("touch", "hidden", !on)
+  }
+
+  /** Places the touch controls for the canvas's current size (on start and on every resize or rotation). */
+  placeTouch(layout: TouchLayout) {
+    const s = layout.stick
+    this.style("touch", "--stick-r", `${s.radius}px`)
+    this.style("touch", "--rest-x", `${s.rest.x}px`)
+    this.style("touch", "--rest-y", `${s.rest.y}px`)
+    this.style("touch", "--fire-x", `${layout.fire.x}px`)
+    this.style("touch", "--fire-y", `${layout.fire.y}px`)
+    this.style("touch", "--fire-r", `${layout.fire.r}px`)
+    const left = layout.leftFire
+    this.style("touch", "--lfire-x", `${left.x}px`)
+    this.style("touch", "--lfire-y", `${left.y}px`)
+    this.style("touch", "--lfire-r", `${left.r}px`)
+    for (const b of TOUCH_BUTTONS) {
+      const c = layout.buttons[b]
+      this.style(`touch-${b}`, "--x", `${c.x}px`)
+      this.style(`touch-${b}`, "--y", `${c.y}px`)
+      this.style(`touch-${b}`, "--r", `${c.r}px`)
+    }
+    // The HUD's area clear of the controls, for the touch HUD's CSS and the performance panel outside it; the orientation.
+    const f = layout.free
+    this.pageStyle("--free-l", `${f.left}px`)
+    this.pageStyle("--free-t", `${f.top}px`)
+    this.pageStyle("--free-w", `${f.width}px`)
+    this.pageStyle("--free-h", `${f.height}px`)
+    this.toggle("hud", "portrait", layout.portrait)
+    // The corner buttons' row, which the score shares in portrait: its height, its gap to the free area, the width left beside the buttons.
+    const { menu, phrases } = layout.buttons
+    this.style("hud", "--row-h", `${2 * menu.r}px`)
+    this.style("hud", "--row-gap", `${f.top - (menu.y + menu.r)}px`)
+    this.style("hud", "--row-w", `${f.left + f.width - (phrases.x + phrases.r) - (f.top - (menu.y + menu.r))}px`)
+    // The vitals, from the free area's corner (they share its box).
+    const v = layout.vitals
+    this.style("vitals", "--x", `${v.left - f.left}px`)
+    this.style("vitals", "--y", `${v.top - f.top}px`)
+    this.style("vitals", "--w", `${v.width}px`)
+    this.style("vitals", "--h", `${v.height}px`)
+    const w = layout.weapon
+    this.style("touch", "--wx", `${w.left}px`)
+    this.style("touch", "--wy", `${w.top}px`)
+    this.style("touch", "--ww", `${w.width}px`)
+    this.style("touch", "--wh", `${w.height}px`)
+    this.touchLayout = layout
+    this.drawnPicker = undefined
+  }
+
+  /** The weapon the vitals last showed in hand: the picker marks it. */
+  private inHand: WeaponId | null = null
+
+  /** What the touch buttons last showed: compared as plain values, so a finger's move redraws nothing else. */
+  private touchLayout: TouchLayout | null = null
+  private drawnPressed = -1
+  private drawnToggles = -1
+  private drawnUse: TouchView["use"] | undefined = undefined
+  private drawnPicker: readonly PickerEntry[] | null | undefined = undefined
+
+  /**
+   * Draws the stick as held and the knob under the thumb, and fire as held.
+   * Called on touch events only; it writes transforms and classes, never layout.
+   */
+  drawTouch(view: TouchView) {
+    const stick = $("touch-stick")
+    const knob = $("touch-knob")
+    const v = view.stick
+    stick.classList.toggle("held", v.held)
+    knob.style.transform = v.held ? `translate(${v.kx}px, ${v.ky}px)` : ""
+    $("touch-fire").classList.toggle("held", view.fire)
+    $("touch-fire-left").classList.toggle("held", view.fire)
+    if (view.pressed !== this.drawnPressed) {
+      this.drawnPressed = view.pressed
+      for (const b of TOUCH_BUTTONS) $(`touch-${b}`).classList.toggle("held", (view.pressed & buttonBit(b)) !== 0)
+    }
+    const toggles = (view.aim ? 1 : 0) | (view.crouch ? 2 : 0) | (view.board ? 4 : 0)
+    if (toggles !== this.drawnToggles) {
+      this.drawnToggles = toggles
+      $("touch-aim").classList.toggle("on", view.aim)
+      $("touch-crouch").classList.toggle("on", view.crouch)
+      $("touch-board").classList.toggle("on", view.board)
+    }
+    if (view.use !== this.drawnUse) {
+      this.drawnUse = view.use
+      const use = $("touch-use")
+      use.classList.toggle("hidden", !view.use)
+      use.textContent = view.use === "dismount" ? t().hud.touchLeave : t().hud.touchUse
+    }
+    if (view.picker !== this.drawnPicker) {
+      this.drawnPicker = view.picker
+      const picker = $("touch-picker")
+      picker.classList.toggle("hidden", !view.picker)
+      const rects = this.touchLayout?.picker ?? []
+      picker.innerHTML = (view.picker ?? [])
+        .map((e, i) => {
+          const r = rects[i]
+          const name = t().weapons[e.id].name
+          return r ? `<div class="${e.id === this.inHand ? "on" : ""}" style="left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px">${esc(name)}</div>` : ""
+        })
+        .join("")
+    }
   }
 }
 

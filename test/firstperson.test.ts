@@ -2,10 +2,10 @@ import { expect, test } from "bun:test"
 import { turretSeat, type TurretSpot } from "../shared/map.ts"
 import { lookDir } from "../shared/movement.ts"
 import { PRIMARIES, TURRET } from "../shared/weapons.ts"
-import { firstPerson, type FirstPersonInput } from "../client/firstperson.ts"
+import { firstPerson, PORTRAIT_FOV, type FirstPersonInput } from "../client/firstperson.ts"
 
 const view = (over: Partial<FirstPersonInput>) =>
-  firstPerson({ chosen: "cjampanili", mount: null, alive: true, aim: 0, baseFov: 90, look: { yaw: 0, pitch: 0 }, sinceShot: Infinity, mag: 3, reserve: 15, reload: null, ...over })
+  firstPerson({ chosen: "cjampanili", mount: null, alive: true, aim: 0, baseFov: 90, aspect: 16 / 9, look: { yaw: 0, pitch: 0 }, sinceShot: Infinity, mag: 3, reserve: 15, reload: null, ...over })
 
 /** A turret facing north-west, its foot on a 4 m terrace. The arc is 1.35 rad either side, pitch -0.45..0.55. */
 const SPOT: TurretSpot = { at: [10, 4, -20], yaw: 0.7 }
@@ -209,4 +209,62 @@ test("the first-person presentation imports no renderer and no browser code", as
   const source = await Bun.file(new URL("../client/firstperson.ts", import.meta.url)).text()
   const imports = [...source.matchAll(/from\s+"([^"]+)"/g)].map((m) => m[1])
   expect(imports.every((path) => path.startsWith("../shared/"))).toBe(true)
+})
+
+// The field of view by the viewport's shape: landscape as it always was, portrait wider.
+
+const horizontal = (vertical: number, aspect: number) => (2 * Math.atan(Math.tan((vertical * Math.PI) / 360) * aspect) * 180) / Math.PI
+
+for (const chosen of PRIMARIES)
+  for (const aim of [0, 0.5, 1])
+    test(`in landscape the ${chosen} at aim ${aim} keeps today's field of view`, () => {
+      const before = view({ chosen, aim, baseFov: 80 })
+      for (const aspect of [1, 16 / 9, 844 / 390]) {
+        const v = view({ chosen, aim, baseFov: 80, aspect })
+        expect(v.fov).toBe(before.fov)
+        expect(v.lookScale).toBe(before.lookScale)
+      }
+    })
+
+test("in a tablet's portrait the horizontal view widens to the target", () => {
+  // 3:4: the player's 80° would leave a 64° slice across; the cap is not reached.
+  const v = view({ chosen: "mandi", baseFov: 80, aspect: 3 / 4 })
+  expect(horizontal(v.fov, 3 / 4)).toBeCloseTo(PORTRAIT_FOV.horizontal)
+  expect(v.fov).toBeLessThan(PORTRAIT_FOV.maxVertical)
+  expect(v.fov).toBeGreaterThan(80)
+})
+
+test("in a phone's portrait the cap stops the vertical view before the target is reached", () => {
+  const aspect = 390 / 844
+  const v = view({ chosen: "mandi", baseFov: 80, aspect })
+  expect(v.fov).toBeCloseTo(PORTRAIT_FOV.maxVertical)
+  expect(horizontal(v.fov, aspect)).toBeLessThan(PORTRAIT_FOV.horizontal)
+  // still far wider than the 42° slice across the player's own 80° would give
+  expect(horizontal(v.fov, aspect)).toBeGreaterThan(horizontal(80, aspect) + 20)
+})
+
+test("in portrait a setting already wider than the widening is left alone", () => {
+  const v = view({ chosen: "mandi", baseFov: 120, aspect: 390 / 844 })
+  expect(v.fov).toBe(120)
+  expect(v.lookScale).toBe(1)
+})
+
+for (const chosen of PRIMARIES)
+  for (const aim of [0.5, 1])
+    test(`in portrait the ${chosen} at aim ${aim} narrows the view by the same ratio as in landscape`, () => {
+      const aspect = 390 / 844
+      const wide = { hip: view({ chosen, baseFov: 80 }), aimed: view({ chosen, aim, baseFov: 80 }) }
+      const tall = { hip: view({ chosen, baseFov: 80, aspect }), aimed: view({ chosen, aim, baseFov: 80, aspect }) }
+      expect(tall.aimed.fov / tall.hip.fov).toBeCloseTo(wide.aimed.fov / wide.hip.fov)
+      // look sensitivity still slows with the zoom, exactly as in landscape
+      expect(tall.aimed.lookScale).toBeCloseTo(wide.aimed.lookScale)
+      expect(tall.aimed.lookScale).toBeLessThan(1)
+    })
+
+test("the Cjampanili's scope in a phone's portrait zooms four times, as in landscape", () => {
+  // 80° to its 20° in landscape; the portrait's 110° to 27.5°.
+  const v = view({ chosen: "cjampanili", aim: 1, baseFov: 80, aspect: 390 / 844 })
+  expect(v.fov).toBeCloseTo(PORTRAIT_FOV.maxVertical / 4)
+  expect(v.lookScale).toBeCloseTo(1 / 4)
+  expect(v.scope).toBe(true)
 })

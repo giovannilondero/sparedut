@@ -1,7 +1,12 @@
+/* UI SDK adds its few behaviour rules in this layer: declared first, so the game's own styles win. */
+@layer ui-sdk;
+
 :root {
   --ink: #f3e9d2;
   --muted: #b9a988;
   --gold: #e8b64c;
+  /* A dropdown's gold arrow: the browser's selects and UI SDK's select buttons. */
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23e8b64c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --gold-deep: #a8761f;
   --night: #14110f;
   --stone: rgba(28, 24, 20, 0.82);
@@ -23,28 +28,37 @@ kbd { font-family: var(--sans); font-size: 0.78em; padding: 0.1em 0.45em; border
 .muted { color: var(--muted); }
 
 /* ---------------- MENU ---------------- */
-.screen { position: fixed; inset: 0; display: grid; grid-template-columns: minmax(380px, 520px) 1fr; grid-template-rows: auto 1fr auto; padding: clamp(18px, 3vw, 40px); gap: 18px; }
-.menu-shade { position: absolute; inset: 0; pointer-events: none; background:
-  radial-gradient(120% 90% at 85% 40%, transparent 30%, rgba(10, 8, 6, 0.55) 70%),
-  linear-gradient(90deg, rgba(12, 10, 8, 0.86) 0%, rgba(12, 10, 8, 0.5) 38%, transparent 62%); }
-.brand { position: relative; grid-column: 1 / 3; }
-.brand-kicker { font-family: var(--serif); letter-spacing: 0.32em; text-transform: uppercase; font-size: 12px; color: var(--gold); opacity: 0.9; }
-.brand-title { margin: 4px 0 0; font-family: var(--serif); font-weight: 700; font-size: clamp(54px, 8vw, 112px); line-height: 0.92; letter-spacing: 0.04em;
+/* The menu scrolls as one page; a screen whose content fits never scrolls. The shade over the map is
+   the menu's own background, so it stays put while the page scrolls. */
+#menu { position: fixed; inset: 0; overflow: auto; overscroll-behavior: contain; container: menu / inline-size;
+  /* One centred column for the header, the screen and the footer. */
+  display: grid; grid-template-columns: minmax(0, 1fr) min(100%, 1280px) minmax(0, 1fr); grid-template-rows: auto 1fr auto; gap: clamp(12px, 2vw, 18px) 0;
+  /* With viewport-fit=cover the page reaches under a notch: the padding grows to clear it. */
+  --pad: clamp(14px, 3vw, 40px);
+  padding-block: max(var(--pad), env(safe-area-inset-top, 0px)) max(var(--pad), env(safe-area-inset-bottom, 0px));
+  padding-inline: max(var(--pad), env(safe-area-inset-left, 0px)) max(var(--pad), env(safe-area-inset-right, 0px));
+  /* The page spans the whole width, so the shade is the same from side to side: darker behind the
+     header and the footer, whose text sits straight on the map, lighter in between. */
+  background: linear-gradient(180deg, oklch(0.15 0.01 60 / 0.82) 0%, oklch(0.15 0.01 60 / 0.3) 30%, oklch(0.15 0.01 60 / 0.3) 65%, oklch(0.15 0.01 60 / 0.88) 100%); }
+#menu > * { grid-column: 2; }
+/* The prompt's root holds no box of its own: its parts open in the top layer. */
+#menu > ui-dialog { position: absolute; }
+.brand { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.brand-title { margin: 0; font-family: var(--serif); font-weight: 700; font-size: clamp(28px, 1.2rem + 2.6vw, 48px); line-height: 1; letter-spacing: 0.04em;
   background: linear-gradient(180deg, #fff3cf 0%, var(--gold) 55%, var(--gold-deep) 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
-  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.45)) drop-shadow(0 18px 30px rgba(0, 0, 0, 0.5)); }
-.brand-sub { font-family: var(--serif); font-style: italic; font-size: clamp(16px, 1.6vw, 21px); color: var(--ink); opacity: 0.92; margin-top: 6px; }
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.45)); }
 
-.panel { position: relative; grid-column: 1; align-self: start; display: flex; flex-direction: column; gap: 10px; padding: 20px; border-radius: 14px;
+.panel { position: relative; align-self: start; inline-size: min(100%, 560px); display: flex; flex-direction: column; gap: 10px; padding: 20px; border-radius: 14px;
   background: var(--stone); border: 1px solid var(--stone-line); box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(6px); max-height: 100%; overflow: auto; animation: rise 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.panel.wide { grid-column: 1 / 3; max-width: 1100px; }
+  backdrop-filter: blur(6px); animation: rise 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.panel.wide { inline-size: min(100%, 1100px); }
 .panel h2 { margin: 0 0 4px; font-family: var(--serif); font-size: 26px; color: var(--gold); }
 .panel h2 small { color: var(--muted); font-size: 15px; font-weight: 400; }
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
-button { cursor: pointer; border: 1px solid var(--stone-line); background: rgba(255, 255, 255, 0.04); border-radius: 10px; padding: 10px 14px; transition: background 0.15s, border-color 0.15s, transform 0.08s; }
-button:hover { background: rgba(232, 182, 76, 0.12); border-color: rgba(232, 182, 76, 0.6); }
-button:active { transform: translateY(1px); }
+button, ui-radio { cursor: pointer; border: 1px solid var(--stone-line); background: rgba(255, 255, 255, 0.04); border-radius: 10px; padding: 10px 14px; transition: background 0.15s, border-color 0.15s, transform 0.08s; }
+button:hover, ui-radio:hover { background: rgba(232, 182, 76, 0.12); border-color: rgba(232, 182, 76, 0.6); }
+button:active, ui-radio:active { transform: translateY(1px); }
 button.primary { background: linear-gradient(180deg, #f0c45d, #c68c27); color: #1d1408; border-color: #f7d483; font-weight: 700; }
 button.primary:hover { background: linear-gradient(180deg, #ffd673, #d49a30); }
 button.big { display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 12px 16px; }
@@ -52,79 +66,110 @@ button.big span { font-family: var(--serif); font-size: 21px; font-weight: 700; 
 button.big small { opacity: 0.75; font-size: 13px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
 .row > button { flex: 1; }
-.small-buttons button { font-size: 14px; padding: 8px 10px; }
 
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
 .field input { background: rgba(0, 0, 0, 0.35); border: 1px solid var(--stone-line); border-radius: 8px; padding: 8px 10px; color: var(--ink); font-size: 15px; }
-.field input[type="range"] { padding: 0; accent-color: var(--gold); }
 
 /* Selects: dark dropdown like the rest, gold arrow, long text truncated. */
 :root { color-scheme: dark; }
 select { appearance: none; min-inline-size: 0; max-inline-size: 100%; text-overflow: ellipsis; white-space: nowrap; overflow: clip; cursor: pointer;
-  background: rgba(0, 0, 0, 0.35) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23e8b64c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center / 12px 8px;
+  background: rgba(0, 0, 0, 0.35) var(--select-arrow) no-repeat right 10px center / 12px 8px;
   border: 1px solid var(--stone-line); border-radius: 8px; padding-block: 8px; padding-inline: 10px 32px; color: var(--ink); }
 select option { background: #1d1813; color: var(--ink); }
-select:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+select:focus-visible, button:focus-visible, input:focus-visible, ui-radio:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 @media (hover: hover) and (pointer: fine) { select:hover { border-color: rgba(232, 182, 76, 0.6); } }
 .field select { font-size: 15px; }
-.inline-field { display: inline-flex; align-items: center; gap: 6px; }
-.inline-field select { padding-block: 5px; font-size: 13px; }
 
-/* Bot skill: three cards instead of a dropdown with long texts. */
-.levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; color: var(--ink); }
+/* The look (Cumò, Vêr), in the header beside the language: after it, on a line of its own, on a narrow screen. */
+.look-switch { order: 1; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 999px;
+  background: var(--stone); border: 1px solid var(--stone-line); backdrop-filter: blur(6px); color: var(--muted); }
+.look-switch > span { padding-inline: 8px 2px; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
+.look-switch button { position: relative; min-block-size: 36px; padding: 5px 12px; font-size: 13px; border-radius: 999px; border-color: transparent; }
+/* A 44px target around a 36px pill. */
+.look-switch button::after { content: ""; position: absolute; inset: min(0px, (100% - 44px) / 2); }
+.look-switch button[aria-pressed="true"] { border-color: var(--gold); background: color-mix(in oklch, var(--gold) 18%, transparent); color: var(--gold); cursor: default; }
+@container menu (inline-size > 46rem) {
+  .look-switch { order: 0; margin-inline-start: auto; }
+}
 
 /* Language: toggle in the top right. */
-.lang { position: absolute; inset-block-start: 0; inset-inline-end: 0; display: flex; align-items: center; gap: 4px; padding: 4px 4px 4px 12px; border-radius: 999px;
+.lang { display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 999px;
   background: var(--stone); border: 1px solid var(--stone-line); backdrop-filter: blur(6px); font-size: 12px; color: var(--muted); }
-.lang span { margin-inline-end: 4px; letter-spacing: 0.12em; text-transform: uppercase; }
-.lang button { padding: 5px 12px; font-size: 13px; border-radius: 999px; border-color: transparent; }
+/* The group's name, for screen readers only: the two languages name themselves. */
+.lang span { position: absolute; inline-size: 1px; block-size: 1px; overflow: clip; clip-path: inset(50%); white-space: nowrap; }
+.lang button { min-block-size: 36px; padding: 5px 12px; font-size: 13px; border-radius: 999px; border-color: transparent; }
 .lang button.selected { border-color: var(--gold); background: rgba(232, 182, 76, 0.18); color: var(--gold); }
 button kbd { margin-inline-start: 6px; opacity: 0.7; }
 .field b { color: var(--ink); font-weight: 600; }
 .check { display: flex; gap: 8px; align-items: center; font-size: 14px; }
-.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .field { min-inline-size: 0; }
-.code-input { font-family: var(--serif); font-size: 46px; letter-spacing: 0.4em; text-transform: uppercase; text-align: center; padding: 10px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--stone-line); border-radius: 10px; }
 
-.room-list-box { border-top: 1px solid var(--stone-line); padding-top: 8px; }
-.room-list-title { font-family: var(--serif); color: var(--gold); font-size: 15px; }
-.room-list-title small { color: var(--muted); font-family: var(--sans); }
-#room-list { list-style: none; padding: 0; margin: 6px 0 0; display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow: auto; }
-#room-list li button { width: 100%; display: flex; justify-content: space-between; font-size: 14px; }
-#room-list li button:disabled { opacity: 0.55; cursor: not-allowed; }
-#room-list .chip { font-style: normal; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--stone-line); }
-#room-list .chip.lan { color: var(--gold); border-color: var(--gold); }
-#room-list .password-mark { font-style: normal; }
 .pw-input { font-size: 22px; text-align: center; padding: 10px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--stone-line); border-radius: 10px; color: var(--ink); }
 .form-msg { margin: 0; min-block-size: 1lh; font-size: 13px; color: #f08a6c; }
 .form-msg:empty { display: none; }
 .field[hidden] { display: none; }
 
-.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .card { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 10px; }
 .card b { font-family: var(--serif); font-size: 17px; }
 .card small { font-size: 12px; opacity: 0.8; line-height: 1.3; }
-.card.selected { border-color: var(--gold); background: rgba(232, 182, 76, 0.16); box-shadow: inset 0 0 0 1px var(--gold); }
+.card[data-checked] { border-color: var(--gold); background: rgba(232, 182, 76, 0.16); box-shadow: inset 0 0 0 1px var(--gold); }
 
-.weapons { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
-.weapon { text-align: left; display: flex; flex-direction: column; gap: 6px; }
+/* The armoury, in the menu and in a match: the primaries to choose from (a UI SDK radio group), then the weapons always carried. */
+.weapons { display: grid; gap: 14px; }
+.weapon-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.weapon { min-inline-size: 0; text-align: start; display: flex; flex-direction: column; gap: 6px; }
 .weapon b { font-family: var(--serif); font-size: 18px; color: var(--gold); }
 .weapon .blurb { font-size: 13px; opacity: 0.85; font-style: italic; }
 .weapon .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
-.weapon.selected { border-color: var(--gold); background: rgba(232, 182, 76, 0.16); }
-.stat { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.weapon[data-checked] { border-color: var(--gold); background: color-mix(in oklch, var(--gold) 16%, transparent); box-shadow: inset 0 0 0 1px var(--gold); }
+.weapon-cards.carried .weapon { padding: 10px 14px; border: 1px dashed var(--stone-line); border-radius: 10px; opacity: 0.75; }
+/* Two columns of bars where the card is wide enough for them, one on a narrow card. */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr)); gap: 3px 14px; }
+.stat { display: grid; grid-template-columns: 5.5em 1fr; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
 .stat i { display: block; height: 5px; border-radius: 3px; background: linear-gradient(90deg, var(--gold-deep), var(--gold)); }
-.weapon.locked { opacity: 0.7; cursor: default; }
 
-.vocab { columns: 2 300px; gap: 24px; font-size: 14px; line-height: 1.5; }
-.vocab p { margin: 0 0 8px; break-inside: avoid; }
+/* Words in rows, not in balanced columns: scrolling down a phone reads every column at once, never back up to the next one. */
+.vocab { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr)); gap: 8px 28px; font-size: 15px; line-height: 1.5; }
+.vocab p { margin: 0; overflow-wrap: break-word; }
 .vocab b { font-family: var(--serif); color: var(--gold); }
 
-.settings-form { display: flex; flex-direction: column; gap: 10px; }
-.settings-form .keys { margin-block-start: 4px; }
-.keys { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; font-size: 13px; color: var(--muted); }
+/* The settings form, in the menu and in a match: rows a thumb can hit, at least 44px tall. */
+.settings-form { display: flex; flex-direction: column; gap: 6px; }
+.settings-form .keys { margin-block-start: 8px; }
+.keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr)); gap: 6px 14px; font-size: 13px; color: var(--muted); }
+.s-range, .s-range ui-slider { display: block; }
+.s-range-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 13px; color: var(--muted); }
+.s-range ui-slider-value { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* The control is where a press lands: as tall as a thumb, with room for the knob at both ends. */
+.s-range ui-slider-control { display: flex; align-items: center; block-size: 40px; padding-inline: 12px; cursor: pointer;
+  /* UI SDK writes touch-action: none here, which stops a thumb scrolling the form across a slider: a vertical swipe scrolls (client/menu.ts puts the value back). */
+  touch-action: pan-y !important; }
+.s-range ui-slider-track { display: block; flex: 1; block-size: 6px; border-radius: 3px; background: oklch(1 0 none / 0.12); }
+.s-range ui-slider-indicator { display: block; border-radius: inherit; background: linear-gradient(90deg, var(--gold-deep), var(--gold)); }
+.s-range ui-slider-thumb { display: block; inline-size: 24px; block-size: 24px; border-radius: 50%; background: var(--gold); border: 2px solid #fff3cf; box-shadow: 0 1px 4px oklch(0 0 none / 0.5); }
+.s-range ui-slider-thumb:has(:focus-visible) { outline: 2px solid var(--gold); outline-offset: 3px; }
+.s-range ui-slider-thumb[data-dragging] { scale: 1.12; }
+.s-switch { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-block-size: 44px; font-size: 14px; cursor: pointer; }
+.s-switch ui-switch { flex: none; display: inline-flex; align-items: center; inline-size: 48px; block-size: 28px; padding: 3px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--stone-line); background: oklch(0 0 none / 0.35); }
+.s-switch ui-switch[data-checked] { border-color: #f7d483; background: var(--gold); }
+.s-switch ui-switch:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.s-switch ui-switch-thumb { display: block; inline-size: 20px; block-size: 20px; border-radius: 50%; background: var(--ink); }
+.s-switch ui-switch-thumb[data-checked] { translate: 20px 0; background: #1d1408; }
+.s-switch:active ui-switch-thumb { scale: 0.92; }
+.settings-form select { min-block-size: 44px; }
+@media (prefers-reduced-motion: no-preference) {
+  .s-switch ui-switch-thumb { transition: translate 0.15s ease-out, scale 0.1s ease-out; }
+  .s-range ui-slider-thumb { transition: scale 0.1s ease-out; }
+}
 
-.menu-foot { position: relative; grid-column: 1 / 3; display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; }
+/* The reference screens (armoury, settings, vocabulary) run long on a phone: the way back stays at the bottom while they scroll, above the home indicator. */
+/* It sticks to the menu's edge, not to the inside of its padding: the padding goes into its own, past the home indicator. */
+.screen-foot { position: sticky; inset-block-end: calc(-1 * max(var(--pad), env(safe-area-inset-bottom, 0px))); z-index: 1; margin: 4px -20px -20px; padding: 6px 20px max(8px, env(safe-area-inset-bottom, 0px));
+  border-block-start: 1px solid var(--stone-line); border-end-start-radius: 14px; border-end-end-radius: 14px; background: oklch(0.19 0.012 60 / 0.96); }
+.screen-foot button { min-block-size: 44px; }
+
+.menu-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 20px; }
 .tip { font-family: var(--serif); font-style: italic; max-width: 760px; font-size: 15px; color: var(--ink); opacity: 0.88; transition: opacity 0.5s; }
 .tip::before { content: "❧ "; color: var(--gold); }
 .status { font-size: 12px; color: var(--muted); white-space: nowrap; }
@@ -249,36 +294,417 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 #board th:first-child, #board td:first-child, .overlay td:first-child, .overlay th:first-child { text-align: left; }
 #board tr.me td { color: var(--gold); }
 #board h3, .overlay h3 { font-family: var(--serif); margin: 10px 0 4px; font-size: 18px; }
-.overlay h2 { font-family: var(--serif); color: var(--gold); margin: 0 0 8px; font-size: 28px; }
+.overlay :is(h2, ui-dialog-title) { display: block; font-family: var(--serif); font-weight: 700; color: var(--gold); margin: 0 0 8px; font-size: clamp(22px, 1rem + 1.6vw, 28px); }
 .overlay .row { margin-top: 12px; }
 .overlay .invite { font-family: var(--serif); font-size: 44px; letter-spacing: 0.3em; color: var(--gold); }
 .overlay .roster { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px; }
 .overlay .roster ul { list-style: none; margin: 0; padding: 0; font-size: 14px; }
 .overlay .roster li { padding: 3px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
 .overlay .host-tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 8px; font-size: 13px; }
-.overlay .host-tools button { padding: 5px 9px; font-size: 13px; }
+.overlay .host-tools button { min-block-size: var(--tap); padding: 5px 9px; font-size: 13px; }
 
-.end-title { font-family: var(--serif); font-size: clamp(36px, 5vw, 64px); text-align: center; margin: 0; }
-.awards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0; }
+.end-title { display: block; font-family: var(--serif); font-size: clamp(36px, 5vw, 64px); text-align: center; margin: 0; }
+.awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 10px; margin: 14px 0; }
 .award { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--stone-line); border-radius: 10px; padding: 10px; text-align: center; }
 .award b { display: block; font-family: var(--serif); color: var(--gold); font-size: 15px; }
 .award span { font-size: 16px; }
 .award small { display: block; opacity: 0.7; font-size: 12px; }
 
+/*
+ * The in-match menus (match menu, loadout, settings, end screen): UI SDK dialogs, their content in
+ * the top layer. Centred as before on a desktop; on a phone they fill the safe area. The title and
+ * the actions stay put while the middle scrolls, so resume and leave are always under a thumb.
+ */
+.match-dialog { display: contents; }
+#hud ui-dialog-content.overlay {
+  /* Today's 7% margin on a desktop, down to 8px on a short screen. */
+  --gap-block: clamp(8px, 14dvh - 52px, 7dvh);
+  --gap-inline: max(8px, 4vw);
+  --top: max(var(--gap-block), env(safe-area-inset-top, 0px));
+  --bottom: max(var(--gap-block), env(safe-area-inset-bottom, 0px));
+  --left: max(var(--gap-inline), env(safe-area-inset-left, 0px));
+  --right: max(var(--gap-inline), env(safe-area-inset-right, 0px));
+  /* A finger's target: 44px on touch, today's sizes with a mouse. */
+  --tap: auto;
+  position: fixed; inset: var(--top) var(--right) var(--bottom) var(--left); margin: auto; transform: none;
+  inline-size: 860px; max-inline-size: calc(100vw - var(--left) - var(--right)); min-inline-size: 0;
+  block-size: fit-content; max-block-size: calc(100dvh - var(--top) - var(--bottom));
+  display: flex; flex-direction: column; overflow: clip; container: overlay / inline-size;
+  padding: clamp(12px, 2.5vw, 18px) clamp(12px, 3vw, 22px); color: var(--ink); font-family: var(--sans); }
+@media (pointer: coarse) { #hud ui-dialog-content.overlay { --tap: 44px; } }
+#hud ui-dialog-content.overlay:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+/* The drawn part holds no box: the body and the actions are the column's own items. */
+.overlay-main { display: contents; }
+.overlay > ui-dialog-title, .overlay .overlay-actions { flex: none; }
+.overlay-body { flex: 1 1 auto; min-block-size: 0; overflow-y: auto; overscroll-behavior: contain; }
+.overlay .overlay-actions > button { min-block-size: var(--tap); }
+/* A key hint (the back buttons' Esc) and the key legend mean nothing on touch, in the menu as in a match. */
+html[data-device="touch"] :is(#menu, #hud .overlay) kbd, html[data-device="touch"] .keys { display: none; }
+/* On touch the actions take two columns, resume across both, rather than a ragged row. */
+@media (pointer: coarse) {
+  .overlay .overlay-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); }
+  @container overlay (inline-size <= 40rem) { #pause .overlay-actions > #p-resume { grid-column: 1 / -1; } }
+  /* A wide, short menu (a phone on its side): the roster and the host tools side by side, so the host's controls show without scrolling. */
+  @container overlay (inline-size > 40rem) {
+    #pause .overlay-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 0 16px; }
+    #pause .overlay-body > :is(.pause-reach, .pause-code) { grid-column: 1 / -1; }
+    #pause .overlay-body > :is(.host-tools, .host-only) { margin-block-start: 10px; }
+    /* The four bot buttons on one row, so the bot skill stays in view too. */
+    #pause .host-bots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    #pause .host-bots button { padding-inline: 4px; font-size: 13px; }
+  }
+}
+
+/* The match menu. */
+.pause-code { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.pause-share { text-align: end; }
+.pause-share button { min-block-size: var(--tap); }
+.pause-reach { font-size: 12px; margin-block-start: 4px; }
+.overlay .invite { font-size: clamp(32px, 1rem + 3vw, 44px); }
+.host-only { margin-block-start: 8px; }
+.host-label { white-space: nowrap; }
+.host-bots { display: flex; flex-wrap: wrap; gap: 6px; }
+/* On touch: the start button and the bot skill each take a row, the four bot buttons a grid of two per team. */
+@media (pointer: coarse) {
+  .overlay .host-tools { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .host-bots { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr)); }
+  .overlay .host-tools button { font-size: 14px; }
+}
+.host-level { display: inline-flex; align-items: center; gap: 6px; }
+.overlay .host-level ui-select-trigger > button { display: inline-flex; align-items: center; gap: 8px; min-block-size: var(--tap); padding-block: 5px; padding-inline: 10px 30px; font-size: 13px;
+  background: rgba(0, 0, 0, 0.35) var(--select-arrow) no-repeat right 10px center / 12px 8px;
+  border-radius: 8px; }
+@media (pointer: coarse) { .overlay .host-level ui-select-trigger > button { flex: 1; font-size: 15px; } }
+/*
+ * A UI SDK select's list (creation's duration and bots, the host's bot skill): beside its button with
+ * a mouse, a sheet from the bottom on a small touch screen (UI SDK decides).
+ */
+.select-list { min-inline-size: var(--anchor-width); max-block-size: var(--available-height); overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 4px; display: grid; gap: 2px;
+  background: #1d1813; color: var(--ink); border: 1px solid var(--gold); border-radius: 10px; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55); font-family: var(--sans); pointer-events: auto; }
+.select-list ui-select-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-inline: 12px; border-radius: 8px; cursor: pointer; }
+.select-list ui-select-item[data-highlighted] { background: rgba(232, 182, 76, 0.16); }
+.select-list ui-select-item[data-selected] { color: var(--gold); }
+.select-list[data-modality="keyboard"] ui-select-item[data-highlighted] { outline: 2px solid var(--gold); outline-offset: -2px; }
+.select-list[data-presentation="sheet"] { inline-size: 100%; max-inline-size: none; border-radius: 16px 16px 0 0; border-block-end: 0;
+  padding: 8px max(8px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+/* The host's bot skill, in a match: smaller with a mouse, the size of a thumb on touch. */
+.level-list { font-size: 14px; }
+.level-list ui-select-item { min-block-size: var(--tap, 36px); padding-block: 8px; }
+.level-list[data-presentation="sheet"] { font-size: 17px; }
+.level-list[data-presentation="sheet"] ui-select-item { min-block-size: 48px; }
+
+/* The end screen. */
+.end-sub { text-align: center; font-family: var(--serif); font-style: italic; }
+.end-restart { text-align: center; }
+/* The scoreboard's eight columns fit a phone's width: the text and the gaps shrink with the menu. */
+#endscreen table { font-size: clamp(10px, 2.6cqi, 14px); }
+#endscreen :is(th, td) { padding: 4px clamp(3px, 1cqi, 8px); }
+#endscreen th { font-size: clamp(8px, 2.3cqi, 11px); letter-spacing: clamp(0px, 0.15cqi, 1.1px); }
+
 #clickplay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; font-family: var(--serif); font-size: 30px; color: var(--gold); background: rgba(10, 8, 6, 0.7); padding: 18px 30px; border-radius: 14px; border: 1px solid var(--stone-line); }
 #clickplay small { display: block; font-size: 14px; color: var(--muted); font-family: var(--sans); }
 
+/*
+ * During a match a finger never zooms, scrolls, refreshes, selects or opens a callout. The canvas takes
+ * the fingers (the HUD lets them through); the match menus still scroll, without zooming, and their
+ * text (the room code) can be selected. With a mouse nothing changes: selection is the page's own.
+ */
+#view { touch-action: none; }
+html.in-match, html.in-match body { overscroll-behavior: none; }
+html.in-match[data-device="touch"] body { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+html.in-match .overlay { touch-action: pan-x pan-y; overscroll-behavior: contain; }
+html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
+
+/* Touch controls: positions come from client/touch.ts through custom properties; moving them is a transform only. */
+#touch { position: absolute; inset: 0; pointer-events: none; }
+#touch-stick { position: absolute; left: 0; top: 0; width: calc(var(--stick-r) * 2); height: calc(var(--stick-r) * 2); margin: calc(var(--stick-r) * -1) 0 0 calc(var(--stick-r) * -1);
+  border-radius: 50%; border: 2px solid rgba(243, 233, 210, 0.35); background: rgba(10, 8, 6, 0.18); transform: translate(var(--rest-x), var(--rest-y)); opacity: 0.45; }
+#touch-stick.held { opacity: 1; }
+#touch-knob { position: absolute; left: 50%; top: 50%; width: 46%; height: 46%; margin: -23% 0 0 -23%; border-radius: 50%; background: rgba(243, 233, 210, 0.55); box-shadow: 0 0 6px rgba(0, 0, 0, 0.5); }
+#touch-fire { left: var(--fire-x); top: var(--fire-y); width: calc(var(--fire-r) * 2); height: calc(var(--fire-r) * 2); }
+/* The second fire, above the stick under the left thumb. */
+#touch-fire-left { left: var(--lfire-x); top: var(--lfire-y); width: calc(var(--lfire-r) * 2); height: calc(var(--lfire-r) * 2); }
+:is(#touch-fire, #touch-fire-left) { position: absolute; transform: translate(-50%, -50%);
+  border-radius: 50%; border: 2px solid rgba(232, 182, 76, 0.75); background: radial-gradient(circle, rgba(232, 182, 76, 0.55) 0 22%, rgba(10, 8, 6, 0.3) 24%); }
+:is(#touch-fire, #touch-fire-left).held { background: radial-gradient(circle, rgba(232, 182, 76, 0.9) 0 26%, rgba(232, 182, 76, 0.25) 28%); }
+/* The other buttons: `--x`, `--y`, `--r` per button, set once per size by the HUD. */
+.touch-btn { position: absolute; left: var(--x); top: var(--y); width: calc(var(--r) * 2); height: calc(var(--r) * 2); transform: translate(-50%, -50%);
+  display: grid; place-items: center; border-radius: 50%; border: 2px solid rgba(243, 233, 210, 0.4); background: rgba(10, 8, 6, 0.32);
+  color: var(--ink); font: 700 calc(var(--r) * 0.8) / 1 var(--sans); opacity: 0.8; }
+.touch-btn.held { background: rgba(243, 233, 210, 0.35); opacity: 1; }
+.touch-btn.on { border-color: var(--gold); background: rgba(232, 182, 76, 0.45); opacity: 1; }
+/* Its label is a word: a long one (Italian's "Mitragliatrice") breaks onto two lines inside the circle. */
+#touch-use { font-size: 11px; letter-spacing: 0.02em; border-color: var(--gold); opacity: 1; text-align: center; hyphens: auto; overflow-wrap: anywhere; padding: 4px; }
+#touch-weapon, #touch-picker > div { position: absolute; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--stone-line); background: var(--stone);
+  font-family: var(--serif); font-size: 15px; color: var(--ink); overflow: hidden; white-space: nowrap; }
+/* The weapon in hand: the rounds large, the name small under them. */
+#touch-weapon { left: var(--wx); top: var(--wy); width: var(--ww); height: var(--wh); align-content: center; gap: 2px; padding-inline: 6px; line-height: 1; font-variant-numeric: tabular-nums; }
+#touch-weapon b { font-size: calc(var(--wh) * 0.5); }
+#touch-weapon i { font-style: normal; font-size: calc(var(--wh) * 0.32); opacity: 0.75; margin-inline-start: 4px; }
+#touch-weapon small { max-inline-size: 100%; overflow: hidden; text-overflow: ellipsis; font: 600 calc(var(--wh) * 0.24) / 1 var(--sans); letter-spacing: 0.04em; color: var(--muted); }
+/* How many bombs and mines are left, on their buttons; none left dims the button. */
+:is(#touch-bomb, #touch-mine)::after { content: attr(data-n); position: absolute; inset-block-start: -4px; inset-inline-end: -4px; box-sizing: border-box; min-inline-size: 16px; block-size: 16px; padding-inline: 3px;
+  border-radius: 8px; background: var(--gold); color: #1d1408; font: 700 10px / 16px var(--sans); text-align: center; text-shadow: none; }
+:is(#touch-bomb, #touch-mine)[data-n="0"] { opacity: 0.3; }
+:is(#touch-bomb, #touch-mine)[data-n="0"]::after { display: none; }
+#touch-picker > div.on { border-color: var(--gold); color: var(--gold); }
+#quickchat.tap { pointer-events: auto; z-index: 1; top: 76px; bottom: auto; left: 12px; max-width: calc(100% - 24px); max-height: calc(100% - 90px); overflow-y: auto; touch-action: pan-y; font-size: 15px; gap: 0; }
+#quickchat.tap div { padding: 7px 4px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+#quickchat.tap div:first-child { border-top: 0; }
+#quickchat.tap kbd { display: none; }
+
+/*
+ * The HUD on touch (#hud.touch, while touch is the active device). A phone's screen is the view:
+ * the panels are small and few. The score, the storm warning and the kill feed sit at the top of
+ * the area client/touch.ts leaves free of the controls (--free-*, set once per size), the chat and
+ * the turret at its foot, the crosshair's middle clear. The vitals are two rings where the layout
+ * puts them; the rounds are on the weapon's control, the bombs and mines on their buttons. On a
+ * desktop the two wrappers are `display: contents` and nothing here applies.
+ */
+#hud-free, #hud-status { display: contents; }
+#hud.touch #hud-free { position: absolute; inset-inline-start: var(--free-l); inset-block-start: var(--free-t); inline-size: var(--free-w); block-size: var(--free-h);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; }
+#hud.touch :is(#turret-prompt, #turret-hud, #topbar, #killfeed, #banner, #chat) { position: static; inset: auto; transform: none; }
+/* The score on one line: the two numbers in their team's colour around the clock. The objective, when the mode has one, on a line under it. */
+#hud.touch #topbar { order: 0; max-inline-size: 100%; flex-wrap: wrap; align-items: baseline; justify-content: center; column-gap: 10px; padding: 2px 12px;
+  border-radius: 12px; border: 1px solid var(--stone-line); background: rgba(10, 8, 6, 0.72); }
+#hud.touch #topbar .score { padding: 0; gap: 6px; border: 0; background: none; align-items: baseline; }
+#hud.touch #topbar .score b { font-size: 18px; min-inline-size: 0; }
+#hud.touch #topbar .team-name { display: none; }
+/* The Tampieste has no score: its "still standing" count is written where the team's name goes. */
+#hud.touch #topbar:has(#score-ben:empty) .team-name { display: inline; font-size: 11px; letter-spacing: 0.08em; }
+#hud.touch .center-info { display: contents; }
+#hud.touch #clock { font-size: 15px; }
+#hud.touch #mode-label { display: none; }
+#hud.touch #objective { flex-basis: 100%; margin: 0 0 2px; font-size: 11px; text-align: center; }
+#hud.touch #objective:empty { display: none; }
+/* Portrait: the score goes up beside the corner buttons, on their row (--row-*, from the layout); the objective keeps the column's first line. */
+#hud.touch.portrait #topbar { position: absolute; inset-block-end: calc(100% + var(--row-gap) + var(--row-h) * 0.1); inset-inline-end: 0; block-size: calc(var(--row-h) * 0.8); max-inline-size: var(--row-w);
+  flex-wrap: nowrap; align-items: center; }
+#hud.touch.portrait #topbar .score b { font-size: calc(var(--row-h) * 0.46); }
+#hud.touch.portrait #clock { font-size: calc(var(--row-h) * 0.36); }
+#hud.touch.portrait #objective { position: absolute; inset-block-start: calc(100% + var(--row-gap) + var(--row-h) * 0.1); inset-inline-end: calc(var(--free-w) / 2); transform: translateX(50%);
+  inline-size: max-content; max-inline-size: var(--free-w); margin: 0; padding: 2px 8px; border-radius: 8px; background: rgba(10, 8, 6, 0.72); }
+#hud.touch.portrait #hud-free:has(#objective:not(:empty)) { padding-block-start: 28px; }
+#hud.touch #banner { order: 1; max-inline-size: 100%; text-align: center; font-size: 12px; padding: 3px 10px; }
+/* The two newest kills, one line each, without the weapon. */
+#hud.touch #killfeed { order: 2; inline-size: 100%; align-items: center; gap: 2px; font-size: 11px; }
+#hud.touch #killfeed .kf { max-inline-size: 100%; padding: 2px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#hud.touch #killfeed .w, #hud.touch #killfeed .kf:nth-last-child(n + 3) { display: none; }
+/* The foot of the column: the two newest chat lines, as wide as their text, and the turret. */
+#hud.touch #chat { order: 3; margin-block-start: auto; align-self: flex-start; inline-size: auto; max-inline-size: 100%; font-size: 11px; }
+#hud.touch #chat-log { align-items: flex-start; }
+#hud.touch #chat-log div { max-inline-size: 100%; padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#hud.touch #chat-log div:nth-last-child(n + 3) { display: none; }
+#hud.touch #turret-prompt { order: 4; font-size: 13px; }
+#hud.touch #turret-hud { order: 5; inline-size: min(260px, 100%); padding: 3px 10px; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+#hud.touch #turret-hud .bar { flex: 1; margin: 0; }
+
+/* Health and armour: a ring around each icon, the number beside it (--x/--y/--w/--h from the layout, --hp/--armor from the match). */
+#hud.touch #vitals { inset: auto; inset-inline-start: var(--x); inset-block-start: var(--y); inline-size: var(--w); block-size: var(--h); flex-direction: row; align-items: center; gap: 8px; }
+#hud.touch .vital { display: flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; }
+#hud.touch .vital.hp { --v: var(--hp); --ring: var(--gold); }
+#hud.touch .vital.hp.low { --ring: #ff6b5a; }
+#hud.touch .vital.armor { --v: var(--armor); --ring: #d79b5b; }
+#hud.touch .vital .ico { inline-size: var(--h); block-size: var(--h); display: grid; place-items: center; border-radius: 50%; font-size: calc(var(--h) * 0.42);
+  background: radial-gradient(closest-side, rgba(10, 8, 6, 0.78) calc(100% - 4px), transparent calc(100% - 3.5px)), conic-gradient(var(--ring) calc(var(--v) * 1%), rgba(243, 233, 210, 0.22) 0); }
+#hud.touch .vital b { font-size: calc(var(--h) * 0.48); min-inline-size: 1.6em; }
+#hud.touch .vital .bar { display: none; }
+#hud.touch #buffs { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+/* The weapon's control shows the rounds and the name, the bomb and mine buttons their counts. */
+#hud.touch #ammo { display: none; }
+
+/* What sits over the middle of the screen keeps to the free area too. */
+#hud.touch #announce { inset-block-start: 24%; inline-size: 100%; white-space: normal; font-size: clamp(20px, 7cqi, 36px); }
+#hud.touch #death { inset-inline-start: calc(var(--free-l) + var(--free-w) / 2); inset-block-start: calc(var(--free-t) + var(--free-h) / 2); transform: translate(-50%, -50%);
+  min-inline-size: 0; inline-size: min(360px, var(--free-w)); padding: 10px 14px; }
+#hud.touch .death-title { font-size: clamp(24px, calc(var(--free-w) * 0.08), 36px); }
+/* The death hint, the key legend: keys a touch player does not have. The armoury is in the match menu. */
+#hud.touch :is(.death-hint, .keys) { display: none; }
+#hud.touch #board { inset-inline-start: var(--free-l); inset-block-start: var(--free-t); transform: none; min-inline-size: 0; inline-size: var(--free-w); max-block-size: var(--free-h);
+  padding: 8px 10px; pointer-events: auto; touch-action: pan-y; overscroll-behavior: contain; }
+#hud.touch #board table { font-size: clamp(10px, calc(var(--free-w) * 0.032), 14px); }
+#hud.touch #board :is(th, td) { padding: 3px 4px; letter-spacing: 0; }
+#hud.touch #board th { font-size: 0.8em; }
+#hud.touch #board h3 { font-size: 15px; }
+#hud.touch #quickchat.tap { inset-inline-start: var(--free-l); inset-block-start: var(--free-t); max-inline-size: var(--free-w); max-block-size: var(--free-h); }
+#hud.touch #clickplay { inline-size: max-content; max-inline-size: calc(100% - 32px); font-size: clamp(22px, 6vw, 30px); }
+
+#safe-area { position: fixed; inset: 0; visibility: hidden; pointer-events: none;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+
+/* In a match on touch the bottom of the screen is the controls and the vitals: the notice goes over the view. */
+html.in-match[data-device="touch"] #toast { bottom: auto; top: calc(var(--free-t) + var(--free-h) * 0.3); padding: 6px 12px; font-size: 13px; }
 #toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); background: var(--stone); border: 1px solid var(--gold); padding: 10px 18px; border-radius: 10px; z-index: 10; animation: rise 0.2s; }
 
-@media (max-width: 860px) {
-  .screen { grid-template-columns: 1fr; }
-  .cards { grid-template-columns: 1fr; }
-}
-
 /* ---------------- PERFORMANCE PANEL (F3) ---------------- */
-#perf { position: fixed; top: 10px; left: 10px; z-index: 20; pointer-events: none; display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 8px;
+#perf { position: fixed; top: max(10px, env(safe-area-inset-top, 0px)); left: max(10px, env(safe-area-inset-left, 0px)); z-index: 20; pointer-events: none; display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 8px;
   background: rgba(10, 8, 6, 0.78); border: 1px solid var(--stone-line); font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); min-width: 220px; }
 #perf b { font-size: 16px; }
 #perf small { color: var(--muted); margin-top: 2px; }
-/* The create form: settings that only a room on the server has (access, password) hide for Offline. */
-#menu-create[data-reach="offline"] .needs-server { display: none; }
+/* A match on touch: in the HUD's free area, clear of the corner buttons and the notch. */
+html.in-match[data-device="touch"] #perf { top: var(--free-t); left: var(--free-l); min-width: 0; max-inline-size: var(--free-w); }
+
+/* ---------------- MENU: HOME ----------------
+   Everything at once. One column on a narrow screen, the list after the actions; where there is
+   room, the room list beside them, as tall as they are and scrolling inside. */
+.home { align-self: start; display: grid; gap: clamp(10px, 1.4vw, 16px);
+  grid-template-columns: minmax(0, 1fr); grid-template-areas: "name" "hero" "tiles" "rooms" "tools"; }
+.home-name { grid-area: name; }
+.home-name input { min-block-size: 44px; font-size: 17px; }
+.home-name input[aria-invalid="true"]::placeholder { color: #f08a6c; }
+.home-hero { grid-area: hero; gap: 2px; padding: 14px 18px; }
+.home-hero > span { font-size: clamp(21px, 1rem + 1.4vw, 28px); }
+.home-hero.primary small { opacity: 0.85; }
+.home-hero .last { color: #4a3008; opacity: 1; font-weight: 600; }
+.home-tiles { grid-area: tiles; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; }
+.home-tile { min-inline-size: 0; background-color: var(--stone); border: 1px solid var(--stone-line); border-radius: 12px; }
+.home-tile.big > span { font-size: 19px; }
+.home-tile.big { justify-content: flex-start; }
+.home-tools { grid-area: tools; display: flex; flex-wrap: wrap; gap: 8px; }
+.home-tools button { flex: 1 1 auto; min-block-size: 44px; font-size: 14px; padding: 8px 12px; background: var(--stone); }
+
+/* Join by code: label, letters, button; the letters show in capitals whatever is typed. */
+.code-join { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0; padding: 10px 12px; }
+.code-join label { flex: 1 0 100%; font-size: 13px; color: var(--muted); }
+.code-join input { flex: 1 1 7rem; min-inline-size: 0; min-block-size: 44px; font-family: var(--serif); font-size: 22px; letter-spacing: 0.3em; text-transform: uppercase; text-align: center;
+  background: rgba(0, 0, 0, 0.35); border: 1px solid var(--stone-line); border-radius: 10px; padding: 4px 8px; color: var(--ink); }
+.code-join input::placeholder { color: rgba(185, 169, 136, 0.45); }
+.code-join input[aria-invalid="true"] { border-color: #f08a6c; }
+/* Beside the letters when they fit, under them across the tile when they do not. */
+.code-join button { flex: 1 0 auto; min-block-size: 44px; }
+.code-join .form-msg { flex: 1 0 100%; }
+
+/* The room list. */
+.home-rooms { grid-area: rooms; display: flex; flex-direction: column; gap: 10px; min-block-size: 0; padding: 14px;
+  background: var(--stone); border: 1px solid var(--stone-line); border-radius: 14px; }
+.home-rooms h2 { margin: 0; font-family: var(--serif); font-size: 18px; color: var(--gold); }
+.home-rooms h2 small { font-family: var(--sans); font-size: 12px; font-weight: 400; color: var(--muted); }
+.rooms { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.room { inline-size: 100%; min-block-size: 44px; display: grid; grid-template-columns: 5.5em minmax(0, 1fr) auto; align-items: center; gap: 10px; text-align: start; padding: 8px 12px;
+  border: 1px solid var(--stone-line); border-radius: 10px; }
+.room-tags { display: flex; align-items: center; gap: 4px; }
+.room-what, .room-seats { display: flex; flex-direction: column; min-inline-size: 0; }
+.room-what b { font-family: var(--serif); font-size: 16px; overflow: clip; text-overflow: ellipsis; white-space: nowrap; }
+.room-what small, .room-seats small { font-size: 12px; color: var(--muted); overflow: clip; text-overflow: ellipsis; white-space: nowrap; }
+.room-seats { align-items: end; font-variant-numeric: tabular-nums; }
+.room:disabled { opacity: 0.5; cursor: not-allowed; }
+.room.full .room-seats small { color: #f08a6c; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.chip { font-style: normal; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--stone-line); white-space: nowrap; }
+.chip.lan { color: var(--gold); border-color: var(--gold); }
+.chip.online { color: #9fd0e0; border-color: #9fd0e0; }
+.chip.offline { color: var(--muted); border-color: var(--muted); }
+.lock { font-style: normal; font-size: 14px; }
+.rooms-empty { display: grid; justify-items: center; gap: 12px; padding: 24px 16px; text-align: center; border: 1px dashed var(--stone-line); border-radius: 12px; }
+.rooms-empty p { margin: 0; font-family: var(--serif); font-size: 18px; font-style: italic; }
+.rooms-empty button { min-block-size: 44px; }
+
+@container menu (inline-size > 46rem) {
+  .home { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); grid-template-rows: repeat(4, auto) 1fr;
+    grid-template-areas: "name rooms" "hero rooms" "tiles rooms" "tools rooms" ". rooms"; }
+  /* The list takes the actions' height, or more on a tall screen, and scrolls inside it rather than making the page taller. */
+  .home-rooms { contain: size; min-block-size: 55dvh; }
+  #room-list { flex: 1; min-block-size: 0; overflow: auto; overscroll-behavior: contain; padding: 2px; margin: -2px; }
+}
+
+/* A short screen (a phone on its side): the name on one line, the second lines folded away. */
+@media (max-height: 500px) {
+  .home-name { flex-direction: row; align-items: center; gap: 10px; }
+  .home-name > span { white-space: nowrap; }
+  .home-name input { flex: 1; min-inline-size: 0; }
+  .home-hero { padding-block: 8px; }
+  .home-hero .sub, .home-tile.big small, .tip { display: none; }
+  .home-tile.big { padding-block: 8px; }
+  .code-join { padding-block: 8px; }
+  .code-join input { flex-basis: 4.5rem; font-size: 17px; letter-spacing: 0.12em; }
+  .code-join button { padding-inline: 10px; }
+}
+
+/* ---------------- MENU: CREATE ----------------
+   One page: mode and map in front, the rest folded under "options", whose bar sums them up. One
+   column on a narrow screen; where there is room, the options and the button beside the cards.
+   The button stays in reach at the bottom of the screen, clear of the home indicator. */
+.create { align-self: start; display: grid; gap: 12px 20px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "pick" "side" "go"; }
+@media (prefers-reduced-motion: no-preference) { .create { animation: rise 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); } }
+.create-head { grid-area: head; display: flex; align-items: center; gap: 12px; }
+.create-head button { min-block-size: 44px; font-size: 14px; background: var(--stone); }
+.create-head h2 { margin: 0; font-family: var(--serif); font-size: clamp(22px, 1rem + 1.4vw, 28px); color: var(--gold); text-shadow: 0 2px 8px oklch(0 0 none / 0.6); }
+.create-pick { grid-area: pick; display: grid; gap: 14px; align-content: start; min-inline-size: 0; }
+.create-sec { display: grid; gap: 8px; }
+.create-sec h3 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.create-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 8px; color: var(--ink); }
+/* Mode and map: two across on a phone, three where there is room, never a lone card stretched wide. */
+.create-pick .create-cards { grid-template-columns: repeat(auto-fill, minmax(min(50% - 4px, 200px), 1fr)); }
+.create-reaches { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
+.create-accesses { grid-template-columns: repeat(auto-fit, minmax(min(100%, 110px), 1fr)); }
+.create-cards .card { min-inline-size: 0; min-block-size: 44px; justify-content: center; gap: 2px; padding: 8px 12px; background-color: var(--stone); }
+/* A card's line is cut after two lines: the cards stay one size, the mode's rules are said below them. */
+.create-cards .card small { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; text-wrap: pretty; }
+.create-cards .card small:empty { display: none; }
+.create-cards .card[data-checked] b { color: var(--gold); }
+.create-cards .chip { font-size: 13px; }
+.create-rules { margin: 0; padding: 8px 12px; border-inline-start: 3px solid var(--gold); border-radius: 0 10px 10px 0; background: oklch(0.15 0.01 60 / 0.6);
+  font-size: 13px; line-height: 1.4; font-style: italic; text-wrap: pretty; }
+
+.create-options { grid-area: side; align-self: start; display: block; min-inline-size: 0; scroll-margin-block-start: max(8px, env(safe-area-inset-top, 0px)); }
+.create-fold { inline-size: 100%; min-block-size: 56px; display: flex; align-items: center; gap: 12px; text-align: start; padding: 10px 16px; background: var(--stone); }
+.create-fold > span { flex: 1; display: grid; gap: 2px; min-inline-size: 0; }
+.create-fold b { font-family: var(--serif); font-size: 18px; color: var(--gold); }
+.create-fold small { font-size: 13px; color: var(--muted); text-wrap: pretty; }
+.create-fold i { font-style: normal; font-size: 18px; color: var(--gold); }
+.create-options[data-open] .create-fold { border-color: var(--gold); border-end-start-radius: 0; border-end-end-radius: 0; }
+.create-options[data-open] .create-fold i { rotate: 180deg; }
+@media (prefers-reduced-motion: no-preference) { .create-fold i { transition: rotate 0.2s ease-out; } }
+.create-opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 14px 16px;
+  background: var(--stone); border: 1px solid var(--gold); border-block-start: 0; border-radius: 0 0 12px 12px; }
+.create-opts[hidden], .create-access[hidden] { display: none; }
+.create-wide { grid-column: 1 / -1; }
+.create-access { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px; }
+.create-access input { min-block-size: 44px; }
+.create-access input[aria-invalid] { border-color: #f08a6c; }
+.create .check { min-block-size: 44px; }
+.create .check input { inline-size: 20px; block-size: 20px; accent-color: var(--gold); }
+
+/* Duration and bots: UI SDK selects, drawn like the game's dropdowns; a bottom sheet on a small touch screen. */
+.create-select { display: grid; gap: 4px; }
+.create-select button { inline-size: 100%; min-block-size: 44px; text-align: start; font-size: 15px; border-radius: 8px; padding-block: 8px; padding-inline: 10px 32px;
+  background: rgba(0, 0, 0, 0.35) var(--select-arrow) no-repeat right 10px center / 12px 8px; }
+/* Creation's lists (the shared look is .select-list's): never taller than most of the screen. */
+.create-list { max-block-size: min(var(--available-height, 60dvh), 60dvh); }
+.create-list ui-select-item { min-block-size: 44px; }
+.create-list ui-select-item[data-selected] { font-weight: 700; }
+
+.create-go { grid-area: go; position: sticky; inset-block-end: 0; z-index: 1; display: grid; gap: 6px;
+  padding-block: 16px max(10px, env(safe-area-inset-bottom, 0px)); background: linear-gradient(transparent, oklch(0.17 0.01 60 / 0.95) 22px); }
+.create-go .primary { min-block-size: 54px; font-size: 18px; }
+.create-go .form-msg { text-align: center; }
+
+@container menu (inline-size > 44rem) {
+  .create { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); grid-template-rows: auto auto 1fr; grid-template-areas: "head head" "pick side" "pick go"; }
+  .create-go { align-self: end; }
+}
+
+/* The password prompt: a UI SDK dialog in the top layer, over the home screen. */
+.pw-scrim { position: fixed; inset: 0; background: oklch(0.1 0.01 60 / 0.6); }
+.pw-dialog { position: fixed; inset: 0; margin: auto; inline-size: min(440px, 100% - 28px); block-size: fit-content; max-block-size: calc(100dvh - 28px); overflow: auto;
+  display: grid; gap: 10px; padding: 20px; color: var(--ink); font-family: var(--sans);
+  background: #1d1813; border: 1px solid var(--gold); border-radius: 16px; box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6); }
+.pw-dialog ui-dialog-title { font-family: var(--serif); font-size: 22px; font-weight: 700; color: var(--gold); }
+.pw-dialog ui-dialog-description { font-size: 14px; color: var(--muted); }
+.pw-room:empty { display: none; }
+.pw-room .room { background: rgba(255, 255, 255, 0.03); }
+.pw-form { display: grid; gap: 10px; }
+.pw-form .pw-input { min-block-size: 44px; }
+.pw-input[aria-invalid] { border-color: #f08a6c; }
+.pw-buttons { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 8px; }
+.pw-buttons button { inline-size: 100%; min-block-size: 44px; }
+@media (max-height: 500px) {
+  .pw-dialog { inline-size: min(560px, 100% - 28px); grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 14px; padding: 14px 18px; }
+  .pw-dialog > :is(ui-dialog-title, ui-dialog-description) { grid-column: 1 / -1; }
+  .pw-dialog > .pw-room { align-self: center; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pw-dialog, .pw-scrim { transition: opacity 0.18s ease-out, translate 0.18s ease-out; }
+  .pw-dialog:is([data-starting-style], [data-ending-style]) { opacity: 0; translate: 0 8px; }
+  .pw-scrim:is([data-starting-style], [data-ending-style]) { opacity: 0; }
+}

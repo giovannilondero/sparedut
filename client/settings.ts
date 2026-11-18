@@ -5,7 +5,7 @@ import { MAP_IDS } from "../shared/maps/index.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 import type { CrouchMode } from "./controls.ts"
 import type { Lang } from "./i18n.ts"
-import type { CreateOptions } from "./menu.ts"
+import type { CreateOptions } from "./menu-model.ts"
 
 export interface Settings {
   name: string
@@ -30,6 +30,8 @@ export interface Settings {
   lastBots: number
   lastLevel: BotLevel
   lastMinutes: number
+  /** Friendly fire in the last room created from the menu. The one-tap match never has it. */
+  lastFf: boolean
 }
 
 const KEY = "sparedut.settings"
@@ -50,7 +52,8 @@ const DEFAULTS: Settings = {
   lastMap: "glemone",
   lastBots: 4,
   lastLevel: "pari",
-  lastMinutes: 10
+  lastMinutes: 10,
+  lastFf: false
 }
 
 export function loadSettings(): Settings {
@@ -59,6 +62,7 @@ export function loadSettings(): Settings {
     // A value saved by an old version (or a removed map) falls back to the default.
     if (!MAP_IDS.includes(s.lastMap)) s.lastMap = DEFAULTS.lastMap
     if (s.crouch !== "hold" && s.crouch !== "toggle") s.crouch = DEFAULTS.crouch
+    if (typeof s.lastFf !== "boolean") s.lastFf = DEFAULTS.lastFf
     return s
   } catch {
     return { ...DEFAULTS }
@@ -73,7 +77,7 @@ export function saveSettings(s: Settings) {
  * The room the home screen's "play against the bots" button makes in one tap: Offline, with the
  * mode, map, duration, bots and bot skill chosen last, friendly fire off. It needs no game server.
  */
-export function oneTapRoom(s: Settings): CreateOptions {
+export function oneTapRoom(s: Pick<Settings, "lastMode" | "lastMap" | "lastMinutes" | "lastBots" | "lastLevel">): CreateOptions {
   return {
     mode: s.lastMode,
     map: s.lastMap,

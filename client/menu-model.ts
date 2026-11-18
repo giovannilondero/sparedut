@@ -1,0 +1,344 @@
+/**
+ * The menu's decisions, with no DOM in it: the screen shown, the name, the creation choices, the
+ * code and the password being typed, the latest room list. It turns choices into requests and says
+ * why a request is refused; the menu's DOM renders it and forwards the player's events to it.
+ */
+import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "../shared/folklore.ts"
+import type { MapId } from "../shared/map.ts"
+import { MAP_IDS } from "../shared/maps/index.ts"
+import { ACCESSES, MAX_BOTS, Password, REACHES, RoomCode, type Access, type ErrorCode, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
+import type { PrimaryId } from "../shared/weapons.ts"
+import type { Lang } from "./i18n.ts"
+import { oneTapRoom, type Settings } from "./settings.ts"
+
+export type CreateOptions = Reached<RoomAccess> & {
+  readonly mode: ModeId
+  readonly map: MapId
+  readonly minutes: number
+  readonly bots: number
+  readonly level: BotLevel
+  readonly ff: boolean
+}
+
+/** What the menu keeps between visits: the player's settings. The caller decides where they are stored. */
+export type Remembered = Settings
+
+/** The settings form's values: the same form in the menu and in a match. */
+export type FormSetting = "sensitivity" | "fov" | "master" | "music" | "quality" | "crouch" | "autoRes" | "showInfo" | "invertY"
+
+export const SCREENS = ["home", "create", "password", "armarie", "settings", "vocabolari"] as const
+export type Screen = (typeof SCREENS)[number]
+
+/** What the menu asks the game to do. */
+export type MenuRequest =
+  /** `oneTap`: the home screen's button, whose match starts at once, without warm-up. */
+  | { readonly t: "create"; readonly room: CreateOptions; readonly oneTap: boolean }
+  /** `password` only once the player typed one. */
+  | { readonly t: "join"; readonly code: string; readonly password?: string }
+
+/** The answer to a choice: a request to send, a reason the screen shows, or only a new state to draw. */
+export type Outcome =
+  | { readonly kind: "send"; readonly request: MenuRequest }
+  | { readonly kind: "refused"; readonly reason: Refusal }
+  | { readonly kind: "none" }
+
+/**
+ * Why a request is refused. `needName`: nobody can play without a name; the menu goes home to it.
+ * `passwordBad`: a password that must be typed is empty or too long. `codeBad`: a room code is four
+ * letters. `roomFull`, `roomGone`: the room chosen in the list is full, or no longer in it.
+ */
+export type Refusal = "needName" | "passwordBad" | "codeBad" | "roomFull" | "roomGone"
+
+/** The host's reasons to ask for a room's password again. */
+export type PasswordRefusal = Extract<ErrorCode, "passwordRequired" | "wrongPassword" | "tooManyAttempts">
+
+/** What the password prompt says about the last attempt: the host's answer, or a password refused before sending. */
+export type PromptProblem = Exclude<PasswordRefusal, "passwordRequired"> | "passwordBad"
+
+/** A room as the list shows it: a full room is shown, not selectable. */
+export interface ListedRoom {
+  readonly room: RoomSummary
+  readonly selectable: boolean
+}
+
+/**
+ * Where each reach stands among creation's choices. LAN comes first and is the one a new room
+ * starts on. Every reach needs a place: a new reach does not compile until it has one.
+ */
+const REACH_PLACE = { lan: 0, online: 1, offline: 2 } as const satisfies Record<Reach, number>
+
+/** What creation offers, from the sets the game defines: a new mode or map appears here by itself. */
+export const MENU_OPTIONS = {
+  modes: MODE_IDS,
+  maps: MAP_IDS,
+  levels: BOT_LEVEL_IDS,
+  reaches: [...REACHES].sort((a, b) => REACH_PLACE[a] - REACH_PLACE[b]),
+  accesses: ACCESSES,
+  minutes: [5, 10, 15, 20],
+  /** Bots per team: none up to as many as the server accepts. */
+  bots: Array.from({ length: MAX_BOTS + 1 }, (_, n) => n)
+} as const satisfies Record<string, readonly unknown[]>
+
+/** Creation's choices as they stand. */
+export interface Choices {
+  readonly mode: ModeId
+  readonly map: MapId
+  readonly minutes: number
+  readonly bots: number
+  readonly level: BotLevel
+  readonly ff: boolean
+  readonly reach: Reach
+  readonly access: Access
+  /** The room's password as typed, before it is cleaned. */
+  readonly password: string
+}
+
+/**
+ * Where focus lands when the menu goes from one screen to another: `"first"`, the new screen's first
+ * control (or its heading when it has none); a screen, the home screen's tile that opens it; null,
+ * where it is. The password prompt is a dialog that moves focus in and back by itself.
+ */
+export function focusOnScreen(from: Screen, to: Screen): "first" | Screen | null {
+  if (from === to || from === "password" || to === "password") return null
+  return to === "home" ? from : "first"
+}
+
+/** The screens a player cannot reach without a name: they create or join a room. */
+const NEED_NAME: ReadonlySet<Screen> = new Set(["create", "password"])
+
+const NONE: Outcome = { kind: "none" }
+const refused = (reason: Refusal): Outcome => ({ kind: "refused", reason })
+
+export class MenuModel {
+  private current: Screen = "home"
+  private mode: ModeId
+  private map: MapId
+  private minutes: number
+  private bots: number
+  private level: BotLevel
+  private ff: boolean
+  private reach: Reach = MENU_OPTIONS.reaches[0]
+  private access: Access = MENU_OPTIONS.accesses[0]
+  private roomPassword = ""
+  private code = ""
+  /** The room the password prompt is for, and the password typed into it. */
+  private prompt: { code: string; password: string; problem: PromptProblem | null } = { code: "", password: "", problem: null }
+  private listed: readonly ListedRoom[] = []
+
+  /** `save` is called whenever a remembered value changed. */
+  constructor(
+    private readonly remembered: Remembered,
+    private readonly save: () => void
+  ) {
+    this.mode = remembered.lastMode
+    this.map = remembered.lastMap
+    this.minutes = remembered.lastMinutes
+    this.bots = remembered.lastBots
+    this.level = remembered.lastLevel
+    this.ff = remembered.lastFf
+  }
+
+  get screen(): Screen {
+    return this.current
+  }
+
+  get options(): typeof MENU_OPTIONS {
+    return MENU_OPTIONS
+  }
+
+  get choices(): Choices {
+    const { mode, map, minutes, bots, level, ff, reach, access, roomPassword: password } = this
+    return { mode, map, minutes, bots, level, ff, reach, access, password }
+  }
+
+  /** Which of creation's fields apply to the current choices. */
+  get fields(): { readonly access: boolean; readonly password: boolean } {
+    const access = this.reach !== "offline"
+    return { access, password: access && this.access === "password" }
+  }
+
+  go(screen: Screen): Outcome {
+    if (NEED_NAME.has(screen) && !this.remembered.name) return this.needName()
+    this.current = screen
+    return NONE
+  }
+
+  /** `Esc`: one screen back. False when there is nowhere to go back to. */
+  back(): boolean {
+    if (this.current === "home") return false
+    this.current = "home"
+    return true
+  }
+
+  typeName(text: string) {
+    this.remembered.name = text.trim()
+    this.save()
+  }
+
+  chooseLanguage(lang: Lang) {
+    this.change("lang", lang)
+  }
+
+  /** The primary weapon, chosen in the armoury: the menu's or a match's. */
+  choosePrimary(primary: PrimaryId) {
+    this.change("primary", primary)
+  }
+
+  /** A value of the settings form: remembered, and applied by whoever `save` calls. */
+  changeSetting<K extends FormSetting>(key: K, value: Settings[K]) {
+    this.change(key, value)
+  }
+
+  /** Remembers a changed value; the value it already has saves nothing. */
+  private change<K extends keyof Settings>(key: K, value: Settings[K]) {
+    if (this.remembered[key] === value) return
+    this.remembered[key] = value
+    this.save()
+  }
+
+  chooseMode(mode: ModeId) {
+    this.mode = mode
+  }
+
+  /** The map is remembered at once: it becomes the menu's background. */
+  chooseMap(map: MapId) {
+    this.map = map
+    this.remembered.lastMap = map
+    this.save()
+  }
+
+  chooseMinutes(minutes: number) {
+    this.minutes = minutes
+  }
+
+  chooseBots(bots: number) {
+    this.bots = bots
+  }
+
+  chooseLevel(level: BotLevel) {
+    this.level = level
+  }
+
+  chooseFriendlyFire(on: boolean) {
+    this.ff = on
+  }
+
+  chooseReach(reach: Reach) {
+    this.reach = reach
+  }
+
+  chooseAccess(access: Access) {
+    this.access = access
+  }
+
+  typeRoomPassword(text: string) {
+    this.roomPassword = text
+  }
+
+  create(): Outcome {
+    if (!this.remembered.name) return this.needName()
+    let access: RoomAccess = { kind: "open" }
+    if (this.fields.password) {
+      const password = Password.safeParse(this.roomPassword)
+      if (!password.success) return refused("passwordBad")
+      access = { kind: "password", password: password.data }
+    }
+    const room: CreateOptions = {
+      mode: this.mode,
+      map: this.map,
+      minutes: this.minutes,
+      bots: this.bots,
+      level: this.level,
+      ff: this.ff,
+      ...(this.reach === "offline" ? { reach: this.reach } : { reach: this.reach, access })
+    }
+    Object.assign(this.remembered, { lastMode: room.mode, lastMap: room.map, lastBots: room.bots, lastLevel: room.level, lastMinutes: room.minutes, lastFf: room.ff })
+    this.save()
+    return { kind: "send", request: { t: "create", room, oneTap: false } }
+  }
+
+  /** The home screen's "play against the bots": an Offline room in one tap, with the remembered values, its match started at once. */
+  oneTap(): Outcome {
+    if (!this.remembered.name) return this.needName()
+    return { kind: "send", request: { t: "create", room: oneTapRoom(this.remembered), oneTap: true } }
+  }
+
+  typeCode(text: string) {
+    this.code = text
+  }
+
+  joinByCode(): Outcome {
+    if (!this.remembered.name) return this.needName()
+    const code = RoomCode.safeParse(this.code)
+    return code.success ? { kind: "send", request: { t: "join", code: code.data } } : refused("codeBad")
+  }
+
+  /** The latest room list, in the order the host sent it: LAN rooms first, then Online. */
+  rooms(list: readonly RoomSummary[]) {
+    this.listed = list.map((room) => ({ room, selectable: room.players < room.max }))
+  }
+
+  get roomList(): readonly ListedRoom[] {
+    return this.listed
+  }
+
+  /** A room chosen in the list: joined at once, or through the password prompt. */
+  joinFromList(code: string): Outcome {
+    if (!this.remembered.name) return this.needName()
+    const listed = this.listed.find((l) => l.room.code === code)
+    if (!listed) return refused("roomGone")
+    if (!listed.selectable) return refused("roomFull")
+    if (listed.room.reach !== "offline" && listed.room.access === "password") return this.askPassword(code)
+    return { kind: "send", request: { t: "join", code } }
+  }
+
+  /** Opens the password prompt for a room; what was typed stays if it is the same room as last time. */
+  askPassword(code: string): Outcome {
+    if (this.prompt.code !== code) this.prompt = { code, password: "", problem: null }
+    else this.prompt.problem = null
+    return this.go("password")
+  }
+
+  get passwordFor(): string {
+    return this.prompt.code
+  }
+
+  /** The room the prompt is for, as the list shows it; undefined for a code the list does not have. */
+  get promptRoom(): RoomSummary | undefined {
+    return this.listed.find((l) => l.room.code === this.prompt.code)?.room
+  }
+
+  get typedPassword(): string {
+    return this.prompt.password
+  }
+
+  typePassword(text: string) {
+    this.prompt.password = text
+  }
+
+  /** What the last attempt at the prompt got wrong; null when there was none. */
+  get promptProblem(): PromptProblem | null {
+    return this.prompt.problem
+  }
+
+  /** The host asked for a room's password, or refused the one sent: back to the prompt, saying why. */
+  hostRefused(code: string, why: PasswordRefusal): Outcome {
+    const outcome = this.askPassword(code)
+    this.prompt.problem = why === "passwordRequired" ? null : why
+    return outcome
+  }
+
+  joinWithPassword(): Outcome {
+    const password = Password.safeParse(this.prompt.password)
+    if (!password.success) {
+      this.prompt.problem = "passwordBad"
+      return refused("passwordBad")
+    }
+    return { kind: "send", request: { t: "join", code: this.prompt.code, password: password.data } }
+  }
+
+  private needName(): Outcome {
+    this.current = "home"
+    return refused("needName")
+  }
+}

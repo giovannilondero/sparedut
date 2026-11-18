@@ -14,7 +14,7 @@ import { isLocalHost } from "../shared/hosts.ts"
 import { Game } from "./game.ts"
 import { inviteLink, readInvite } from "./invite.ts"
 import { t } from "./i18n.ts"
-import { createLook, lookFromUrl, mountLookSwitcher } from "./looks.ts"
+import { createLook, lookFromUrl } from "./looks.ts"
 import { loadDetailed } from "./models/detailed.ts"
 import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
@@ -24,6 +24,7 @@ import { PerfMonitor } from "./perf.ts"
 import { loadSettings, saveSettings } from "./settings.ts"
 import type { WorldScene } from "./contracts.ts"
 import { createViewmodel } from "./viewmodel.ts"
+import { onViewportChange } from "./viewport.ts"
 import { createWorld } from "./world.ts"
 
 const settings = loadSettings()
@@ -37,7 +38,6 @@ renderer.toneMappingExposure = 1.05
 renderer.info.autoReset = false
 const perf = new PerfMonitor(renderer)
 const look = createLook(lookFromUrl(), renderer)
-mountLookSwitcher(look.id)
 
 /** The maximum pixel ratio per quality; dynamic resolution goes down to `minRatio`. */
 const maxRatio = () => Math.min(devicePixelRatio, settings.quality === "alta" ? 2 : settings.quality === "media" ? 1.5 : 1)
@@ -50,7 +50,11 @@ const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera(settings.fov, innerWidth / innerHeight, 0.05, 2500)
 camera.rotation.order = "YXZ"
 
+/** The size the canvas was last drawn for: resizing it clears it, so a change that moved nothing leaves it alone. */
+let sized = ""
+const viewport = () => `${innerWidth}x${innerHeight}@${devicePixelRatio}`
 const resize = () => {
+  sized = viewport()
   renderer.setPixelRatio(pixelRatio())
   renderer.setSize(innerWidth, innerHeight, false)
   camera.aspect = innerWidth / innerHeight
@@ -93,7 +97,7 @@ if (look.id === "ver")
   })
 const audio = createAudio()
 audio.setVolumes(settings.master, settings.music)
-addEventListener("resize", resize)
+onViewportChange(() => viewport() !== sized && resize())
 resize()
 
 let quality = settings.quality
@@ -156,6 +160,8 @@ const sendJoin = (code: string, password?: string) => {
 const menu = new Menu(settings, audio, {
   create: (o, oneTap = false) => {
     if (o.reach === "offline") {
+      // Still inside the tap that asks for the match: the only moment the browser grants fullscreen.
+      game?.requestFullscreen()
       // The room lives in this page: the game server need not be reachable.
       autostart = oneTap
       roomPassword = null
@@ -167,6 +173,7 @@ const menu = new Menu(settings, audio, {
       return
     }
     if (!ensureOnline()) return
+    game?.requestFullscreen()
     autostart = oneTap
     roomPassword = o.access.kind === "password" ? o.access.password : null
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
@@ -177,11 +184,12 @@ const menu = new Menu(settings, audio, {
   },
   join: (code, password) => {
     if (!ensureOnline()) return
+    game?.requestFullscreen()
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
     sendJoin(code, password)
   },
   settingsChanged: persist
-})
+}, look.id)
 
 /** Public address announced by the server: used for invite links when playing from localhost. */
 let publicUrl: string | null = null
@@ -266,8 +274,7 @@ link.on((msg: ServerMessage) => {
       return
     case "error":
       // A password room: ask for it, saying why when the last one did not work.
-      if (msg.code === "passwordRequired") menu.askPassword(joining)
-      else if (msg.code === "wrongPassword" || msg.code === "tooManyAttempts") menu.askPassword(joining, t().errors[msg.code])
+      if (msg.code === "passwordRequired" || msg.code === "wrongPassword" || msg.code === "tooManyAttempts") menu.hostRefused(joining, msg.code)
       else toast(t().errors[msg.code])
       return
   }
@@ -335,6 +342,7 @@ const loop = (now: number) => {
     game.frame(dt, time)
     game.render()
   } else {
+    game?.menuFrame()
     world.menuCamera(time, camera)
     camera.updateMatrixWorld()
     world.update(dt, time, { pickups: [], flags: null, hill: null, cart: null, storm: null, turrets: [], doors: [], camera })

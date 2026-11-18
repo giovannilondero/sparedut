@@ -4,8 +4,8 @@
  * holding the current room may start, replace or feed a match.
  */
 import { expect, test } from "bun:test"
-import { Link, type Connection, type Listener } from "../client/connection.ts"
-import type { ClientMessage, RoomInfo, ServerMessage } from "../shared/protocol.ts"
+import { HostConnection, Link, type Connection, type Listener } from "../client/connection.ts"
+import { ClientMessage, type RoomInfo, type ServerMessage } from "../shared/protocol.ts"
 
 /** A host the test speaks for. */
 function fakeHost() {
@@ -72,4 +72,16 @@ test("back on the server, its rooms start matches again and the closed in-browse
   link.send({ t: "start" })
   expect(server.sent).toEqual([{ t: "start" }])
   expect(browser.sent).toEqual([])
+})
+
+test("a pong that waited while the page slept leaves a round trip the host still accepts", () => {
+  class Wire extends HostConnection {
+    send() {}
+    hear(msg: ServerMessage) {
+      this.receive(JSON.stringify(msg))
+    }
+  }
+  const wire = new Wire()
+  wire.hear({ t: "pong", c: performance.now() - 120_000, tick: 0 })
+  expect(ClientMessage.safeParse({ t: "ping", c: 0, rtt: wire.rtt }).success).toBe(true)
 })

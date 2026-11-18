@@ -10,6 +10,7 @@ import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId, Team } from "../shared/map.ts"
 import type { Access, ErrorCode, Reach } from "../shared/protocol.ts"
 import type { WeaponId } from "../shared/weapons.ts"
+import type { Device } from "./device.ts"
 
 export type Lang = "fur" | "it"
 
@@ -17,11 +18,11 @@ type Fn<A extends unknown[] = [string]> = (...args: A) => string
 
 /** Static HTML texts: `data-t="key"` (innerHTML) and `data-t-ph="key"` (placeholder). */
 type StaticKey =
-  | "title" | "kicker" | "sub" | "nameLabel" | "namePh" | "oneTap" | "oneTapSub" | "create" | "createSub" | "join" | "joinSub"
-  | "roomsTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "reachLabel" | "reachLan" | "reachOnline" | "reachOffline"
+  | "title" | "nameLabel" | "namePh" | "oneTap" | "oneTapSub" | "create" | "createSub" | "join"
+  | "roomsTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "reachLabel"
   | "ff" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
   | "qHigh" | "autoRes" | "showInfo" | "invert" | "keys" | "vocabTitle" | "connecting" | "chatPh" | "deathTitle" | "deathHint"
-  | "clickplay" | "language" | "mapLabel" | "crouchMode" | "crouchHold" | "crouchToggle"
+  | "language" | "modeLabel" | "mapLabel" | "optionsLabel" | "crouchMode" | "crouchHold" | "crouchToggle"
   | "accessLabel" | "accessOpen" | "accessPassword" | "passwordLabel" | "passwordTitle"
 
 export interface Strings {
@@ -38,6 +39,8 @@ export interface Strings {
   readonly menu: {
     readonly needName: string
     readonly roomsEmpty: string
+    /** A room code that is not four letters, said under the code field. */
+    readonly codeBad: string
     /** The chip on a room in the list. */
     readonly reach: Record<Reach, string>
     /** A full room in the list: shown, not selectable. */
@@ -49,10 +52,18 @@ export interface Strings {
     /** A password the create form or the prompt refuses before sending it. */
     readonly passwordBad: string
     readonly botsNone: string
+    /** Bots per team in a few words, for creation's options line. */
+    readonly bots: Fn<[number]>
+    /** Friendly fire on, in creation's options line. */
+    readonly ffOn: string
     readonly minutes: Fn<[number]>
     readonly tag: { readonly primary: string; readonly power: string; readonly melee: string; readonly pistol: string }
     readonly stat: { readonly damage: string; readonly rate: string; readonly range: string; readonly mag: string }
     readonly vocab: readonly (readonly [string, string])[]
+    /** One line on who can see and join a room of that reach. */
+    readonly reachSub: Record<Reach, string>
+    /** The look selector's label (Cumò, Vêr). */
+    readonly look: string
   }
   readonly net: {
     readonly connecting: string
@@ -76,7 +87,8 @@ export interface Strings {
     readonly contested: string
     readonly hillOwned: Fn
     readonly hillFree: string
-    readonly warmup: Fn
+    /** `menu`: the active device's control for the match menu (`menuControl`). */
+    readonly warmup: Fn<[string, string]>
     readonly streak: Fn<[string, number]>
     readonly deathBy: Fn
     readonly deathSelf: string
@@ -103,9 +115,14 @@ export interface Strings {
     readonly stormOutside: string
     readonly spectate: string
     readonly healed: Fn<[string, number]>
-    /** Turrets: the key to mount, to dismount, the heat. */
-    readonly turretUse: string
-    readonly turretLeave: string
+    /** The prompt to start playing, naming the active device's control. */
+    readonly play: Readonly<Record<Device, string>>
+    /** Turrets: the active device's control to mount, to dismount; the heat. */
+    readonly turretUse: Readonly<Record<Device, string>>
+    readonly turretLeave: Readonly<Record<Device, string>>
+    /** The touch button that mounts a free turret, and the one that dismounts in its place. */
+    readonly touchUse: string
+    readonly touchLeave: string
     readonly turretHeat: string
     readonly turretHot: string
   }
@@ -139,6 +156,11 @@ export interface Strings {
     readonly start: string
     readonly restart: string
     readonly hostOnly: string
+    /** The host tools' label. */
+    readonly host: string
+    /** The host's buttons that add or remove a bot in a team (its short name). */
+    readonly addBot: Fn
+    readonly removeBot: Fn
     readonly level: string
     readonly switchTeam: Fn
     readonly leave: string
@@ -253,11 +275,13 @@ const WEAPON_NAMES = {
   mitraie: { name: "Mitraie de Postazion", short: "Mitraie" }
 } as const
 
+/** The labels on the touch "use" button, mounting and dismounting: the turret prompts on touch name them. */
+const FUR_TOUCH = { use: "Mitraie", leave: "Lasse" } as const
+const IT_TOUCH = { use: "Mitragliatrice", leave: "Lascia" } as const
+
 const fur: Strings = {
   static: {
     title: "Sparedût — Bataie tal Dom di Glemone",
-    kicker: "Glemone · Zone dal Dom · MCMLXXVI → MMXXVI",
-    sub: `Bataie tra <b class="ben">Benandants</b> e <b class="mal">Malandants</b> sot dal Cjampanili`,
     nameLabel: "Il to non",
     namePh: "Toni di Glemone",
     oneTap: "Zuie cuintri i bot",
@@ -265,7 +289,6 @@ const fur: Strings = {
     create: "Cree une partide",
     createSub: "Offline, te rêt locâl o in linie",
     join: "Jentre cul codiç",
-    joinSub: "Âstu un codiç di 4 letaris?",
     roomsTitle: "Partidis viertis <small>(prime la tô rêt, po in linie)</small>",
     armarie: "Armarie",
     settings: "Impostazions",
@@ -274,9 +297,6 @@ const fur: Strings = {
     botsLabel: "Bot par scuadre",
     levelLabel: "Bravure dai bot",
     reachLabel: "Puartade",
-    reachLan: "LAN · dome te stesse rêt",
-    reachOnline: "In linie · par ducj",
-    reachOffline: "Offline (cuintri i bot)",
     accessLabel: "Acès",
     accessOpen: "Viert",
     accessPassword: "Cun password",
@@ -307,9 +327,10 @@ const fur: Strings = {
     chatPh: "Scrîf… (Invio par mandâ)",
     deathTitle: "Ti àn fat frico!",
     deathHint: "Frache <kbd>B</kbd> par cambiâ l'arme principâl",
-    clickplay: "<div>Fâs clic par zuiâ</div><small>o frache un boton dal controller · Esc pal menù de partide</small>",
     language: "Lenghe",
-    mapLabel: "Mape"
+    modeLabel: "Modalitât",
+    mapLabel: "Mape",
+    optionsLabel: "Opzions"
   },
   teams: {
     benandanti: { name: "Benandants", motto: "Pal racolt e pe glesie!" },
@@ -396,12 +417,15 @@ const fur: Strings = {
   menu: {
     needName: "Prime il non!",
     roomsEmpty: "Nissune partide viarte. Creine une!",
+    codeBad: "Il codiç al à 4 letaris.",
     reach: { offline: "Offline", lan: "LAN", online: "In linie" },
     full: "Plene",
     passwordRoom: "Cun password",
     passwordFor: (code) => `La partide ${code} e domande une password.`,
     passwordBad: "La password e à di vê di 1 a 32 caratars.",
     botsNone: "Nissun (dome personis)",
+    bots: (n) => (n === 0 ? "Cence bot" : `${n} bot`),
+    ffOn: "Fûc amì",
     minutes: (n) => `${n} minûts`,
     tag: {
       primary: "Arme principâl · clic par sielzile",
@@ -410,7 +434,13 @@ const fur: Strings = {
       pistol: "Pistole · simpri cun te"
     },
     stat: { damage: "Dam", rate: "Cjadence", range: "Puartade", mag: "Cjamadôr" },
-    vocab: VOCAB
+    vocab: VOCAB,
+    reachSub: {
+      offline: "Dome tu cuintri i bot, in chest navigadôr",
+      lan: "Dome cui che al è te tô stesse rêt",
+      online: "Ducj a puedin viodile e jentrâ"
+    },
+    look: "Aspiet"
   },
   net: {
     connecting: "Conession al server…",
@@ -433,7 +463,7 @@ const fur: Strings = {
     contested: "Contindude!",
     hillOwned: (team) => `Plaçute: ${team}`,
     hillFree: "Plaçute libare",
-    warmup: (left) => `Riscjaldament: i ponts no contin. Si partìs tra ${left}, o l'host al fâs partî subite dal menù (<kbd>Esc</kbd>)`,
+    warmup: (left, menu) => `Riscjaldament: i ponts no contin. Si partìs tra ${left}, o l'host al fâs partî subite dal menù (${menu})`,
     streak: (name, n) => `${name} · ${n} di file`,
     deathBy: (name) => `Ti à fat fûr <b>${name}</b>`,
     deathSelf: "Tu ti sês fat mâl di bessôl",
@@ -489,8 +519,19 @@ const fur: Strings = {
     stormOutside: "Fûr de tampieste! Torne dentri dal cercli",
     spectate: "Une vite sole: tu cjalis fin a la fin de partide.",
     healed: (who, n) => `+${n} a ${who}`,
-    turretUse: "<kbd>E</kbd> Mitraie",
-    turretLeave: "<kbd>E</kbd> / <kbd>Spazi</kbd> lasse la mitraie",
+    play: {
+      keyboard: "<div>Fâs clic par zuiâ</div><small>o frache un boton dal controller · Esc pal menù de partide</small>",
+      pad: "<div>Frache un boton par zuiâ</div><small>Options pal menù de partide</small>",
+      touch: "<div>Tocje par zuiâ</div><small>o frache un boton dal controller</small>"
+    },
+    turretUse: { keyboard: "<kbd>E</kbd> Mitraie", pad: "<kbd>⬇</kbd> Mitraie", touch: `Tocje <kbd>${FUR_TOUCH.use}</kbd>` },
+    turretLeave: {
+      keyboard: "<kbd>E</kbd> / <kbd>Spazi</kbd> lasse la mitraie",
+      pad: "<kbd>⬇</kbd> / <kbd>✕</kbd> lasse la mitraie",
+      touch: `Tocje <kbd>${FUR_TOUCH.leave}</kbd> par lassâ la mitraie`
+    },
+    touchUse: FUR_TOUCH.use,
+    touchLeave: FUR_TOUCH.leave,
     turretHeat: "Calôr",
     turretHot: "SCJALDADE!"
   },
@@ -532,6 +573,9 @@ const fur: Strings = {
     start: "Fâs partî la partide",
     restart: "Torne a scomençâ",
     hostOnly: "L'host (👑) al fâs partî la partide.",
+    host: "Host:",
+    addBot: (team) => `+ bot ${team}`,
+    removeBot: (team) => `− bot ${team}`,
     level: "Bravure",
     switchTeam: (team) => `Passe cui ${team}`,
     leave: "Va fûr · Mandi!"
@@ -591,8 +635,6 @@ const fur: Strings = {
 const it: Strings = {
   static: {
     title: "Sparedût — Battaglia nel Duomo di Gemona",
-    kicker: "Gemona del Friuli · Zona del Duomo · MCMLXXVI → MMXXVI",
-    sub: `Battaglia tra <b class="ben">Benandanti</b> e <b class="mal">Malandanti</b> sotto il campanile`,
     nameLabel: "Il tuo nome",
     namePh: "Toni di Gemona",
     oneTap: "Gioca contro i bot",
@@ -600,7 +642,6 @@ const it: Strings = {
     create: "Crea una partita",
     createSub: "Offline, in rete locale o online",
     join: "Entra con codice",
-    joinSub: "Hai un codice di 4 lettere?",
     roomsTitle: "Partite aperte <small>(prima la tua rete, poi online)</small>",
     armarie: "Armeria",
     settings: "Impostazioni",
@@ -609,9 +650,6 @@ const it: Strings = {
     botsLabel: "Bot per squadra",
     levelLabel: "Bravura dei bot",
     reachLabel: "Portata",
-    reachLan: "LAN · solo sulla stessa rete",
-    reachOnline: "Online · per tutti",
-    reachOffline: "Offline (contro i bot)",
     accessLabel: "Accesso",
     accessOpen: "Aperto",
     accessPassword: "Con password",
@@ -642,9 +680,10 @@ const it: Strings = {
     chatPh: "Scrivi… (Invio per mandare)",
     deathTitle: "Ti hanno fatto frico!",
     deathHint: "Premi <kbd>B</kbd> per cambiare arma principale",
-    clickplay: "<div>Clicca per giocare</div><small>o premi un tasto del controller · Esc per il menu della partita</small>",
     language: "Lingua",
-    mapLabel: "Mappa"
+    modeLabel: "Modalità",
+    mapLabel: "Mappa",
+    optionsLabel: "Opzioni"
   },
   teams: {
     benandanti: { name: "Benandanti", motto: "Per il raccolto e per la chiesa!" },
@@ -731,12 +770,15 @@ const it: Strings = {
   menu: {
     needName: "Prima il nome!",
     roomsEmpty: "Nessuna partita aperta. Creane una!",
+    codeBad: "Il codice ha 4 lettere.",
     reach: { offline: "Offline", lan: "LAN", online: "Online" },
     full: "Piena",
     passwordRoom: "Con password",
     passwordFor: (code) => `La partita ${code} chiede una password.`,
     passwordBad: "La password deve avere da 1 a 32 caratteri.",
     botsNone: "Nessuno (solo persone)",
+    bots: (n) => (n === 0 ? "Senza bot" : `${n} bot`),
+    ffOn: "Fuoco amico",
     minutes: (n) => `${n} minuti`,
     tag: {
       primary: "Arma principale · clic per sceglierla",
@@ -745,7 +787,13 @@ const it: Strings = {
       pistol: "Pistola · sempre con te"
     },
     stat: { damage: "Danno", rate: "Cadenza", range: "Portata", mag: "Caricatore" },
-    vocab: VOCAB
+    vocab: VOCAB,
+    reachSub: {
+      offline: "Solo tu contro i bot, in questo browser",
+      lan: "Solo chi è sulla tua stessa rete",
+      online: "Tutti possono vederla ed entrare"
+    },
+    look: "Aspetto"
   },
   net: {
     connecting: "Connessione al server…",
@@ -768,7 +816,7 @@ const it: Strings = {
     contested: "Contesa!",
     hillOwned: (team) => `Piazzetta: ${team}`,
     hillFree: "Piazzetta libera",
-    warmup: (left) => `Riscaldamento: i punti non contano. Si parte tra ${left}, o l'host fa partire subito dal menu (<kbd>Esc</kbd>)`,
+    warmup: (left, menu) => `Riscaldamento: i punti non contano. Si parte tra ${left}, o l'host fa partire subito dal menu (${menu})`,
     streak: (name, n) => `${name} · ${n} di fila`,
     deathBy: (name) => `Ti ha fatto fuori <b>${name}</b>`,
     deathSelf: "Ti sei fatto male da solo",
@@ -824,8 +872,19 @@ const it: Strings = {
     stormOutside: "Fuori dalla tempesta! Torna dentro il cerchio",
     spectate: "Una vita sola: guardi fino alla fine della partita.",
     healed: (who, n) => `+${n} a ${who}`,
-    turretUse: "<kbd>E</kbd> Mitragliatrice",
-    turretLeave: "<kbd>E</kbd> / <kbd>Spazio</kbd> lascia la mitragliatrice",
+    play: {
+      keyboard: "<div>Clicca per giocare</div><small>o premi un tasto del controller · Esc per il menu della partita</small>",
+      pad: "<div>Premi un tasto per giocare</div><small>Options per il menu della partita</small>",
+      touch: "<div>Tocca per giocare</div><small>o premi un tasto del controller</small>"
+    },
+    turretUse: { keyboard: "<kbd>E</kbd> Mitragliatrice", pad: "<kbd>⬇</kbd> Mitragliatrice", touch: `Tocca <kbd>${IT_TOUCH.use}</kbd>` },
+    turretLeave: {
+      keyboard: "<kbd>E</kbd> / <kbd>Spazio</kbd> lascia la mitragliatrice",
+      pad: "<kbd>⬇</kbd> / <kbd>✕</kbd> lascia la mitragliatrice",
+      touch: `Tocca <kbd>${IT_TOUCH.leave}</kbd> per lasciare la mitragliatrice`
+    },
+    touchUse: IT_TOUCH.use,
+    touchLeave: IT_TOUCH.leave,
     turretHeat: "Calore",
     turretHot: "SURRISCALDATA!"
   },
@@ -878,6 +937,9 @@ const it: Strings = {
     start: "Fai partire la partita",
     restart: "Ricomincia",
     hostOnly: "L'host (👑) fa partire la partita.",
+    host: "Host:",
+    addBot: (team) => `+ bot ${team}`,
+    removeBot: (team) => `− bot ${team}`,
     level: "Bravura",
     switchTeam: (team) => `Passa con i ${team}`,
     leave: "Esci · Mandi!"
@@ -934,7 +996,7 @@ const it: Strings = {
   ]
 }
 
-const STRINGS: Record<Lang, Strings> = { fur, it }
+export const STRINGS: Readonly<Record<Lang, Strings>> = { fur, it }
 
 let current: Lang = "fur"
 const listeners = new Set<() => void>()

@@ -6,7 +6,7 @@ import { EYE_STAND } from "../../shared/movement.ts"
 import { firstPerson } from "../firstperson.ts"
 import { MAP_IDS, MAPS } from "../../shared/maps/index.ts"
 import type { WorldFrame } from "../contracts.ts"
-import { createLook, lookFromUrl, mountLookSwitcher } from "../looks.ts"
+import { createLook, lookFromUrl } from "../looks.ts"
 import { createWorld } from "../world.ts"
 
 const q = new URLSearchParams(location.search)
@@ -21,7 +21,6 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap
 renderer.setPixelRatio(Math.min(devicePixelRatio, Number(q.get("pr") ?? 1.5)))
 
 const look = createLook(lookFromUrl(), renderer)
-mountLookSwitcher(look.id)
 
 const scene = new THREE.Scene()
 const camera = new THREE.PerspectiveCamera(75, 1, 0.05, 2500)
@@ -59,6 +58,7 @@ const gunner = gunnerSpot
       alive: true,
       aim: 0,
       baseFov: 80,
+      aspect: innerWidth / innerHeight,
       look: { yaw: gunnerSpot.yaw + (gunnerAim[0] ?? 0), pitch: gunnerAim[1] ?? 0 },
       sinceShot: q.get("shot") === null ? Infinity : Number(q.get("shot")),
       mag: 0,
