@@ -12,7 +12,7 @@ import type { MapDef } from "../../shared/map.ts"
 import type { Quality } from "../contracts.ts"
 import type { Sky } from "./backdrop.ts"
 import type { Batch, Inst, V } from "./geo.ts"
-import type { Atlas, WorldTextures } from "./tex.ts"
+import type { Atlas, Region, SignSpec, WorldTextures } from "./tex.ts"
 
 /** The world's materials: every geometry added to the `Batch` picks one. */
 export type K =
@@ -77,6 +77,8 @@ export interface SceneryKit {
   readonly win: (n: V, p: V, w: number, h: number, shutter: THREE.Color | null, vase: boolean) => void
   /** Door with its base at `p`. */
   readonly door: (n: V, p: V, w: number, h: number, tint: THREE.Color) => void
+  /** The map's own painted signs, on one sheet: its material (cut out, both sides) and each sign's region, in order. */
+  readonly paint: (specs: readonly SignSpec[]) => { readonly material: THREE.Material; readonly regions: readonly Region[] }
 }
 
 /** What the scenery animates after construction. */
