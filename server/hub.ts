@@ -182,6 +182,12 @@ export class Hub {
         this.send(peer, { t: "pong", c: msg.c, tick: room?.tick ?? 0 })
         return
     }
+    // An interface step's report: only a training takes it.
+    if (msg.t === "report") {
+      if (!room?.training) return this.send(peer, { t: "error", code: "invalid" })
+      room.sim.report(id, msg.a)
+      return
+    }
     if (!room) return
     // A training has no host tools, and its player stays a Benandante.
     if (room.training && (msg.t === "team" || msg.t === "start" || msg.t === "bot" || msg.t === "level")) return

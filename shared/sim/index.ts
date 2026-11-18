@@ -10,7 +10,8 @@ import type { PrimaryId } from "../weapons.ts"
 import type { GameEvent } from "./events.ts"
 import { freshDoors, freshTurrets } from "./rules.ts"
 import { simulate } from "./schedule.ts"
-import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, StartMatch, Training, type PickupState } from "./schema.ts"
+import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, StartMatch, Training, type PickupState } from "./schema.ts"
+import type { InterfaceAction } from "../training/interface.ts"
 import { TRAINING } from "../training/index.ts"
 import { ReadOutbox, ViewWorld, type WorldView } from "./view.ts"
 
@@ -72,6 +73,8 @@ export function createSim(options: SimOptions) {
     team: (session: string, team: Team) => runtime.send(ChangeTeam, { session, team }),
     primary: (session: string, primary: PrimaryId) => runtime.send(ChangePrimary, { session, primary }),
     start: () => runtime.send(StartMatch, {}),
+    /** The client's report of an interface step: only a training's current step that declares this action takes it. */
+    report: (session: string, action: InterfaceAction) => runtime.send(ReportInterface, { session, action }),
     /** Advances one tick and returns the game events it produced. */
     step(): GameEvent[] {
       const ticked = runtime.tick(simulate)

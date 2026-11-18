@@ -13,6 +13,7 @@ import type { ArsenalValue, FlagState, HillValue, TurretState } from "./sim/sche
 import type { StormValue } from "./sim/rules.ts"
 import type { CartView, PhaseView, TrainingView } from "./sim/view.ts"
 import { PRIMARIES, type PrimaryId, type ProjectileKind, type WeaponId } from "./weapons.ts"
+import { INTERFACE_ACTIONS } from "./training/interface.ts"
 
 export const PROTOCOL_VERSION = 14
 export const MAX_PLAYERS = 16
@@ -111,7 +112,9 @@ export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("level"), level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]) }),
   z.object({ t: z.literal("ping"), c: z.number(), rtt: z.number().min(0).max(RTT_MAX).optional() }),
   /** The match menu opened or closed, the tab hidden or shown. Only an Offline room pauses; the server ignores it. */
-  z.object({ t: z.literal("pause"), paused: z.boolean() })
+  z.object({ t: z.literal("pause"), paused: z.boolean() }),
+  /** How the player did something the simulation cannot see (`shared/training/interface.ts`). Only a training accepts it. */
+  z.object({ t: z.literal("report"), a: z.enum(INTERFACE_ACTIONS) })
 ])
 export type ClientMessage = z.infer<typeof ClientMessage>
 

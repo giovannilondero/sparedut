@@ -13,6 +13,7 @@ import type { Body } from "../movement.ts"
 import type { PhysicsWorld } from "../physics.ts"
 import type { ModeId, ObjectiveId } from "../folklore.ts"
 import type { PrimaryId, ProjectileKind, WeaponId } from "../weapons.ts"
+import type { InterfaceAction } from "../training/interface.ts"
 import type { GameEvent, KillCause } from "./events.ts"
 
 export const Root = Schema.defineRoot("Sparedut")
@@ -219,6 +220,8 @@ export const ChangeTeam = Descriptor.Event<{ readonly session: string; readonly 
 export const ChangePrimary = Descriptor.Event<{ readonly session: string; readonly primary: PrimaryId }>()("Sparedut/ChangePrimary")
 /** The host starts (or restarts) the match. */
 export const StartMatch = Descriptor.Event<{}>()("Sparedut/StartMatch")
+/** From the host, only in a training: the client's report of an interface step (`shared/training/interface.ts`). */
+export const ReportInterface = Descriptor.Event<{ readonly session: string; readonly action: InterfaceAction }>()("Sparedut/ReportInterface")
 
 export interface DamageValue {
   readonly victim: string
@@ -251,7 +254,7 @@ export const Game = Schema.bind(
     components: { Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers, Projectile },
     requires: [Schema.requires(Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers)],
     resources: { Rules, Objective, Tick, Score, Flags, Hill, Cart, Pickups, Turrets, Doors, History, Rng },
-    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, Damage, Heal, DoorHit, Out }
+    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, ReportInterface, Damage, Heal, DoorHit, Out }
   }),
   Root
 )
