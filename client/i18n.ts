@@ -77,6 +77,8 @@ export interface Strings {
     readonly lostRetry: string
     /** The host of an Offline room did not start in this browser. */
     readonly offlineFailed: string
+    /** Vêr was chosen, but with no network and never downloaded: Cumò is shown instead. */
+    readonly verOffline: string
   }
   readonly hud: {
     readonly over: string
@@ -452,7 +454,8 @@ const fur: Strings = {
     down: "Il server nol rispuint. Isal impiât? (pnpm dev)",
     lost: "Conession pierdude. Mandi!",
     lostRetry: "Conession pierdude: o torni a provâ…",
-    offlineFailed: "No rivi a inviâ la partide offline: torne a cjamâ la pagjine."
+    offlineFailed: "No rivi a inviâ la partide offline: torne a cjamâ la pagjine.",
+    verOffline: "Vêr nol è ancjemò stât discjamât e no tu âs rêt: intant tu viodis Cumò."
   },
   hud: {
     over: "FIN",
@@ -805,7 +808,8 @@ const it: Strings = {
     down: "Il server non risponde. È acceso? (pnpm dev)",
     lost: "Connessione persa. Mandi!",
     lostRetry: "Connessione persa: riprovo…",
-    offlineFailed: "Non riesco ad avviare la partita offline: ricarica la pagina."
+    offlineFailed: "Non riesco ad avviare la partita offline: ricarica la pagina.",
+    verOffline: "Vêr non è ancora stato scaricato e non c'è rete: intanto vedi Cumò."
   },
   hud: {
     over: "FINE",

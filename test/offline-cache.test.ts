@@ -50,8 +50,6 @@ test("anything that is not a plain read of the game's own origin goes to the net
 })
 
 test("a file of the game that is not in the build's list goes to the network", () => {
-  expect(route(get("/models/mitraie.glb", "cors"))).toBe("network")
-  expect(route(get("/tex/pietra_d.webp", "cors"))).toBe("network")
   expect(route(get("/assets/index-old.js", "cors"))).toBe("network")
 })
 

@@ -20,6 +20,7 @@ import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
 import { BrowserHostConnection } from "./offline.ts"
 import { registerServiceWorker } from "./offline-cache/register.ts"
+import { keepVerFilesOnceControlled, lookToShow, verState } from "./offline-cache/ver.ts"
 import { Link } from "./connection.ts"
 import { PerfMonitor } from "./perf.ts"
 import { loadSettings, saveSettings } from "./settings.ts"
@@ -38,7 +39,14 @@ renderer.toneMappingExposure = 1.05
 // The draw call and triangle count covers world and weapon: the frame resets it.
 renderer.info.autoReset = false
 const perf = new PerfMonitor(renderer)
-const look = createLook(lookFromUrl(), renderer)
+const chosenLook = lookFromUrl()
+// Vêr chosen with no network and never fetched: Cumò for this page, and the saved choice kept,
+// so Vêr comes back by itself once it can load (`client/offline-cache/ver.ts`).
+const shownLook = lookToShow(
+  chosenLook,
+  chosenLook === "ver" ? await verState({ caches: "caches" in globalThis ? caches : undefined, fetch: (url, init) => fetch(url, init) }) : "reachable"
+)
+const look = createLook(shownLook.look, renderer)
 
 /** The maximum pixel ratio per quality; dynamic resolution goes down to `minRatio`. */
 const maxRatio = () => Math.min(devicePixelRatio, settings.quality === "alta" ? 2 : settings.quality === "media" ? 1.5 : 1)
@@ -95,6 +103,14 @@ if (look.id === "ver")
       setDetailedWeapon(id, far)
     }
     viewmodel.remodel(id, model)
+  })
+// On the first visit Vêr's files arrive before the service worker controls the page: kept once it does.
+if (look.id === "ver" && import.meta.env.PROD)
+  keepVerFilesOnceControlled({
+    container: navigator.serviceWorker as ServiceWorkerContainer | undefined,
+    fetched: () => performance.getEntriesByType("resource").map((entry) => entry.name),
+    fetch: (url) => fetch(url),
+    origin: location.origin
   })
 const audio = createAudio()
 audio.setVolumes(settings.master, settings.music)
@@ -191,6 +207,7 @@ const menu = new Menu(settings, audio, {
   },
   settingsChanged: persist
 }, look.id)
+if (shownLook.fellBack) toast(t().net.verOffline)
 
 /** Public address announced by the server: used for invite links when playing from localhost. */
 let publicUrl: string | null = null

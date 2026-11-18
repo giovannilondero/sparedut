@@ -6,9 +6,10 @@
 /**
  * - `page`: a navigation inside the game, invite links included: the cached page.
  * - `precached`: a file of this build's list (`./precache.ts`): from the cache, the network if it is missing.
+ * - `first-use`: a Vêr file (`VER_PREFIXES`): from the Vêr cache, else the network, kept on the way (`storable`).
  * - `network`: everything else, never cached: the game socket, other origins, anything but a plain read.
  */
-export const ROUTES = ["page", "precached", "network"] as const
+export const ROUTES = ["page", "precached", "first-use", "network"] as const
 export type Route = (typeof ROUTES)[number]
 
 /** The parts of a `Request` the decision reads. */
@@ -37,5 +38,9 @@ export function routeOf(request: RequestLike, origin: string, precached: Readonl
   if (url.pathname === SOCKET_PATH || request.mode === "websocket" || request.headers.get("Upgrade")) return "network"
   if (request.mode === "navigate") return "page"
   if (url.search || request.headers.get("Range")) return "network"
+  if (isVerFile(url.pathname)) return "first-use"
   return precached.has(url.pathname) ? "precached" : "network"
 }
+
+/** Whether an answer to a `first-use` request is kept: a whole, successful answer of the game's own origin. */
+export const storable = (response: { readonly status: number; readonly type: string }) => response.status === 200 && response.type === "basic"
