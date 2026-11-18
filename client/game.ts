@@ -20,7 +20,7 @@ import { UnavailableSteps } from "./training-unavailable.ts"
 import type { StationId } from "../shared/training/index.ts"
 import { FRESH_TRAINING, trainingProgressed } from "./settings.ts"
 import { entryChoice, listOnEntry, stationButtonId, stationEntries, stationListHtml } from "./training-menu.ts"
-import { WEAPONS, type Slot, type WeaponId } from "../shared/weapons.ts"
+import { usesAmmo, WEAPONS, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
 import { Controls, trackedIn } from "./controls.ts"
@@ -65,6 +65,8 @@ const OPENED_CONTENT = MATCH_MENUS.map((m) => `#${MENU_PARTS[m][1]}`).join(", ")
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 const INTERP_TICKS = 6
+/** The keys of the quick phrases, in order: the number row, then the key after 0. */
+const PHRASE_KEYS = [..."1234567890".split("").map((d) => ({ code: `Digit${d}`, label: d })), { code: "Minus", label: "-" }]
 const SHOT_SOUND: Partial<Record<WeaponId, SoundName>> = {
   mandi: "shot_mandi",
   cramar: "shot_cramar",
@@ -255,7 +257,7 @@ export class Game {
     })
     $("quickchat").addEventListener("click", (e) => {
       const n = (e.target as HTMLElement).closest<HTMLElement>("[data-n]")?.dataset.n
-      if (n) this.key(`Digit${n}`, true)
+      if (n) this.key(PHRASE_KEYS[Number(n)].code, true)
     })
     const chat = $<HTMLInputElement>("chat-input")
     chat.addEventListener("keydown", (e) => {
@@ -885,9 +887,8 @@ export class Game {
       this.escape()
       return false
     }
-    if (this.quickOpen && /^Digit\d$/.test(code)) {
-      const n = Number(code.slice(5))
-      const phrase = QUICK_CHAT[(n + 9) % 10]
+    if (this.quickOpen && PHRASE_KEYS.some((k) => k.code === code)) {
+      const phrase = QUICK_CHAT[PHRASE_KEYS.findIndex((k) => k.code === code)]
       if (phrase) {
         this.d.net.send({ t: "chat", text: phrase })
         // Sending a quick phrase is a training's interface step.
@@ -935,7 +936,7 @@ export class Game {
     const gloss = t().game.quickGloss
     // On touch the list takes taps: each row says the phrase as its number key would.
     q.classList.toggle("tap", on && this.controls.touchActive)
-    if (on) q.innerHTML = QUICK_CHAT.map((p, i) => `<div data-n="${(i + 1) % 10}"><kbd>${(i + 1) % 10}</kbd>${esc(p)}${gloss ? ` <span class="muted">· ${gloss[i]}</span>` : ""}</div>`).join("")
+    if (on) q.innerHTML = QUICK_CHAT.map((p, i) => `<div data-n="${i}"><kbd>${PHRASE_KEYS[i].label}</kbd>${esc(p)}${gloss ? ` <span class="muted">· ${gloss[i]}</span>` : ""}</div>`).join("")
   }
 
   private openChat() {
@@ -1563,14 +1564,14 @@ export class Game {
       this.localSpin = turning ? Math.min(def.spinTicks, this.localSpin + 1) : Math.max(0, this.localSpin - 2)
     } else this.localSpin = 0
     const mag = this.localMag ?? you.arsenal.ammo[this.wanted].mag
-    const trigger = (def.mode === "auto" || def.mode === "beam" ? fire : pressedFire) && this.localSpin >= def.spinTicks
+    const trigger = (def.mode === "auto" || def.mode === "beam" || def.mode === "held" ? fire : pressedFire) && this.localSpin >= def.spinTicks
     if (trigger && this.localCooldown === 0 && !busy && you.arsenal.current === this.wanted) {
-      if (def.mode !== "melee" && mag <= 0) {
+      if (usesAmmo(def.id) && mag <= 0) {
         if (pressedFire) this.d.audio.play("dry")
       } else {
         this.localShot(def.id, input)
         this.localCooldown = def.cooldownTicks
-        if (def.mode !== "melee") {
+        if (usesAmmo(def.id)) {
           this.shots.push(input.seq)
           this.localMag = mag - 1
         }
@@ -1598,6 +1599,10 @@ export class Game {
     this.controls.rumble(def.kick * 4, 0.15 + def.kick * 3, def.mode === "melee" ? 90 : 60)
     if (def.mode === "melee") {
       audio.play("melee_swing")
+      return
+    }
+    if (def.mode === "held") {
+      audio.play("cut_motosee")
       return
     }
     if (def.mode === "projectile") {

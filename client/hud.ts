@@ -5,7 +5,7 @@ import { MODES, pick, TEAM_INFO, type ModeId } from "../shared/folklore.ts"
 import type { Team } from "../shared/map.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type SnapSelf, type Snapshot } from "../shared/protocol.ts"
 import type { KillCause } from "../shared/sim/events.ts"
-import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
+import { usesAmmo, type WeaponId } from "../shared/weapons.ts"
 import { maxHp } from "../shared/sim/rules.ts"
 import type { TrainingView } from "../shared/sim/view.ts"
 import { STATION_IDS } from "../shared/training/index.ts"
@@ -152,8 +152,7 @@ export class Hud {
     this.style("vitals", "--hp", String(share))
     this.style("vitals", "--armor", String(you.armor))
     const a = you.arsenal
-    const def = WEAPONS[a.current]
-    const endless = def.mode === "melee" || turret
+    const endless = !usesAmmo(a.current) || turret
     this.inHand = turret ? "mitraie" : a.current
     this.text("weapon-name", t().weapons[this.inHand].name)
     const ammo = a.ammo[a.current]

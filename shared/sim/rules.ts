@@ -185,6 +185,8 @@ export const freshPanels = (map: MapDef): PanelState[] => (map.panels ?? []).map
 
 /** Breakable doors take more from kicks (the mescul) than from pellets. */
 export const DOOR_MELEE_SCALE = 1.6
+/** And from the Motosee's teeth, so that a door falls in about a second of cutting. Starting value. */
+export const DOOR_CUT_SCALE = 1.2
 
 /** The turret `session` is using, if any. */
 export const turretOf = (turrets: ReadonlyArray<TurretState>, session: string): number => turrets.findIndex((t) => t.gunner === session)

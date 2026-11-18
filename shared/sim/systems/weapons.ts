@@ -1,6 +1,6 @@
 /**
  * Weapons: switching, reloading, hitscan fire with lag compensation,
- * melee (the mescul and the casot's panel), the miedi's beam, the Mulin's spin-up, frico and hen launches,
+ * melee (the mescul and the casot's panel), the Motosee's held melee, the miedi's beam, the Mulin's and the Motosee's spin-up, frico and hen launches,
  * sgnape bombs and Raibl mines, the turrets' mitraie. Sprinting players keep the weapon
  * lowered and don't fire. Shots and kicks splinter breakable doors.
  */
@@ -9,10 +9,10 @@ import { rayPose, type Pose } from "../../hitbox.ts"
 import { eyeHeight, lookDir, sprinting } from "../../movement.ts"
 import { turretAim } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
-import { BEAM_DAMAGE, RAIBL_MINE, SGNAPE_BOMB, SHELLS, TURRET, WEAPONS, type WeaponId } from "../../weapons.ts"
+import { BEAM_DAMAGE, RAIBL_MINE, SGNAPE_BOMB, SHELLS, TURRET, usesAmmo, WEAPONS, type WeaponId } from "../../weapons.ts"
 import type { Vec3 } from "../../vec.ts"
 import type { P3 } from "../events.ts"
-import { allied, damageAt, DOOR_MELEE_SCALE, hostile, owned, RAISE_TICKS, turretOf } from "../rules.ts"
+import { allied, damageAt, DOOR_CUT_SCALE, DOOR_MELEE_SCALE, hostile, owned, RAISE_TICKS, turretOf } from "../rules.ts"
 import {
   Arsenal,
   Controls,
@@ -206,10 +206,10 @@ export const UseWeapons = Game.System(
 
       const def = WEAPONS[a.current]
       const ammo = a.ammo[a.current]
-      const needsAmmo = def.mode !== "melee"
-      const automatic = def.mode === "auto" || def.mode === "beam"
+      const needsAmmo = usesAmmo(a.current)
+      const automatic = def.mode === "auto" || def.mode === "beam" || def.mode === "held"
       const trigger = automatic ? held(controls, "fire") : justPressed(controls, "fire")
-      // The Mulin spins while the trigger is held (and the weapon is up), then slows down.
+      // The Mulin (and the Motosee, revving) spins while the trigger is held (and the weapon is up), then slows down.
       if (def.spinTicks > 0) {
         const turning = held(controls, "fire") && !running && a.action._tag !== "reload" && a.action._tag !== "switch"
         a = { ...a, spin: turning ? Math.min(def.spinTicks, a.spin + 1) : Math.max(0, a.spin - 2) }
@@ -260,6 +260,20 @@ export const UseWeapons = Game.System(
             if (wall?.door != null) events.doorHit.emit({ door: wall.door, amount: def.damage * DOOR_MELEE_SCALE, by: session })
           }
           events.out.emit({ t: "melee", s: session, hit: best !== null })
+        } else if (def.mode === "held") {
+          // The Motosee bites the nearest hostile player in front, within reach; with nobody there, the door in front.
+          const dir = lookDir(input.yaw, input.pitch)
+          let best: { session: string; dist: number } | null = null
+          for (const [other, pose] of targets) {
+            if (!hittable(other)) continue
+            const hit = rayPose(eye, dir, pose) ?? rayPose(eye, lookDir(input.yaw, input.pitch - 0.25), pose)
+            if (hit && hit.dist <= def.range && (!best || hit.dist < best.dist)) best = { session: other, dist: hit.dist }
+          }
+          if (best) events.damage.emit({ victim: best.session, attacker: session, amount: damageAt(a.current, best.dist, false), weapon: a.current, head: false, push: null })
+          else {
+            const wall = physics.raycast(eye, dir, def.range)
+            if (wall?.door != null) events.doorHit.emit({ door: wall.door, amount: def.damage * DOOR_CUT_SCALE, by: session })
+          }
         } else if (def.mode === "projectile" && def.shell) {
           const dir = lookDir(input.yaw, input.pitch)
           const shell = SHELLS[def.shell]
