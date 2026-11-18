@@ -226,7 +226,8 @@ export class Hud {
       this.text("clock", "")
       this.text("mode-label", `${s.modes[mode].name} · ${s.modes[mode].sub}`)
       this.html("objective", this.objectiveLine(snap, names))
-      this.html("banner", "")
+      // The storm's step (#49): outside the ring, the same warning as in La Tampieste.
+      this.html("banner", outside ? `<b class="storm">${s.hud.stormOutside}</b>` : "")
       return
     }
     const alone = mode === "tampieste"

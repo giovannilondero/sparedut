@@ -189,6 +189,22 @@ export interface CartValue {
 }
 export const Cart = Descriptor.Resource<CartValue>()("Sparedut/Cart")
 
+/**
+ * A storm on a course of its own (the training's, `StepGiven.storm`): closing on (`x`, `z`) from
+ * `from` to `to` metres over `ticks` ticks from tick `start`, then holding. Null where the storm
+ * follows the match clock instead (a regular room's Tampieste, `stormAt`); read only while the
+ * storm is the objective in force.
+ */
+export interface StormCourseValue {
+  readonly x: number
+  readonly z: number
+  readonly from: number
+  readonly to: number
+  readonly start: number
+  readonly ticks: number
+}
+export const StormCourse = Descriptor.Resource<StormCourseValue | null>()("Sparedut/StormCourse")
+
 /** A turret (one per `map.turrets`, same order). */
 export interface TurretState {
   /** Who is using it (session): stays put behind the gun until they dismount or die. */
@@ -271,7 +287,7 @@ export const Game = Schema.bind(
   Schema.fragment({
     components: { Player, TeamOf, Post, Motion, Controls, Life, Arsenal, Stats, Attackers, Projectile },
     requires: [Schema.requires(Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers)],
-    resources: { Rules, Objective, Tick, Score, Flags, Hill, Cart, Pickups, Turrets, Doors, History, Rng },
+    resources: { Rules, Objective, Tick, Score, Flags, Hill, Cart, StormCourse, Pickups, Turrets, Doors, History, Rng },
     events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, ReportInterface, Damage, Heal, DoorHit, Out }
   }),
   Root
