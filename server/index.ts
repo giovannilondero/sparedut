@@ -11,6 +11,7 @@ import { createPhysicsWorld, initPhysics, type PhysicsWorld } from "../shared/ph
 import { Hub, type Peer } from "./hub.ts"
 import { warmNavGraph } from "./nav.ts"
 import { networkOf, type NetworkId } from "./network.ts"
+import { headersFor, parseHeaders } from "./static-headers.ts"
 
 const PORT = Number(process.env.PORT ?? 3007)
 const TRUST_PROXY = process.env.TRUST_PROXY === "1"
@@ -21,18 +22,8 @@ interface SocketData {
   peer: Peer | null
 }
 
-/** The security headers from the `/*` block of `_headers`, the same ones Cloudflare sets. */
-function staticHeaders(): Record<string, string> {
-  const file = join(DIST, "_headers")
-  if (!existsSync(file)) return {}
-  const out: Record<string, string> = {}
-  for (const line of readFileSync(file, "utf8").split("\n")) {
-    const header = /^\s+([\w-]+):\s*(.+)$/.exec(line)
-    if (header) out[header[1]] = header[2].trim()
-  }
-  return out
-}
-const HEADERS = staticHeaders()
+/** The blocks of `_headers`, the same ones Cloudflare applies: security headers everywhere, revalidation for the service worker. */
+const HEADERS = parseHeaders(existsSync(join(DIST, "_headers")) ? readFileSync(join(DIST, "_headers"), "utf8") : "")
 
 await initPhysics()
 const hub = new Hub()
@@ -80,7 +71,7 @@ Bun.serve<SocketData>({
     if (existsSync(DIST)) {
       const path = url.pathname === "/" ? "/index.html" : url.pathname
       const file = Bun.file(join(DIST, path))
-      return file.exists().then((ok) => new Response(ok ? file : Bun.file(join(DIST, "index.html")), { headers: HEADERS }))
+      return file.exists().then((ok) => new Response(ok ? file : Bun.file(join(DIST, "index.html")), { headers: headersFor(HEADERS, ok ? path : "/") }))
     }
     return new Response("Client not built: use `pnpm dev` and open the Vite port (5173).", { status: 404 })
   },

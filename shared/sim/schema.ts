@@ -11,7 +11,7 @@ import type { PlayerInput } from "../input.ts"
 import type { MapId, Team } from "../map.ts"
 import type { Body } from "../movement.ts"
 import type { PhysicsWorld } from "../physics.ts"
-import type { ModeId } from "../folklore.ts"
+import type { ModeId, ObjectiveId } from "../folklore.ts"
 import type { PrimaryId, ProjectileKind, WeaponId } from "../weapons.ts"
 import type { GameEvent, KillCause } from "./events.ts"
 
@@ -148,6 +148,8 @@ export interface RulesValue {
   readonly friendlyFire: boolean
 }
 export const Rules = Descriptor.Resource<RulesValue>()("Sparedut/Rules")
+/** The objective in force: the objective systems read this, never the mode. A regular room derives it from its mode. */
+export const Objective = Descriptor.Resource<ObjectiveId>()("Sparedut/Objective")
 export const Tick = Descriptor.Resource<number>()("Sparedut/Tick")
 export const Score = Descriptor.Resource<Readonly<Record<Team, number>>>()("Sparedut/Score")
 
@@ -248,7 +250,7 @@ export const Game = Schema.bind(
   Schema.fragment({
     components: { Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers, Projectile },
     requires: [Schema.requires(Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers)],
-    resources: { Rules, Tick, Score, Flags, Hill, Cart, Pickups, Turrets, Doors, History, Rng },
+    resources: { Rules, Objective, Tick, Score, Flags, Hill, Cart, Pickups, Turrets, Doors, History, Rng },
     events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, Damage, Heal, DoorHit, Out }
   }),
   Root

@@ -28,6 +28,21 @@ export const MODES = {
 export const MODE_IDS = Object.keys(MODES) as ModeId[]
 
 /**
+ * The objective in force: which objective system plays. At most one at a time.
+ * `placute` is the hill of Re de Plaçute, `storm` the Tampieste's closing circle.
+ */
+export type ObjectiveId = "none" | "frico" | "placute" | "cjar" | "storm"
+
+/** The objective each regular mode puts in force. */
+export const MODE_OBJECTIVE = {
+  bataie: "none",
+  frico: "frico",
+  culine: "placute",
+  cjar: "cjar",
+  tampieste: "storm"
+} as const satisfies Record<ModeId, ObjectiveId>
+
+/**
  * Quick chat (V key): sent as chat text, so it stays in Friulian for
  * everyone. The client shows a translation if the language is different.
  */

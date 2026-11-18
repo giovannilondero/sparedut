@@ -5,7 +5,7 @@ import { TEAMS, trackLength, trackPoint, type Team } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
 import { DT } from "../../movement.ts"
 import { CART, FLAG_RETURN_TICKS, otherTeam } from "../rules.ts"
-import { Cart, Flags, Game, Hill, Life, Match, Motion, Out, Player, Rules, Score, Stats, TeamOf, type CartValue, type FlagState } from "../schema.ts"
+import { Cart, Flags, Game, Hill, Life, Match, Motion, Objective, Out, Player, Rules, Score, Stats, TeamOf, type CartValue, type FlagState } from "../schema.ts"
 
 type CartMotion = "push" | "stop" | "back" | "still"
 const cartMotion = (c: CartValue): CartMotion => (c.contested ? "stop" : c.pushers > 0 ? "push" : c.idle > CART.idleTicks && c.d > 0 ? "back" : "still")
@@ -28,6 +28,7 @@ export const PlayObjectives = Game.System(
     },
     resources: {
       rules: Game.System.readResource(Rules),
+      objective: Game.System.readResource(Objective),
       flags: Game.System.writeResource(Flags),
       hill: Game.System.writeResource(Hill),
       cart: Game.System.writeResource(Cart),
@@ -39,6 +40,7 @@ export const PlayObjectives = Game.System(
   ({ queries, resources, events, machines }) => {
     const { data } = queries.players
     const rules = resources.rules.get()
+    const objective = resources.objective.get()
     const phase = machines.match.get()._tag
     if (phase === "Over") return
     const live = phase === "Live"
@@ -56,7 +58,7 @@ export const PlayObjectives = Game.System(
       return dx * dx + dz * dz < r * r && Math.abs(b.y - at[1]) < 2.2
     }
 
-    if (rules.mode === "frico") {
+    if (objective === "frico") {
       const flags: Record<Team, FlagState> = { ...resources.flags.get() }
       for (const team of TEAMS) {
         const flag = flags[team]
@@ -110,7 +112,7 @@ export const PlayObjectives = Game.System(
       resources.flags.set(flags)
     }
 
-    if (rules.mode === "culine") {
+    if (objective === "placute") {
       const inside = players.filter((p) => p.alive && near(p.body, HILL.at, HILL.radius))
       const teams = new Set(inside.map((p) => p.team))
       const hill = resources.hill.get()
@@ -125,7 +127,7 @@ export const PlayObjectives = Game.System(
       resources.hill.set({ owner, contested, ticks })
     }
 
-    if (rules.mode === "cjar") {
+    if (objective === "cjar") {
       const length = trackLength(track)
       const cart = resources.cart.get()
       if (cart.d >= length) return
