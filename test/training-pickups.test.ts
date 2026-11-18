@@ -178,12 +178,12 @@ describe("station 9: the turret and the Lanciafrico", () => {
     drive(10, tap(BUTTON.use), (e) => e.some((x) => x.t === "turret" && x.a === "on"))
     drive(60 * 10, () => ({ yaw: TURRET.yaw, buttons: BUTTON.fire }), (e) => e.some((x) => x.t === "turret" && x.a === "hot"))
     drive(10, tap(BUTTON.use), (e) => e.some((x) => x.t === "turret" && x.a === "off"))
-    expect(snap().you!.arsenal.launcher).toBe(false)
+    expect(snap().you!.arsenal.power).toBeNull()
 
     const picked = walkTo(LANCIAFRICO)
     expect(picked).toContainEqual(expect.objectContaining({ t: "pick", k: "lanciafrico" }))
     expect(steps(picked)).toEqual(["pickLanciafrico"])
-    expect(snap().you!.arsenal).toMatchObject({ launcher: true, current: "lanciafrico" })
+    expect(snap().you!.arsenal).toMatchObject({ power: "lanciafrico", current: "lanciafrico" })
 
     // One press, one frico: it is not automatic.
     const fired = drive(60 * 3, (i) => ({ ...tap(BUTTON.fire)(i), weapon: "lanciafrico" }), (e) => e.some((x) => x.t === "training" && x.a === "station"))
@@ -238,12 +238,12 @@ describe("entering a station again", () => {
     const index = SAGRE_STATIONS.turret.lanciafrico
     const { me, snap, walkTo, drive } = reach("turret", true)
     walkTo(LANCIAFRICO)
-    expect(snap().you!.arsenal.launcher).toBe(true)
+    expect(snap().you!.arsenal.power).toBe("lanciafrico")
     expect(snap().pickups[index]).toBe("0")
     me.say({ t: "goTo", station: "turret" })
     drive(6, () => ({}))
     expect(snap().pickups[index]).toBe("1")
-    expect(snap().you!.arsenal.launcher).toBe(false)
+    expect(snap().you!.arsenal.power).toBeNull()
     expect(snap().training).toMatchObject({ station: "turret", step: "mount", count: 0 })
   })
 })

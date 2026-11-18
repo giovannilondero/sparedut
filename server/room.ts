@@ -320,6 +320,7 @@ export class Room {
       storm: w.storm,
       turrets: w.turrets.map((t) => ({ ...t, heat: r2(t.heat) })),
       doors: w.doors.map((d) => Math.ceil(d)),
+      panels: w.panels.map((p) => (p.tag === "tearing" ? { ...p, progress: r2(p.progress) } : p)),
       pickups: w.pickups.map((p) => (p ? "1" : "0")).join(""),
       proj: w.projectiles.map((p) => [p.kind, r2(p.x), r2(p.y), r2(p.z)] as const),
       players: others,

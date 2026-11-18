@@ -20,6 +20,9 @@ export const menuControl = (device: Device): string => MENU_CONTROL[device]
 
 export const turretPrompt = (s: Strings, device: Device, mounted: boolean): string => (mounted ? s.hud.turretLeave : s.hud.turretUse)[device]
 
+/** Facing the casot's panel: the control to hold to tear it off. */
+export const panelPrompt = (s: Strings, device: Device): string => s.hud.panelTear[device]
+
 /**
  * The control a training step names, as the active device shows it: a key or mouse button, a
  * controller's button, the on-screen control. Null when the device has no control for it

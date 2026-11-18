@@ -6,7 +6,7 @@ import * as THREE from "three"
 import { BOT_LEVEL_IDS, QUICK_CHAT, TEAM_INFO, type BotLevel } from "../shared/folklore.ts"
 import { rayPose } from "../shared/hitbox.ts"
 import { BUTTON, IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
-import { freeTurretInReach, turretAim, turretSeat, type MapId, type PickupKind, type Team } from "../shared/map.ts"
+import { facesPanel, freeTurretInReach, turretAim, turretSeat, type MapId, type PickupKind, type Team } from "../shared/map.ts"
 import { DISCO } from "../shared/maps/maran.ts"
 import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, seatedBody, sprinting } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
@@ -437,6 +437,8 @@ export class Game {
     this.snap = s
     // Broken-down doors no longer stop predicted movement or shots.
     this.physics.setDoors(s.doors.map((hp) => hp > 0))
+    // A panel torn off leaves its gap: predicted shots pass through it (bodies still cannot).
+    this.physics.setPanels(s.panels.map((p) => p.tag !== "off"))
     // The training's closed ways stop predicted movement as they stop it on the host.
     const gates = this.physics.map.gates?.length ?? 0
     const at = viewedStation(s.training)
@@ -471,7 +473,13 @@ export class Game {
       this.seated = you.alive && this.mounted() >= 0
       const mounted = this.mounted() >= 0
       const body = this.predictor.body
-      this.controls.track(trackedIn(s, this.me, { mounted, freeTurret: body !== null && freeTurretInReach(this.physics.map.turrets, s.turrets, body) >= 0 }))
+      this.controls.track(
+        trackedIn(s, this.me, {
+          mounted,
+          freeTurret: body !== null && freeTurretInReach(this.physics.map.turrets, s.turrets, body) >= 0,
+          panel: you.alive && body !== null && this.panelToTear(s, body) >= 0
+        })
+      )
       // The server has already seen my last weapon switch and holds a different one: it
       // switched it itself (lanciafrico pickup, armoury, respawn) or rejected the switch. Follow it.
       const server = you.arsenal.current
@@ -623,6 +631,15 @@ export class Game {
         if (broken) this.hud.announce(t().game.doorBroken(this.names.get(e.s) ?? "?"), t().game.doorSub)
         return
       }
+      case "panel": {
+        const panel = this.physics.map.panels?.[e.i]
+        if (!panel) return
+        const at: P3 = [(panel.min[0] + panel.max[0]) / 2, (panel.min[1] + panel.max[1]) / 2, (panel.min[2] + panel.max[2]) / 2]
+        fx.splinters(at, true)
+        audio.play("door_break", { at })
+        this.hud.announce(t().game.panelTorn(this.names.get(e.s) ?? "?"), t().game.panelSub)
+        return
+      }
       case "bounce":
         audio.play("bounce", { at: e.p, volume: 0.6 })
         return
@@ -738,6 +755,19 @@ export class Game {
   }
 
   /** The turret I'm using, or -1. */
+  /**
+   * The panel holding "use" would tear off now, as the simulation decides it (`TearPanels`): on its
+   * wall or being torn by me, faced from inside with slot 3 free. -1 when none.
+   */
+  private panelToTear(s: Snapshot, body: { readonly x: number; readonly y: number; readonly z: number }): number {
+    const defs = this.physics.map.panels ?? []
+    if (defs.length === 0 || s.you?.arsenal.power !== null) return -1
+    return defs.findIndex((def, i) => {
+      const state = s.panels[i]
+      return state !== undefined && (state.tag === "wall" || (state.tag === "tearing" && state.by === this.me)) && facesPanel(def, body, this.controls.yaw)
+    })
+  }
+
   private mounted() {
     return this.snap?.turrets.findIndex((t) => t.gunner === this.me) ?? -1
   }
@@ -1609,6 +1639,7 @@ export class Game {
           }
         }),
         doors: s.doors.map((hp, i) => hp / (this.physics.map.doors[i]?.hp ?? 1)),
+        panels: s.panels.map((p) => (p.tag === "off" ? null : p.tag === "tearing" ? p.progress : 0)),
         gates: this.gates,
         camera
       })
@@ -1633,6 +1664,9 @@ export class Game {
       // At the turret: the heat. Near a free one: the key to mount it (the same decision as the touch "use" button).
       const gun = turret >= 0 ? s?.turrets[turret] ?? null : null
       this.hud.turret(gun ? { heat: gun.heat, jammed: gun.jammed } : null, this.controls.turretControl === "use", this.controls.device)
+      // Facing the casot's panel: the control to hold, and how far my tear has got (the same decision as the touch "use" button).
+      const tearing = s?.panels.find((p) => p.tag === "tearing" && p.by === this.me)
+      this.hud.panel(this.controls.turretControl === "tear", tearing?.tag === "tearing" ? tearing.progress : 0, this.controls.device)
       const speed = b ? Math.hypot(b.vx, b.vz) : 0
       const spread = aiming ? def.spread.aimed : speed > 1.5 || !b?.grounded ? def.spread.moving : def.spread.still
       const px = (Math.tan(spread) / Math.tan(((camera.fov / 2) * Math.PI) / 180)) * (innerHeight / 2)

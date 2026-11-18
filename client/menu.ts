@@ -569,7 +569,7 @@ export class Menu {
       const w = WEAPONS[id]
       const text = s.weapons[id]
       const rate = 60 / w.cooldownTicks
-      const tag = isPrimary(id) ? s.menu.tag.primary : id === "lanciafrico" ? s.menu.tag.power : id === "mescul" ? s.menu.tag.melee : s.menu.tag.pistol
+      const tag = isPrimary(id) ? s.menu.tag.primary : w.slot === 3 ? s.menu.tag.power : id === "mescul" ? s.menu.tag.melee : s.menu.tag.pistol
       return `<span class="tag">${w.slot} · ${tag}</span><b id="${target.id}-${id}">${text.name}</b><span class="blurb" id="${target.id}-${id}-blurb">${text.blurb}</span>
         <span class="stats">${bar(s.menu.stat.damage, (w.damage * w.pellets) / max.damage)}${bar(s.menu.stat.rate, rate / max.rate)}${bar(s.menu.stat.range, (w.range || 120) / max.range)}${bar(s.menu.stat.mag, Math.max(w.magazine, 1) / max.mag)}</span>`
     }

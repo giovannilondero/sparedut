@@ -1,5 +1,6 @@
 /**
- * Pickups: frico (health), gubane (armor), sgnape (speed), munizions, lanciafrico.
+ * Pickups: frico (health), gubane (armor), sgnape (speed), munizions, lanciafrico (not for
+ * whoever carries the casot's panel: they share slot 3).
  */
 import type { PickupKind } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
@@ -15,7 +16,7 @@ export const RESPAWN_OF = {
   lanciafrico: 45 * 60
 } as const satisfies Record<PickupKind, number>
 
-const ammoFull = (a: ArsenalValue) => WEAPON_IDS.every((id) => !(id === a.primary || id === "mandi" || (id === "lanciafrico" && a.launcher)) || a.ammo[id].reserve >= WEAPONS[id].reserve)
+const ammoFull = (a: ArsenalValue) => WEAPON_IDS.every((id) => !(id === a.primary || id === "mandi" || id === a.power) || a.ammo[id].reserve >= WEAPONS[id].reserve)
 
 export const CollectPickups = Game.System(
   "Sparedut/CollectPickups",
@@ -69,9 +70,14 @@ export const CollectPickups = Game.System(
             break
           }
           case "lanciafrico":
+            // Slot 3 holds one thing: whoever carries the panel leaves the Lanciafrico where it is.
+            if (a.power === "panel") {
+              used = false
+              break
+            }
             data.arsenal.set(m, {
               ...a,
-              launcher: true,
+              power: "lanciafrico",
               current: "lanciafrico",
               action: { _tag: "switch", ticks: 20 },
               ammo: { ...a.ammo, lanciafrico: { mag: WEAPONS.lanciafrico.magazine, reserve: WEAPONS.lanciafrico.reserve } }

@@ -11,13 +11,13 @@ import type { Body } from "./movement.ts"
 import type { GameEvent } from "./sim/events.ts"
 import type { ArsenalValue, FlagState, HillValue, TurretState } from "./sim/schema.ts"
 import type { StormValue } from "./sim/rules.ts"
-import type { CartView, PhaseView, TrainingView } from "./sim/view.ts"
+import type { CartView, PanelView, PhaseView, TrainingView } from "./sim/view.ts"
 import { PRIMARIES, type PrimaryId, type ProjectileKind, type WeaponId } from "./weapons.ts"
 import { INTERFACE_ACTIONS } from "./training/interface.ts"
 import { isStepId, isStepOf, STATION_IDS, type StepId } from "./training/index.ts"
 import { DEVICES } from "./devices.ts"
 
-export const PROTOCOL_VERSION = 14
+export const PROTOCOL_VERSION = 15
 export const MAX_PLAYERS = 16
 export const SNAPSHOT_EVERY = 2 // ticks: 30 snapshots per second
 /** The longest round trip a client reports, in milliseconds. */
@@ -218,6 +218,8 @@ export interface Snapshot {
   readonly turrets: ReadonlyArray<TurretState>
   /** Health of the breakable doors, in `map.doors` order (0 = broken down). */
   readonly doors: readonly number[]
+  /** The map's panels, in `map.panels` order: on the wall, being torn off, or off. */
+  readonly panels: readonly PanelView[]
   readonly players: readonly SnapOther[]
   readonly you: SnapSelf | null
   /** Only in a training: where the trainee is in it. */

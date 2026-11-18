@@ -5,8 +5,8 @@
 import { TEAMS } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
 import type { Winner } from "../events.ts"
-import { freshDoors, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL, NO_STATS, OVER_TICKS, START_GRACE_TICKS, WARMUP_TICKS } from "../rules.ts"
-import { Attackers, Cart, Doors, Flags, Game, Hill, Life, Match, Out, Pickups, Player, Rules, Score, StartMatch, Stats, Tick, Turrets } from "../schema.ts"
+import { freshDoors, freshPanels, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL, NO_STATS, OVER_TICKS, START_GRACE_TICKS, WARMUP_TICKS } from "../rules.ts"
+import { Attackers, Cart, Doors, Flags, Game, Hill, Life, Match, Out, Panels, Pickups, Player, Rules, Score, StartMatch, Stats, Tick, Turrets } from "../schema.ts"
 
 export const AdvanceTick = Game.System(
   "Sparedut/AdvanceTick",
@@ -38,7 +38,8 @@ export const MatchFlow = Game.System(
       cart: Game.System.writeResource(Cart),
       pickups: Game.System.writeResource(Pickups),
       turrets: Game.System.writeResource(Turrets),
-      doors: Game.System.writeResource(Doors)
+      doors: Game.System.writeResource(Doors),
+      panels: Game.System.writeResource(Panels)
     },
     events: { start: Game.System.readEvent(StartMatch), out: Game.System.writeEvent(Out) },
     machines: { match: Game.System.machine(Match) },
@@ -59,6 +60,7 @@ export const MatchFlow = Game.System(
       resources.pickups.set(MAPS[rules.map].pickups.map(() => ({ _tag: "up" })))
       resources.turrets.set(freshTurrets(MAPS[rules.map]))
       resources.doors.set(freshDoors(MAPS[rules.map]))
+      resources.panels.set(freshPanels(MAPS[rules.map]))
       for (const m of queries.players.each()) {
         data.stats.set(m, NO_STATS)
         data.attackers.set(m, [])

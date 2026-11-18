@@ -4,7 +4,7 @@
  */
 import type { MapDef, Spawn, Team } from "../map.ts"
 import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../weapons.ts"
-import type { Ammo, ArsenalValue, CartValue, FlagState, HillValue, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
+import type { Ammo, ArsenalValue, CartValue, FlagState, HillValue, PanelState, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
 
 export const MAX_HP = 100
 export const MAX_ARMOR = 100
@@ -104,7 +104,7 @@ export function freshArsenal(primary: PrimaryId): ArsenalValue {
     current: primary,
     primary,
     nextPrimary: primary,
-    launcher: false,
+    power: null,
     ammo: freshAmmo(),
     action: { _tag: "switch", ticks: 20 },
     bombs: SGNAPE_BOMB.perLife,
@@ -120,7 +120,7 @@ export const NO_STATS: StatsValue = { kills: 0, deaths: 0, assists: 0, caps: 0, 
 
 /** The weapons the player can hold right now (the mitraie isn't held: you use the turret). */
 export const owned = (a: ArsenalValue, id: WeaponId) =>
-  id === "mescul" || id === "mandi" || id === a.primary || (id === "lanciafrico" && a.launcher)
+  id === "mescul" || id === "mandi" || id === a.primary || id === a.power
 
 /** The weapon a number key selects: the one in that slot the player owns (in slot 1, the primary), or null. */
 export const weaponInSlot = (a: ArsenalValue, slot: Slot): WeaponId | null => WEAPON_IDS.find((id) => WEAPONS[id].slot === slot && owned(a, id)) ?? null
@@ -137,6 +137,8 @@ export const currentStation = (training: { readonly _tag: "Off" | "Complete" } |
 /** Cool, free turrets and intact doors: how they are at match start. */
 export const freshTurrets = (map: MapDef): TurretState[] => map.turrets.map(() => ({ gunner: null, heat: 0, jammed: false, cooldown: 0 }))
 export const freshDoors = (map: MapDef): number[] => map.doors.map((d) => d.hp)
+/** Every panel on its wall: how they are at match start. */
+export const freshPanels = (map: MapDef): PanelState[] => (map.panels ?? []).map(() => ({ _tag: "wall" }))
 
 /** Breakable doors take more from kicks (the mescul) than from pellets. */
 export const DOOR_MELEE_SCALE = 1.6

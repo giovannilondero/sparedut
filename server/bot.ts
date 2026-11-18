@@ -85,7 +85,7 @@ export class BotBrain {
     // Weapon: the lanciafrico if there is one, the double-barrel only up close, otherwise the primary.
     const a = me.arsenal
     let weapon: WeaponId = a.primary
-    if (a.launcher && a.ammo.lanciafrico.mag + a.ammo.lanciafrico.reserve > 0) weapon = "lanciafrico"
+    if (a.power === "lanciafrico" && a.ammo.lanciafrico.mag + a.ammo.lanciafrico.reserve > 0) weapon = "lanciafrico"
     else if (a.ammo[a.primary].mag + a.ammo[a.primary].reserve === 0) weapon = "mandi"
     if (enemy && enemyDist < 2.2) weapon = "mescul"
 
