@@ -184,24 +184,22 @@ export class Hub {
         this.send(peer, { t: "pong", c: msg.c, tick: room?.tick ?? 0 })
         return
     }
-    // An interface step's report: only a training takes it.
-    if (msg.t === "report") {
+    // A training's own intents: only a training takes them.
+    if (msg.t === "report" || msg.t === "unavailable" || msg.t === "goTo" || msg.t === "startOver") {
       if (!room?.training) return this.send(peer, { t: "error", code: "invalid" })
-      room.sim.report(id, msg.a)
-      return
-    }
-    // A step the player's device cannot perform: only a training takes the word for it.
-    if (msg.t === "unavailable") {
-      if (!room?.training) return this.send(peer, { t: "error", code: "invalid" })
-      room.sim.unavailable(id, msg.station, msg.step, msg.device)
-      return
-    }
-    // Going to a station, restarting one, starting over: only a training takes them.
-    if (msg.t === "goTo" || msg.t === "startOver") {
-      if (!room?.training) return this.send(peer, { t: "error", code: "invalid" })
-      if (msg.t === "goTo") room.sim.goTo(id, msg.station)
-      else room.sim.startOver(id)
-      return
+      switch (msg.t) {
+        // An interface step's report.
+        case "report":
+          return room.sim.report(id, msg.a)
+        // A step the player's device cannot perform.
+        case "unavailable":
+          return room.sim.unavailable(id, msg.station, msg.step, msg.device)
+        // Going to a station (the current one: restarting it), or starting over.
+        case "goTo":
+          return room.sim.goTo(id, msg.station)
+        case "startOver":
+          return room.sim.startOver(id)
+      }
     }
     if (!room) return
     // A training has no host tools, and its player stays a Benandante.
