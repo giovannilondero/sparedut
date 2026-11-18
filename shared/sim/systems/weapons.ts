@@ -153,7 +153,7 @@ export const UseWeapons = Game.System(
           }
         }
         for (const [victim, d] of dealt) {
-          const value: DamageValue = { victim, attacker: session, amount: d.amount, weapon, head: d.head, push: null }
+          const value: DamageValue = { victim, attacker: session, amount: d.amount, weapon, head: d.head, push: null, from: { x: eye.x, z: eye.z } }
           events.damage.emit(value)
         }
         events.out.emit({ t: "shot", s: session, w: weapon, o: r3(eye), e: ends, hw: hitWorld })
@@ -242,7 +242,7 @@ export const UseWeapons = Game.System(
           if (touched) {
             const theirs = teamOf.get(touched.session) ?? team
             if (allied(rules, team, theirs)) events.heal.emit({ target: touched.session, healer: session, amount: def.damage })
-            else if (hittable(touched.session)) events.damage.emit({ victim: touched.session, attacker: session, amount: BEAM_DAMAGE, weapon: "miedi", head: false, push: null })
+            else if (hittable(touched.session)) events.damage.emit({ victim: touched.session, attacker: session, amount: BEAM_DAMAGE, weapon: "miedi", head: false, push: null, from: { x: eye.x, z: eye.z } })
           }
           events.out.emit({ t: "shot", s: session, w: a.current, o: r3(eye), e: [r3({ x: eye.x + dir.x * reach, y: eye.y + dir.y * reach, z: eye.z + dir.z * reach })], hw: [false] })
         } else if (def.mode === "melee") {
@@ -253,7 +253,7 @@ export const UseWeapons = Game.System(
             const hit = rayPose(eye, dir, pose) ?? rayPose(eye, lookDir(input.yaw, input.pitch - 0.25), pose)
             if (hit && hit.dist <= def.range && (!best || hit.dist < best.dist)) best = { session: other, dist: hit.dist, head: hit.head }
           }
-          if (best) events.damage.emit({ victim: best.session, attacker: session, amount: damageAt(a.current, best.dist, best.head), weapon: a.current, head: best.head, push: null })
+          if (best) events.damage.emit({ victim: best.session, attacker: session, amount: damageAt(a.current, best.dist, best.head), weapon: a.current, head: best.head, push: null, from: { x: eye.x, z: eye.z } })
           else {
             // A kick at the door.
             const wall = physics.raycast(eye, dir, def.range)
@@ -269,7 +269,7 @@ export const UseWeapons = Game.System(
             const hit = rayPose(eye, dir, pose) ?? rayPose(eye, lookDir(input.yaw, input.pitch - 0.25), pose)
             if (hit && hit.dist <= def.range && (!best || hit.dist < best.dist)) best = { session: other, dist: hit.dist }
           }
-          if (best) events.damage.emit({ victim: best.session, attacker: session, amount: damageAt(a.current, best.dist, false), weapon: a.current, head: false, push: null })
+          if (best) events.damage.emit({ victim: best.session, attacker: session, amount: damageAt(a.current, best.dist, false), weapon: a.current, head: false, push: null, from: { x: eye.x, z: eye.z } })
           else {
             const wall = physics.raycast(eye, dir, def.range)
             if (wall?.door != null) events.doorHit.emit({ door: wall.door, amount: def.damage * DOOR_CUT_SCALE, by: session })

@@ -68,7 +68,8 @@ export const FlyProjectiles = Game.System(
           amount,
           weapon: blast.cause,
           head: false,
-          push: { x: dx * inv * push, y: 4 + 6 * falloff, z: dz * inv * push }
+          push: { x: dx * inv * push, y: 4 + 6 * falloff, z: dz * inv * push },
+          from: { x: at.x, z: at.z }
         })
         // The gjaline's feathers: whoever is hit can't see anything for a while.
         if (p.kind === "gjaline") events.out.emit({ t: "plumis", v: target.session, n: Math.round(GJALINE.blindTicks * (0.5 + 0.5 * falloff)) })

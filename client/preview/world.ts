@@ -116,9 +116,12 @@ const walkCamera = (dt: number) => {
   return true
 }
 /** The cjar going back and forth along the track, the storm closing in. */
-/** `?panel=wall|off` holds the casot's panel on its wall or torn off; otherwise it shakes and comes away with the door. */
+/**
+ * `?panel=wall|off|lying` holds the casot's panel on its wall, torn off, or torn off and lying on the
+ * floor in front of its gap (fallen from a carrier); otherwise it shakes and comes away with the door.
+ */
 const panelAt = q.get("panel")
-const extras = (t: number): Pick<WorldFrame, "cart" | "storm" | "turrets" | "doors" | "gates" | "panels"> => {
+const extras = (t: number): Pick<WorldFrame, "cart" | "storm" | "turrets" | "doors" | "gates" | "panels" | "lyingPanels"> => {
   const len = trackLength(map.track)
   const p = trackPoint(map.track, ((Math.sin(t * 0.05) + 1) / 2) * len)
   // the turrets turn and heat up, the doors break and come back
@@ -132,7 +135,8 @@ const extras = (t: number): Pick<WorldFrame, "cart" | "storm" | "turrets" | "doo
     doors: map.doors.map(() => Math.max(0, Math.cos(t * 0.2))),
     // the gates close and open with the doors
     gates: (map.gates ?? []).map(() => Math.cos(t * 0.2) > 0),
-    panels: (map.panels ?? []).map(() => (panelAt === "off" ? null : panelAt === "wall" ? 0 : Math.cos(t * 0.2) > 0 ? Math.max(0, Math.sin(t * 0.8)) : null)),
+    lyingPanels: (map.panels ?? []).map((d) => (panelAt === "lying" ? [(d.min[0] + d.max[0]) / 2 + d.inward[0] * 1.2, d.min[1] - 0.8, (d.min[2] + d.max[2]) / 2 + d.inward[2] * 1.2] : null)),
+    panels: (map.panels ?? []).map(() => (panelAt === "off" || panelAt === "lying" ? null : panelAt === "wall" ? 0 : Math.cos(t * 0.2) > 0 ? Math.max(0, Math.sin(t * 0.8)) : null)),
     cart: mode === "cjar" ? { at: p.at, yaw: p.yaw, contested: Math.floor(t / 5) % 3 === 2, pushers: 1 } : null,
     storm: mode === "tampieste" ? { x: map.hill.at[0], z: map.hill.at[2], radius: 10 + ((Math.cos(t * 0.1) + 1) / 2) * 80 } : null
   }

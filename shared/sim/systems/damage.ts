@@ -1,12 +1,13 @@
 /**
  * Applies the tick's heals and damage: it's the only system that touches the health of the living
- * after respawn. Armor, deaths, kills, assists, streaks, points.
+ * after respawn. Armor, deaths, kills, assists, streaks, points. With the casot's panel in hand,
+ * what comes from the front is the panel's to take (`fromTheFront`), and the panel breaks at zero.
  */
 import { STREAK_AT } from "../../folklore.ts"
 import { foesStandDown, killsScore, spared, SPARED_HP } from "../../training/spared.ts"
 import type { KillCause } from "../events.ts"
-import { absorb, ASSIST_WINDOW_TICKS, currentStation, hostile, maxHp, RESPAWN_TICKS } from "../rules.ts"
-import { Arsenal, Attackers, Damage, Game, Heal, Life, Match, Motion, Out, Player, Rules, Score, Stats, TeamOf, Tick, Training } from "../schema.ts"
+import { absorb, ASSIST_WINDOW_TICKS, currentStation, fromTheFront, hostile, maxHp, RESPAWN_TICKS } from "../rules.ts"
+import { Arsenal, Attackers, Damage, Game, Heal, Life, Match, Motion, Out, Panels, Player, Rules, Score, Stats, TeamOf, Tick, Training, type PanelState } from "../schema.ts"
 
 /** Causes that can also hit whoever launched them (the others, on oneself, count as a fall). */
 const SELF_HARM: ReadonlySet<KillCause> = new Set(["sgnape", "lanciafrico", "mine", "tampieste"])
@@ -25,14 +26,15 @@ export const ApplyDamage = Game.System(
           stats: Game.Query.write(Stats),
           attackers: Game.Query.write(Attackers),
           motion: Game.Query.write(Motion),
-          arsenal: Game.Query.read(Arsenal)
+          arsenal: Game.Query.write(Arsenal)
         }
       })
     },
     resources: {
       tick: Game.System.readResource(Tick),
       rules: Game.System.readResource(Rules),
-      score: Game.System.writeResource(Score)
+      score: Game.System.writeResource(Score),
+      panels: Game.System.writeResource(Panels)
     },
     events: {
       damage: Game.System.thisTick(Game.System.readEvent(Damage)),
@@ -49,6 +51,8 @@ export const ApplyDamage = Game.System(
     const tick = resources.tick.get()
     const rules = resources.rules.get()
     const live = machines.match.get()._tag === "Live"
+    const before = resources.panels.get()
+    const panels: PanelState[] = [...before]
     const bySession = new Map(queries.players.each().map((m) => [data.player.get(m).session, m]))
     // The training spares the trainee (the one player who is not a bot) before the skirmish.
     const training = machines.training.get()
@@ -86,6 +90,22 @@ export const ApplyDamage = Game.System(
       if (attacker && !self && !hostile(rules, data.team.get(attacker), victimTeam)) continue
       if (harmless && attacker && data.player.get(attacker).bot && !data.player.get(victim).bot) continue
       if (life.shield > 0 && hit.weapon !== "fall") continue
+
+      // The panel in hand takes what comes from the front, and breaks at zero.
+      const shield = data.arsenal.get(victim).current === "panel" ? panels.findIndex((p) => p._tag === "carried" && p.by === hit.victim) : -1
+      const carried = shield < 0 ? null : panels[shield]
+      if (carried?._tag === "carried" && fromTheFront(data.motion.get(victim).body, data.motion.get(victim).yaw, hit.from)) {
+        const hp = carried.hp - hit.amount
+        if (hp > 0) {
+          panels[shield] = { ...carried, hp }
+          events.out.emit({ t: "panel", i: shield, s: hit.victim, a: "blocked" })
+        } else {
+          panels[shield] = { _tag: "broken" }
+          data.arsenal.update(victim, (a) => ({ ...a, power: null, current: a.primary, action: { _tag: "switch", ticks: 20 } }))
+          events.out.emit({ t: "panel", i: shield, s: hit.victim, a: "broken" })
+        }
+        continue
+      }
 
       if (hit.push) {
         const push = hit.push
@@ -142,5 +162,6 @@ export const ApplyDamage = Game.System(
 
       events.out.emit({ t: "kill", k: killer ? hit.attacker : null, v: hit.victim, w: self && !SELF_HARM.has(hit.weapon) ? "fall" : hit.weapon, h: hit.head, n: streak })
     }
+    if (panels.some((p, i) => p !== before[i])) resources.panels.set(panels)
   }
 )

@@ -2,14 +2,16 @@
  * Match flow: Muster → live → over → Muster again. In the Muster the host's start begins a
  * countdown, at whose end the match goes live, or the match at once when the room says everybody
  * is ready; the host can cancel the countdown. During a live match the start ends it and sends
- * the room back to the Muster.
+ * the room back to the Muster. Single weapon, part of the rules, is changed by the host only in the
+ * Muster.
  * Each mode decides when it ends and who wins.
  */
 import { TEAMS } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
 import type { Winner } from "../events.ts"
+import { isTraining } from "../../training/index.ts"
 import { COUNTDOWN_TICKS, freshDoors, freshPanels, freshPickups, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL, NO_STATS, OVER_TICKS, RESPAWN_TICKS, START_GRACE_TICKS } from "../rules.ts"
-import { Attackers, CancelCountdown, Cart, Doors, Flags, Game, Hill, Life, Match, Out, Panels, Pickups, Player, Rules, Score, StartMatch, Stats, Tick, Turrets } from "../schema.ts"
+import { Attackers, CancelCountdown, Cart, Doors, Flags, Game, Hill, Life, Match, Out, Panels, Pickups, Player, Rules, Score, SetSingle, StartMatch, Stats, Tick, Turrets } from "../schema.ts"
 
 export const AdvanceTick = Game.System(
   "Sparedut/AdvanceTick",
@@ -34,7 +36,7 @@ export const MatchFlow = Game.System(
     },
     resources: {
       tick: Game.System.readResource(Tick),
-      rules: Game.System.readResource(Rules),
+      rules: Game.System.writeResource(Rules),
       score: Game.System.writeResource(Score),
       flags: Game.System.writeResource(Flags),
       hill: Game.System.writeResource(Hill),
@@ -44,14 +46,14 @@ export const MatchFlow = Game.System(
       doors: Game.System.writeResource(Doors),
       panels: Game.System.writeResource(Panels)
     },
-    events: { start: Game.System.readEvent(StartMatch), cancel: Game.System.readEvent(CancelCountdown), out: Game.System.writeEvent(Out) },
+    events: { start: Game.System.readEvent(StartMatch), cancel: Game.System.readEvent(CancelCountdown), single: Game.System.readEvent(SetSingle), out: Game.System.writeEvent(Out) },
     machines: { match: Game.System.updateMachine(Match) },
     nextMachines: { match: Game.System.nextState(Match) }
   },
   ({ queries, resources, events, machines, nextMachines }) => {
     const { data } = queries.players
     const tick = resources.tick.get()
-    const rules = resources.rules.get()
+    let rules = resources.rules.get()
     const match = machines.match.get()
     const starts = events.start.all()
     const startRequested = starts.length > 0
@@ -129,6 +131,13 @@ export const MatchFlow = Game.System(
 
     switch (match._tag) {
       case "Muster": {
+        // Single weapon changes here and nowhere else; the map shows the Lanciafrico by the new rule.
+        const set = events.single.all().at(-1)
+        if (set && set.single !== rules.single && !isTraining(rules.mode)) {
+          rules = { ...rules, single: set.single }
+          resources.rules.set(rules)
+          resources.pickups.set(freshPickups(MAPS[rules.map], rules))
+        }
         // Only the host's start begins a match: the Muster never ends by itself.
         if (starts.some((s) => s.now)) return begin()
         // A start while a countdown runs restarts it; a cancel in the same tick wins.

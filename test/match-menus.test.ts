@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { afterEscape, endFocus, focusOnOpen, menuPrimary, musterCountdown, musterFocus, musterScreen, musterTeams, primaryPicker, startsAtOnce } from "../client/match-menus.ts"
+import { afterEscape, endFocus, focusOnOpen, menuPrimary, musterCountdown, musterFocus, musterScreen, musterTeams, primaryPicker, singleOf, singleValue, startsAtOnce } from "../client/match-menus.ts"
 
 test("Esc closes the in-match menus one step at a time", () => {
   expect(afterEscape("pause", "none")).toBe("none")
@@ -61,6 +61,14 @@ test("in a LAN or Online room the Muster opens on its first control, for the hos
   expect(musterFocus({ host: true, reach: "lan" })).toBeNull()
   expect(musterFocus({ host: true, reach: "online" })).toBeNull()
   expect(musterFocus({ host: false, reach: "online" })).toBeNull()
+})
+
+test("the host's single-weapon control in the Muster goes from the room's setting to its value and back", () => {
+  expect(singleOf(singleValue(null))).toBeNull()
+  expect(singleValue("cjampanili")).toBe("cjampanili")
+  expect(singleOf(singleValue("mulin"))).toBe("mulin")
+  // Anything that is not a primary is off: never a weapon every class carries.
+  expect(singleOf("mescul")).toBeNull()
 })
 
 test("the Muster's primary picker is free on the player's own primary, and locked on the host's choice under single weapon", () => {

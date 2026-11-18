@@ -103,7 +103,8 @@ export class Room {
     public hostId: string,
     public hostName: string,
     readonly networkKey: string,
-    readonly settings: RoomSettings,
+    /** Fixed at creation, but for single weapon, which the host changes in the Muster (`setSingle`). */
+    public settings: RoomSettings,
     /** A training's start, from its request (`shared/training/start.ts`). */
     start?: TrainingStart
   ) {
@@ -340,12 +341,26 @@ export class Room {
 
   /**
    * A running countdown starts again from the beginning, so that everybody has time to take in a
-   * change to the room (single weapon, #82). Nothing when no countdown runs.
+   * change to the room (single weapon). Nothing when no countdown runs.
    */
   restartCountdown() {
     if (!this.countingDown) return
     this.sim.start(false)
     this.startSent = true
+  }
+
+  /**
+   * The host sets single weapon in the Muster: every member is shown with, and enters with, the
+   * setting's primary, or their own again when it is off. A running countdown restarts, so that
+   * everybody has time to take in the change. Refused (false) from anybody but the host, outside
+   * the Muster, and in a training.
+   */
+  setSingle(id: string, single: PrimaryId | null): boolean {
+    if (id !== this.hostId || this.training || this.world.phase.tag !== "Muster" || single === this.settings.single) return false
+    this.settings = { ...this.settings, single }
+    this.sim.single(single)
+    this.restartCountdown()
+    return true
   }
 
   /** The host cancels the countdown: the room stays in the Muster with none running. */
