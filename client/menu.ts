@@ -305,7 +305,7 @@ export class Menu {
     const { invitation, completed } = this.model.trainingEntry
     const inviting = invitation === "shown"
     $("home-training").dataset.invite = inviting ? INVITE_TREATMENT : ""
-    const done = $("training-done")
+    const done = $("training-completed")
     done.hidden = !completed
     done.textContent = s.completed
     const ribbon = $("invite-ribbon")
