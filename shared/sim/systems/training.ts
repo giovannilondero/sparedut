@@ -88,6 +88,16 @@ export const PlayTraining = Game.System(
       }
     }
 
+    /** What a step gives as it begins (`StepRule.given`): a primary and the weapon in hand, ammunition refilled. */
+    const give = (rule: StepRule) => {
+      const given = rule.given
+      if (given?.primary === undefined && given?.hold === undefined) return
+      const now = data.arsenal.get(trainee)
+      const primary = given.primary ?? now.primary
+      const fresh = freshArsenal(primary)
+      data.arsenal.set(trainee, { ...fresh, nextPrimary: now.nextPrimary, launcher: now.launcher, current: given.hold ?? (given.primary ? primary : now.current) })
+    }
+
     /** Arrives at station `from` (and past any station with no steps): its setup applied, its first step begun. */
     const arrive = (from: number, unlocked: number, place: boolean): Next => {
       let index = from
@@ -120,7 +130,9 @@ export const PlayTraining = Game.System(
           pitch: 0
         })
       }
-      const begun = stepRule(id, stepsOf(id)[0]).begin(seen(null))
+      const first = stepRule(id, stepsOf(id)[0])
+      give(first)
+      const begun = first.begin(seen(null))
       return { _tag: "Step", station: index, step: 0, count: begun.count, mark: begun.mark, unlocked: Math.min(STATION_IDS.length, open) }
     }
 
@@ -152,7 +164,9 @@ export const PlayTraining = Game.System(
     } else {
       events.out.emit({ t: "training", a: "step", station: id, step: steps[state.step] })
       if (state.step + 1 < steps.length) {
-        const begun = stepRule(id, steps[state.step + 1]).begin(seen(null))
+        const following = stepRule(id, steps[state.step + 1])
+        give(following)
+        const begun = following.begin(seen(null))
         next = { _tag: "Step", station: state.station, step: state.step + 1, count: begun.count, mark: begun.mark, unlocked: state.unlocked }
       } else {
         events.out.emit({ t: "training", a: "station", station: id })

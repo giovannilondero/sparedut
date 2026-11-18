@@ -8,7 +8,7 @@ import type { Team, V3 } from "../map.ts"
 import type { Body } from "../movement.ts"
 import type { GameEvent } from "../sim/events.ts"
 import type { ArsenalValue, ControlsValue } from "../sim/schema.ts"
-import type { WeaponId } from "../weapons.ts"
+import type { PrimaryId, WeaponId } from "../weapons.ts"
 import type { InterfaceAction } from "./interface.ts"
 
 /**
@@ -80,6 +80,19 @@ export interface StepRule {
   readonly report?: InterfaceAction
   readonly begin: (seen: Seen) => StepProgress
   readonly advance: (seen: Seen, now: StepProgress) => StepProgress
+  /** What the trainee is given on the tick the step becomes current; a step without it changes nothing. */
+  readonly given?: StepGiven
+}
+
+/**
+ * What a step gives the trainee as it begins. Giving a weapon refills every weapon's ammunition;
+ * the primary chosen for the next respawn stays the trainee's own.
+ */
+export interface StepGiven {
+  /** The primary carried for the step (station 5's stalls: one each). */
+  readonly primary?: PrimaryId
+  /** The weapon in hand as the step begins. */
+  readonly hold?: WeaponId
 }
 
 /**
