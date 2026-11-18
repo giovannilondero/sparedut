@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { afterEscape, endFocus, focusOnOpen, musterFocus, musterTeams } from "../client/match-menus.ts"
+import { afterEscape, endFocus, focusOnOpen, musterFocus, musterTeams, primaryPicker } from "../client/match-menus.ts"
 
 test("Esc closes the in-match menus one step at a time", () => {
   expect(afterEscape("pause", "none")).toBe("none")
@@ -61,4 +61,9 @@ test("in a LAN or Online room the Muster opens on its first control, for the hos
   expect(musterFocus({ host: true, reach: "lan" })).toBeNull()
   expect(musterFocus({ host: true, reach: "online" })).toBeNull()
   expect(musterFocus({ host: false, reach: "online" })).toBeNull()
+})
+
+test("the Muster's primary picker is free on the player's own primary, and locked on the host's choice under single weapon", () => {
+  expect(primaryPicker({ single: null }, "mulin")).toEqual({ _tag: "free", chosen: "mulin" })
+  expect(primaryPicker({ single: "cjampanili" }, "mulin")).toEqual({ _tag: "locked", chosen: "cjampanili" })
 })

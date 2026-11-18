@@ -8,10 +8,10 @@ import type { Team } from "../map.ts"
 import type { PhysicsWorld } from "../physics.ts"
 import type { PrimaryId } from "../weapons.ts"
 import type { GameEvent } from "./events.ts"
-import { freshDoors, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL } from "./rules.ts"
+import { freshDoors, freshPickups, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL } from "./rules.ts"
 import { simulate } from "./schedule.ts"
 import type { Device } from "../devices.ts"
-import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, GoToStation, StartMatch, StepUnavailable, Training, type PickupState, type PostValue } from "./schema.ts"
+import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, GoToStation, StartMatch, StepUnavailable, Training, type PostValue, type RulesValue } from "./schema.ts"
 import type { InterfaceAction } from "../training/interface.ts"
 import { isTraining, STATION_IDS, type StationId, type StepId } from "../training/index.ts"
 import { arrival, FIRST_START, type TrainingStart } from "../training/start.ts"
@@ -22,6 +22,8 @@ export interface SimOptions {
   readonly minutes: number
   readonly scoreLimit?: number
   readonly friendlyFire?: boolean
+  /** Single weapon: the one primary everybody carries; absent or null, off. A training never has it. */
+  readonly single?: PrimaryId | null
   readonly seed: number
   /** The map's physics world: the match map is its map. */
   readonly physics: PhysicsWorld
@@ -36,16 +38,18 @@ export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: H
   // The training has no Muster and no clock: it is live from the start, at its first station.
   const training = isTraining(options.mode)
   const first = arrival(options.training ?? FIRST_START)
+  const rules: RulesValue = {
+    mode: options.mode,
+    map: options.physics.map.id,
+    scoreLimit: options.scoreLimit ?? MODES[options.mode].scoreLimit,
+    timeLimitTicks: Math.round(options.minutes * 60 * 60),
+    friendlyFire: options.friendlyFire ?? false,
+    single: training ? null : (options.single ?? null)
+  }
   const made = Game.Runtime.make({
     services: Game.Runtime.services(Game.Runtime.service(Physics, options.physics)),
     resources: {
-      Rules: {
-        mode: options.mode,
-        map: options.physics.map.id,
-        scoreLimit: options.scoreLimit ?? MODES[options.mode].scoreLimit,
-        timeLimitTicks: Math.round(options.minutes * 60 * 60),
-        friendlyFire: options.friendlyFire ?? false
-      },
+      Rules: rules,
       Objective: MODE_OBJECTIVE[options.mode],
       Tick: 0,
       Score: { benandanti: 0, malandanti: 0 },
@@ -53,7 +57,7 @@ export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: H
       Hill: FRESH_HILL,
       Cart: FRESH_CART,
       StormCourse: null,
-      Pickups: options.physics.map.pickups.map((): PickupState => ({ _tag: "up" })),
+      Pickups: freshPickups(options.physics.map, rules),
       Turrets: freshTurrets(options.physics.map),
       Doors: freshDoors(options.physics.map),
       History: [],

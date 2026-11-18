@@ -131,7 +131,8 @@ export class Hub {
           minutes: msg.minutes,
           ...(msg.reach === "offline" ? { reach: msg.reach } : { reach: msg.reach, access: msg.access }),
           level: msg.level,
-          ff: msg.ff
+          ff: msg.ff,
+          single: msg.single
         })
         if (!created) return
         created.fillBots(msg.bots)

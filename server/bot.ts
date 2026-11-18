@@ -6,7 +6,7 @@ import { BUTTON, IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
 import type { Team, V3 } from "../shared/map.ts"
 import { eyeHeight } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
-import { allied, outsideStorm } from "../shared/sim/rules.ts"
+import { allied, outsideStorm, owned } from "../shared/sim/rules.ts"
 import type { PlayerView, WorldView } from "../shared/sim/view.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { nearestNode, route, type NavGraph } from "./nav.ts"
@@ -86,7 +86,7 @@ export class BotBrain {
     const a = me.arsenal
     let weapon: WeaponId = a.primary
     if (a.launcher && a.ammo.lanciafrico.mag + a.ammo.lanciafrico.reserve > 0) weapon = "lanciafrico"
-    else if (a.ammo[a.primary].mag + a.ammo[a.primary].reserve === 0) weapon = "mandi"
+    else if (a.ammo[a.primary].mag + a.ammo[a.primary].reserve === 0) weapon = owned(a, "mandi") ? "mandi" : "mescul"
     if (enemy && enemyDist < 2.2) weapon = "mescul"
 
     let buttons = 0

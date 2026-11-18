@@ -40,7 +40,7 @@ import "@ui-sdk/web/dialog"
 import "@ui-sdk/web/select"
 import { takeAwayDeparted } from "./bodies.ts"
 import { alwaysChosen } from "./choice.ts"
-import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, musterFocus, musterTeams, type MatchMenu } from "./match-menus.ts"
+import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, musterFocus, musterTeams, primaryPicker, type MatchMenu } from "./match-menus.ts"
 import { pickerEntries } from "./touch.ts"
 import { onViewportChange } from "./viewport.ts"
 
@@ -290,7 +290,7 @@ export class Game {
     // A map's physics may be reused from an earlier room: its gates are set again from the first snapshot.
     this.gates = []
     this.predictor = new Predictor(stage.physics)
-    this.wanted = this.d.settings.primary
+    this.wanted = primaryPicker(room, this.d.settings.primary).chosen
     this.wantedSeq = 0
     this.shownWeapon = null
     this.ownReload = null
@@ -976,7 +976,9 @@ export class Game {
 
   private renderLoadout() {
     const lo = t().loadout
-    this.drawMenu(MENU_PARTS.loadout[1], lo.title, `<div class="overlay-body"><p class="muted">${lo.note}</p><div class="weapons" id="loadout-list"></div></div><div class="row overlay-actions"><button id="lo-close" class="primary">${lo.resume}</button></div>`)
+    const picker = primaryPicker(this.room ?? { single: null }, this.d.settings.primary)
+    const note = picker._tag === "locked" ? t().muster.locked(t().weapons[picker.chosen].name) : lo.note
+    this.drawMenu(MENU_PARTS.loadout[1], lo.title, `<div class="overlay-body"><p class="muted">${esc(note)}</p><div class="weapons" id="loadout-list"></div></div><div class="row overlay-actions"><button id="lo-close" class="primary">${lo.resume}</button></div>`)
     this.d.menu.buildArmarie($("loadout-list"), (p) => {
       this.d.net.send({ t: "primary", p })
       // If I was holding the old primary, switch to the new one right away.
@@ -986,7 +988,7 @@ export class Game {
         this.wanted = p
         this.wantedSeq = this.seq + 1
       }
-    })
+    }, picker)
     $("lo-close").onclick = () => {
       this.openOverlay("none")
       this.controls.lock()
@@ -1168,6 +1170,7 @@ export class Game {
     const s = t()
     const p = s.pause
     const m = s.muster
+    const picker = primaryPicker(room, this.d.settings.primary)
     this.drawMenu(MENU_PARTS.muster[1], m.title, `
       <div class="overlay-body">
         <div class="muted pause-reach">${s.modes[room.mode].name} · ${s.maps[room.map].name} · ${s.menu.minutes(room.minutes)}</div>
@@ -1175,6 +1178,7 @@ export class Game {
         <div class="roster" id="m-roster"></div>
         ${host ? `<div class="host-tools"><span class="host-label">👑 ${p.host}</span>${this.botToolsHtml("m", room)}</div>` : `<div class="muted host-only">${p.hostOnly}</div>`}
         <h3>${m.primary}</h3>
+        ${picker._tag === "locked" ? `<p class="muted" id="m-locked">${esc(m.locked(s.weapons[picker.chosen].name))}</p>` : ""}
         <div class="weapons" id="muster-armarie"></div>
         <h3>${m.chat}</h3>
         <div class="muster-chat" id="m-chat-log" role="log"></div>
@@ -1187,8 +1191,9 @@ export class Game {
       </div>`)
     const el = $(MENU_PARTS.muster[1])
     this.bindCopy("m", room)
-    // The primary the player enters with; the browser remembers it for the next room.
-    this.d.menu.buildArmarie($("muster-armarie"), (primary) => this.d.net.send({ t: "primary", p: primary }))
+    // The primary the player enters with; the browser remembers it for the next room. Under single
+    // weapon the picker is locked on the host's choice, and the remembered primary stays.
+    this.d.menu.buildArmarie($("muster-armarie"), (primary) => this.d.net.send({ t: "primary", p: primary }), picker)
     this.renderMusterChat()
     const chat = $<HTMLInputElement>("m-chat")
     chat.addEventListener("keydown", (e) => {

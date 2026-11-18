@@ -43,7 +43,7 @@ export interface Member {
   readonly id: string
   name: string
   team: Team
-  /** The primary chosen: the roster shows it, and the member enters a match with it. */
+  /** The primary the member chose, kept under single weapon: the roster shows `primaryOf` this. */
   primary: PrimaryId
   readonly bot: boolean
   send: ((msg: ServerMessage) => void) | null
@@ -60,10 +60,12 @@ export type RoomSettings = Reached<RoomAccess> & {
   readonly minutes: number
   readonly level: BotLevel
   readonly ff: boolean
+  /** Single weapon: the one primary everybody carries, or null when it is off. */
+  readonly single: PrimaryId | null
 }
 
 /** A training's settings: the request fixes them all. Always Offline, on the fair, in the Dutrine. */
-export const TRAINING_ROOM: RoomSettings = { reach: "offline", mode: TRAINING.mode, map: TRAINING.map, minutes: 0, level: "zovin", ff: false }
+export const TRAINING_ROOM: RoomSettings = { reach: "offline", mode: TRAINING.mode, map: TRAINING.map, minutes: 0, level: "zovin", ff: false, single: null }
 
 let botCounter = 0
 
@@ -97,7 +99,7 @@ export class Room {
   ) {
     this.level = settings.level
     this.physics = createPhysicsWorld(MAPS[settings.map])
-    this.sim = createSim({ mode: settings.mode, minutes: settings.minutes, friendlyFire: settings.ff, seed: Math.floor(Math.random() * 2 ** 31), physics: this.physics, ...(start ? { training: start } : {}) })
+    this.sim = createSim({ mode: settings.mode, minutes: settings.minutes, friendlyFire: settings.ff, single: settings.single, seed: Math.floor(Math.random() * 2 ** 31), physics: this.physics, ...(start ? { training: start } : {}) })
     this.world = this.sim.view()
   }
 
@@ -196,9 +198,15 @@ export class Room {
     this.sim.team(id, team)
   }
 
+  /** The primary a member enters a match with: the room's single weapon when it is on, else their own. */
+  primaryOf(m: Member): PrimaryId {
+    return this.settings.single ?? m.primary
+  }
+
+  /** Under single weapon nobody changes primary, and each member's own choice stays as it was. */
   setPrimary(id: string, primary: PrimaryId) {
     const m = this.members.get(id)
-    if (!m) return
+    if (!m || this.settings.single) return
     m.primary = primary
     this.sim.primary(id, primary)
   }
@@ -396,7 +404,8 @@ export class Room {
       players: this.humans.length,
       bots: this.bots.size + this.stationBots.size,
       max: MAX_PLAYERS,
-      phase: this.world.phase.tag
+      phase: this.world.phase.tag,
+      single: this.settings.single
     }
   }
 
@@ -407,7 +416,7 @@ export class Room {
       minutes: this.settings.minutes,
       level: this.level,
       ff: this.settings.ff,
-      roster: [...this.members.values()].map((m) => ({ id: m.id, name: m.name, team: m.team, primary: m.primary, bot: m.bot, away: false }))
+      roster: [...this.members.values()].map((m) => ({ id: m.id, name: m.name, team: m.team, primary: this.primaryOf(m), bot: m.bot, away: false }))
     }
   }
 

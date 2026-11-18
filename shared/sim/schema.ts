@@ -100,7 +100,15 @@ export interface Ammo {
   readonly reserve: number
 }
 
+/**
+ * What a player carries besides the primary and the Mescul: `full`, the pistol, the bombs, the mines
+ * and room for the Lanciafrico; `single` (a single-weapon room), nothing else. Set at each spawn
+ * from the room's rules (`kitOf`).
+ */
+export type Kit = "full" | "single"
+
 export interface ArsenalValue {
+  readonly kit: Kit
   readonly current: WeaponId
   readonly primary: PrimaryId
   /** The primary weapon chosen for the next respawn. */
@@ -160,6 +168,8 @@ export interface RulesValue {
   readonly scoreLimit: number
   readonly timeLimitTicks: number
   readonly friendlyFire: boolean
+  /** Single weapon: off (null), or the one primary every player carries, with the Mescul and nothing else. */
+  readonly single: PrimaryId | null
 }
 export const Rules = Descriptor.Resource<RulesValue>()("Sparedut/Rules")
 /** The objective in force: the objective systems read this, never the mode. A regular room derives it from its mode. */
@@ -223,7 +233,8 @@ export const Turrets = Descriptor.Resource<ReadonlyArray<TurretState>>()("Spared
 /** Health of the breakable doors (one per `map.doors`): 0 means broken down. */
 export const Doors = Descriptor.Resource<ReadonlyArray<number>>()("Sparedut/Doors")
 
-export type PickupState = { readonly _tag: "up" } | { readonly _tag: "down"; readonly ticks: number }
+/** A pickup: there, taken and coming back, or not on the map for the match (the Lanciafrico under single weapon). */
+export type PickupState = { readonly _tag: "up" } | { readonly _tag: "down"; readonly ticks: number } | { readonly _tag: "absent" }
 /** One per `PICKUPS` point, in the same order. */
 export const Pickups = Descriptor.Resource<ReadonlyArray<PickupState>>()("Sparedut/Pickups")
 

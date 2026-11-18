@@ -4,7 +4,7 @@
  */
 import type { MapDef, Spawn, Team } from "../map.ts"
 import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../weapons.ts"
-import type { Ammo, ArsenalValue, CartValue, FlagState, HillValue, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
+import type { Ammo, ArsenalValue, CartValue, FlagState, HillValue, Kit, PickupState, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
 
 export const MAX_HP = 100
 export const MAX_ARMOR = 100
@@ -97,17 +97,25 @@ export function freshAmmo(): Record<WeaponId, Ammo> {
   return out
 }
 
-export function freshArsenal(primary: PrimaryId): ArsenalValue {
+/** What the room's rules give a player to carry: everything, or under single weapon only its primary and the Mescul. */
+export const kitOf = (rules: Pick<RulesValue, "single">): Kit => (rules.single ? "single" : "full")
+
+/** The primary a player spawns with: the room's single weapon when it is on, else their own. */
+export const primaryOf = (rules: Pick<RulesValue, "single">, own: PrimaryId): PrimaryId => rules.single ?? own
+
+export function freshArsenal(primary: PrimaryId, kit: Kit = "full"): ArsenalValue {
+  const full = kit === "full"
   return {
+    kit,
     current: primary,
     primary,
     nextPrimary: primary,
     launcher: false,
     ammo: freshAmmo(),
     action: { _tag: "switch", ticks: 20 },
-    bombs: SGNAPE_BOMB.perLife,
+    bombs: full ? SGNAPE_BOMB.perLife : 0,
     bombCooldown: 0,
-    mines: RAIBL_MINE.perLife,
+    mines: full ? RAIBL_MINE.perLife : 0,
     mineCooldown: 0,
     spin: 0,
     sgnape: 0
@@ -118,7 +126,24 @@ export const NO_STATS: StatsValue = { kills: 0, deaths: 0, assists: 0, caps: 0, 
 
 /** The weapons the player can hold right now (the mitraie isn't held: you use the turret). */
 export const owned = (a: ArsenalValue, id: WeaponId) =>
-  id === "mescul" || id === "mandi" || id === a.primary || (id === "lanciafrico" && a.launcher)
+  id === "mescul" || id === a.primary || (a.kit === "full" && (id === "mandi" || (id === "lanciafrico" && a.launcher)))
+
+/**
+ * An ammunition pickup taken: every weapon owned back to its full reserve, and with a full kit the
+ * bombs and mines too. Null when there is nothing to fill: the pickup stays for someone else.
+ */
+export function restock(a: ArsenalValue): ArsenalValue | null {
+  const sidearms = a.kit === "full"
+  const full = WEAPON_IDS.every((id) => !owned(a, id) || a.ammo[id].reserve >= WEAPONS[id].reserve) && (!sidearms || (a.bombs >= SGNAPE_BOMB.perLife && a.mines >= RAIBL_MINE.perLife))
+  if (full) return null
+  const ammo = { ...a.ammo }
+  for (const id of WEAPON_IDS) ammo[id] = { mag: ammo[id].mag, reserve: Math.max(ammo[id].reserve, WEAPONS[id].reserve) }
+  return sidearms ? { ...a, ammo, bombs: Math.max(a.bombs, SGNAPE_BOMB.perLife), mines: Math.max(a.mines, RAIBL_MINE.perLife) } : { ...a, ammo }
+}
+
+/** The map's pickups as a match starts them: all there, but the Lanciafrico is not on the map under single weapon. */
+export const freshPickups = (map: MapDef, rules: Pick<RulesValue, "single">): PickupState[] =>
+  map.pickups.map((p): PickupState => (rules.single && p.kind === "lanciafrico" ? { _tag: "absent" } : { _tag: "up" }))
 
 /** The weapon a number key selects: the one in that slot the player owns (in slot 1, the primary), or null. */
 export const weaponInSlot = (a: ArsenalValue, slot: Slot): WeaponId | null => WEAPON_IDS.find((id) => WEAPONS[id].slot === slot && owned(a, id)) ?? null

@@ -3,9 +3,9 @@
  */
 import type { PickupKind } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
-import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS } from "../../weapons.ts"
-import { MAX_ARMOR, MAX_HP, SGNAPE_TICKS } from "../rules.ts"
-import { Arsenal, Game, Life, Match, Motion, Out, Pickups, Player, Rules, type ArsenalValue } from "../schema.ts"
+import { WEAPONS } from "../../weapons.ts"
+import { MAX_ARMOR, MAX_HP, restock, SGNAPE_TICKS } from "../rules.ts"
+import { Arsenal, Game, Life, Match, Motion, Out, Pickups, Player, Rules } from "../schema.ts"
 
 export const RESPAWN_OF = {
   frico: 20 * 60,
@@ -14,8 +14,6 @@ export const RESPAWN_OF = {
   munizions: 15 * 60,
   lanciafrico: 45 * 60
 } as const satisfies Record<PickupKind, number>
-
-const ammoFull = (a: ArsenalValue) => WEAPON_IDS.every((id) => !(id === a.primary || id === "mandi" || (id === "lanciafrico" && a.launcher)) || a.ammo[id].reserve >= WEAPONS[id].reserve)
 
 export const CollectPickups = Game.System(
   "Sparedut/CollectPickups",
@@ -59,13 +57,9 @@ export const CollectPickups = Game.System(
             data.arsenal.set(m, { ...a, sgnape: SGNAPE_TICKS })
             break
           case "munizions": {
-            if (ammoFull(a) && a.bombs >= SGNAPE_BOMB.perLife && a.mines >= RAIBL_MINE.perLife) {
-              used = false
-              break
-            }
-            const ammo = { ...a.ammo }
-            for (const id of WEAPON_IDS) ammo[id] = { mag: ammo[id].mag, reserve: Math.max(ammo[id].reserve, WEAPONS[id].reserve) }
-            data.arsenal.set(m, { ...a, ammo, bombs: Math.max(a.bombs, SGNAPE_BOMB.perLife), mines: Math.max(a.mines, RAIBL_MINE.perLife) })
+            const restocked = restock(a)
+            if (restocked) data.arsenal.set(m, restocked)
+            else used = false
             break
           }
           case "lanciafrico":

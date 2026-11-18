@@ -51,6 +51,15 @@ export function musterTeams(room: Pick<RoomInfo, "hostId" | "roster">): Record<T
 }
 
 /**
+ * The primary picker of the Muster and the match's armoury: free, on the player's own primary, or
+ * locked on the host's choice under single weapon, when nothing picked there is sent or remembered.
+ */
+export type PrimaryPicker = { readonly _tag: "free"; readonly chosen: PrimaryId } | { readonly _tag: "locked"; readonly chosen: PrimaryId }
+
+export const primaryPicker = (room: Pick<RoomInfo, "single">, own: PrimaryId): PrimaryPicker =>
+  room.single ? { _tag: "locked", chosen: room.single } : { _tag: "free", chosen: own }
+
+/**
  * The Muster's first focus: start, in an Offline room, whose one player is its host, so that one
  * press begins the match; elsewhere the screen's first control, so that a host's stray press
  * does not start a match others are still choosing for.
