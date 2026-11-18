@@ -26,7 +26,7 @@ export const StormDamage = Game.System(
     const storm = stormNow(MAPS[rules.map], rules, match.ends - rules.timeLimitTicks, resources.course.get(), tick)
     for (const m of queries.players.each()) {
       if (data.life.get(m)._tag !== "Alive" || !outsideStorm(storm, data.motion.get(m).body)) continue
-      events.damage.emit({ victim: data.player.get(m).session, attacker: null, amount: STORM_DAMAGE, weapon: "tampieste", head: false, push: null })
+      events.damage.emit({ victim: data.player.get(m).session, attacker: null, amount: STORM_DAMAGE, weapon: "tampieste", head: false, push: null, from: null })
     }
   }
 )

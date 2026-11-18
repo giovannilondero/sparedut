@@ -321,7 +321,12 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
   const panels = (map.panels ?? []).map((p) => {
     const m = panelModel(p)
     scene.add(m.g)
-    return m
+    // the same board lying flat on the ground, where its carrier fell
+    const loose = panelModel(p).g
+    loose.rotation.set(-Math.PI / 2, 0, 0.4)
+    loose.visible = false
+    scene.add(loose)
+    return { ...m, loose }
   })
   // The training's gates: drawn only while they close the way. Open is how a plain map's physics starts.
   const gates = (map.gates ?? []).map((g) => {
@@ -608,6 +613,9 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
         const k = tear ?? 0
         p.board.rotation.set(Math.sin(t * 31) * 0.03 * k, 0, Math.sin(t * 23) * 0.02 * k)
         p.board.position.z = 0.06 * k
+        const lying = frame.lyingPanels[i] ?? null
+        p.loose.visible = lying !== null
+        if (lying) p.loose.position.set(lying[0], lying[1] + 0.04, lying[2])
       }
       for (let i = 0; i < gates.length; i++) gates[i].visible = frame.gates[i] ?? false
       const c = frame.cart

@@ -200,6 +200,15 @@ export class Hud {
     this.style("panel-tear", "width", `${Math.round(progress * 100)}%`)
   }
 
+  /** Carrying the casot's panel: how much it can still take, from 1 (whole) down; null when not carrying it. */
+  panelHealth(left: number | null) {
+    this.toggle("panel-hud", "hidden", left === null)
+    if (left === null) return
+    this.text("panel-hp-label", t().weapons.panel.name)
+    this.style("panel-hp", "width", `${Math.round(left * 100)}%`)
+    this.toggle("panel-hud", "low", left < 0.3)
+  }
+
   /** Feathers in the eyes (the gjaline): vision is covered for `seconds` and then slowly clears. */
   feathers(seconds: number) {
     const el = $("plumis")

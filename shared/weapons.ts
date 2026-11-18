@@ -313,6 +313,10 @@ export type PowerId = "lanciafrico" | "panel"
  */
 export const PANEL_TEAR_TICKS = 120
 export const PANEL_REACH = 1.8
+/** The panel's own health: what it takes for its carrier before it breaks. Starting value. */
+export const PANEL_HP = 300
+/** How wide the arc in front of its carrier is, from side to side, within which the panel takes the damage (radians). Starting value. */
+export const PANEL_ARC = (Math.PI * 2) / 3
 
 /** What a class adds beyond health and speed: the medic's healing (`MEDIC_AURA`, and the beam's heal on teammates). */
 export type ClassTrait = "medic"

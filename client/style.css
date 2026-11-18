@@ -317,6 +317,10 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 #panel-prompt { position: absolute; top: 60%; left: 50%; transform: translateX(-50%); min-width: 220px; text-align: center; font-family: var(--serif); color: var(--ink); background: var(--stone); border: 1px solid var(--stone-line); padding: 4px 12px 6px; border-radius: 8px; font-size: 15px; }
 #panel-prompt .bar { height: 6px; margin-top: 4px; background: rgba(0, 0, 0, 0.35); border-radius: 3px; overflow: hidden; }
 #panel-prompt .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #c9a26b, #8a5a32); }
+#panel-hud { position: absolute; left: 50%; bottom: 76px; transform: translateX(-50%); width: 220px; text-align: center; font-family: var(--serif); color: var(--ink); background: var(--stone); border: 1px solid var(--stone-line); padding: 4px 12px 6px; border-radius: 10px; font-size: 14px; }
+#panel-hud .bar { height: 7px; margin-top: 4px; background: rgba(0, 0, 0, 0.35); border-radius: 4px; overflow: hidden; }
+#panel-hud .bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #c9a26b, #8a5a32); transition: width 0.1s linear; }
+#panel-hud.low .bar i { background: linear-gradient(90deg, #ff8a30, #b4321e); }
 #turret-hud { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); width: 260px; text-align: center; font-family: var(--serif); color: var(--ink); background: var(--stone); border: 1px solid var(--stone-line); padding: 6px 12px; border-radius: 10px; }
 #turret-hud .bar { height: 8px; margin-top: 4px; background: rgba(0, 0, 0, 0.35); border-radius: 4px; overflow: hidden; }
 #turret-hud .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #f0c060, #ff6a20); transition: width 0.1s linear; }
@@ -558,7 +562,7 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #hud-free, #hud-status { display: contents; }
 #hud.touch #hud-free { position: absolute; inset-inline-start: var(--free-l); inset-block-start: var(--free-t); inline-size: var(--free-w); block-size: var(--free-h);
   display: flex; flex-direction: column; align-items: center; gap: 4px; }
-#hud.touch :is(#turret-prompt, #panel-prompt, #turret-hud, #topbar, #killfeed, #banner, #chat, #training) { position: static; inset: auto; transform: none; }
+#hud.touch :is(#turret-prompt, #panel-prompt, #panel-hud, #turret-hud, #topbar, #killfeed, #banner, #chat, #training) { position: static; inset: auto; transform: none; }
 /* The score on one line: the two numbers in their team's colour around the clock. The objective, when the mode has one, on a line under it. */
 #hud.touch #topbar { order: 0; max-inline-size: 100%; flex-wrap: wrap; align-items: baseline; justify-content: center; column-gap: 10px; padding: 2px 12px;
   border-radius: 12px; border: 1px solid var(--stone-line); background: rgba(10, 8, 6, 0.72); }
@@ -594,6 +598,8 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #hud.touch #panel-prompt { order: 4; font-size: 13px; min-width: 0; }
 #hud.touch #turret-hud { order: 5; inline-size: min(260px, 100%); padding: 3px 10px; display: flex; align-items: center; gap: 8px; font-size: 13px; }
 #hud.touch #turret-hud .bar { flex: 1; margin: 0; }
+#hud.touch #panel-hud { order: 6; inline-size: min(220px, 100%); padding: 3px 10px; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+#hud.touch #panel-hud .bar { flex: 1; margin: 0; }
 /*
  * The training's panel on touch: first in the free area, as wide as it allows, never down to the
  * crosshair (the screen's middle). A training has no score: the empty score bar is not drawn.

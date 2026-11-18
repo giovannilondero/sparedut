@@ -66,7 +66,7 @@ export const MovePlayers = Game.System(
         body = step.body
         if (step.launchedBy) events.out.emit({ t: "pad", s: session })
         if (step.fellOut) {
-          events.damage.emit({ victim: session, attacker: null, amount: 9999, weapon: "fall", head: false, push: null })
+          events.damage.emit({ victim: session, attacker: null, amount: 9999, weapon: "fall", head: false, push: null, from: null })
           break
         }
       }
