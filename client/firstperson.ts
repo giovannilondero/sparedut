@@ -15,6 +15,8 @@ export interface FirstPersonInput {
   readonly aim: number
   /** The player's field of view setting, in degrees. */
   readonly baseFov: number
+  /** The viewport's width over its height: below 1 it is portrait. */
+  readonly aspect: number
   /** Rounds in the chosen weapon's magazine, as this client knows it. */
   readonly mag: number
   /** Rounds in reserve for the chosen weapon. */
@@ -67,6 +69,22 @@ export interface FirstPersonView {
   readonly mitraie: MitraiePose | null
 }
 
+/**
+ * The view in a portrait viewport, in degrees: the vertical field of view is raised until the
+ * view across reaches `horizontal`, but never past `maxVertical`, which bounds the stretch at
+ * the top and bottom edges. Tuned by eye on a real phone.
+ */
+export const PORTRAIT_FOV = { horizontal: 90, maxVertical: 110 } as const
+
+const RAD = Math.PI / 180
+
+/** The vertical field of view the player sees at rest: their setting, widened in portrait. */
+const restingFov = (baseFov: number, aspect: number): number => {
+  if (aspect >= 1) return baseFov
+  const reach = (2 * Math.atan(Math.tan((PORTRAIT_FOV.horizontal * RAD) / 2) / aspect)) / RAD
+  return Math.max(baseFov, Math.min(reach, PORTRAIT_FOV.maxVertical))
+}
+
 /** How far into aiming the scope overlay replaces the view. */
 const SCOPE_AT = 0.85
 /** Seconds after a shot before the next hen is back at the cannon's mouth. */
@@ -93,10 +111,13 @@ export const henDrop = (progress: number, count: number, i: number): number => {
 
 export const firstPerson = (input: FirstPersonInput): FirstPersonView => {
   const inHand: WeaponId = input.mount ? "mitraie" : input.chosen
-  const fov = input.baseFov + (WEAPONS[inHand].aimFov - input.baseFov) * input.aim
+  const aimed = input.baseFov + (WEAPONS[inHand].aimFov - input.baseFov) * input.aim
+  // Portrait widens the resting view and keeps the zoom aiming gives over the player's own setting.
+  const resting = restingFov(input.baseFov, input.aspect)
+  const fov = resting === input.baseFov ? aimed : (aimed / input.baseFov) * resting
   const scope = WEAPONS[inHand].scope && input.aim > SCOPE_AT
   const hen = henCannon(inHand, input)
-  return { inHand, fov, lookScale: fov / input.baseFov, scope, drawWeapon: input.alive && !scope && !input.mount, crosshair: input.alive && !scope, mitraie: mitraiePose(input), ...hen }
+  return { inHand, fov, lookScale: aimed / input.baseFov, scope, drawWeapon: input.alive && !scope && !input.mount, crosshair: input.alive && !scope, mitraie: mitraiePose(input), ...hen }
 }
 
 /** The mitraie's kick on its tripod: how far back (m) and for how long (s). It fires every 4 ticks, so a burst keeps it shaking. */
