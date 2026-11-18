@@ -241,7 +241,11 @@ export class Game {
       e.stopPropagation()
       if (e.key === "Enter") {
         const text = chat.value.trim()
-        if (text) d.net.send({ t: "chat", text })
+        if (text) {
+          d.net.send({ t: "chat", text })
+          // Sending a typed message is a training's interface step; opening the chat is not.
+          if (this.room !== null && isTraining(this.room.mode)) d.net.send({ t: "report", a: "chat" })
+        }
         this.closeChat()
       }
       if (e.key === "Escape") this.closeChat()

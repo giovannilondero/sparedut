@@ -107,7 +107,7 @@ describe("the way forward", () => {
   test("a snapshot of a regular room, or of a completed training, closes no gate", () => {
     expect(closedGates(3, viewedStation(null))).toEqual([false, false, false])
     expect(closedGates(3, viewedStation({ tag: "complete" }))).toEqual([false, false, false])
-    expect(closedGates(3, viewedStation({ tag: "station", station: "always", step: null, count: 0, target: 0, unlocked: 12 }))).toEqual([false, false, true])
+    expect(closedGates(3, viewedStation({ tag: "station", station: "always", step: null, count: 0, target: 0, unlocked: 12, completed: false }))).toEqual([false, false, true])
   })
 })
 

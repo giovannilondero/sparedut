@@ -352,7 +352,7 @@ test("a screen opens on its first control, and going back lands on the home scre
 
 test("the training starts in one tap from the home screen, with nothing to choose", () => {
   const { model } = menu()
-  expect(model.training()).toEqual({ kind: "send", request: { t: "training", start: { unlocked: 1, from: "look" } } })
+  expect(model.training()).toEqual({ kind: "send", request: { t: "training", start: { unlocked: 1, from: "look", completed: false } } })
 })
 
 test("the training, like any room, needs a name first", () => {

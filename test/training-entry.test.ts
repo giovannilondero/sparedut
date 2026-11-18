@@ -37,7 +37,7 @@ function played(settings: Settings, ...events: Parameters<typeof trainingProgres
 
 test("the entry asks for the training, starting where the saved progress says", () => {
   storage({ name: "Toni", training: { done: 4 } })
-  expect(visit().model.training()).toEqual({ kind: "send", request: { t: "training", start: { unlocked: 5, from: "stalls" } } })
+  expect(visit().model.training()).toEqual({ kind: "send", request: { t: "training", start: { unlocked: 5, from: "stalls", completed: false } } })
 })
 
 test("a first visit shows the invitation, and no completed mark", () => {
@@ -84,7 +84,7 @@ test("starting without a name asks for the name first, and the invitation stays"
   expect(visit().model.trainingEntry.invitation).toBe("shown")
   // With a name, the same tap starts it.
   model.typeName("Toni")
-  expect(model.training()).toEqual({ kind: "send", request: { t: "training", start: { unlocked: 1, from: "look" } } })
+  expect(model.training()).toEqual({ kind: "send", request: { t: "training", start: { unlocked: 1, from: "look", completed: false } } })
 })
 
 test("the completed mark shows only once the training has been completed", () => {
@@ -107,7 +107,7 @@ test("starting over clears the completed mark and keeps the invitation away", ()
   settings.training = FRESH_TRAINING
   saveSettings(settings)
   expect(visit().model.trainingEntry).toEqual({ invitation: "hidden", completed: false })
-  expect(visit().model.training()).toEqual({ kind: "send", request: { t: "training", start: { unlocked: 1, from: "look" } } })
+  expect(visit().model.training()).toEqual({ kind: "send", request: { t: "training", start: { unlocked: 1, from: "look", completed: false } } })
 })
 
 test("a player who trained before the invitation existed is not invited", () => {

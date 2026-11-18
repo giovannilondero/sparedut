@@ -20,12 +20,13 @@ export interface StationEntry {
 
 /**
  * The stations as the list shows them. Stations unlock only by completing the one before, so
- * every unlocked station but the last is completed; a completed training has them all completed.
+ * every unlocked station but the last is completed; a training completed once has them all completed,
+ * wherever the player is now.
  */
 export function stationEntries(view: TrainingView | null): readonly StationEntry[] {
   const unlocked = view === null ? 1 : view.tag === "complete" ? STATION_IDS.length : view.unlocked
   const current = view?.tag === "station" ? view.station : null
-  const done = view?.tag === "complete" ? STATION_IDS.length : unlocked - 1
+  const done = view?.tag === "complete" || (view?.tag === "station" && view.completed) ? STATION_IDS.length : unlocked - 1
   return STATION_IDS.map((station, i) => ({
     station,
     n: i + 1,

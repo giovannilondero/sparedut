@@ -68,7 +68,7 @@ describe("starting the training", () => {
     expect(snap.phase.tag).toBe("Live")
     expect(snap.you!.alive).toBe(true)
     expect(snap.you!.body).toMatchObject({ x: START.at[0], z: START.at[2] })
-    expect(snap.training).toEqual({ tag: "station", station: "look", step: "lookAround", count: 0, target: 1, unlocked: 1 })
+    expect(snap.training).toEqual({ tag: "station", station: "look", step: "lookAround", count: 0, target: 1, unlocked: 1, completed: false })
   })
 
   test("no warm-up and no end: the training is still live long after a match would have ended", () => {

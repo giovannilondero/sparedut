@@ -8,6 +8,7 @@ import type { V3 } from "../shared/map.ts"
 import { SAGRE_STATIONS } from "../shared/maps/sagre.ts"
 import type { PostValue, WorldView } from "../shared/sim/index.ts"
 import { STATIONS, type StationId } from "../shared/training/index.ts"
+import { foeStance } from "../shared/training/spared.ts"
 import { MAX_STATION_BOTS, type StationBot } from "../shared/training/station.ts"
 import type { NavGraph } from "./nav.ts"
 
@@ -97,5 +98,23 @@ export class RouteBrain implements Brain {
     }
     this.yaw = yawFrom([me.body.x, me.body.y, me.body.z], at)
     return { ...idle, yaw: this.yaw, mz: 1 }
+  }
+}
+
+/**
+ * A station's bot that fires: it fights as an ordinary bot while the current step says so, and
+ * stands down when it does not (`StepRule.foes`): it walks back to its post and waits there,
+ * never firing. Read from the world every tick, so restarting the station makes it fight again.
+ */
+export class FoeBrain implements Brain {
+  constructor(
+    private readonly fight: Brain,
+    private readonly rest: RouteBrain
+  ) {}
+
+  think(world: WorldView): PlayerInput {
+    const t = world.training
+    const down = t?.tag === "station" && t.step !== null && foeStance(t.station, t.step) === "standDown"
+    return down ? this.rest.think(world) : this.fight.think(world)
   }
 }

@@ -16,13 +16,16 @@ const KEY_NAMES = ["Mouse", "WASD", "Spazi", "Spazio", "Ctrl", "Shift", "Rodele"
 const kbds = (markup: string) => [...markup.matchAll(/<kbd>(.*?)<\/kbd>/g)].map((m) => m[1] ?? "")
 const namesAKey = (markup: string) => kbds(markup).some((k) => KEY_NAMES.some((n) => k === n || k.startsWith(`${n} `)))
 
-test("which devices have a control: a controller has no quick phrases, and only the keyboard goes back to the previous weapon", () => {
+test("which devices have a control: a controller has no quick phrases, only the keyboard goes back to the previous weapon, and only it types a chat message", () => {
   for (const c of CONTROL_IDS) expect(hasControl(c, "keyboard")).toBe(true)
   expect(hasControl("phrases", "pad")).toBe(false)
   expect(hasControl("phrases", "touch")).toBe(true)
   expect(hasControl("lastWeapon", "pad")).toBe(false)
   expect(hasControl("lastWeapon", "touch")).toBe(false)
-  for (const c of CONTROL_IDS.filter((c) => c !== "phrases" && c !== "lastWeapon")) {
+  // Typing a chat message needs a keyboard.
+  expect(hasControl("chat", "pad")).toBe(false)
+  expect(hasControl("chat", "touch")).toBe(false)
+  for (const c of CONTROL_IDS.filter((c) => c !== "phrases" && c !== "lastWeapon" && c !== "chat")) {
     expect(hasControl(c, "pad")).toBe(true)
     expect(hasControl(c, "touch")).toBe(true)
   }
@@ -78,7 +81,7 @@ for (const [lang, s] of Object.entries(STRINGS)) {
     for (const station of STATION_IDS)
       for (const step of stepsOf(station))
         for (const d of DEVICES) {
-          const view: TrainingView = { tag: "station", station, step, count: 0, target: 1, unlocked: 1 }
+          const view: TrainingView = { tag: "station", station, step, count: 0, target: 1, unlocked: 1, completed: false }
           const prompt = trainingPrompt(s, view, d)
           if (!stepAvailable(station, step, d)) {
             expect(prompt).toContain(s.training.unavailable)
@@ -90,7 +93,7 @@ for (const [lang, s] of Object.entries(STRINGS)) {
   })
 
   test(`${lang}: the same step, unchanged, reads differently on each device`, () => {
-    const view: TrainingView = { tag: "station", station: "look", step: "walkToMarker", count: 0, target: 1, unlocked: 1 }
+    const view: TrainingView = { tag: "station", station: "look", step: "walkToMarker", count: 0, target: 1, unlocked: 1, completed: false }
     const prompts = DEVICES.map((d) => trainingPrompt(s, view, d))
     expect(prompts[0]).toContain("WASD")
     expect(new Set(prompts).size).toBe(3)
@@ -141,7 +144,7 @@ test("the prompt follows the device used last: a key, then the controller, then 
   const c = new Controls(element as unknown as HTMLElement, { onSlot() {}, onLastWeapon() {}, onWheel() {}, onKey: () => false, onPause() {} })
   c.inMatch = true
   const s = STRINGS.fur
-  const view: TrainingView = { tag: "station", station: "look", step: "walkToMarker", count: 0, target: 1, unlocked: 1 }
+  const view: TrainingView = { tag: "station", station: "look", step: "walkToMarker", count: 0, target: 1, unlocked: 1, completed: false }
   const prompt = () => trainingPrompt(s, view, c.device)
 
   emit(winListeners, "keydown", { code: "KeyW", repeat: false })

@@ -107,8 +107,11 @@ describe("station 12: the scoreboard and a quick phrase", () => {
     b.me.say({ t: "report", a: "board" })
     expect(steps(b.wait(5))).toEqual([])
     b.me.say({ t: "report", a: "phrases" })
+    expect(steps(b.wait(5))).toEqual(["phrases"])
+    // Then a chat message, the station's last step.
+    b.me.say({ t: "report", a: "chat" })
     const events = b.wait(5)
-    expect(steps(events)).toEqual(["phrases"])
+    expect(steps(events)).toEqual(["chat"])
     expect(events).toContainEqual({ t: "training", a: "station", station: "skirmish" })
     expect(events).toContainEqual({ t: "training", a: "complete" })
     expect(at(b)).toEqual({ tag: "complete" })
@@ -125,9 +128,8 @@ describe("a step the active device has no control for", () => {
     r.me.say({ t: "unavailable", station: "skirmish", step: "phrases", device: "keyboard" })
     expect(steps(r.wait(5))).toEqual([])
     r.me.say({ t: "unavailable", station: "skirmish", step: "phrases", device: "pad" })
-    const events = r.wait(5)
-    expect(steps(events)).toEqual(["phrases"])
-    expect(events).toContainEqual({ t: "training", a: "complete" })
+    expect(steps(r.wait(5))).toEqual(["phrases"])
+    expect(at(r)).toMatchObject({ station: "skirmish", step: "chat" })
   })
 
   test("the previous weapon completes itself on a controller and on touch, never on a keyboard", () => {

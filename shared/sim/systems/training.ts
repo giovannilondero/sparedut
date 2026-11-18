@@ -42,7 +42,7 @@ import {
 } from "../schema.ts"
 
 /** Where the trainee is after a station completes: at the next station's first step, or done. */
-type Next = { readonly _tag: "Step"; readonly station: number; readonly step: number; readonly count: number; readonly mark: number; readonly unlocked: number } | { readonly _tag: "Complete" }
+type Next = { readonly _tag: "Step"; readonly station: number; readonly step: number; readonly count: number; readonly mark: number; readonly unlocked: number; readonly completed: boolean } | { readonly _tag: "Complete" }
 
 /** An arsenal with only what is in each magazine: no reserve, no bombs or mines (a station's `ammo: "loaded"`). */
 const onlyLoaded = (a: ArsenalValue): ArsenalValue => {
@@ -103,7 +103,11 @@ export const PlayTraining = Game.System(
     for (const g of goes) if (queries.players.each().some((m) => !data.player.get(m).bot && data.player.get(m).session === g.session)) go = g.to
     if (go !== null) {
       const unlocked = state._tag === "Complete" ? STATION_IDS.length : state.unlocked
-      const to = go._tag === "startOver" ? { station: 0, unlocked: 1, place: "keepingLook" as const } : go.station >= 0 && go.station < unlocked ? { station: go.station, unlocked, place: "keepingLook" as const } : null
+      const completed = state._tag === "Complete" || state.completed
+      const to =
+        go._tag === "startOver" ? { station: 0, unlocked: 1, completed: false, place: "keepingLook" as const }
+        : go.station >= 0 && go.station < unlocked ? { station: go.station, unlocked, completed, place: "keepingLook" as const }
+        : null
       if (to !== null) {
         if (state._tag === "Arriving") machines.training.update({ state: "Arriving", data: () => to })
         else if (state._tag === "Step") nextMachines.training.transition({ from: "Step", to: "Arriving", data: to })
@@ -181,7 +185,7 @@ export const PlayTraining = Game.System(
     }
 
     /** Arrives at station `from` (and past any station with no steps): its setup applied, its first step begun. */
-    const arrive = (from: number, unlocked: number, place: ArrivalPlace): Next => {
+    const arrive = (from: number, unlocked: number, completed: boolean, place: ArrivalPlace): Next => {
       let index = from
       let open = unlocked
       while (index < STATION_IDS.length && stepsOf(STATION_IDS[index]).length === 0) {
@@ -236,7 +240,7 @@ export const PlayTraining = Game.System(
       const first = stepRule(id, stepsOf(id)[0])
       give(first)
       const begun = first.begin(seen(null))
-      return { _tag: "Step", station: index, step: 0, count: begun.count, mark: begun.mark, unlocked: Math.min(STATION_IDS.length, open) }
+      return { _tag: "Step", station: index, step: 0, count: begun.count, mark: begun.mark, unlocked: Math.min(STATION_IDS.length, open), completed }
     }
 
     // The doors (station 3's shed): whole whenever the trainee arrives at a station, and standing
@@ -249,9 +253,9 @@ export const PlayTraining = Game.System(
 
     if (state._tag === "Arriving") {
       standDoors(true)
-      const next = arrive(state.station, state.unlocked, state.place)
+      const next = arrive(state.station, state.unlocked, state.completed, state.place)
       if (next._tag === "Complete") nextMachines.training.transition({ from: "Arriving", to: "Complete" })
-      else nextMachines.training.transition({ from: "Arriving", to: "Step", data: { station: next.station, step: next.step, count: next.count, mark: next.mark, unlocked: next.unlocked } })
+      else nextMachines.training.transition({ from: "Arriving", to: "Step", data: { station: next.station, step: next.step, count: next.count, mark: next.mark, unlocked: next.unlocked, completed: next.completed } })
       return
     }
 
@@ -273,23 +277,23 @@ export const PlayTraining = Game.System(
     let next: Next
     if (count < rule.target) {
       standDoors(false)
-      next = { _tag: "Step", station: state.station, step: state.step, count, mark: now.mark, unlocked: state.unlocked }
+      next = { _tag: "Step", station: state.station, step: state.step, count, mark: now.mark, unlocked: state.unlocked, completed: state.completed }
     } else {
       events.out.emit({ t: "training", a: "step", station: id, step: steps[state.step] })
       if (state.step + 1 < steps.length) {
         const following = stepRule(id, steps[state.step + 1])
         give(following)
         const begun = following.begin(seen(null))
-        next = { _tag: "Step", station: state.station, step: state.step + 1, count: begun.count, mark: begun.mark, unlocked: state.unlocked }
+        next = { _tag: "Step", station: state.station, step: state.step + 1, count: begun.count, mark: begun.mark, unlocked: state.unlocked, completed: state.completed }
       } else {
         events.out.emit({ t: "training", a: "station", station: id })
-        next = arrive(state.station + 1, Math.max(state.unlocked, state.station + 2), "walked")
+        next = arrive(state.station + 1, Math.max(state.unlocked, state.station + 2), state.completed, "walked")
       }
     }
     if (next._tag === "Complete") nextMachines.training.transition({ from: "Step", to: "Complete" })
     else {
-      const { station, step, count: done, mark, unlocked } = next
-      machines.training.update({ state: "Step", data: () => ({ station, step, count: done, mark, unlocked }) })
+      const { station, step, count: done, mark, unlocked, completed } = next
+      machines.training.update({ state: "Step", data: () => ({ station, step, count: done, mark, unlocked, completed }) })
     }
   }
 )
