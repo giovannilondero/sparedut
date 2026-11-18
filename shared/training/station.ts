@@ -7,6 +7,7 @@ import type { ObjectiveId } from "../folklore.ts"
 import type { Team, V3 } from "../map.ts"
 import type { Body } from "../movement.ts"
 import type { GameEvent } from "../sim/events.ts"
+import type { StormValue } from "../sim/rules.ts"
 import type { ArsenalValue, ControlsValue } from "../sim/schema.ts"
 import type { PrimaryId, WeaponId } from "../weapons.ts"
 import type { InterfaceAction } from "./interface.ts"
@@ -60,6 +61,8 @@ export interface Seen {
   readonly reported: number
   /** Each team's score, which an objective in force raises (`PlayObjectives`). */
   readonly score: Readonly<Record<Team, number>>
+  /** The storm's safe circle this tick while the storm is the objective in force; null otherwise. */
+  readonly storm: StormValue | null
 }
 
 /** A step's progress: how many times its action happened, and a number the step keeps for itself. */
@@ -97,6 +100,19 @@ export interface StepGiven {
   readonly hold?: WeaponId
   /** The objective put in force, its state fresh (the frico at its bases, the plaçute free, the cjar at the start). */
   readonly objective?: ObjectiveId
+  /** The storm's course, when the objective is the storm: it starts closing on the tick the step becomes current. */
+  readonly storm?: StormClosing
+}
+
+/**
+ * How a training's storm closes: on `at`, from `from` to `to` metres in `ticks` ticks, then holding.
+ * A regular room's storm follows the match clock instead; a training has none.
+ */
+export interface StormClosing {
+  readonly at: V3
+  readonly from: number
+  readonly to: number
+  readonly ticks: number
 }
 
 /**

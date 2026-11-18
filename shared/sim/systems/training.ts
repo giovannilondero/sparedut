@@ -11,8 +11,8 @@ import { SAGRE, SAGRE_STATIONS } from "../../maps/sagre.ts"
 import { STATION_IDS, STATIONS, stepRule, stepsOf } from "../../training/index.ts"
 import type { Seen, StepRule } from "../../training/station.ts"
 import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS } from "../../weapons.ts"
-import { freshArsenal, freshDoors, MAX_HP } from "../rules.ts"
-import { Arsenal, Cart, Controls, Doors, Flags, Game, Hill, Life, Motion, Objective, Out, Pickups, Player, ReportInterface, Score, Tick, Training, type ArsenalValue } from "../schema.ts"
+import { freshArsenal, freshDoors, MAX_HP, stormOnCourse } from "../rules.ts"
+import { Arsenal, Cart, Controls, Doors, Flags, Game, Hill, Life, Motion, Objective, Out, Pickups, Player, ReportInterface, Score, StormCourse, Tick, Training, type ArsenalValue } from "../schema.ts"
 
 /** Where the trainee is after a station completes: at the next station's first step, or done. */
 type Next = { readonly _tag: "Step"; readonly station: number; readonly step: number; readonly count: number; readonly mark: number; readonly unlocked: number } | { readonly _tag: "Complete" }
@@ -46,7 +46,8 @@ export const PlayTraining = Game.System(
       score: Game.System.readResource(Score),
       flags: Game.System.writeResource(Flags),
       hill: Game.System.writeResource(Hill),
-      cart: Game.System.writeResource(Cart)
+      cart: Game.System.writeResource(Cart),
+      stormCourse: Game.System.writeResource(StormCourse)
     },
     events: { happened: Game.System.readEvent(Out), out: Game.System.writeEvent(Out), reports: Game.System.readEvent(ReportInterface) },
     machines: { training: Game.System.updateMachine(Training) },
@@ -71,6 +72,12 @@ export const PlayTraining = Game.System(
       return n
     }
 
+    /** The storm's safe circle while it is the objective in force on a course of the training's (#49). */
+    const storm = () => {
+      const course = resources.stormCourse.get()
+      return resources.objective.get() === "storm" && course ? stormOnCourse(course, resources.tick.get()) : null
+    }
+
     /** What the current step sees; `null` while a step begins, when no report is its own yet. */
     const seen = (rule: StepRule | null): Seen => {
       const life = data.life.get(trainee)
@@ -89,7 +96,8 @@ export const PlayTraining = Game.System(
         },
         events: happened,
         reported: rule ? reported(rule.report) : 0,
-        score: resources.score.get()
+        score: resources.score.get(),
+        storm: storm()
       }
     }
 
@@ -110,6 +118,9 @@ export const PlayTraining = Game.System(
       if (objective === "frico") resources.flags.set({ benandanti: { _tag: "base" }, malandanti: { _tag: "base" } })
       if (objective === "placute") resources.hill.set({ owner: null, contested: false, ticks: 0 })
       if (objective === "cjar") resources.cart.set({ d: 0, pushers: 0, contested: false, idle: 0 })
+      // #49: the storm starts closing on its course now.
+      const course = objective === "storm" ? given.storm : undefined
+      resources.stormCourse.set(course ? { x: course.at[0], z: course.at[2], from: course.from, to: course.to, start: resources.tick.get(), ticks: course.ticks } : null)
     }
 
     /** Arrives at station `from` (and past any station with no steps): its setup applied, its first step begun. */
@@ -124,6 +135,7 @@ export const PlayTraining = Game.System(
       if (index >= STATION_IDS.length) {
         // A completed training teaches no objective: none is left in force (#48).
         resources.objective.set("none")
+        resources.stormCourse.set(null)
         events.out.emit({ t: "training", a: "complete" })
         return { _tag: "Complete" }
       }

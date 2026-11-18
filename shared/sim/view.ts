@@ -6,7 +6,7 @@ import { trackLength, trackPoint, type V3 } from "../map.ts"
 import { MAPS } from "../maps/index.ts"
 import { STATION_IDS, stepRule, stepsOf, type StationId, type StepId } from "../training/index.ts"
 import type { GameEvent, Winner } from "./events.ts"
-import { CART, stormAt, type StormValue } from "./rules.ts"
+import { CART, stormNow, type StormValue } from "./rules.ts"
 import {
   Arsenal,
   Cart,
@@ -25,6 +25,7 @@ import {
   Rules,
   Score,
   Stats,
+  StormCourse,
   TeamOf,
   Tick,
   Turrets,
@@ -143,6 +144,7 @@ export const ViewWorld = Game.Inspector(
       flags: Game.System.readResource(Flags),
       hill: Game.System.readResource(Hill),
       cart: Game.System.readResource(Cart),
+      stormCourse: Game.System.readResource(StormCourse),
       pickups: Game.System.readResource(Pickups),
       turrets: Game.System.readResource(Turrets),
       doors: Game.System.readResource(Doors)
@@ -182,7 +184,7 @@ export const ViewWorld = Game.Inspector(
       const step = stepsOf(station)[progress.step]
       training = { tag: "station", station, step, count: progress.count, target: stepRule(station, step).target, unlocked: progress.unlocked }
     }
-    const storm = objective === "storm" && match._tag === "Live" ? stormAt(map, rules, match.ends - rules.timeLimitTicks, tick) : null
+    const storm = objective === "storm" && match._tag === "Live" ? stormNow(map, rules, match.ends - rules.timeLimitTicks, resources.stormCourse.get(), tick) : null
     return {
       tick,
       phase,

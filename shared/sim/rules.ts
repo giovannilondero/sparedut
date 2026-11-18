@@ -4,7 +4,7 @@
  */
 import type { MapDef, Spawn, Team } from "../map.ts"
 import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../weapons.ts"
-import type { Ammo, ArsenalValue, RulesValue, StatsValue, TurretState } from "./schema.ts"
+import type { Ammo, ArsenalValue, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
 
 export const MAX_HP = 100
 export const MAX_ARMOR = 100
@@ -67,6 +67,16 @@ export function stormAt(map: MapDef, rules: RulesValue, start: number, tick: num
   const k = Math.min(1, Math.max(0, (tick - start - STORM_GRACE_TICKS) / span))
   return { x, z, radius: far + (STORM_MIN_RADIUS - far) * k }
 }
+
+/** The safe circle of a storm on its own course (the training's): it closes from the course's start, then holds. */
+export function stormOnCourse(course: StormCourseValue, tick: number): StormValue {
+  const k = Math.min(1, Math.max(0, (tick - course.start) / Math.max(1, course.ticks)))
+  return { x: course.x, z: course.z, radius: course.from + (course.to - course.from) * k }
+}
+
+/** The safe circle now: on its own course when one is set, else from the match clock (`stormAt`), as in every regular room. */
+export const stormNow = (map: MapDef, rules: RulesValue, matchStart: number, course: StormCourseValue | null, tick: number): StormValue =>
+  course ? stormOnCourse(course, tick) : stormAt(map, rules, matchStart, tick)
 
 export const outsideStorm = (storm: StormValue, p: { x: number; z: number }) => (p.x - storm.x) ** 2 + (p.z - storm.z) ** 2 > storm.radius * storm.radius
 
