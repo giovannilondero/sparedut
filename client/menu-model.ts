@@ -6,7 +6,7 @@
 import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "../shared/folklore.ts"
 import type { MapId } from "../shared/map.ts"
 import { MAP_IDS } from "../shared/maps/index.ts"
-import { ACCESSES, Password, REACHES, type Access, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
+import { ACCESSES, Password, REACHES, type Access, type ErrorCode, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
 import { oneTapRoom } from "./settings.ts"
 
 export type CreateOptions = Reached<RoomAccess> & {
@@ -28,7 +28,7 @@ export interface Remembered {
   lastLevel: BotLevel
 }
 
-export const SCREENS = ["home", "create", "join", "password", "armarie", "settings", "vocabolari"] as const
+export const SCREENS = ["home", "create", "password", "armarie", "settings", "vocabolari"] as const
 export type Screen = (typeof SCREENS)[number]
 
 /** What the menu asks the game to do. */
@@ -50,6 +50,12 @@ export type Outcome =
  * letters. `roomFull`, `roomGone`: the room chosen in the list is full, or no longer in it.
  */
 export type Refusal = "needName" | "passwordBad" | "codeBad" | "roomFull" | "roomGone"
+
+/** The host's reasons to ask for a room's password again. */
+export type PasswordRefusal = Extract<ErrorCode, "passwordRequired" | "wrongPassword" | "tooManyAttempts">
+
+/** What the password prompt says about the last attempt: the host's answer, or a password refused before sending. */
+export type PromptProblem = Exclude<PasswordRefusal, "passwordRequired"> | "passwordBad"
 
 /** A room as the list shows it: a full room is shown, not selectable. */
 export interface ListedRoom {
@@ -90,7 +96,7 @@ export interface Choices {
 }
 
 /** The screens a player cannot reach without a name: they start or join a match. */
-const NEED_NAME: ReadonlySet<Screen> = new Set(["create", "join", "password"])
+const NEED_NAME: ReadonlySet<Screen> = new Set(["create", "password"])
 
 const NONE: Outcome = { kind: "none" }
 const refused = (reason: Refusal): Outcome => ({ kind: "refused", reason })
@@ -108,7 +114,7 @@ export class MenuModel {
   private roomPassword = ""
   private code = ""
   /** The room the password prompt is for, and the password typed into it. */
-  private prompt = { code: "", password: "" }
+  private prompt: { code: string; password: string; problem: PromptProblem | null } = { code: "", password: "", problem: null }
   private listed: readonly ListedRoom[] = []
 
   /** `save` is called whenever a remembered value changed. */
@@ -258,12 +264,18 @@ export class MenuModel {
 
   /** Opens the password prompt for a room; what was typed stays if it is the same room as last time. */
   askPassword(code: string): Outcome {
-    if (this.prompt.code !== code) this.prompt = { code, password: "" }
+    if (this.prompt.code !== code) this.prompt = { code, password: "", problem: null }
+    else this.prompt.problem = null
     return this.go("password")
   }
 
   get passwordFor(): string {
     return this.prompt.code
+  }
+
+  /** The room the prompt is for, as the list shows it; undefined for a code the list does not have. */
+  get promptRoom(): RoomSummary | undefined {
+    return this.listed.find((l) => l.room.code === this.prompt.code)?.room
   }
 
   get typedPassword(): string {
@@ -274,9 +286,24 @@ export class MenuModel {
     this.prompt.password = text
   }
 
+  /** What the last attempt at the prompt got wrong; null when there was none. */
+  get promptProblem(): PromptProblem | null {
+    return this.prompt.problem
+  }
+
+  /** The host asked for a room's password, or refused the one sent: back to the prompt, saying why. */
+  hostRefused(code: string, why: PasswordRefusal): Outcome {
+    const outcome = this.askPassword(code)
+    this.prompt.problem = why === "passwordRequired" ? null : why
+    return outcome
+  }
+
   joinWithPassword(): Outcome {
     const password = Password.safeParse(this.prompt.password)
-    if (!password.success) return refused("passwordBad")
+    if (!password.success) {
+      this.prompt.problem = "passwordBad"
+      return refused("passwordBad")
+    }
     return { kind: "send", request: { t: "join", code: this.prompt.code, password: password.data } }
   }
 

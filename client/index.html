@@ -37,39 +37,62 @@
     <canvas id="view"></canvas>
 
     <!-- ===================== MENU ===================== -->
-    <div id="menu" class="screen">
-      <div class="menu-shade"></div>
+    <div id="menu">
       <header class="brand">
-        <div class="brand-kicker" data-t="kicker"></div>
         <h1 class="brand-title">Sparedût</h1>
-        <div class="brand-sub" data-t="sub"></div>
-        <div class="lang" role="group"><span data-t="language"></span><button data-lang="fur">Furlan</button><button data-lang="it">Italiano</button></div>
+        <div class="lang" role="group" aria-labelledby="lang-label"><span id="lang-label" data-t="language"></span><button data-lang="fur">Furlan</button><button data-lang="it">Italiano</button></div>
       </header>
 
-      <nav id="menu-home" class="panel home">
-        <label class="field name-field">
+      <!-- Home: everything at once, the room list beside the actions when there is room for it. -->
+      <div id="menu-home" class="home">
+        <label class="field home-name">
           <span data-t="nameLabel"></span>
-          <input id="name" maxlength="20" data-t-ph="namePh" autocomplete="off" />
+          <input id="name" maxlength="20" data-t-ph="namePh" autocomplete="off" autocapitalize="words" spellcheck="false" />
         </label>
-        <button class="big primary" data-go="one-tap">
-          <span data-t="oneTap"></span><small data-t="oneTapSub"></small>
+        <button class="big primary home-hero" data-go="one-tap">
+          <span data-t="oneTap"></span><small class="sub" data-t="oneTapSub"></small><small class="last" id="one-tap-last"></small>
         </button>
-        <button class="big" data-go="create">
-          <span data-t="create"></span><small data-t="createSub"></small>
-        </button>
-        <button class="big" data-go="join">
-          <span data-t="join"></span><small data-t="joinSub"></small>
-        </button>
-        <div class="room-list-box">
-          <div class="room-list-title" data-t="roomsTitle"></div>
-          <ul id="room-list"></ul>
+        <div class="home-tiles">
+          <button class="big home-tile" data-go="create">
+            <span data-t="create"></span><small data-t="createSub"></small>
+          </button>
+          <form id="j-form" class="home-tile code-join" novalidate>
+            <label for="j-code" data-t="join"></label>
+            <input id="j-code" maxlength="4" placeholder="ABCD" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="j-msg" />
+            <button id="j-go" data-t="joinGo"></button>
+            <p id="j-msg" class="form-msg" role="alert"></p>
+          </form>
+          <!-- The training's place: its entry goes here once the training exists. Nothing is shown or focusable until then. -->
+          <div class="home-training" hidden></div>
         </div>
-        <div class="row small-buttons">
+        <section class="home-rooms" aria-labelledby="rooms-title">
+          <h2 id="rooms-title" data-t="roomsTitle"></h2>
+          <div id="room-list"></div>
+        </section>
+        <nav class="home-tools">
           <button data-go="armarie" data-t="armarie"></button>
           <button data-go="settings" data-t="settings"></button>
           <button data-go="vocabolari" data-t="vocab"></button>
-        </div>
-      </nav>
+        </nav>
+      </div>
+
+      <!-- A password room's prompt, over the home screen: the room list stays where it was. -->
+      <ui-dialog id="pw-dialog">
+        <ui-dialog-backdrop class="pw-scrim" hidden></ui-dialog-backdrop>
+        <ui-dialog-content class="pw-dialog" initial-focus="#pw-input" hidden>
+          <ui-dialog-title><span aria-hidden="true">🔒</span> <span data-t="passwordTitle"></span></ui-dialog-title>
+          <ui-dialog-description id="pw-for"></ui-dialog-description>
+          <ul id="pw-room" class="rooms pw-room"></ul>
+          <form id="pw-form" class="pw-form" novalidate>
+            <label class="field"><span data-t="passwordLabel"></span><input id="pw-input" class="pw-input" maxlength="32" autocomplete="off" spellcheck="false" aria-describedby="pw-msg" /></label>
+            <p id="pw-msg" class="form-msg" role="alert"></p>
+            <div class="pw-buttons">
+              <ui-dialog-close><button type="button" data-t="back"></button></ui-dialog-close>
+              <button class="primary" data-t="joinGo"></button>
+            </div>
+          </form>
+        </ui-dialog-content>
+      </ui-dialog>
 
       <section id="menu-create" class="panel hidden">
         <h2 data-t="create"></h2>
@@ -90,26 +113,6 @@
         <div class="row">
           <button data-go="home" data-t="back"></button>
           <button class="primary" id="c-go" data-t="createGo"></button>
-        </div>
-      </section>
-
-      <section id="menu-join" class="panel hidden">
-        <h2 data-t="join"></h2>
-        <input id="j-code" class="code-input" maxlength="4" placeholder="ABCD" autocomplete="off" />
-        <div class="row">
-          <button data-go="home" data-t="back"></button>
-          <button class="primary" id="j-go" data-t="joinGo"></button>
-        </div>
-      </section>
-
-      <section id="menu-password" class="panel hidden">
-        <h2 data-t="passwordTitle"></h2>
-        <p id="pw-for" class="muted"></p>
-        <input id="pw-input" class="pw-input" maxlength="32" autocomplete="off" spellcheck="false" />
-        <p id="pw-msg" class="form-msg" role="alert"></p>
-        <div class="row">
-          <button data-go="home" data-t="back"></button>
-          <button class="primary" id="pw-go" data-t="joinGo"></button>
         </div>
       </section>
 

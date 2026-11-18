@@ -124,7 +124,7 @@ test("friendly fire is carried into the room", () => {
 
 test("the screens that start a match need a name; the others do not", () => {
   const { model } = menu({ name: "" })
-  for (const screen of ["create", "join", "password"] as const) expect(model.go(screen)).toEqual({ kind: "refused", reason: "needName" })
+  for (const screen of ["create", "password"] as const) expect(model.go(screen)).toEqual({ kind: "refused", reason: "needName" })
   expect(model.screen).toBe("home")
   expect(model.go("armarie")).toEqual({ kind: "none" })
   expect(model.screen).toBe("armarie")
@@ -149,16 +149,14 @@ test("back goes home from any other screen, and does nothing at home", () => {
 const room = (code: string, over: object = {}) =>
   ({ code, host: "Toni", mode: "bataie", map: "glemone", players: 2, bots: 4, max: 16, phase: "Warmup", reach: "lan", access: "open", ...over }) as const
 
-test("a typed code joins its room, cleaned of spaces and case", () => {
+test("a code typed on the home screen joins its room, cleaned of spaces and case", () => {
   const { model } = menu()
-  model.go("join")
   model.typeCode(" abcd ")
   expect(model.joinByCode()).toEqual({ kind: "send", request: { t: "join", code: "ABCD" } })
 })
 
 test("a code that is not four letters sends nothing", () => {
   const { model } = menu()
-  model.go("join")
   model.typeCode("ABC")
   expect(model.joinByCode()).toEqual({ kind: "refused", reason: "codeBad" })
 })
@@ -255,4 +253,36 @@ test("a new room starts on the menu's first reach and access", () => {
 test("the creation choices start from the remembered values", () => {
   const { model } = menu({ lastMode: "cjar", lastMap: "maran", lastMinutes: 15, lastBots: 2, lastLevel: "zovin" })
   expect(model.choices).toMatchObject({ mode: "cjar", map: "maran", minutes: 15, bots: 2, level: "zovin" })
+})
+
+test("a wrong password from the host brings back the prompt for the same room, saying so and keeping what was typed", () => {
+  const { model } = menu()
+  model.rooms([room("ABCD", { access: "password" })])
+  model.joinFromList("ABCD")
+  model.typePassword("Cjavedal")
+  model.joinWithPassword()
+  model.hostRefused("ABCD", "wrongPassword")
+  expect([model.screen, model.passwordFor, model.typedPassword, model.promptProblem]).toEqual(["password", "ABCD", "Cjavedal", "wrongPassword"])
+})
+
+test("the prompt says when the typed password is refused before sending, and forgets it when the room is chosen again", () => {
+  const { model } = menu()
+  model.rooms([room("ABCD", { access: "password" })])
+  model.joinFromList("ABCD")
+  model.joinWithPassword()
+  expect(model.promptProblem).toBe("passwordBad")
+  model.back()
+  model.joinFromList("ABCD")
+  expect(model.promptProblem).toBe(null)
+})
+
+test("the prompt shows the room it is for when the list has it, and only the code otherwise", () => {
+  const { model } = menu()
+  model.rooms([room("ABCD", { access: "password", host: "Mariute" })])
+  model.joinFromList("ABCD")
+  expect(model.promptRoom?.host).toBe("Mariute")
+  model.typeCode("wxyz")
+  model.joinByCode()
+  model.hostRefused("WXYZ", "passwordRequired")
+  expect([model.passwordFor, model.promptRoom]).toEqual(["WXYZ", undefined])
 })

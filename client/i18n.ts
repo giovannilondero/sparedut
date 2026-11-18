@@ -39,6 +39,8 @@ export interface Strings {
   readonly menu: {
     readonly needName: string
     readonly roomsEmpty: string
+    /** A room code that is not four letters, said under the code field. */
+    readonly codeBad: string
     /** The chip on a room in the list. */
     readonly reach: Record<Reach, string>
     /** A full room in the list: shown, not selectable. */
@@ -414,6 +416,7 @@ const fur: Strings = {
   menu: {
     needName: "Prime il non!",
     roomsEmpty: "Nissune partide viarte. Creine une!",
+    codeBad: "Il codiç al à 4 letaris.",
     reach: { offline: "Offline", lan: "LAN", online: "In linie" },
     full: "Plene",
     passwordRoom: "Cun password",
@@ -770,6 +773,7 @@ const it: Strings = {
   menu: {
     needName: "Prima il nome!",
     roomsEmpty: "Nessuna partita aperta. Creane una!",
+    codeBad: "Il codice ha 4 lettere.",
     reach: { offline: "Offline", lan: "LAN", online: "Online" },
     full: "Piena",
     passwordRoom: "Con password",
