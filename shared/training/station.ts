@@ -65,7 +65,7 @@ export interface Seen {
   readonly storm: StormValue | null
 }
 
-/** A step's progress: how many times its action happened, and a number the step keeps for itself. */
+/** A step's progress: how many times its action happened, and a number the step keeps for itself, whose meaning is the step's own (see `Training.Step` in `shared/sim/schema.ts`). */
 export interface StepProgress {
   readonly count: number
   readonly mark: number

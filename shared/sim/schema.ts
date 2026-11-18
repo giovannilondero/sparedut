@@ -310,15 +310,15 @@ export const Match = Game.StateMachine("Sparedut/Match", {
   })
 })
 
+/** Where an arrival puts the trainee: see `Training.Arriving`. */
+export const ARRIVAL_PLACES = ["walked", "facingStart", "keepingLook"] as const
+export type ArrivalPlace = (typeof ARRIVAL_PLACES)[number]
+
 /**
  * The training's progress (`shared/training/`): which station, which step, how far the step has
  * got. A regular room is `Off` for good. Stations and steps are indices into `STATION_IDS` and
  * the station's `stepsOf`. `unlocked`: how many stations, from the first, the trainee may go to.
  */
-/** Where an arrival puts the trainee: see `Training.Arriving`. */
-export const ARRIVAL_PLACES = ["walked", "facingStart", "keepingLook"] as const
-export type ArrivalPlace = (typeof ARRIVAL_PLACES)[number]
-
 export const Training = Game.StateMachine(
   "Sparedut/Training",
   {
@@ -330,7 +330,13 @@ export const Training = Game.StateMachine(
      * station: the client owns the look, and a turn it did not make would complete a look step).
      */
     Arriving: z.object({ station: z.number().int(), unlocked: z.number().int(), place: z.enum(ARRIVAL_PLACES) }),
-    /** At a station, on one of its steps: how many times its action happened, and what the step keeps (`StepProgress`). */
+    /**
+     * At a station, on one of its steps: `count`, how many times its action happened; `mark`, the one
+     * number the step keeps (`StepProgress`), whose meaning is the step's own: the yaw it began at
+     * (station 1's look), an x (where the sprint began), a tick (the last report, the storm's start),
+     * a score (when a scoring step began), an index (the primary held when the armoury opened) or
+     * 1 or 0 (whether the trainee was already inside, for a step that asks to go in).
+     */
     Step: z.object({ station: z.number().int(), step: z.number().int(), count: z.number().int(), mark: z.number(), unlocked: z.number().int() }),
     /** Every station done: all of them unlocked. */
     Complete: {}
