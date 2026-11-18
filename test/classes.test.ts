@@ -23,7 +23,7 @@ beforeAll(async () => {
 function match(players: [id: string, team: "benandanti" | "malandanti", primary: PrimaryId][]) {
   const sim = createSim({ mode: "bataie", minutes: 10, seed: 11, physics })
   for (const [id, team, primary] of players) sim.join(id, id, team, false, primary)
-  sim.start()
+  sim.start(true)
   for (let i = 0; i < SHIELD_TICKS + 5; i++) sim.step()
   return sim
 }
