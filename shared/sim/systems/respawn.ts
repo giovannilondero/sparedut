@@ -5,7 +5,7 @@
  */
 import { Random } from "@typeonce/ritmo"
 import { IDLE_INPUT } from "../../input.ts"
-import { chooseSpawn, everyoneAlone, START_GRACE_TICKS, freshArsenal, hostile, maxHp, SHIELD_TICKS, spawnsFor } from "../rules.ts"
+import { chooseSpawn, everyoneAlone, START_GRACE_TICKS, freshArsenal, hostile, kitOf, maxHp, primaryOf, SHIELD_TICKS, spawnsFor } from "../rules.ts"
 import { MAPS } from "../../maps/index.ts"
 import { Arsenal, Attackers, Controls, Game, Life, Match, Motion, Out, Player, Post, Rng, Rules, TeamOf, Tick } from "../schema.ts"
 
@@ -57,16 +57,17 @@ export const Respawn = Game.System(
         .map((o) => data.motion.get(o).body)
       const post = data.post?.get(m)
       const spot = post ?? chooseSpawn(spawnsFor(map, rules, team), enemies, rng.next() * 1000)
-      data.life.transition(m, { from: "Dead", to: "Alive", data: { hp: post?.hp ?? maxHp(data.arsenal.get(m).nextPrimary), armor: 0, shield: SHIELD_TICKS } })
+      // Under single weapon the class is the setting's primary's, whatever the player prefers.
+      const primary = primaryOf(rules, data.arsenal.get(m).nextPrimary)
+      data.life.transition(m, { from: "Dead", to: "Alive", data: { hp: post?.hp ?? maxHp(primary), armor: 0, shield: SHIELD_TICKS } })
       data.motion.set(m, {
         body: { x: spot.at[0], y: spot.at[1], z: spot.at[2], vx: 0, vy: 0, vz: 0, grounded: true, crouch: false },
         yaw: spot.yaw,
         pitch: 0
       })
-      const arsenal = data.arsenal.get(m)
-      data.arsenal.set(m, freshArsenal(arsenal.nextPrimary))
+      data.arsenal.set(m, freshArsenal(primary, kitOf(rules)))
       data.controls.update(m, (c) => ({
-        input: { ...IDLE_INPUT, seq: c.input.seq, view: c.input.view, yaw: spot.yaw, weapon: arsenal.nextPrimary },
+        input: { ...IDLE_INPUT, seq: c.input.seq, view: c.input.view, yaw: spot.yaw, weapon: primary },
         previous: c.input.buttons,
         pressed: 0,
         steps: [],

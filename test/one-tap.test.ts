@@ -14,12 +14,12 @@ afterEach(() => {
 
 test("the home screen's button makes an Offline room with what the player chose last, friendly fire off", () => {
   storage({ name: "Toni", lastMode: "frico", lastMap: "trincee", lastMinutes: 20, lastBots: 6, lastLevel: "plevan" })
-  expect(oneTapRoom(loadSettings())).toEqual({ mode: "frico", map: "trincee", minutes: 20, reach: "offline", bots: 6, level: "plevan", ff: false })
+  expect(oneTapRoom(loadSettings())).toEqual({ mode: "frico", map: "trincee", minutes: 20, reach: "offline", bots: 6, level: "plevan", ff: false, single: null })
 })
 
 test("a first-time player gets an Offline room with the defaults", () => {
   storage(null)
-  expect(oneTapRoom(loadSettings())).toEqual({ mode: "bataie", map: "glemone", minutes: 10, reach: "offline", bots: 4, level: "pari", ff: false })
+  expect(oneTapRoom(loadSettings())).toEqual({ mode: "bataie", map: "glemone", minutes: 10, reach: "offline", bots: 4, level: "pari", ff: false, single: null })
 })
 
 test("a player who last made a room without bots still gets bots to play against", () => {

@@ -6,7 +6,7 @@
 import { BOT_LEVEL_IDS, ROOM_MODE_IDS, type BotLevel, type RoomModeId } from "../shared/folklore.ts"
 import { ROOM_MAP_IDS, type RoomMapId } from "../shared/maps/index.ts"
 import { ACCESSES, MAX_BOTS, Password, REACHES, RoomCode, type Access, type ErrorCode, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
-import { CLASSES, type PrimaryId } from "../shared/weapons.ts"
+import { CLASSES, PRIMARIES, type PrimaryId } from "../shared/weapons.ts"
 import type { Lang, Strings } from "./i18n.ts"
 import type { TrainingStart } from "../shared/training/start.ts"
 import { oneTapRoom, trainingCompleted, trainingStart, type Settings, type TrainingInvitation } from "./settings.ts"
@@ -18,6 +18,8 @@ export type CreateOptions = Reached<RoomAccess> & {
   readonly bots: number
   readonly level: BotLevel
   readonly ff: boolean
+  /** Single weapon: the one primary everybody carries, or null for off. */
+  readonly single: PrimaryId | null
 }
 
 /** What the menu keeps between visits: the player's settings. The caller decides where they are stored. */
@@ -87,7 +89,9 @@ export const MENU_OPTIONS = {
   accesses: ACCESSES,
   minutes: [5, 10, 15, 20],
   /** Bots per team: none up to as many as the server accepts. */
-  bots: Array.from({ length: MAX_BOTS + 1 }, (_, n) => n)
+  bots: Array.from({ length: MAX_BOTS + 1 }, (_, n) => n),
+  /** Single weapon: off, then every primary, a new one included by itself. */
+  singles: [null, ...PRIMARIES]
 } as const satisfies Record<string, readonly unknown[]>
 
 /** Creation's choices as they stand. */
@@ -98,6 +102,7 @@ export interface Choices {
   readonly bots: number
   readonly level: BotLevel
   readonly ff: boolean
+  readonly single: PrimaryId | null
   readonly reach: Reach
   readonly access: Access
   /** The room's password as typed, before it is cleaned. */
@@ -163,6 +168,7 @@ export class MenuModel {
   private bots: number
   private level: BotLevel
   private ff: boolean
+  private single: PrimaryId | null = null
   private reach: Reach = MENU_OPTIONS.reaches[0]
   private access: Access = MENU_OPTIONS.accesses[0]
   private roomPassword = ""
@@ -193,8 +199,8 @@ export class MenuModel {
   }
 
   get choices(): Choices {
-    const { mode, map, minutes, bots, level, ff, reach, access, roomPassword: password } = this
-    return { mode, map, minutes, bots, level, ff, reach, access, password }
+    const { mode, map, minutes, bots, level, ff, single, reach, access, roomPassword: password } = this
+    return { mode, map, minutes, bots, level, ff, single, reach, access, password }
   }
 
   /** Which of creation's fields apply to the current choices. */
@@ -269,6 +275,11 @@ export class MenuModel {
     this.ff = on
   }
 
+  /** Single weapon for the room: off (null) or a primary. The player's own primary stays as it is. */
+  chooseSingle(single: PrimaryId | null) {
+    this.single = single
+  }
+
   chooseReach(reach: Reach) {
     this.reach = reach
   }
@@ -296,6 +307,7 @@ export class MenuModel {
       bots: this.bots,
       level: this.level,
       ff: this.ff,
+      single: this.single,
       ...(this.reach === "offline" ? { reach: this.reach } : { reach: this.reach, access })
     }
     Object.assign(this.remembered, { lastMode: room.mode, lastMap: room.map, lastBots: room.bots, lastLevel: room.level, lastMinutes: room.minutes, lastFf: room.ff })

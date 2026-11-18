@@ -25,7 +25,7 @@ type Fn<A extends unknown[] = [string]> = (...args: A) => string
 type StaticKey =
   | "title" | "nameLabel" | "namePh" | "oneTap" | "oneTapSub" | "create" | "createSub" | "join"
   | "roomsTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "reachLabel"
-  | "ff" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
+  | "ff" | "singleLabel" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
   | "qHigh" | "autoRes" | "showInfo" | "invert" | "keys" | "vocabTitle" | "connecting" | "chatPh" | "deathTitle" | "deathHint"
   | "language" | "modeLabel" | "mapLabel" | "optionsLabel" | "crouchMode" | "crouchHold" | "crouchToggle"
   | "accessLabel" | "accessOpen" | "accessPassword" | "passwordLabel" | "passwordTitle" | "training" | "trainingSub"
@@ -116,6 +116,10 @@ export interface Strings {
     readonly bots: Fn<[number]>
     /** Friendly fire on, in creation's options line. */
     readonly ffOn: string
+    /** Single weapon off, among creation's choices for it. */
+    readonly singleOff: string
+    /** Single weapon on, with the primary's name: in creation's options line and on a room in the list. */
+    readonly single: Fn
     readonly minutes: Fn<[number]>
     readonly tag: { readonly primary: string; readonly power: string; readonly melee: string; readonly pistol: string }
     readonly stat: { readonly damage: string; readonly rate: string; readonly range: string; readonly mag: string; readonly health: string; readonly speed: string }
@@ -260,6 +264,8 @@ export interface Strings {
     readonly primary: string
     readonly chat: string
     readonly chatPlaceholder: string
+    /** Under single weapon, above the locked picker: the primary everybody carries, chosen by the host. */
+    readonly locked: Fn
     /** Joining a match already on: the confirm that puts the player on the map. */
     readonly enter: string
     /** Joining a Tampieste already on: entering now plays from the next match. */
@@ -391,6 +397,7 @@ const fur: Strings = {
     passwordLabel: "Password <small>(di 1 a 32 caratars)</small>",
     passwordTitle: "Al covente la password",
     ff: "Fûc amì (i compagns si fasin mâl)",
+    singleLabel: "Arme uniche",
     back: "Indaûr <kbd>Esc</kbd>",
     createGo: "Cree e jentre",
     joinGo: "Jentre",
@@ -578,6 +585,8 @@ const fur: Strings = {
     botsNone: "Nissun (dome personis)",
     bots: (n) => (n === 0 ? "Cence bot" : `${n} bot`),
     ffOn: "Fûc amì",
+    singleOff: "No, ognidun la sô",
+    single: (name) => `Arme uniche: ${name}`,
     minutes: (n) => `${n} minûts`,
     tag: {
       primary: "Arme principâl · clic par sielzile",
@@ -768,6 +777,7 @@ const fur: Strings = {
     primary: "Arme principâl",
     chat: "Cjacaris",
     chatPlaceholder: "Scrîf ai altris e frache Invio",
+    locked: (name) => `Arme uniche: ducj a zuin cun ${name}. Le à sielte l'host (👑).`,
     enter: "Jentre te partide",
     nextMatch: "La Tampieste e je za scomençade: tu zuiarâs de prossime partide.",
     ready: "Pront",
@@ -832,6 +842,7 @@ const it: Strings = {
     passwordLabel: "Password <small>(da 1 a 32 caratteri)</small>",
     passwordTitle: "Serve la password",
     ff: "Fuoco amico (i compagni si fanno male)",
+    singleLabel: "Arma unica",
     back: "Indietro <kbd>Esc</kbd>",
     createGo: "Crea ed entra",
     joinGo: "Entra",
@@ -1019,6 +1030,8 @@ const it: Strings = {
     botsNone: "Nessuno (solo persone)",
     bots: (n) => (n === 0 ? "Senza bot" : `${n} bot`),
     ffOn: "Fuoco amico",
+    singleOff: "No, ognuno la sua",
+    single: (name) => `Arma unica: ${name}`,
     minutes: (n) => `${n} minuti`,
     tag: {
       primary: "Arma principale · clic per sceglierla",
@@ -1220,6 +1233,7 @@ const it: Strings = {
     primary: "Arma principale",
     chat: "Chiacchiere",
     chatPlaceholder: "Scrivi agli altri e premi Invio",
+    locked: (name) => `Arma unica: tutti giocano con ${name}. L'ha scelta l'host (👑).`,
     enter: "Entra in partita",
     nextMatch: "La Tampieste è già cominciata: giocherai dalla prossima partita.",
     ready: "Pronto",

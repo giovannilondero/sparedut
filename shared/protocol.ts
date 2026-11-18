@@ -82,7 +82,9 @@ const createRoom = {
   bots: z.number().int().min(0).max(MAX_BOTS),
   level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]),
   ff: z.boolean(),
-  primary: z.enum(PRIMARIES)
+  primary: z.enum(PRIMARIES),
+  /** Single weapon: the one primary every player carries, or null (also when absent) for off. */
+  single: z.enum(PRIMARIES).nullable().default(null)
 }
 
 export const ClientMessage = z.discriminatedUnion("t", [
@@ -148,7 +150,7 @@ export interface RosterEntry {
   readonly id: string
   readonly name: string
   readonly team: Team
-  /** The primary the member enters the next match with (the one in hand in a live match). */
+  /** The primary the member enters the next match with (the one in hand in a live match): the room's single weapon when it is on. */
   readonly primary: PrimaryId
   /** Marked ready in the Muster; a bot always is. */
   readonly ready: boolean
@@ -172,6 +174,8 @@ export type RoomSummary = Reached<Access> & {
   readonly bots: number
   readonly max: number
   readonly phase: PhaseView["tag"]
+  /** Single weapon: the one primary everybody carries, or null when it is off. */
+  readonly single: PrimaryId | null
 }
 
 export type RoomInfo = RoomSummary & {

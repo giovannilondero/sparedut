@@ -49,7 +49,7 @@ export interface Member {
   place: Place
   name: string
   team: Team
-  /** The primary chosen: the roster shows it, and the member enters a match with it. */
+  /** The primary the member chose, kept under single weapon: the roster shows `primaryOf` this. */
   primary: PrimaryId
   /** Marked ready in the Muster (cleared whenever the room enters it); a bot always is. */
   ready: boolean
@@ -68,10 +68,12 @@ export type RoomSettings = Reached<RoomAccess> & {
   readonly minutes: number
   readonly level: BotLevel
   readonly ff: boolean
+  /** Single weapon: the one primary everybody carries, or null when it is off. */
+  readonly single: PrimaryId | null
 }
 
 /** A training's settings: the request fixes them all. Always Offline, on the fair, in the Dutrine. */
-export const TRAINING_ROOM: RoomSettings = { reach: "offline", mode: TRAINING.mode, map: TRAINING.map, minutes: 0, level: "zovin", ff: false }
+export const TRAINING_ROOM: RoomSettings = { reach: "offline", mode: TRAINING.mode, map: TRAINING.map, minutes: 0, level: "zovin", ff: false, single: null }
 
 let botCounter = 0
 
@@ -107,7 +109,7 @@ export class Room {
   ) {
     this.level = settings.level
     this.physics = createPhysicsWorld(MAPS[settings.map])
-    this.sim = createSim({ mode: settings.mode, minutes: settings.minutes, friendlyFire: settings.ff, seed: Math.floor(Math.random() * 2 ** 31), physics: this.physics, ...(start ? { training: start } : {}) })
+    this.sim = createSim({ mode: settings.mode, minutes: settings.minutes, friendlyFire: settings.ff, single: settings.single, seed: Math.floor(Math.random() * 2 ** 31), physics: this.physics, ...(start ? { training: start } : {}) })
     this.world = this.sim.view()
   }
 
@@ -261,14 +263,20 @@ export class Room {
     this.sim.team(id, team)
   }
 
+  /** The primary a member enters a match with: the room's single weapon when it is on, else their own. */
+  primaryOf(m: Member): PrimaryId {
+    return this.settings.single ?? m.primary
+  }
+
   /**
    * The change-primary intent. The primary is fixed for the match: accepted only in the Muster, from
    * a member who has not entered the match on, and in a training (where it arrives at once). Refused
-   * (false), with nothing changed, from a player on the map while a match is live or over.
+   * (false), with nothing changed, from a player on the map while a match is live or over, and from
+   * everybody under single weapon, where each member's own choice stays as it was.
    */
   setPrimary(id: string, primary: PrimaryId): boolean {
     const m = this.members.get(id)
-    if (!m || (this.matchOn && m.place === "inMatch")) return false
+    if (!m || this.settings.single || (this.matchOn && m.place === "inMatch")) return false
     m.primary = primary
     if (m.place === "inMatch") this.sim.primary(id, primary)
     return true
@@ -535,7 +543,8 @@ export class Room {
       players: this.humans.length,
       bots: this.bots.size + this.stationBots.size,
       max: MAX_PLAYERS,
-      phase: this.world.phase.tag
+      phase: this.world.phase.tag,
+      single: this.settings.single
     }
   }
 
@@ -546,7 +555,7 @@ export class Room {
       minutes: this.settings.minutes,
       level: this.level,
       ff: this.settings.ff,
-      roster: [...this.members.values()].map((m) => ({ id: m.id, name: m.name, team: m.team, primary: m.primary, ready: m.ready, bot: m.bot, away: false, onMap: m.place === "inMatch" }))
+      roster: [...this.members.values()].map((m) => ({ id: m.id, name: m.name, team: m.team, primary: this.primaryOf(m), ready: m.ready, bot: m.bot, away: false, onMap: m.place === "inMatch" }))
     }
   }
 

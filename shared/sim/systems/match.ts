@@ -8,7 +8,7 @@
 import { TEAMS } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
 import type { Winner } from "../events.ts"
-import { COUNTDOWN_TICKS, freshDoors, freshPanels, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL, NO_STATS, OVER_TICKS, RESPAWN_TICKS, START_GRACE_TICKS } from "../rules.ts"
+import { COUNTDOWN_TICKS, freshDoors, freshPanels, freshPickups, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL, NO_STATS, OVER_TICKS, RESPAWN_TICKS, START_GRACE_TICKS } from "../rules.ts"
 import { Attackers, CancelCountdown, Cart, Doors, Flags, Game, Hill, Life, Match, Out, Panels, Pickups, Player, Rules, Score, StartMatch, Stats, Tick, Turrets } from "../schema.ts"
 
 export const AdvanceTick = Game.System(
@@ -61,7 +61,7 @@ export const MatchFlow = Game.System(
       resources.flags.set(FRESH_FLAGS)
       resources.hill.set(FRESH_HILL)
       resources.cart.set(FRESH_CART)
-      resources.pickups.set(MAPS[rules.map].pickups.map(() => ({ _tag: "up" })))
+      resources.pickups.set(freshPickups(MAPS[rules.map], rules))
       resources.turrets.set(freshTurrets(MAPS[rules.map]))
       resources.doors.set(freshDoors(MAPS[rules.map]))
       resources.panels.set(freshPanels(MAPS[rules.map]))
