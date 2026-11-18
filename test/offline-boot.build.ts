@@ -47,6 +47,17 @@ test("every file needed to boot and play in Cumò is in the precache list", () =
   expect([...needed].filter((url) => !listed.has(url))).toEqual([])
 })
 
+test("the installed game's manifest and every icon it names are in the precache list", () => {
+  const html = readFileSync(join(DIST, "index.html"), "utf8")
+  const manifest = html.match(/<link rel="manifest" href="([^"]+)"/)?.[1]
+  const apple = html.match(/<link rel="apple-touch-icon" href="([^"]+)"/)?.[1]
+  expect(manifest).toBeDefined()
+  expect(apple).toBeDefined()
+  const icons = (JSON.parse(readFileSync(fileOf(manifest!), "utf8")) as { icons: { src: string }[] }).icons.map((icon) => icon.src)
+  expect(icons.length).toBeGreaterThan(0)
+  expect([manifest!, apple!, ...icons].filter((url) => !listed.has(url))).toEqual([])
+})
+
 test("every listed file exists in the build", () => {
   expect(precache.urls.filter((url) => !existsSync(fileOf(url)))).toEqual([])
 })
