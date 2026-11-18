@@ -1,6 +1,7 @@
 /**
  * Projections of the world into plain data: the only read the host does.
  */
+import type { ObjectiveId } from "../folklore.ts"
 import { trackLength, trackPoint, type V3 } from "../map.ts"
 import { MAPS } from "../maps/index.ts"
 import type { GameEvent, Winner } from "./events.ts"
@@ -15,6 +16,7 @@ import {
   Life,
   Match,
   Motion,
+  Objective,
   Out,
   Pickups,
   Player,
@@ -78,12 +80,14 @@ export interface WorldView {
   readonly tick: number
   readonly phase: PhaseView
   readonly rules: RulesValue
+  /** The objective in force. */
+  readonly objective: ObjectiveId
   readonly score: Readonly<Record<Team, number>>
   readonly flags: Readonly<Record<Team, FlagState>>
   readonly hill: HillValue
-  /** Only in Spingi il Cjar. */
+  /** Only while the cjar is in force. */
   readonly cart: CartView | null
-  /** Only in a live Tampieste: the safe circle. */
+  /** Only while the storm is in force and the match is live: the safe circle. */
   readonly storm: StormValue | null
   readonly pickups: readonly boolean[]
   /** One per `map.turrets`. */
@@ -114,6 +118,7 @@ export const ViewWorld = Game.Inspector(
     resources: {
       tick: Game.System.readResource(Tick),
       rules: Game.System.readResource(Rules),
+      objective: Game.System.readResource(Objective),
       score: Game.System.readResource(Score),
       flags: Game.System.readResource(Flags),
       hill: Game.System.readResource(Hill),
@@ -129,10 +134,11 @@ export const ViewWorld = Game.Inspector(
     const rules = resources.rules.get()
     const map = MAPS[rules.map]
     const tick = resources.tick.get()
+    const objective = resources.objective.get()
     const cartState = resources.cart.get()
     const cartPoint = trackPoint(map.track, cartState.d)
     const cart: CartView | null =
-      rules.mode === "cjar"
+      objective === "cjar"
         ? {
             at: cartPoint.at,
             yaw: cartPoint.yaw,
@@ -147,11 +153,12 @@ export const ViewWorld = Game.Inspector(
       match._tag === "Live" ? { tag: "Live", ends: match.ends }
       : match._tag === "Over" ? { tag: "Over", winner: match.winner, restarts: match.restarts }
       : { tag: "Warmup" }
-    const storm = rules.mode === "tampieste" && match._tag === "Live" ? stormAt(map, rules, match.ends - rules.timeLimitTicks, tick) : null
+    const storm = objective === "storm" && match._tag === "Live" ? stormAt(map, rules, match.ends - rules.timeLimitTicks, tick) : null
     return {
       tick,
       phase,
       rules,
+      objective,
       score: resources.score.get(),
       flags: resources.flags.get(),
       hill: resources.hill.get(),

@@ -6,7 +6,7 @@ import { createPhysicsWorld, initPhysics, type PhysicsWorld } from "../shared/ph
 import type { GameEvent } from "../shared/sim/events.ts"
 import { createSim, type Sim } from "../shared/sim/index.ts"
 import { CART, MAX_HP, RAISE_TICKS, SHIELD_TICKS } from "../shared/sim/rules.ts"
-import type { ModeId } from "../shared/folklore.ts"
+import type { ModeId, ObjectiveId } from "../shared/folklore.ts"
 import { WEAPONS, type PrimaryId } from "../shared/weapons.ts"
 
 let physics: PhysicsWorld
@@ -176,6 +176,14 @@ describe("weapons", () => {
 })
 
 describe("modes", () => {
+  test("each mode puts its own objective in force, and the room reports it", () => {
+    const expected: Record<ModeId, ObjectiveId> = { bataie: "none", frico: "frico", culine: "placute", cjar: "cjar", tampieste: "storm" }
+    for (const mode of Object.keys(expected) as ModeId[]) {
+      const sim = createSim({ mode, minutes: 5, seed: 11, physics })
+      expect(sim.view().objective).toBe(expected[mode])
+    }
+  })
+
   test("La Tampieste: whoever stays outside the storm dies and doesn't respawn, the last one standing wins", () => {
     const sim = match("tampieste", [["a", "benandanti", "cramar"], ["b", "malandanti", "cramar"], ["c", "benandanti", "cramar"]], { minutes: 1 })
     const kills: GameEvent[] = []
