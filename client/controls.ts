@@ -439,7 +439,14 @@ export class Controls {
   private useTouch(on: boolean) {
     if (on === this.touchActive) return
     this.touchActive = on
-    if (!on) return this.releaseTouch()
+    if (!on) {
+      // On "hold" only touch can set the crouch latch, and no other device could clear it.
+      if (this._crouchMode === "hold" && this.crouched) {
+        this.crouched = false
+        this.redraw()
+      }
+      return this.releaseTouch()
+    }
     this.padActive = false
     this.releaseKeys()
     this.releasePad()
@@ -511,7 +518,10 @@ export class Controls {
     this.keys.clear()
   }
 
-  /** Lets go of every finger and touch toggle (aim, the picker, a scoreboard a tap opened). The crouch latch is not touch's alone: it stays. */
+  /**
+   * Lets go of every finger and touch toggle (aim, the picker, a scoreboard a tap opened). The crouch
+   * latch is the keyboard's toggle too: `useTouch` decides whether it outlives touch.
+   */
   private releaseTouch() {
     const v = this.touchView
     if (this.fingers.size === 0 && this.touchHeld.size === 0 && !v.board && !v.picker) return

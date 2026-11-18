@@ -479,6 +479,39 @@ test("the touch crouch and the keyboard's toggled crouch are one latch", () => {
   expect(c.isHeld("crouch")).toBe(false)
 })
 
+test("with crouch on hold, a crouch toggled on touch ends when another device takes over: nothing else could stand up", () => {
+  const { c, finger, layout, tap, view } = phone()
+  c.crouchMode = "hold"
+  c.track(player())
+  tap(layout().buttons.crouch)
+  expect(c.isHeld("crouch")).toBe(true)
+  // A mouse click: keyboard and mouse take over.
+  finger(9, "mouse").down(400, 200)
+  expect(c.isHeld("crouch")).toBe(false)
+  expect(view().crouch).toBe(false)
+  // Touch again, then the pad.
+  tap(layout().buttons.crouch)
+  expect(c.isHeld("crouch")).toBe(true)
+  pad.buttons[0] = { pressed: true, value: 1 }
+  c.poll(1 / 60)
+  pad.buttons[0] = { pressed: false, value: 0 }
+  c.poll(1 / 60)
+  expect(c.isHeld("crouch")).toBe(false)
+})
+
+test("with crouch on toggle, the crouch survives a switch: the other device's crouch button stands up", () => {
+  const { c, finger, layout, tap } = phone()
+  c.crouchMode = "toggle"
+  c.track(player())
+  tap(layout().buttons.crouch)
+  finger(9, "mouse").down(400, 200)
+  c.lock()
+  expect(c.isHeld("crouch")).toBe(true)
+  emit(winListeners, "keydown", { code: "KeyC", repeat: false })
+  emit(winListeners, "keyup", { code: "KeyC" })
+  expect(c.isHeld("crouch")).toBe(false)
+})
+
 test("a tap on the weapon's name is the next weapon", () => {
   const { calls, layout, tap } = phone()
   tap(centre(layout().weapon))
