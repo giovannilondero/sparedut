@@ -14,8 +14,8 @@ import { makeSky, makeTerrain, makeTown, nearGround, SKIES } from "./world/backd
 import { createDynamic } from "./world/dynamic.ts"
 import { SCENERY } from "./world/maps/index.ts"
 import type { K, SceneryKit, SceneryLive } from "./world/scenery.ts"
-import { archPanel, archRing, Batch, boxAt, faceMatrix, Inst, quad, rng, spandrel, tri, vault, type V } from "./world/geo.ts"
-import { atlasDisc, atlasQuad, makeAtlas, makeTextures, setAnisotropy, type Region } from "./world/tex.ts"
+import { archPanel, archRing, Batch, boxAt, cylBetween, face, faceMatrix, Inst, orient, quad, rng, spandrel, sphere, tri, vault, type V } from "./world/geo.ts"
+import { atlasDisc, atlasQuad, makeAtlas, makeSignSheet, makeTextures, setAnisotropy, type Region, type SignSpec } from "./world/tex.ts"
 
 const SCALES: Record<K, number> = {
   pietra: 3,
@@ -49,58 +49,6 @@ const PLASTER: Partial<Record<Mat, string>> = {
 }
 const PALETTE = ["#e0ac66", "#e3a090", "#efe8d8", "#ecc864", "#d98f6a", "#e8d2b0", "#c9b48a", "#f0dcb8"]
 const SHUTTERS = ["#4d6b3a", "#3f5e45", "#6b4a2e", "#7d8f74", "#5e3326", "#56704f"].map(C)
-const UP = new THREE.Vector3(0, 1, 0)
-
-// --- geometry helpers ---------------------------------------------------------------------
-
-/** One face of a box as a quad (outward normal). */
-function face(min: V, max: V, side: "top" | "bottom" | "east" | "west" | "south" | "north"): THREE.BufferGeometry {
-  const [x0, y0, z0] = min
-  const [x1, y1, z1] = max
-  switch (side) {
-    case "top": return quad([x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0])
-    case "bottom": return quad([x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1])
-    case "south": return quad([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1])
-    case "north": return quad([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0])
-    case "east": return quad([x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1])
-    case "west": return quad([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0])
-  }
-}
-
-/** Rotates the geometry so its normal faces `dir`. */
-function orient(g: THREE.BufferGeometry, dir: V): THREE.BufferGeometry {
-  g.computeVertexNormals()
-  const n = g.getAttribute("normal")
-  if (n.getX(0) * dir[0] + n.getY(0) * dir[1] + n.getZ(0) * dir[2] >= 0) return g
-  if (g.index) {
-    const a = g.index.array as Uint16Array
-    for (let i = 0; i < a.length; i += 3) [a[i + 1], a[i + 2]] = [a[i + 2], a[i + 1]]
-    g.index.needsUpdate = true
-  } else {
-    const p = g.getAttribute("position") as THREE.BufferAttribute
-    for (let i = 0; i < p.count; i += 3) {
-      const [x, y, z] = [p.getX(i + 1), p.getY(i + 1), p.getZ(i + 1)]
-      p.setXYZ(i + 1, p.getX(i + 2), p.getY(i + 2), p.getZ(i + 2))
-      p.setXYZ(i + 2, x, y, z)
-    }
-  }
-  g.computeVertexNormals()
-  return g
-}
-
-/** Cylinder between two points (statue limbs, poles). */
-function cylBetween(a: V, b: V, r0: number, r1 = r0, seg = 8): THREE.BufferGeometry {
-  const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b)
-  const len = va.distanceTo(vb)
-  const g = new THREE.CylinderGeometry(r1, r0, len, seg)
-  g.translate(0, len / 2, 0)
-  const q = new THREE.Quaternion().setFromUnitVectors(UP, vb.clone().sub(va).normalize())
-  g.applyQuaternion(q)
-  g.translate(...a)
-  return g
-}
-
-const sphere = (c: V, r: number, sy = 1, seg = 10) => new THREE.SphereGeometry(r, seg, Math.max(6, seg - 2)).scale(1, sy, 1).translate(...c)
 
 /** A map's ground: `terreno` blocks and ramps. */
 function groundOf(map: MapDef) {
@@ -1093,7 +1041,13 @@ export function createWorld(scene: THREE.Scene, renderer: THREE.WebGLRenderer, m
   }
 
   // --- 9b. the other maps' scenery ---------------------------------------------------------
-  const kit: SceneryKit = { map, B, I, root, MATS, tex, atlas, R, C, groundAt, face, orient, cylBetween, sphere, roof, win, door }
+  const paint = (specs: readonly SignSpec[]) => {
+    const { texture, regions } = makeSignSheet(specs)
+    const material = new THREE.MeshLambertMaterial({ map: texture, alphaTest: 0.5, side: THREE.DoubleSide })
+    material.name = "insegnis"
+    return { material, regions }
+  }
+  const kit: SceneryKit = { map, B, I, root, MATS, tex, atlas, R, C, groundAt, face, orient, cylBetween, sphere, roof, win, door, paint }
   const live: SceneryLive = scenery?.build(kit) ?? {}
 
   // --- 10. assembly --------------------------------------------------------------------
