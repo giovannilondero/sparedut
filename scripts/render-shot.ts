@@ -19,6 +19,8 @@ export interface Shot {
   readonly out: string
   /** Seconds the page runs before the shot. */
   readonly wait?: number
+  /** Run in the page before its own scripts, from the first load (settings in `localStorage`…). */
+  readonly setup?: string
   /** Run in the page after the wait; the shot follows 1.5 s later. */
   readonly script?: string
   /** The emulated viewport, `[width, height]`; below 1000 px wide it is a mobile one. */
@@ -29,7 +31,7 @@ export interface Shot {
   readonly touch?: boolean
 }
 
-export async function shoot({ url, out, wait = 6, script, size, scale = 1, touch = false }: Shot): Promise<string> {
+export async function shoot({ url, out, wait = 6, setup, script, size, scale = 1, touch = false }: Shot): Promise<string> {
   const browser = process.env.BROWSER ?? "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
   const port = 9300 + Math.floor(Math.random() * 500)
   const child = Bun.spawn([browser, "--headless=new", "--mute-audio", "--use-angle=metal", "--enable-gpu", "--hide-scrollbars", "--allow-file-access-from-files", "--window-size=1280,720", `--remote-debugging-port=${port}`, `--user-data-dir=/tmp/render-shot-${port}`, url], { stdout: "ignore", stderr: "ignore" })
@@ -62,6 +64,12 @@ export async function shoot({ url, out, wait = 6, script, size, scale = 1, touch
       await call("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: scale, mobile: width < 1000 })
       if (touch) await call("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 })
     }
+    if (setup) {
+      await call("Page.enable")
+      await call("Page.addScriptToEvaluateOnNewDocument", { source: setup })
+    }
+    // The page loaded before the device was emulated and the setup added: loaded again, it has both from the start (a phone's coarse pointer, its viewport).
+    if (size || setup) await call("Page.reload")
     await Bun.sleep(wait * 1000)
     if (script) {
       await call("Runtime.evaluate", { expression: script, awaitPromise: true })

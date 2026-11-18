@@ -3,6 +3,7 @@
   "name": "Sparedût",
   "short_name": "Sparedût",
   "lang": "fur",
+  "description": "Benandants cuintri Malandants: un zûc di sparâ in prime persone tal Dom di Glemone e pal Friûl, tal browser e sul telefonin.",
   "start_url": "/",
   "scope": "/",
   "display": "fullscreen",
@@ -13,5 +14,11 @@
     { "src": "/icons/any-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/any-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    { "src": "/showcase/phone-match.png", "sizes": "1688x780", "type": "image/png", "form_factor": "narrow", "label": "Une partide sul telefonin: si zuie cui dêts su la schermade" },
+    { "src": "/showcase/phone-menu.png", "sizes": "1688x780", "type": "image/png", "form_factor": "narrow", "label": "Il menù sul telefonin, tignût dret" },
+    { "src": "/showcase/desktop-match.png", "sizes": "1920x1080", "type": "image/png", "form_factor": "wide", "label": "Une partide sul computer, cu la tastiere e il mouse" },
+    { "src": "/showcase/desktop-menu.png", "sizes": "1920x1080", "type": "image/png", "form_factor": "wide", "label": "Il menù: zuie cuintri i bot, cree une partide o jentre cul codiç" }
   ]
 }

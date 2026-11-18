@@ -90,3 +90,27 @@ test("the built page carries the link preview, every absolute address on the bui
   expect([meta("og:image:width"), meta("og:image:height")]).toEqual(["1200", "630"])
   expect(listed.has(image)).toBe(false)
 })
+
+test("every screenshot of the built manifest exists at the size it declares, within Chrome's limits, and is not cached at install", () => {
+  const html = readFileSync(join(DIST, "index.html"), "utf8")
+  const manifest = JSON.parse(readFileSync(fileOf(html.match(/<link rel="manifest" href="([^"]+)"/)![1]!), "utf8")) as {
+    lang?: string
+    description?: string
+    screenshots?: { src: string; sizes: string; type: string; form_factor?: string; label?: string }[]
+  }
+  expect(manifest.lang).toBe("fur")
+  expect(manifest.description).toEqual(expect.any(String))
+  const shots = manifest.screenshots ?? []
+  expect(shots.some((shot) => shot.form_factor === "narrow")).toBe(true)
+  expect(shots.some((shot) => shot.form_factor === "wide")).toBe(true)
+  for (const shot of shots) {
+    expect([shot.src, existsSync(fileOf(shot.src))]).toEqual([shot.src, true])
+    const bytes = readFileSync(fileOf(shot.src))
+    const [w, h] = shot.sizes.split("x").map(Number) as [number, number]
+    expect([shot.src, bytes.toString("latin1", 1, 4), bytes.readUInt32BE(16), bytes.readUInt32BE(20)]).toEqual([shot.src, "PNG", w, h])
+    // Chrome: each side from 320 to 3840 pixels, the long one at most 2.3 times the short one.
+    expect([shot.src, Math.min(w, h) >= 320 && Math.max(w, h) <= 3840 && Math.max(w, h) <= 2.3 * Math.min(w, h)]).toEqual([shot.src, true])
+    expect([shot.src, shot.label]).toEqual([shot.src, expect.any(String)])
+    expect([shot.src, listed.has(shot.src)]).toEqual([shot.src, false])
+  }
+})

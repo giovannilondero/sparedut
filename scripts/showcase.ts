@@ -7,8 +7,9 @@
  *   pnpm dev                                  # or `pnpm exec vite`: the Vite server
  *   bun scripts/showcase.ts [http://localhost:5173] [picture …]
  *
- * With names after the address, only those pictures are taken (`link-preview`). When to take
- * them again: see AGENTS.md.
+ * With names after the address, only those pictures are taken (`link-preview`, `phone-match`,
+ * `phone-menu`, `desktop-match`, `desktop-menu`). A match starts at a random spawn: look at the
+ * picture, and take it again if the view is dull. When to take them again: see AGENTS.md.
  *
  * A picture is a page of the game shot at a viewport (a phone is `size` under 1000 px wide,
  * with `touch` for its controls), optionally prepared by a script run in the page, and
@@ -37,6 +38,8 @@ interface Picture {
   readonly touch?: boolean
   /** Seconds the page runs before the shot. */
   readonly wait?: number
+  /** Run in the page before its own scripts: the settings a returning player has… */
+  readonly setup?: string
   /** Run in the page before the shot: hides what should not show, starts a match… */
   readonly prepare?: string
   /** An HTML page over the shot (given as `scene.png`, next to the page), shot at `size`. */
@@ -62,7 +65,91 @@ const linkPreview = (): string => `<!doctype html>
     font-size: 150px; animation: none; filter: drop-shadow(0 4px 14px rgba(0,0,0,0.75)); }
 </style></head><body><div class="scene"></div><div class="shade"></div><div class="title">Sparedût</div></body></html>`
 
+/**
+ * A returning player: a name typed, the training's invitation dealt with, Glemone chosen last
+ * (the one-tap match plays there, the menu shows it behind); the page fills in the rest from its defaults.
+ */
+const PLAYER = `localStorage.setItem('sparedut.settings', JSON.stringify({ name: 'Toni', lastMap: 'glemone', trainingInvitation: 'dismissed' }))`
+
+/** Waits in a page script: `pause(ms)`. */
+const PAUSE = "const pause = (ms) => new Promise((done) => setTimeout(done, ms));"
+
+/**
+ * The home screen's one-tap match against the bots, a while into it, as a player sees it once
+ * playing: no match menu open, no hint to click (the mouse is locked by then). `then` runs last.
+ */
+const match = (then = "") => `(async () => { ${PAUSE}
+  document.querySelector('[data-go="one-tap"]').click(); await pause(14000);
+  if (document.getElementById('p-resume')?.checkVisibility()) { document.getElementById('p-resume').click(); await pause(500); }
+  document.head.insertAdjacentHTML('beforeend', '<style>#clickplay { display: none !important }</style>');
+  ${then} })()`
+
+/**
+ * A finger dragged across the right of the screen, where it only looks around: touch becomes the
+ * device, its controls show, and the view turns by `turn` pixels of drag (rightwards when positive).
+ */
+const finger = (turn: number) => `const view = document.getElementById('view'), box = view.getBoundingClientRect();
+  const at = (dx) => ({ pointerType: 'touch', pointerId: 7, isPrimary: true, bubbles: true, clientX: box.left + box.width * 0.62 + dx, clientY: box.top + box.height * 0.3 });
+  view.dispatchEvent(new PointerEvent('pointerdown', at(0)));
+  for (let i = 1; i <= 20; i++) { await pause(16); view.dispatchEvent(new PointerEvent('pointermove', at(${turn} * i / 20))); }
+  view.dispatchEvent(new PointerEvent('pointerup', at(${turn}))); await pause(1500);`
+
+/** A phone held sideways (844×390, a 6.1" phone), at twice its pixels: the shape of every `narrow` screenshot. */
+const PHONE: readonly [number, number] = [844, 390]
+/** A laptop's window (1280×720), at 1.5 times its pixels: 1920×1080, the shape of every `wide` screenshot. */
+const DESKTOP: readonly [number, number] = [1280, 720]
+
+/** The phone's menu held upright, in the shape of the `narrow` screenshots (Chrome wants one shape per form factor): framed beside the title. */
+const portraitInLandscape = (): string => `<!doctype html>
+<html><head><meta charset="utf-8"><style>
+  html, body { margin: 0; inline-size: ${PHONE[0] * 2}px; block-size: ${PHONE[1] * 2}px; overflow: hidden; background: #14110f; }
+  body { display: flex; align-items: center; justify-content: center; gap: 120px; }
+  img { block-size: 92%; border-radius: 34px; box-shadow: 0 0 0 10px #2a241f, 0 18px 50px rgba(0,0,0,0.7); }
+  .title { ${loaderTitleStyle()} font-size: 150px; animation: none; }
+</style></head><body><img src="scene.png" alt=""><div class="title">Sparedût</div></body></html>`
+
 const PICTURES: Record<string, Picture> = {
+  "phone-match": {
+    file: "phone-match.png",
+    size: [PHONE[0] * 2, PHONE[1] * 2],
+    page: "/?look=ver",
+    viewport: PHONE,
+    scale: 2,
+    touch: true,
+    wait: 8,
+    setup: PLAYER,
+    prepare: match(finger(-160))
+  },
+  "phone-menu": {
+    file: "phone-menu.png",
+    size: [PHONE[0] * 2, PHONE[1] * 2],
+    page: "/?look=ver",
+    viewport: [PHONE[1], PHONE[0]],
+    scale: 2,
+    touch: true,
+    wait: 8,
+    setup: PLAYER,
+    compose: portraitInLandscape
+  },
+  "desktop-match": {
+    file: "desktop-match.png",
+    size: [DESKTOP[0] * 1.5, DESKTOP[1] * 1.5],
+    page: "/?look=ver",
+    viewport: DESKTOP,
+    scale: 1.5,
+    wait: 8,
+    setup: PLAYER,
+    prepare: match()
+  },
+  "desktop-menu": {
+    file: "desktop-menu.png",
+    size: [DESKTOP[0] * 1.5, DESKTOP[1] * 1.5],
+    page: "/?look=ver",
+    viewport: DESKTOP,
+    scale: 1.5,
+    wait: 8,
+    setup: PLAYER
+  },
   "link-preview": {
     file: "link-preview.png",
     size: [1200, 630],
@@ -84,7 +171,7 @@ async function take(base: string, picture: Picture, work: string): Promise<strin
   const out = join(OUT, picture.file)
   const viewport = picture.viewport ?? picture.size
   const scene = picture.compose ? join(work, "scene.png") : out
-  await shoot({ url: new URL(picture.page, base).href, out: scene, wait: picture.wait, script: picture.prepare, size: viewport, scale: picture.scale, touch: picture.touch })
+  await shoot({ url: new URL(picture.page, base).href, out: scene, wait: picture.wait, setup: picture.setup, script: picture.prepare, size: viewport, scale: picture.scale, touch: picture.touch })
   if (picture.compose) {
     const page = join(work, "compose.html")
     writeFileSync(page, picture.compose())

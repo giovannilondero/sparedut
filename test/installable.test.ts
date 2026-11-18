@@ -46,6 +46,15 @@ test("the installed game is named, opens on the game, with no browser bars and i
   expect(manifest.orientation).toBe("any")
 })
 
+test("the install prompt introduces the game in Friulian, with the line a shared link shows", () => {
+  expect(manifest.lang).toBe("fur")
+  // The same line a shared link shows: the game says one thing about itself.
+  const page = html.match(/<meta name="description" content="([^"]+)"/)?.[1]
+  expect(page).toBeDefined()
+  expect(manifest.description).toBe(page)
+  expect(page!.length).toBeLessThanOrEqual(300)
+})
+
 test("the installed game keeps the page's theme colour", () => {
   const theme = html.match(/<meta name="theme-color" content="([^"]+)"/)?.[1]
   expect(theme).toBe("#14110f")
@@ -75,6 +84,51 @@ test("iOS finds its home screen icon, a 180 pixel PNG, and opens the game with n
   expect(pngSize(apple!)).toEqual([180, 180])
   expect(html).toContain('<meta name="apple-mobile-web-app-capable" content="yes" />')
   expect(html).toContain('<meta name="mobile-web-app-capable" content="yes" />')
+})
+
+interface Screenshot {
+  src: string
+  sizes: string
+  type: string
+  form_factor?: string
+  label?: string
+}
+const screenshots = (manifest.screenshots ?? []) as Screenshot[]
+const ofForm = (form: string) => screenshots.filter((shot) => shot.form_factor === form)
+
+test("the install prompt shows phone and desktop screenshots, each with a Friulian caption", () => {
+  // A match and the menu, for each: on a phone (`narrow`, Android) and on a computer (`wide`, desktop).
+  expect(ofForm("narrow").length).toBeGreaterThanOrEqual(2)
+  expect(ofForm("wide").length).toBeGreaterThanOrEqual(2)
+  expect(screenshots.filter((shot) => shot.form_factor !== "narrow" && shot.form_factor !== "wide")).toEqual([])
+  expect(screenshots.filter((shot) => !shot.label?.trim())).toEqual([])
+  expect(new Set(screenshots.map((shot) => shot.label)).size).toBe(screenshots.length)
+})
+
+test("every screenshot is a PNG of the size it declares, within what Chrome shows", () => {
+  for (const shot of screenshots) {
+    expect(shot.type).toBe("image/png")
+    const [w, h] = shot.sizes.split("x").map(Number) as [number, number]
+    expect([shot.src, pngSize(shot.src)]).toEqual([shot.src, [w, h]])
+    // Chrome: each side from 320 to 3840 pixels, the long one at most 2.3 times the short one.
+    expect([shot.src, Math.min(w, h) >= 320, Math.max(w, h) <= 3840, Math.max(w, h) <= 2.3 * Math.min(w, h)]).toEqual([shot.src, true, true, true])
+  }
+})
+
+test("the screenshots of a form factor share one aspect ratio, as Chrome asks", () => {
+  for (const form of ["narrow", "wide"]) {
+    const ratios = new Set(ofForm(form).map((shot) => {
+      const [w, h] = shot.sizes.split("x").map(Number) as [number, number]
+      return (w / h).toFixed(3)
+    }))
+    expect([form, ratios.size]).toEqual([form, 1])
+  }
+})
+
+test("the screenshots are not downloaded when the game is installed", () => {
+  const { urls } = precacheOf(builtFiles(PUBLIC))
+  expect(screenshots.length).toBeGreaterThan(0)
+  expect(screenshots.map((shot) => shot.src).filter((src) => urls.includes(src))).toEqual([])
 })
 
 /** The page as the build writes it, for a deploy on `domain` (`DEPLOY_DOMAIN`, or none). */
