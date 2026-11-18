@@ -3,9 +3,10 @@
  * after respawn. Armor, deaths, kills, assists, streaks, points.
  */
 import { STREAK_AT } from "../../folklore.ts"
+import { spared, SPARED_HP } from "../../training/spared.ts"
 import type { KillCause } from "../events.ts"
 import { absorb, ASSIST_WINDOW_TICKS, hostile, MAX_HP, RESPAWN_TICKS } from "../rules.ts"
-import { Attackers, Damage, Game, Heal, Life, Match, Motion, Out, Player, Rules, Score, Stats, TeamOf, Tick } from "../schema.ts"
+import { Attackers, Damage, Game, Heal, Life, Match, Motion, Out, Player, Rules, Score, Stats, TeamOf, Tick, Training } from "../schema.ts"
 
 /** Causes that can also hit whoever launched them (the others, on oneself, count as a fall). */
 const SELF_HARM: ReadonlySet<KillCause> = new Set(["sgnape", "lanciafrico", "mine", "tampieste"])
@@ -37,7 +38,7 @@ export const ApplyDamage = Game.System(
       heal: Game.System.thisTick(Game.System.readEvent(Heal)),
       out: Game.System.writeEvent(Out)
     },
-    machines: { match: Game.System.machine(Match) }
+    machines: { match: Game.System.machine(Match), training: Game.System.machine(Training) }
   },
   ({ queries, resources, events, machines }) => {
     const { data } = queries.players
@@ -48,6 +49,9 @@ export const ApplyDamage = Game.System(
     const rules = resources.rules.get()
     const live = machines.match.get()._tag === "Live"
     const bySession = new Map(queries.players.each().map((m) => [data.player.get(m).session, m]))
+    // The training spares the trainee (the one player who is not a bot) before the skirmish.
+    const training = machines.training.get()
+    const sparing = (training._tag === "Arriving" || training._tag === "Step") && spared(training.station)
 
     for (const h of heals) {
       const target = bySession.get(h.target)
@@ -79,7 +83,8 @@ export const ApplyDamage = Game.System(
         data.motion.update(victim, (mo) => ({ ...mo, body: { ...mo.body, vx: mo.body.vx + push.x, vy: Math.max(mo.body.vy, 0) + push.y, vz: mo.body.vz + push.z, grounded: false } }))
       }
 
-      const after = absorb(life.hp, life.armor, hit.amount)
+      const absorbed = absorb(life.hp, life.armor, hit.amount)
+      const after = sparing && absorbed.hp <= 0 && !data.player.get(victim).bot ? { hp: SPARED_HP, armor: absorbed.armor } : absorbed
       const dead = after.hp <= 0
       if (attacker && !self) {
         data.attackers.update(victim, (list) => [...list.filter((x) => x.session !== hit.attacker), { session: hit.attacker ?? "", tick }])

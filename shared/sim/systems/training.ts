@@ -10,7 +10,7 @@
 import { SAGRE, SAGRE_STATIONS } from "../../maps/sagre.ts"
 import { STATION_IDS, STATIONS, stepRule, stepsOf } from "../../training/index.ts"
 import type { Seen, StepRule } from "../../training/station.ts"
-import { WEAPON_IDS } from "../../weapons.ts"
+import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS } from "../../weapons.ts"
 import { freshArsenal, freshDoors, MAX_HP } from "../rules.ts"
 import { Arsenal, Controls, Doors, Game, Life, Motion, Objective, Out, Pickups, Player, ReportInterface, Tick, Training, type ArsenalValue } from "../schema.ts"
 
@@ -143,7 +143,14 @@ export const PlayTraining = Game.System(
     const id = STATION_IDS[state.station]
     const steps = stepsOf(id)
     const rule = stepRule(id, steps[state.step])
-    const now = rule.advance(seen(rule), { count: state.count, mark: state.mark })
+
+    // A station that restocks gives bombs and mines back as soon as the last one is used.
+    if (STATIONS[id].setup.restock) {
+      const a = data.arsenal.get(trainee)
+      if (a.bombs === 0 || a.mines === 0) data.arsenal.set(trainee, { ...a, bombs: a.bombs || SGNAPE_BOMB.perLife, mines: a.mines || RAIBL_MINE.perLife })
+    }
+
+    const now =rule.advance(seen(rule), { count: state.count, mark: state.mark })
     const count = Math.min(rule.target, now.count)
     let next: Next
     if (count < rule.target) {

@@ -115,6 +115,8 @@ export interface StationSetup {
   readonly ammo?: AmmoSetup
   /** Pickups put back on arrival (indices in the map's `pickups`), so they are there however recently they were taken. */
   readonly pickups?: readonly number[]
+  /** Bombs and mines given back whenever the last one is used while the station is current, so a miss never leaves a step undoable. */
+  readonly restock?: boolean
 }
 
 /**
