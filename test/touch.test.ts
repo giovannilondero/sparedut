@@ -260,6 +260,17 @@ test("the first touch in a match makes touch the active device, with no mouse lo
   expect(doc.pointerLockElement).toBe(null) // a tap is no reason to lock a mouse
 })
 
+test("a pen is touch: it takes over and drives the controls as a finger does", () => {
+  const { c, finger, layout } = phone()
+  const fire = layout().fire
+  finger(4, "pen").down(fire.x, fire.y)
+  expect(c.touchActive).toBe(true)
+  expect(c.device).toBe("touch")
+  expect(c.isHeld("fire")).toBe(true)
+  finger(4, "pen").up(fire.x, fire.y)
+  expect(c.isHeld("fire")).toBe(false)
+})
+
 test("whichever device was used last is active, and switching clears held buttons", () => {
   const { c, finger, layout } = phone()
   const fire = layout().fire

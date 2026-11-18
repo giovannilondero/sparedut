@@ -282,8 +282,10 @@ export class Controls {
    * landed in the stick's region, else look.
    */
   private fingerDown(e: PointerEvent) {
-    if (e.pointerType === "mouse") return this.useTouch(false)
-    if (e.pointerType !== "touch" || !this.inMatch || !this.enabled || !this.playing) return
+    const device = pointerDevice(e.pointerType)
+    if (device === "keyboard") return this.useTouch(false)
+    // A finger or a pen: the same touch controls.
+    if (device !== "touch" || !this.inMatch || !this.enabled || !this.playing) return
     e.preventDefault()
     this.useTouch(true)
     // A finger that comes down again without an up in between (the up was lost) lets go first.
