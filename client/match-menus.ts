@@ -7,6 +7,7 @@ import type { Team } from "../shared/map.ts"
 import type { Reach, RoomInfo } from "../shared/protocol.ts"
 import { TICK_RATE } from "../shared/movement.ts"
 import type { PhaseView } from "../shared/sim/view.ts"
+import { isTraining } from "../shared/training/index.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 
 /** The menus a player opens over the match: the match menu, the loadout, the settings. */
@@ -31,6 +32,19 @@ export function focusOnOpen(which: MatchMenu, previous: MatchMenu): string | nul
   if (previous === "settings") return "p-settings"
   if (previous === "loadout") return "p-loadout"
   return "p-resume"
+}
+
+/**
+ * What the match menu offers for the primary: in a training the armoury, where it changes on the
+ * spot; in a match the player's primary, read-only, for it is fixed until the Muster (nothing for
+ * somebody not in the roster: never the armoury outside a training).
+ */
+export type MenuPrimary = { readonly tag: "armoury" } | { readonly tag: "fixed"; readonly primary: PrimaryId } | { readonly tag: "none" }
+
+export function menuPrimary(room: Pick<RoomInfo, "mode" | "roster">, me: string): MenuPrimary {
+  if (isTraining(room.mode)) return { tag: "armoury" }
+  const primary = room.roster.find((r) => r.id === me)?.primary
+  return primary ? { tag: "fixed", primary } : { tag: "none" }
 }
 
 /** The end screen's first focus: another match for the host, who alone can start one; leaving for the rest. */

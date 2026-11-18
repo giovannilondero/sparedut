@@ -221,6 +221,9 @@ export interface Strings {
     readonly start: string
     readonly restart: string
     readonly hostOnly: string
+    /** The player's primary, read-only in a match: its label, and where it is changed. */
+    readonly primary: string
+    readonly primaryFixed: string
     /** The host tools' label. */
     readonly host: string
     /** The host's buttons that add or remove a bot in a team (its short name). */
@@ -731,6 +734,8 @@ const fur: Strings = {
     start: "Fâs partî la partide",
     restart: "Finìs la partide e torne ae Adunade",
     hostOnly: "L'host (👑) al fâs partî la partide.",
+    primary: "La tô arme principâl",
+    primaryFixed: "E reste chê par dute la partide: si le cambie te Adunade.",
     host: "Host:",
     addBot: (team) => `+ bot ${team}`,
     removeBot: (team) => `− bot ${team}`,
@@ -1181,6 +1186,8 @@ const it: Strings = {
     start: "Fai partire la partita",
     restart: "Chiudi la partita e torna all'Adunata",
     hostOnly: "L'host (👑) fa partire la partita.",
+    primary: "La tua arma principale",
+    primaryFixed: "Resta quella per tutta la partita: si cambia all'Adunata.",
     host: "Host:",
     addBot: (team) => `+ bot ${team}`,
     removeBot: (team) => `− bot ${team}`,

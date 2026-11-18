@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { afterEscape, endFocus, focusOnOpen, musterCountdown, musterFocus, musterScreen, musterTeams, startsAtOnce } from "../client/match-menus.ts"
+import { afterEscape, endFocus, focusOnOpen, menuPrimary, musterCountdown, musterFocus, musterScreen, musterTeams, startsAtOnce } from "../client/match-menus.ts"
 
 test("Esc closes the in-match menus one step at a time", () => {
   expect(afterEscape("pause", "none")).toBe("none")
@@ -109,4 +109,12 @@ test("the host's start goes live at once when every other human member is ready,
   expect(startsAtOnce(ready, "p1")).toBe(true)
   // Alone with the bots, as in an Offline room: always at once.
   expect(startsAtOnce(room({ roster: room().roster.filter((r) => r.id !== "p2") }), "p1")).toBe(true)
+})
+
+test("the match menu offers the armoury only in a training; in a match it shows the primary, fixed until the Muster", () => {
+  expect(menuPrimary({ ...room(), mode: "bataie" }, "p1")).toEqual({ tag: "fixed", primary: "mulin" })
+  expect(menuPrimary({ ...room(), mode: "tampieste" }, "p2")).toEqual({ tag: "fixed", primary: "miedi" })
+  expect(menuPrimary({ ...room(), mode: "dutrine" }, "p1")).toEqual({ tag: "armoury" })
+  // Somebody not in the roster gets nothing, never the armoury.
+  expect(menuPrimary({ ...room(), mode: "bataie" }, "p9")).toEqual({ tag: "none" })
 })

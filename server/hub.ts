@@ -216,8 +216,7 @@ export class Hub {
         this.roomChanged(room)
         return
       case "primary":
-        room.setPrimary(id, msg.p)
-        this.roomChanged(room)
+        if (room.setPrimary(id, msg.p)) this.roomChanged(room)
         return
       case "chat":
         room.chat(id, msg.text)

@@ -11,6 +11,8 @@ import type { TrainingView } from "../shared/sim/view.ts"
 import { STATION_IDS } from "../shared/training/index.ts"
 import type { Device } from "./device.ts"
 import { t } from "./i18n.ts"
+import type { MenuPrimary } from "./match-menus.ts"
+import { classFigures } from "./menu-model.ts"
 import { panelPrompt, playPrompt, trainingPrompt, turretPrompt } from "./prompts.ts"
 import { announcesStep, NOT_SHOWN, stepMarksHtml, type PanelPlace } from "./training-panel.ts"
 import { buttonBit, TOUCH_BUTTONS, type Insets, type PickerEntry, type TouchLayout, type TouchView } from "./touch.ts"
@@ -519,6 +521,14 @@ export function rosterHtml(room: RoomInfo, me: string) {
           .join("")}</ul>`
     )
     .join("")
+}
+
+/** The match menu's primary: read-only in a match, with its class and where it is changed. */
+export function primaryHtml(shown: MenuPrimary) {
+  if (shown.tag !== "fixed") return ""
+  const s = t()
+  const figures = classFigures(s, shown.primary).map(([label, value]) => `<span class="stat figure">${label}<b>${value}</b></span>`).join("")
+  return `<div class="muted">${s.pause.primary}</div><div class="pause-primary-name">${s.weapons[shown.primary].name}</div><div class="pause-primary-figures">${figures}</div><p class="muted">${s.pause.primaryFixed}</p>`
 }
 
 export { esc }
