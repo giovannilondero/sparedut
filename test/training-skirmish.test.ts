@@ -50,6 +50,15 @@ describe("station 12: the skirmish", () => {
     for (const edges of part.edges) expect(edges.length).toBeGreaterThan(0)
   })
 
+  test("each graph gives its own part: a station's part of one graph is never handed out for another", () => {
+    const whole = navGraph(createPhysicsWorld(SAGRE))
+    stationGraph(whole, "skirmish")
+    // Another graph: only the points in the skirmish's half, the first two linked.
+    const inside = whole.points.filter(([x, , z]) => x >= SKIRMISH.minX && x <= SKIRMISH.maxX && Math.abs(z) <= SKIRMISH.maxZ).slice(0, 2)
+    const other = { points: inside, edges: [[1], [0]] }
+    expect(stationGraph(other, "skirmish")).toEqual(other)
+  })
+
   test("the trainee can die in it, and respawns at the skirmish", () => {
     const r = reach("skirmish")
     const killed = r.drive(60 * 90, () => ({}), (events) => events.some((e) => e.t === "kill" && e.v === r.you))
