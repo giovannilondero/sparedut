@@ -39,6 +39,14 @@ export interface Strings {
   readonly errors: Record<ErrorCode, string>
   /** The game is too old for the server (`client/offline-cache/too-old.ts`): updating itself, or why it cannot. */
   readonly tooOld: Record<Notice, string>
+  /** The installable game in the menu: the install entry and the update notice. */
+  readonly app: {
+    readonly install: string
+    /** How to add the game to the home screen where the browser has no install prompt (iPhone, iPad). */
+    readonly byHand: string
+    readonly update: string
+    readonly updating: string
+  }
   readonly menu: {
     readonly needName: string
     readonly roomsEmpty: string
@@ -426,6 +434,12 @@ const fur: Strings = {
     noUpdate: "Il server al à une version plui gnove, ma no rivi a cjamâle jù. Lis partidis offline a van istès.",
     stillRefused: "Il server nol acete ancjemò cheste version. Lis partidis offline a van istès: torne a provâ plui tart."
   },
+  app: {
+    install: "Instale il zûc",
+    byHand: "Par vê il zûc su la schermade di inizi: tocje Condividi e po «Aggiungi alla schermata Home».",
+    update: "E je pronte une version gnove dal zûc: tocje par cjariâle.",
+    updating: "O cjarii la version gnove…"
+  },
   menu: {
     needName: "Prime il non!",
     roomsEmpty: "Nissune partide viarte. Creine une!",
@@ -786,6 +800,12 @@ const it: Strings = {
     noWorker: "Versione diversa dal server: ricarica la pagina.",
     noUpdate: "Il server ha una versione più nuova, ma non riesco a scaricarla. Le partite offline funzionano comunque.",
     stillRefused: "Il server non accetta ancora questa versione. Le partite offline funzionano comunque: riprova più tardi."
+  },
+  app: {
+    install: "Installa il gioco",
+    byHand: "Per avere il gioco nella schermata Home: tocca Condividi e poi «Aggiungi alla schermata Home».",
+    update: "È pronta una nuova versione del gioco: tocca per caricarla.",
+    updating: "Carico la nuova versione…"
   },
   menu: {
     needName: "Prima il nome!",

@@ -22,7 +22,8 @@ import { BrowserHostConnection } from "./offline.ts"
 import { registerServiceWorker } from "./offline-cache/register.ts"
 import { keepVerFilesOnceControlled, lookToShow, verState } from "./offline-cache/ver.ts"
 import { SelfUpdate } from "./offline-cache/self-update.ts"
-import { keepStorage, runsInstalled } from "./installed.ts"
+import { loadNewVersion, watchNewVersion } from "./offline-cache/update.ts"
+import { addsToHomeScreenByHand, keepStorage, runsInstalled } from "./installed.ts"
 import { Link } from "./connection.ts"
 import { PerfMonitor } from "./perf.ts"
 import { loadSettings, saveSettings } from "./settings.ts"
@@ -228,7 +229,10 @@ const menu = new Menu(settings, audio, {
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
     sendJoin(code, password)
   },
-  settingsChanged: persist
+  settingsChanged: persist,
+  install: promptInstall,
+  // The menu asks only from the menu: never over a match.
+  update: () => void registration.then((reg) => loadNewVersion(reg, serviceWorkers, () => location.reload()))
 }, look.id)
 if (shownLook.fellBack) toast(t().net.verOffline)
 
@@ -414,5 +418,28 @@ requestAnimationFrame(() =>
 // Installed, the game asks the browser to keep its storage (cache, settings, training progress):
 // at every start, since the browser may only grant it later, and in the tab that installs it.
 const storage = navigator.storage as StorageManager | undefined
-void keepStorage({ installed: runsInstalled({ matchMedia: (q) => matchMedia(q), fullscreenElement: document.fullscreenElement, standalone: (navigator as { standalone?: boolean }).standalone }), storage })
+const installed = runsInstalled({ matchMedia: (q) => matchMedia(q), fullscreenElement: document.fullscreenElement, standalone: (navigator as { standalone?: boolean }).standalone })
+void keepStorage({ installed, storage })
 addEventListener("appinstalled", () => void keepStorage({ installed: true, storage }), { once: true })
+
+// The menu's install entry: the browser's own prompt where it has one, how to do it by hand on
+// iPhone and iPad, nothing once installed. Then its update notice when a new version waits.
+/** `beforeinstallprompt`, which no TypeScript library describes yet. */
+interface InstallPromptEvent extends Event {
+  prompt(): Promise<unknown>
+}
+/** The browser's install prompt, kept for the entry's tap: it can be shown once. */
+let installPrompt: InstallPromptEvent | null = null
+menu.installSurroundings({ installed, byHand: addsToHomeScreenByHand(navigator) })
+addEventListener("beforeinstallprompt", (e) => {
+  // The browser's own banner stays away: the menu offers it.
+  e.preventDefault()
+  installPrompt = e as InstallPromptEvent
+  menu.installOffered()
+})
+addEventListener("appinstalled", () => menu.installed())
+function promptInstall() {
+  void installPrompt?.prompt().catch((error: unknown) => console.warn("install prompt refused", error))
+  installPrompt = null
+}
+void registration.then((reg) => reg && watchNewVersion(reg, () => Boolean(serviceWorkers?.controller), () => menu.newVersionWaiting()))
