@@ -405,7 +405,7 @@ const fur: Strings = {
       armoury: "La armarie",
       throw: "Bombis e minis",
       pickups: "Robe di cjapâ sù",
-      turret: "La mitraie e il Lanciafrico",
+      turret: "La torete e il Lanciafrico",
       medic: "Il miedi",
       modes: "Lis modalitâts",
       skirmish: "La scaramucie"
@@ -821,7 +821,7 @@ const it: Strings = {
       armoury: "L'armeria",
       throw: "Bombe e mine",
       pickups: "Cose da raccogliere",
-      turret: "La mitragliatrice e il Lanciafrico",
+      turret: "La torretta e il Lanciafrico",
       medic: "Il medico",
       modes: "Le modalità",
       skirmish: "La scaramuccia"

@@ -34,6 +34,7 @@ _Avoid_: Closed, locked, private
 
 **Training**:
 A guided session for one player that teaches the controls, the weapons and the modes. It is always offline and never appears in the room list.
+Its mode is **Dutrine** and its map **Sagre dal Frico**, both provisional names.
 _Italian_: Allenamento
 _Avoid_: Tutorial, bonus level, practice
 
@@ -67,3 +68,7 @@ _Avoid_: Machine gun, mitragliatrice (when meaning the emplacement)
 **Mitraie**:
 The gun on a turret. It cannot be carried.
 _Avoid_: Turret (when meaning the gun), machine gun
+
+**Objective**:
+What a match is played for, in force one at a time: none, the frico, the plaçute, the cjar or the storm. A mode puts its own in force; the training changes it from station to station.
+_Italian_: Obiettivo

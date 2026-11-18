@@ -133,8 +133,8 @@ una sagra di paese con le stazioni come bancarelle in fila lungo la strada e, in
 Si apre dalla schermata iniziale (*Impare a zuiâ*) e serve un nome, come per ogni stanza. Si gioca da Benandante, senza fuoco amico,
 senza riscaldamento, orologio né punteggio limite: finisce quando l'ultimo passo è fatto.
 
-Ogni stazione chiede alcuni passi, in ordine; il pannello dice la stazione, il passo con il comando del dispositivo in uso
-(tastiera, controller o touch) e quante volte manca. La strada verso la stazione dopo resta sbarrata finché la stazione non è finita.
+Ogni stazione chiede alcuni passi, in ordine; il pannello dice la stazione, a che passo si è e quanti ne restano (un segno per passo),
+il passo con il comando del dispositivo in uso (tastiera, controller o touch) e quante volte manca. La strada verso la stazione dopo resta sbarrata finché la stazione non è finita.
 
 | | |
 |---|---|
@@ -146,7 +146,7 @@ Ogni stazione chiede alcuni passi, in ordine; il pannello dice la stazione, il p
 | 6. La armarie | scegliere la propria arma principale |
 | 7. Bombis e minis | la bomba di sgnape e la mina di Raibl |
 | 8. Robe di cjapâ sù | frico, gubane, sgnape, munizions |
-| 9. La mitraie e il Lanciafrico | salire sulla torretta, surriscaldarla, scendere; raccogliere e sparare il Lanciafrico |
+| 9. La torete e il Lanciafrico | salire sulla torretta, surriscaldarla, scendere; raccogliere e sparare il Lanciafrico |
 | 10. Il miedi | curare un compagno ferito con la Cassele dal Miedi |
 | 11. Lis modalitâts | portare a casa il frico, tenere la plaçute, spingere il cjar, restare dentro la tempesta |
 | 12. La scaramucie | vincere una breve Bataie di Gnot contro due bot che sparano, aprire la classifica, mandare una frase rapida |
