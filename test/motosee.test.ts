@@ -196,14 +196,14 @@ for (const host of HOSTS) {
       expect(other.last("room")!.room.roster.find((r) => r.id === other.last("joined")!.you)!.primary).toBe("motosee")
     })
 
-    test("no bot takes it", () => {
+    test("bots take it in their rotation of primaries", () => {
       const { connect } = harness(host.make)
       const me = connect()
       me.say(create)
       for (let i = 0; i < 8; i++) me.say({ t: "bot", team: i % 2 ? "benandanti" : "malandanti", delta: 1 })
       const bots = me.last("room")!.room.roster.filter((r) => r.bot)
       expect(bots.length).toBeGreaterThan(8)
-      expect(bots.map((b) => b.primary)).not.toContain("motosee")
+      expect(bots.map((b) => b.primary)).toContain("motosee")
     })
   })
 }
