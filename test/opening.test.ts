@@ -1,7 +1,11 @@
 import { expect, test } from "bun:test"
-import { decideOpening, readOpening } from "../client/opening.ts"
+import { STRINGS } from "../client/i18n.ts"
+import { decideOpening, type OpeningAction, readOpening } from "../client/opening.ts"
 
 const MENU = { playing: false, named: true }
+
+/** What an `askName` action says, in Friulian and in Italian; anything else asks nothing. */
+const asked = (action: OpeningAction) => (action.kind === "askName" ? [action.message(STRINGS.fur.net), action.message(STRINGS.it.net)] : [])
 
 test("an invite's address opens the game on the invite, with or without a password", () => {
   expect(readOpening("?p=abcd", "#pw=Cjavedal")).toEqual({ kind: "invite", invite: { code: "ABCD", password: "Cjavedal" } })
@@ -18,16 +22,12 @@ test("an invite opened from the menu by a named player joins its room, with its 
   expect(decideOpening(readOpening("?p=abcd", ""), MENU)).toEqual({ kind: "join", code: "ABCD", password: null })
 })
 
-test("an invite opened from the menu with no name asks for the name and joins nothing", () => {
+test("an invite opened from the menu with no name asks for the name with the room's code, and joins nothing", () => {
   const nameless = { playing: false, named: false }
-  expect(decideOpening(readOpening("?p=abcd", "#pw=Cjavedal"), nameless)).toEqual({
-    kind: "askName",
-    opening: { kind: "invite", invite: { code: "ABCD", password: "Cjavedal" } },
-  })
-  expect(decideOpening(readOpening("?p=abcd", ""), nameless)).toEqual({
-    kind: "askName",
-    opening: { kind: "invite", invite: { code: "ABCD", password: null } },
-  })
+  for (const hash of ["#pw=Cjavedal", ""]) {
+    const action = decideOpening(readOpening("?p=abcd", hash), nameless)
+    expect(asked(action)).toEqual(["Scrîf il to non e jentre cul codiç ABCD", "Scrivi il tuo nome ed entra col codice ABCD"])
+  }
 })
 
 test("an invite opened during a match does nothing, with or without a name: the match goes on", () => {
@@ -50,7 +50,8 @@ test("the shortcut used from the menu by a named player starts the home button's
 })
 
 test("the shortcut used from the menu with no name asks for the name and starts nothing", () => {
-  expect(decideOpening(readOpening("?shortcut=bots", ""), { playing: false, named: false })).toEqual({ kind: "askName", opening: { kind: "shortcut" } })
+  const action = decideOpening(readOpening("?shortcut=bots", ""), { playing: false, named: false })
+  expect(asked(action)).toEqual(["Scrîf il to non e frache «Zuie cuintri i bot»", "Scrivi il tuo nome e tocca «Gioca contro i bot»"])
 })
 
 test("the shortcut used during a match does nothing, with or without a name: the match goes on", () => {

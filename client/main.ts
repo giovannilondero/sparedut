@@ -382,7 +382,7 @@ function answerOpening(opening: Opening) {
       menu.shortcut()
       return
     case "askName":
-      toast(action.opening.kind === "invite" ? t().net.inviteNeedName(action.opening.invite.code) : t().net.shortcutNeedName)
+      toast(action.message(t().net))
       return
     case "nothing":
       return

@@ -3,6 +3,7 @@
  * so that every way into the game is answered in one place.
  */
 
+import type { Strings } from "./i18n.ts"
 import { type Invite, readInvite } from "./invite.ts"
 
 /** How the page was opened: on an invite, from the installed game's shortcut, or on nothing in particular. */
@@ -31,14 +32,18 @@ export type OpeningAction =
   | { readonly kind: "join"; readonly code: string; readonly password: string | null }
   /** The home screen's button, "Zuie cuintri i bot": the same menu action, so the same match. */
   | { readonly kind: "start" }
-  /** A message asking for the name, about the opening that needed it; nothing else, and nothing remembered. */
-  | { readonly kind: "askName"; readonly opening: Exclude<Opening, { kind: "none" }> }
+  /** A message asking for the name, in the player's language, about the opening that needed it; nothing else, and nothing remembered. */
+  | { readonly kind: "askName"; readonly message: (texts: Strings["net"]) => string }
   | { readonly kind: "nothing" }
 
 /** What to do about how the game was opened. An opening acts only from the menu, never over a match in progress. */
 export function decideOpening(opening: Opening, situation: OpeningSituation): OpeningAction {
   if (opening.kind === "none" || situation.playing) return { kind: "nothing" }
-  if (!situation.named) return { kind: "askName", opening }
+  if (!situation.named) {
+    if (opening.kind === "shortcut") return { kind: "askName", message: (texts) => texts.shortcutNeedName }
+    const { code } = opening.invite
+    return { kind: "askName", message: (texts) => texts.inviteNeedName(code) }
+  }
   if (opening.kind === "shortcut") return { kind: "start" }
   return { kind: "join", code: opening.invite.code, password: opening.invite.password }
 }
