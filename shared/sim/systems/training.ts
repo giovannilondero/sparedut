@@ -104,7 +104,9 @@ export const PlayTraining = Game.System(
       const id = STATION_IDS[index]
       const setup = STATIONS[id].setup
       resources.objective.set(setup.objective)
-      const fresh = freshArsenal(data.arsenal.get(trainee).nextPrimary)
+      const own = data.arsenal.get(trainee).nextPrimary
+      // A station's primary (the medic's Cassele) is lent: the trainee's own stays the next one.
+      const fresh = setup.primary ? { ...freshArsenal(setup.primary), nextPrimary: own } : freshArsenal(own)
       const given = setup.ammo === "loaded" ? onlyLoaded(fresh) : fresh
       data.arsenal.set(trainee, setup.hold ? { ...given, current: setup.hold } : given)
       if (setup.pickups) {
