@@ -4,6 +4,7 @@
  */
 import { Ops } from "@typeonce/ritmo"
 import type { PlayerInput } from "./input.ts"
+import type { V3 } from "./map.ts"
 import { pressed } from "./input.ts"
 import type { PhysicsWorld } from "./physics.ts"
 
@@ -53,6 +54,9 @@ export const lookDir = (yaw: number, pitch: number) => {
 }
 
 export const eyeHeight = (body: Body) => (body.crouch ? EYE_CROUCH : EYE_STAND)
+
+/** A body sitting still at a turret's seat: how the simulation holds a gunner, and the gunner's own client predicts them. */
+export const seatedBody = ([x, y, z]: V3): Body => ({ x, y, z, vx: 0, vy: 0, vz: 0, grounded: true, crouch: false })
 
 /** Sprinting: Shift, moving forward, neither crouching nor aiming. Sprinters hold the weapon lowered and can't fire. */
 export const sprinting = (input: PlayerInput, crouch: boolean) => pressed(input, "sprint") && !crouch && !pressed(input, "aim") && input.mz > 0

@@ -4,34 +4,35 @@
 import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "../shared/folklore.ts"
 import type { MapId } from "../shared/map.ts"
 import { MAP_IDS } from "../shared/maps/index.ts"
-import type { RoomSummary, Visibility } from "../shared/protocol.ts"
+import { Password, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
 import { PRIMARIES, WEAPON_IDS, WEAPONS, type PrimaryId } from "../shared/weapons.ts"
 import type { GameAudio } from "./contracts.ts"
 import { esc } from "./hud.ts"
 import { onLangChange, setLang, t, type Lang } from "./i18n.ts"
-import type { Settings } from "./settings.ts"
+import { oneTapRoom, type Settings } from "./settings.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 
-export interface CreateOptions {
+export type CreateOptions = Reached<RoomAccess> & {
   readonly mode: ModeId
   readonly map: MapId
   readonly minutes: number
-  readonly visibility: Visibility
   readonly bots: number
   readonly level: BotLevel
   readonly ff: boolean
 }
 
 export interface MenuHandlers {
-  readonly create: (o: CreateOptions, quick?: boolean) => void
-  readonly join: (code: string) => void
+  /** `oneTap`: the home screen's button, whose match starts at once, without warm-up. */
+  readonly create: (o: CreateOptions, oneTap?: boolean) => void
+  /** `password` only once the player typed one (from the prompt or an invite link). */
+  readonly join: (code: string, password?: string) => void
   /** The map chosen in the menu: it becomes the background. */
   readonly mapChanged: (id: MapId) => void
   readonly settingsChanged: () => void
 }
 
-const SCREENS = ["home", "create", "join", "armarie", "settings", "vocabolari"] as const
+const SCREENS = ["home", "create", "join", "password", "armarie", "settings", "vocabolari"] as const
 type ScreenName = (typeof SCREENS)[number]
 const MINUTES = [5, 10, 15, 20]
 
@@ -41,6 +42,8 @@ export class Menu {
   private map: MapId
   private level: BotLevel
   private roomList: readonly RoomSummary[] = []
+  /** The room the password prompt is for. */
+  private passwordCode = ""
   private tipIndex = Math.floor(Math.random() * 100)
 
   constructor(private readonly settings: Settings, private readonly audio: GameAudio, private readonly handlers: MenuHandlers) {
@@ -52,7 +55,7 @@ export class Menu {
         audio.unlock()
         audio.play("ui_click")
         const go = el.dataset.go!
-        if (go === "quick") this.quick()
+        if (go === "one-tap") this.oneTap()
         else this.go(go as ScreenName)
       })
     }
@@ -86,6 +89,8 @@ export class Menu {
     this.bindSettings()
     $("j-go").addEventListener("click", () => this.joinCode())
     $("j-code").addEventListener("keydown", (e) => e.key === "Enter" && this.joinCode())
+    $("pw-go").addEventListener("click", () => this.joinWithPassword())
+    $("pw-input").addEventListener("keydown", (e) => e.key === "Enter" && this.joinWithPassword())
     onLangChange(() => this.renderTexts())
     setLang(settings.lang)
     setInterval(() => this.showTip(), 9000)
@@ -138,15 +143,38 @@ export class Menu {
   }
 
   go(screen: ScreenName) {
-    if ((screen === "create" || screen === "join") && this.needName()) return
+    if ((screen === "create" || screen === "join" || screen === "password") && this.needName()) return
     this.screen = screen
     for (const s of SCREENS) $(`menu-${s}`).classList.toggle("hidden", s !== screen)
     if (screen === "join") setTimeout(() => $("j-code").focus(), 50)
+    if (screen === "password") setTimeout(() => $("pw-input").focus(), 50)
   }
 
-  private quick() {
+  /** Asks for a password room's password; `message` says why the last one did not work. */
+  askPassword(code: string, message = "") {
+    if (this.passwordCode !== code) $<HTMLInputElement>("pw-input").value = ""
+    this.passwordCode = code
+    $("pw-for").textContent = t().menu.passwordFor(code)
+    $("pw-msg").textContent = message
+    $("menu").classList.remove("hidden")
+    this.go("password")
+    $<HTMLInputElement>("pw-input").select()
+  }
+
+  private joinWithPassword() {
+    const password = Password.safeParse($<HTMLInputElement>("pw-input").value)
+    if (!password.success) {
+      $("pw-msg").textContent = t().menu.passwordBad
+      return
+    }
+    $("pw-msg").textContent = ""
+    this.handlers.join(this.passwordCode, password.data)
+  }
+
+  /** The home screen's "play against the bots": an Offline match in one tap. */
+  private oneTap() {
     if (this.needName()) return
-    this.handlers.create({ mode: this.settings.lastMode, map: this.settings.lastMap, minutes: 10, visibility: "code", bots: this.settings.lastBots || 4, level: this.settings.lastLevel, ff: false }, true)
+    this.handlers.create(oneTapRoom(this.settings), true)
   }
 
   private joinCode() {
@@ -156,18 +184,27 @@ export class Menu {
 
   rooms(list: readonly RoomSummary[]) {
     this.roomList = list
-    const ul = $("lan-list")
+    const ul = $("room-list")
+    const s = t()
     if (!list.length) {
-      ul.innerHTML = `<li class="muted">${t().menu.lanEmpty}</li>`
+      ul.innerHTML = `<li class="muted">${s.menu.roomsEmpty}</li>`
       return
     }
     ul.innerHTML = list
-      .map(
-        (r) =>
-          `<li><button data-code="${r.code}"><span><b>${esc(r.host)}</b> · ${t().modes[r.mode].name} · ${t().maps[r.map].name}</span><span>${r.players}👤 ${r.bots}🤖 · ${r.code}</span></button></li>`
-      )
+      .map((r) => {
+        const full = r.players >= r.max
+        const access = r.reach === "offline" ? null : r.access
+        const passwordMark = access === "password" ? ` <i class="password-mark" role="img" aria-label="${s.menu.passwordRoom}" title="${s.menu.passwordRoom}">🔒</i>` : ""
+        return `<li><button data-code="${r.code}" data-access="${access ?? ""}"${full ? " disabled" : ""}><span><i class="chip ${r.reach}">${s.menu.reach[r.reach]}</i>${passwordMark} <b>${esc(r.host)}</b> · ${s.modes[r.mode].name} · ${s.maps[r.map].name}</span><span>${full ? `${s.menu.full} · ` : ""}${r.players}/${r.max}👤 ${r.bots}🤖 · ${r.code}</span></button></li>`
+      })
       .join("")
-    for (const b of ul.querySelectorAll<HTMLButtonElement>("button")) b.addEventListener("click", () => !this.needName() && this.handlers.join(b.dataset.code!))
+    for (const b of ul.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")) {
+      b.addEventListener("click", () => {
+        if (this.needName()) return
+        if (b.dataset.access === "password") this.askPassword(b.dataset.code!)
+        else this.handlers.join(b.dataset.code!)
+      })
+    }
   }
 
   // ---------------------------------------------------------------- create match
@@ -198,12 +235,35 @@ export class Menu {
       this.audio.play("ui_click")
       this.renderCreate()
     })
+    // An Offline room lives in this browser: what only the server offers (access, password) hides.
+    const reach = $<HTMLSelectElement>("c-reach")
+    const showReach = () => ($("menu-create").dataset.reach = reach.value)
+    reach.addEventListener("change", showReach)
+    showReach()
+    const access = $<HTMLSelectElement>("c-access")
+    access.addEventListener("change", () => {
+      $("c-password-field").hidden = access.value !== "password"
+      $("c-msg").textContent = ""
+      if (access.value === "password") $("c-password").focus()
+    })
     $("c-go").addEventListener("click", () => {
+      const reach = $<HTMLSelectElement>("c-reach").value as Reach
+      let roomAccess: RoomAccess = { kind: "open" }
+      if (reach !== "offline" && access.value === "password") {
+        const password = Password.safeParse($<HTMLInputElement>("c-password").value)
+        if (!password.success) {
+          $("c-msg").textContent = t().menu.passwordBad
+          $("c-password").focus()
+          return
+        }
+        roomAccess = { kind: "password", password: password.data }
+      }
+      $("c-msg").textContent = ""
       const o: CreateOptions = {
         mode: this.mode,
         map: this.map,
         minutes: Number($<HTMLSelectElement>("c-minutes").value),
-        visibility: $<HTMLSelectElement>("c-vis").value as Visibility,
+        ...(reach === "offline" ? { reach } : { reach, access: roomAccess }),
         bots: Number($<HTMLSelectElement>("c-bots").value),
         level: this.level,
         ff: $<HTMLInputElement>("c-ff").checked
@@ -294,6 +354,12 @@ export class Menu {
     q.value = s.quality
     q.addEventListener("change", () => {
       s.quality = q.value as Settings["quality"]
+      this.handlers.settingsChanged()
+    })
+    const crouch = $<HTMLSelectElement>("s-crouch")
+    crouch.value = s.crouch
+    crouch.addEventListener("change", () => {
+      s.crouch = crouch.value as Settings["crouch"]
       this.handlers.settingsChanged()
     })
     for (const [id, key] of [["s-autores", "autoRes"], ["s-info", "showInfo"], ["s-invert", "invertY"]] as const) {

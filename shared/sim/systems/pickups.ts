@@ -30,6 +30,7 @@ export const CollectPickups = Game.System(
     machines: { match: Game.System.machine(Match) }
   },
   ({ queries, resources, events, machines }) => {
+    const { data } = queries.players
     if (machines.match.get()._tag === "Over") return
     const states = resources.pickups.get()
     const next = states.map((s) => (s._tag === "down" ? (s.ticks <= 1 ? { _tag: "up" as const } : { _tag: "down" as const, ticks: s.ticks - 1 }) : s))
@@ -37,25 +38,25 @@ export const CollectPickups = Game.System(
     MAPS[resources.rules.get().map].pickups.forEach((spot, i) => {
       if (next[i]._tag !== "up") return
       for (const m of players) {
-        const life = m.data.life.get()
+        const life = data.life.get(m)
         if (life._tag !== "Alive") continue
-        const b = m.data.motion.get().body
+        const b = data.motion.get(m).body
         const dx = b.x - spot.at[0]
         const dz = b.z - spot.at[2]
         if (dx * dx + dz * dz > 1.5 * 1.5 || Math.abs(b.y - spot.at[1]) > 1.6) continue
-        const a = m.data.arsenal.get()
+        const a = data.arsenal.get(m)
         let used = true
         switch (spot.kind) {
           case "frico":
             if (life.hp >= MAX_HP) used = false
-            else m.data.life.update({ state: "Alive", data: (l) => ({ hp: Math.min(MAX_HP, l.hp + 40), armor: l.armor, shield: l.shield }) })
+            else data.life.update(m, { state: "Alive", data: (l) => ({ hp: Math.min(MAX_HP, l.hp + 40), armor: l.armor, shield: l.shield }) })
             break
           case "gubane":
             if (life.armor >= MAX_ARMOR) used = false
-            else m.data.life.update({ state: "Alive", data: (l) => ({ hp: l.hp, armor: Math.min(MAX_ARMOR, l.armor + 50), shield: l.shield }) })
+            else data.life.update(m, { state: "Alive", data: (l) => ({ hp: l.hp, armor: Math.min(MAX_ARMOR, l.armor + 50), shield: l.shield }) })
             break
           case "sgnape":
-            m.data.arsenal.set({ ...a, sgnape: SGNAPE_TICKS })
+            data.arsenal.set(m, { ...a, sgnape: SGNAPE_TICKS })
             break
           case "munizions": {
             if (ammoFull(a) && a.bombs >= SGNAPE_BOMB.perLife && a.mines >= RAIBL_MINE.perLife) {
@@ -64,11 +65,11 @@ export const CollectPickups = Game.System(
             }
             const ammo = { ...a.ammo }
             for (const id of WEAPON_IDS) ammo[id] = { mag: ammo[id].mag, reserve: Math.max(ammo[id].reserve, WEAPONS[id].reserve) }
-            m.data.arsenal.set({ ...a, ammo, bombs: Math.max(a.bombs, SGNAPE_BOMB.perLife), mines: Math.max(a.mines, RAIBL_MINE.perLife) })
+            data.arsenal.set(m, { ...a, ammo, bombs: Math.max(a.bombs, SGNAPE_BOMB.perLife), mines: Math.max(a.mines, RAIBL_MINE.perLife) })
             break
           }
           case "lanciafrico":
-            m.data.arsenal.set({
+            data.arsenal.set(m, {
               ...a,
               launcher: true,
               current: "lanciafrico",
@@ -79,7 +80,7 @@ export const CollectPickups = Game.System(
         }
         if (!used) continue
         next[i] = { _tag: "down", ticks: RESPAWN_OF[spot.kind] }
-        events.out.emit({ t: "pick", s: m.data.player.get().session, k: spot.kind })
+        events.out.emit({ t: "pick", s: data.player.get(m).session, k: spot.kind })
         break
       }
     })

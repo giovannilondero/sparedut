@@ -1,6 +1,9 @@
 // World preview: map with ?map=osoppo, look with ?look=ver, quality with ?q=alta, menu camera (or fixed with ?cam=x,y,z,lx,ly,lz), mode with ?mode=frico|culine|cjar|tampieste.
+// A turret's gunner's view with ?gunner=<turret>&aim=<yaw from its facing>,<pitch> (radians, clamped to the arc) and ?shot=<seconds since a shot>.
 import * as THREE from "three"
 import { trackLength, trackPoint, type MapId } from "../../shared/map.ts"
+import { EYE_STAND } from "../../shared/movement.ts"
+import { firstPerson } from "../firstperson.ts"
 import { MAP_IDS, MAPS } from "../../shared/maps/index.ts"
 import type { WorldFrame } from "../contracts.ts"
 import { createLook, lookFromUrl, mountLookSwitcher } from "../looks.ts"
@@ -45,6 +48,34 @@ resize()
 
 const cam = q.get("cam")?.split(",").map(Number)
 const mode = q.get("mode")
+const gunnerAt = q.get("gunner") === null ? -1 : Number(q.get("gunner"))
+const gunnerSpot = map.turrets[gunnerAt]
+const gunnerAim = (q.get("aim") ?? "0,0").split(",").map(Number)
+/** The gunner's own view, decided by the first-person presentation as in a match. */
+const gunner = gunnerSpot
+  ? firstPerson({
+      chosen: "mandi",
+      mount: { turret: gunnerAt, spot: gunnerSpot },
+      alive: true,
+      aim: 0,
+      baseFov: 80,
+      look: { yaw: gunnerSpot.yaw + (gunnerAim[0] ?? 0), pitch: gunnerAim[1] ?? 0 },
+      sinceShot: q.get("shot") === null ? Infinity : Number(q.get("shot")),
+      mag: 0,
+      reserve: 0,
+      reload: null
+    })
+  : null
+const gunnerCamera = () => {
+  if (!gunnerSpot || !gunner?.mitraie) return false
+  // The seat turns with the aim, as in a match: the gunner sits behind the gun.
+  const seat = gunner.mitraie.seat
+  camera.fov = gunner.fov
+  camera.updateProjectionMatrix()
+  camera.position.set(seat[0], seat[1] + EYE_STAND, seat[2])
+  camera.rotation.set(gunner.mitraie.pitch, gunner.mitraie.yaw, 0, "YXZ")
+  return true
+}
 /** The cjar going back and forth along the track, the storm closing in. */
 const extras = (t: number): Pick<WorldFrame, "cart" | "storm" | "turrets" | "doors"> => {
   const len = trackLength(map.track)
@@ -52,7 +83,11 @@ const extras = (t: number): Pick<WorldFrame, "cart" | "storm" | "turrets" | "doo
   // the turrets turn and heat up, the doors break and come back
   const heat = (Math.sin(t * 0.4) + 1) / 2
   return {
-    turrets: map.turrets.map((s, i) => ({ yaw: s.yaw + Math.sin(t * 0.7 + i) * 0.8, pitch: Math.sin(t * 0.5) * 0.15, heat, jammed: heat > 0.95, manned: true, mine: false })),
+    turrets: map.turrets.map((s, i) => {
+      const pose = gunner?.mitraie?.turret === i ? gunner.mitraie : null
+      if (pose) return { yaw: pose.yaw, pitch: pose.pitch, heat, jammed: heat > 0.95, manned: true, mine: true, recoil: pose.recoil }
+      return { yaw: s.yaw + Math.sin(t * 0.7 + i) * 0.8, pitch: Math.sin(t * 0.5) * 0.15, heat, jammed: heat > 0.95, manned: true, mine: false, recoil: 0 }
+    }),
     doors: map.doors.map(() => Math.max(0, Math.cos(t * 0.2))),
     cart: mode === "cjar" ? { at: p.at, yaw: p.yaw, contested: Math.floor(t / 5) % 3 === 2, pushers: 1 } : null,
     storm: mode === "tampieste" ? { x: map.hill.at[0], z: map.hill.at[2], radius: 10 + ((Math.cos(t * 0.1) + 1) / 2) * 80 } : null
@@ -67,7 +102,8 @@ const loop = (now: number) => {
   const dt = Math.min(0.1, (now - last) / 1000)
   last = now
   const t = tFixed ?? (now - t0) / 1000
-  if (cam && cam.length === 6) {
+  if (gunnerCamera()) camera.updateMatrixWorld()
+  else if (cam && cam.length === 6) {
     camera.position.set(cam[0], cam[1], cam[2])
     camera.lookAt(cam[3], cam[4], cam[5])
   } else world.menuCamera(t, camera)

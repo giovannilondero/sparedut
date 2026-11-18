@@ -23,6 +23,8 @@ export interface WeaponModel {
     readonly pouch?: THREE.Object3D
     /** The Mulin's barrel cluster, which spins around z. */
     readonly spinner?: THREE.Object3D
+    /** The Cjanon des Gjalinis' loading lid, hinged towards the shooter: it opens around x. */
+    readonly lid?: THREE.Object3D
   }
   /** Where the left hand goes (weapon space), null for one-handed weapons. */
   readonly left: THREE.Vector3 | null
@@ -377,10 +379,12 @@ function gjalinis(): WeaponModel {
   Z(root, 0.064, 0.078, 0.07, M.brass(), 0, y, -0.39, 22)
   put(root, T(0.078, 0.008, Math.PI * 2, 24), M.darkCopper(), 0, y, -0.425)
   for (const z of [-0.28, -0.12, 0.04]) put(root, T(0.063, 0.005, Math.PI * 2, 22), M.darkCopper(), 0, y, z)
-  // loading chamber with a hinged lid and the pressure knob
+  // loading chamber, dark inside, with the lid and its pressure knob on a hinge towards the shooter
   put(root, C(0.034, 0.034, 0.04, 14), M.copper(), 0, y + 0.07, -0.12)
-  put(root, C(0.037, 0.037, 0.01, 14), M.darkCopper(), 0, y + 0.092, -0.12)
-  put(root, C(0.008, 0.008, 0.02, 8), M.black(), 0.02, y + 0.1, -0.12)
+  put(root, C(0.029, 0.029, 0.002, 14), M.black(), 0, y + 0.0905, -0.12)
+  const lid = group(root, 0, 0.1655, -0.0795)
+  put(lid, C(0.037, 0.037, 0.01, 14), M.darkCopper(), 0, y + 0.092 - 0.1655, -0.12 + 0.0795)
+  put(lid, C(0.008, 0.008, 0.02, 8), M.black(), 0.02, y + 0.1 - 0.1655, -0.12 + 0.0795)
   put(root, C(0.022, 0.022, 0.008, 14), M.plainStone(), -0.065, y + 0.02, -0.06, 0, 0, Math.PI / 2)
   put(root, B(0.002, 0.016, 0.002), M.shell(), -0.07, y + 0.025, -0.06, 0, 0, -0.6)
   // leather straps around the arm and the handle underneath, for the hand
@@ -399,7 +403,7 @@ function gjalinis(): WeaponModel {
   hen.rotation.y = Math.PI
   frico.add(hen)
   const muzzle = marker(root, 0, y, -0.45)
-  return { root, muzzle, parts: { frico }, left: null, sightH: 0.17 }
+  return { root, muzzle, parts: { frico, lid }, left: null, sightH: 0.17 }
 }
 
 /**

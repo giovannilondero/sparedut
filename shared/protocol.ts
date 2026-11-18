@@ -14,7 +14,7 @@ import type { StormValue } from "./sim/rules.ts"
 import type { CartView, PhaseView } from "./sim/view.ts"
 import { PRIMARIES, type PrimaryId, type ProjectileKind, type WeaponId } from "./weapons.ts"
 
-export const PROTOCOL_VERSION = 9
+export const PROTOCOL_VERSION = 13
 export const MAX_PLAYERS = 16
 export const SNAPSHOT_EVERY = 2 // ticks: 30 snapshots per second
 
@@ -29,21 +29,65 @@ const visible = (max: number) =>
     .pipe(z.string().trim().min(1).max(max))
 const name = visible(20)
 
+/**
+ * Who can see and join a room. A room on the server is LAN (players on the host's network) or Online (anyone).
+ * An Offline room is hosted in the player's own browser, against bots: no code, no list.
+ */
+export const REACHES = ["offline", "lan", "online"] as const
+export type Reach = (typeof REACHES)[number]
+/** The reaches the game server creates rooms with. */
+export const SERVER_REACHES = ["lan", "online"] as const satisfies readonly Reach[]
+/** A reach a room on the game server has: one with an access. */
+export type ServerReach = (typeof SERVER_REACHES)[number]
+/** The reaches the host in the player's browser creates rooms with. */
+export const BROWSER_REACHES = ["offline"] as const satisfies readonly Reach[]
+
+/** Whether a room lets anyone within its reach in, or asks for a password. */
+export const ACCESSES = ["open", "password"] as const
+export type Access = (typeof ACCESSES)[number]
+/** A password is cleaned like a name. It stays with the host: never sent back, never logged. */
+export const PASSWORD_MAX = 32
+export const Password = visible(PASSWORD_MAX)
+/** A room's access as the host chose it, password included: it travels only in `create`. */
+export const RoomAccess = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("open") }),
+  z.object({ kind: z.literal("password"), password: Password })
+])
+export type RoomAccess = z.infer<typeof RoomAccess>
+
+/**
+ * A room's reach and, for a reach that has one, its access: an Offline room has nobody to keep
+ * out, a LAN or Online room always says who may come in. `A` is the access as written where it is
+ * kept: the host's choice with its password (`RoomAccess`), or what a room list shows (`Access`).
+ */
+export type Reached<A> = { readonly reach: "offline" } | { readonly reach: ServerReach; readonly access: A }
+
+/** What every `create` carries, whatever its reach. */
+const createRoom = {
+  t: z.literal("create"),
+  mode: z.enum(MODE_IDS as [ModeId, ...ModeId[]]),
+  map: z.enum(MAP_IDS as [MapId, ...MapId[]]),
+  minutes: z.number().int().min(2).max(30),
+  bots: z.number().int().min(0).max(7),
+  level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]),
+  ff: z.boolean(),
+  primary: z.enum(PRIMARIES)
+}
+
 export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("hello"), name, version: z.number() }),
   z.object({ t: z.literal("list") }),
+  z.discriminatedUnion("reach", [
+    z.object({ ...createRoom, reach: z.literal("offline") }).strict(),
+    z.object({ ...createRoom, reach: z.enum(SERVER_REACHES), access: RoomAccess })
+  ]),
   z.object({
-    t: z.literal("create"),
-    mode: z.enum(MODE_IDS as [ModeId, ...ModeId[]]),
-    map: z.enum(MAP_IDS as [MapId, ...MapId[]]),
-    minutes: z.number().int().min(2).max(30),
-    visibility: z.enum(["lan", "code"]),
-    bots: z.number().int().min(0).max(7),
-    level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]),
-    ff: z.boolean(),
+    t: z.literal("join"),
+    code: z.string().trim().toUpperCase().length(4),
+    /** Only for a password room; an open room ignores it. */
+    password: Password.optional(),
     primary: z.enum(PRIMARIES)
   }),
-  z.object({ t: z.literal("join"), code: z.string().trim().toUpperCase().length(4), primary: z.enum(PRIMARIES) }),
   z.object({ t: z.literal("leave") }),
   z.object({ t: z.literal("input"), i: PlayerInputSchema }),
   z.object({ t: z.literal("team"), team }),
@@ -52,11 +96,11 @@ export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("start") }),
   z.object({ t: z.literal("bot"), team, delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ t: z.literal("level"), level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]) }),
-  z.object({ t: z.literal("ping"), c: z.number(), rtt: z.number().min(0).max(10000).optional() })
+  z.object({ t: z.literal("ping"), c: z.number(), rtt: z.number().min(0).max(10000).optional() }),
+  /** The match menu opened or closed, the tab hidden or shown. Only an Offline room pauses; the server ignores it. */
+  z.object({ t: z.literal("pause"), paused: z.boolean() })
 ])
 export type ClientMessage = z.infer<typeof ClientMessage>
-
-export type Visibility = "lan" | "code"
 
 export interface RosterEntry {
   readonly id: string
@@ -66,19 +110,20 @@ export interface RosterEntry {
   readonly away: boolean
 }
 
-export interface RoomSummary {
+/** A room in the room list. Its access says whether it asks for a password, never the password itself. */
+export type RoomSummary = Reached<Access> & {
   readonly code: string
   readonly host: string
   readonly mode: ModeId
   readonly map: MapId
-  readonly visibility: Visibility
+  /** Humans in the room; bots give their seat up to a human who joins. */
   readonly players: number
   readonly bots: number
   readonly max: number
   readonly phase: PhaseView["tag"]
 }
 
-export interface RoomInfo extends RoomSummary {
+export type RoomInfo = RoomSummary & {
   readonly hostId: string
   readonly minutes: number
   readonly level: BotLevel
@@ -157,7 +202,17 @@ export interface BoardRow {
 }
 
 /** Errors for the client: it picks the text, in its own language. */
-export type ErrorCode = "invalid" | "version" | "notFound" | "lanOnly" | "full" | "busy"
+export type ErrorCode =
+  | "invalid"
+  | "version"
+  | "notFound"
+  | "lanOnly"
+  | "full"
+  | "busy"
+  | "passwordRequired"
+  | "wrongPassword"
+  /** Too many wrong passwords from this connection: it waits a while before trying again. */
+  | "tooManyAttempts"
 
 export type ServerMessage =
   /** `publicUrl`: the game's public address (tunnel or PUBLIC_URL), if the server knows it. */

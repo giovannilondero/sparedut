@@ -12,11 +12,14 @@ import { createAvatar, setDetailedWeapon } from "./avatars.ts"
 import { createFx } from "./fx.ts"
 import { isLocalHost } from "../shared/hosts.ts"
 import { Game } from "./game.ts"
+import { inviteLink, readInvite } from "./invite.ts"
 import { t } from "./i18n.ts"
 import { createLook, lookFromUrl, mountLookSwitcher } from "./looks.ts"
 import { loadDetailed } from "./models/detailed.ts"
 import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
+import { BrowserHostConnection } from "./offline.ts"
+import { Link } from "./connection.ts"
 import { PerfMonitor } from "./perf.ts"
 import { loadSettings, saveSettings } from "./settings.ts"
 import type { WorldScene } from "./contracts.ts"
@@ -115,6 +118,22 @@ window.addEventListener("keydown", (e: KeyboardEvent) => {
 })
 
 const net = new Net()
+/** An Offline room's host, in a worker of this page: started on create, ended on leave. */
+const browserHostConnection = new BrowserHostConnection()
+/** What the game talks to: the server, or the browser's host while in an Offline room. */
+const link = new Link([net, browserHostConnection])
+const offline = () => link.uses(browserHostConnection)
+browserHostConnection.onError = (error) => {
+  console.error("The Offline room's host failed:", error)
+  toast(t().net.offlineFailed)
+  if (offline()) leaveOffline()
+  backToMenu()
+}
+/** Back to the server: the browser's host and its Offline room end. */
+function leaveOffline() {
+  browserHostConnection.close()
+  link.use(net)
+}
 const persist = () => {
   saveSettings(settings)
   audio.setVolumes(settings.master, settings.music)
@@ -124,20 +143,42 @@ const persist = () => {
   else resize()
 }
 
+/** The room being joined, for the password prompt. */
+let joining = ""
+/** The password of the room being created, joined or played, if it has one: it goes into the invite link. */
+let roomPassword: string | null = null
+const sendJoin = (code: string, password?: string) => {
+  joining = code
+  roomPassword = password ?? null
+  net.send({ t: "join", code, ...(password === undefined ? {} : { password }), primary: settings.primary })
+}
+
 const menu = new Menu(settings, audio, {
-  create: (o, quick = false) => {
+  create: (o, oneTap = false) => {
+    if (o.reach === "offline") {
+      // The room lives in this page: the game server need not be reachable.
+      autostart = oneTap
+      roomPassword = null
+      // An invite still in the address must not pull the player out when the server comes back.
+      forgetRoomAddress()
+      link.use(browserHostConnection)
+      browserHostConnection.open(settings.name)
+      browserHostConnection.send({ t: "create", ...o, primary: settings.primary })
+      return
+    }
     if (!ensureOnline()) return
-    autostart = quick
+    autostart = oneTap
+    roomPassword = o.access.kind === "password" ? o.access.password : null
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
     net.send({ t: "create", ...o, primary: settings.primary })
   },
   mapChanged: (id) => {
     if (!game?.active) loadMap(id)
   },
-  join: (code) => {
+  join: (code, password) => {
     if (!ensureOnline()) return
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
-    net.send({ t: "join", code, primary: settings.primary })
+    sendJoin(code, password)
   },
   settingsChanged: persist
 })
@@ -146,7 +187,7 @@ const menu = new Menu(settings, audio, {
 let publicUrl: string | null = null
 const inviteBase = () => `${publicUrl && isLocalHost(location.hostname) ? publicUrl : location.origin}${location.pathname}`
 
-/** A quick match against bots starts right away, without warmup. */
+/** The home screen's one-tap match against the bots starts right away, without warm-up. */
 let autostart = false
 const physicsReady = initPhysics().then(() => {
   game = new Game({
@@ -158,13 +199,14 @@ const physicsReady = initPhysics().then(() => {
     audio,
     fx,
     viewmodel,
-    net,
+    net: link,
     settings,
     menu,
     createAvatar,
     saveSettings: () => saveSettings(settings),
     onLeave: backToMenu,
-    inviteBase
+    inviteBase,
+    roomPassword: () => roomPassword
   })
   game.setQuality(quality)
 })
@@ -183,13 +225,18 @@ function ensureOnline() {
   return false
 }
 
+/** The address no longer names a room: nothing joins it again on its own. */
+function forgetRoomAddress() {
+  history.replaceState(null, "", location.pathname)
+}
+
 function backToMenu() {
   game?.stop()
   menu.show(true)
   audio.menuMusic(true)
 }
 
-net.on((msg: ServerMessage) => {
+link.on((msg: ServerMessage) => {
   switch (msg.t) {
     case "welcome":
       publicUrl = msg.publicUrl
@@ -204,18 +251,24 @@ net.on((msg: ServerMessage) => {
       void physicsReady.then(() => {
         menu.show(false)
         audio.menuMusic(false)
-        history.replaceState(null, "", `?p=${msg.room.code}`)
+        // An Offline room has no code to share.
+        if (msg.room.reach !== "offline") history.replaceState(null, "", inviteLink("", msg.room.code, roomPassword))
         game!.start(msg.room, msg.you)
-        if (autostart && msg.room.hostId === msg.you) net.send({ t: "start" })
+        if (autostart && msg.room.hostId === msg.you) link.send({ t: "start" })
         autostart = false
       })
       return
     case "left":
-      history.replaceState(null, "", location.pathname)
+      if (offline()) leaveOffline()
+      roomPassword = null
+      forgetRoomAddress()
       backToMenu()
       return
     case "error":
-      toast(t().errors[msg.code])
+      // A password room: ask for it, saying why when the last one did not work.
+      if (msg.code === "passwordRequired") menu.askPassword(joining)
+      else if (msg.code === "wrongPassword" || msg.code === "tooManyAttempts") menu.askPassword(joining, t().errors[msg.code])
+      else toast(t().errors[msg.code])
       return
   }
 })
@@ -238,11 +291,12 @@ async function connect() {
     connecting = false
     menu.status(t().net.connected(settings.name || t().net.stranger))
     net.send({ t: "list" })
-    const invite = new URLSearchParams(location.search).get("p")
+    // An invite joins on its own only from the menu: never over a room in progress.
+    const invite = game?.active || offline() ? null : readInvite(location.search, location.hash)
     if (invite && settings.name) {
-      menu.status(t().net.invite(invite))
-      net.send({ t: "join", code: invite.toUpperCase(), primary: settings.primary })
-    } else if (invite) toast(t().net.inviteNeedName(invite))
+      menu.status(t().net.invite(invite.code))
+      sendJoin(invite.code, invite.password ?? undefined)
+    } else if (invite) toast(t().net.inviteNeedName(invite.code))
   } catch {
     connecting = false
     menu.status(t().net.retry)
@@ -250,8 +304,10 @@ async function connect() {
   }
 }
 net.onClose = () => {
-  if (game?.active) {
+  if (game?.active && !offline()) {
     toast(t().net.lost)
+    roomPassword = null
+    forgetRoomAddress()
     backToMenu()
   }
   menu.status(t().net.lostRetry)

@@ -3,7 +3,9 @@ import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId } from "../shared/map.ts"
 import { MAP_IDS } from "../shared/maps/index.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
+import type { CrouchMode } from "./controls.ts"
 import type { Lang } from "./i18n.ts"
+import type { CreateOptions } from "./menu.ts"
 
 export interface Settings {
   name: string
@@ -14,6 +16,8 @@ export interface Settings {
   master: number
   music: number
   invertY: boolean
+  /** Crouch while the key is held, or a press to crouch and one to stand. */
+  crouch: CrouchMode
   primary: PrimaryId
   quality: "bassa" | "media" | "alta"
   /** Performance panel (F3). */
@@ -37,6 +41,7 @@ const DEFAULTS: Settings = {
   master: 0.8,
   music: 0.5,
   invertY: false,
+  crouch: "hold",
   primary: "cramar",
   quality: "media",
   showInfo: false,
@@ -53,6 +58,7 @@ export function loadSettings(): Settings {
     const s: Settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") }
     // A value saved by an old version (or a removed map) falls back to the default.
     if (!MAP_IDS.includes(s.lastMap)) s.lastMap = DEFAULTS.lastMap
+    if (s.crouch !== "hold" && s.crouch !== "toggle") s.crouch = DEFAULTS.crouch
     return s
   } catch {
     return { ...DEFAULTS }
@@ -61,4 +67,21 @@ export function loadSettings(): Settings {
 
 export function saveSettings(s: Settings) {
   localStorage.setItem(KEY, JSON.stringify(s))
+}
+
+/**
+ * The room the home screen's "play against the bots" button makes in one tap: Offline, with the
+ * mode, map, duration, bots and bot skill chosen last, friendly fire off. It needs no game server.
+ */
+export function oneTapRoom(s: Settings): CreateOptions {
+  return {
+    mode: s.lastMode,
+    map: s.lastMap,
+    minutes: s.lastMinutes,
+    reach: "offline",
+    // The button promises bots: a room last made without them falls back to the default.
+    bots: s.lastBots || DEFAULTS.lastBots,
+    level: s.lastLevel,
+    ff: false
+  }
 }

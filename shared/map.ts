@@ -205,16 +205,30 @@ export function defineMap(input: MapInput): MapDef {
   return { ...rest, blocks: [...blocks, ...edge, ...input.buildings.flatMap(buildingBlocks)] }
 }
 
-/** Where a turret's user stands: behind the gun, on the same level. */
-export function turretSeat(t: TurretSpot): V3 {
-  return [t.at[0] + Ops.sin(t.yaw) * TURRET.seat, t.at[1], t.at[2] + Ops.cos(t.yaw) * TURRET.seat]
+/** A look's yaw turned as far as the gun can follow it: inside the turret's arc. */
+const turretYaw = (t: TurretSpot, yaw: number) => {
+  let d = yaw - t.yaw
+  d -= Math.round(d / (2 * Math.PI)) * 2 * Math.PI
+  return t.yaw + Math.max(-TURRET.arc, Math.min(TURRET.arc, d))
 }
+
+/**
+ * Where a turret's gunner stands while looking along `yaw`: behind the gun, which turns with
+ * the look inside its arc, so the seat, the pivot and the clamped aim are on one line seen from
+ * above. On the turret's foot level, `TURRET.seat` from the pivot. The simulation places the
+ * gunner here and the gunner's own client its eye, so the two cannot drift apart.
+ */
+export function turretSeat(t: TurretSpot, yaw: number): V3 {
+  const aim = turretYaw(t, yaw)
+  return [t.at[0] + Ops.sin(aim) * TURRET.seat, t.at[1], t.at[2] + Ops.cos(aim) * TURRET.seat]
+}
+
+/** The seat with the gun at rest: where a player mounts the turret from, and where its prompt appears. */
+export const turretRestSeat = (t: TurretSpot): V3 => turretSeat(t, t.yaw)
 
 /** The turret user's aim, clamped to the arc the gun turns through. */
 export function turretAim(t: TurretSpot, yaw: number, pitch: number): { readonly yaw: number; readonly pitch: number } {
-  let d = yaw - t.yaw
-  d -= Math.round(d / (2 * Math.PI)) * 2 * Math.PI
-  return { yaw: t.yaw + Math.max(-TURRET.arc, Math.min(TURRET.arc, d)), pitch: Math.max(-TURRET.pitchDown, Math.min(TURRET.pitchUp, pitch)) }
+  return { yaw: turretYaw(t, yaw), pitch: Math.max(-TURRET.pitchDown, Math.min(TURRET.pitchUp, pitch)) }
 }
 
 const dist3 = (a: V3, b: V3) => Math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2 + (b[2] - a[2]) ** 2)

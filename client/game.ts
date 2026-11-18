@@ -6,21 +6,24 @@ import * as THREE from "three"
 import { BOT_LEVEL_IDS, QUICK_CHAT, TEAM_INFO, type BotLevel } from "../shared/folklore.ts"
 import { rayPose } from "../shared/hitbox.ts"
 import { BUTTON, IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
-import { turretAim, turretSeat, type MapId, type PickupKind, type Team } from "../shared/map.ts"
+import { turretAim, turretRestSeat, turretSeat, type MapId, type PickupKind, type Team } from "../shared/map.ts"
 import { DISCO } from "../shared/maps/maran.ts"
-import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, sprinting } from "../shared/movement.ts"
+import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, seatedBody, sprinting } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
 import { outsideStorm, owned, RAISE_TICKS } from "../shared/sim/rules.ts"
 import { TURRET, WEAPONS, type WeaponId } from "../shared/weapons.ts"
+import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
-import { Controls } from "./controls.ts"
+import { Controls, trackedIn } from "./controls.ts"
 import { boardHtml, esc, Hud, rosterHtml } from "./hud.ts"
 import { t } from "./i18n.ts"
 import type { Look } from "./looks.ts"
 import type { Menu } from "./menu.ts"
-import type { Net } from "./net.ts"
+import type { Connection } from "./connection.ts"
+import { inviteLink } from "./invite.ts"
+import { MatchClock } from "./match-clock.ts"
 import { Predictor } from "./predict.ts"
 import type { Settings } from "./settings.ts"
 
@@ -54,7 +57,8 @@ export interface GameDeps {
   readonly audio: GameAudio
   readonly fx: Fx
   readonly viewmodel: Viewmodel
-  readonly net: Net
+  /** Whoever hosts the room: the game server or this browser. */
+  readonly net: Connection
   readonly settings: Settings
   readonly menu: Menu
   readonly createAvatar: (team: Team, name: string) => Avatar
@@ -62,6 +66,8 @@ export interface GameDeps {
   readonly onLeave: () => void
   /** Origin and path for invite links (the public address when playing from localhost). */
   readonly inviteBase: () => string
+  /** The room's password, if this client knows it: it goes into the invite link's fragment. */
+  readonly roomPassword: () => string | null
 }
 
 interface Frame {
@@ -96,11 +102,18 @@ export class Game {
   private localCooldown = 0
   private localMag: number | null = null
   private shots: number[] = []
+  /**
+   * This player's reload under way, as it began: weapon, start (frame time, s), length, and the
+   * magazine and reserve it started from; `hensIn` counts the cannon's hens that have gone in, and clucked.
+   */
+  private ownReload: { weapon: WeaponId; at: number; seconds: number; mag: number; reserve: number; hensIn: number } | null = null
   private prevFire = false
   private prevBomb = false
   private prevMine = false
   /** Predicted Mulin spin-up (ticks), counted as the server does. */
   private localSpin = 0
+  /** Seconds since my last shot, for the first-person view (the mitraie's recoil on its tripod). */
+  private sinceShot = Infinity
   /** Ticks until the next predicted mitraie shot, at the turret. */
   private turretCooldown = 0
   /** Last time (s) the heal sound played, so it doesn't turn into a barrage. */
@@ -124,13 +137,18 @@ export class Game {
   private stepAcc = 0
   private wasGrounded = true
   private wasAlive = false
+  /** The predictor holds me in a turret's seat (the last snapshot had me alive on one). */
+  private seated = false
   private shake = 0
   private aimBlend = 0
   private kickPitch = 0
   private seed = 1
   private lastPhase = ""
   private renderTick = 0
+  /** Match time (s): reloads, prediction and the others' interpolation all read it. */
   private time = 0
+  /** Stands still while an Offline match is paused: on resume, the pause never happened. */
+  private clock = new MatchClock(() => performance.now())
   private running = false
   private readonly blobGeo = new THREE.CircleGeometry(0.42, 20).rotateX(-Math.PI / 2)
   private readonly blobMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false })
@@ -170,6 +188,7 @@ export class Game {
       if (e.key === "Escape") this.closeChat()
     })
     d.net.on((msg) => this.running && this.message(msg))
+    document.addEventListener("visibilitychange", () => this.syncPause())
     // Development only: automated tests drive the player without pointer lock.
     if (import.meta.env.DEV) Object.assign(window, { __sparedut: { controls: this.controls, game: this } })
   }
@@ -190,6 +209,9 @@ export class Game {
     this.wanted = this.d.settings.primary
     this.wantedSeq = 0
     this.shownWeapon = null
+    this.ownReload = null
+    this.sinceShot = Infinity
+    this.clock = new MatchClock(() => performance.now())
     this.applySettings()
     this.updateRoster(room)
     this.hud.show(true)
@@ -212,6 +234,7 @@ export class Game {
     this.openOverlay("none")
     this.d.viewmodel.setVisible(false)
     if (document.pointerLockElement) document.exitPointerLock()
+    this.controls.track(null)
   }
 
   get active() {
@@ -250,6 +273,7 @@ export class Game {
     const s = this.d.settings
     this.controls.sensitivity = s.sensitivity
     this.controls.invertY = s.invertY
+    this.controls.crouchMode = s.crouch
   }
 
   // ---------------------------------------------------------------- network
@@ -297,9 +321,9 @@ export class Game {
   }
 
   private onSnapshot(s: Snapshot) {
-    this.snapArrivals.push(performance.now())
+    this.snapArrivals.push(this.clock.now())
     if (this.snapArrivals.length > 31) this.snapArrivals.shift()
-    const now = performance.now() / 1000
+    const now = this.clock.now() / 1000
     const target = s.tick - now * 60
     if (this.offset === null || Math.abs(target - this.offset) > 30) this.offset = target
     // The others' clock drifts slowly: an early or late snapshot
@@ -327,11 +351,17 @@ export class Game {
         this.wanted = you.arsenal.current
         this.localMag = null
       } else if (you.alive) {
-        if (this.mounted() >= 0) this.predictor.pin(you.body)
-        else if (!this.predictor.body) this.predictor.body = you.body
+        const turret = this.mounted()
+        if (turret >= 0) {
+          // On the turret the seat follows my own look, not the body the server sent: see `fixedStep`.
+          this.predictor.ack(you.seq)
+          if (!this.seated) this.predictor.sit(seatedBody(turretSeat(this.physics.map.turrets[turret], this.controls.yaw)))
+        } else if (!this.predictor.body) this.predictor.body = you.body
         else this.predictor.reconcile(you.body, you.seq, true)
       }
       this.wasAlive = you.alive
+      this.seated = you.alive && this.mounted() >= 0
+      this.controls.track(trackedIn(s, this.me, this.mounted() >= 0))
       // The server has already seen my last weapon switch and holds a different one: it
       // switched it itself (lanciafrico pickup, armoury, respawn) or rejected the switch. Follow it.
       const server = you.arsenal.current
@@ -518,7 +548,11 @@ export class Game {
         }
         return
       case "reload":
-        if (e.s === me) this.d.viewmodel.reload(WEAPONS[e.w].reloadTicks / 60)
+        if (e.s === me) {
+          const seconds = WEAPONS[e.w].reloadTicks / 60
+          const ammo = this.you()?.arsenal.ammo[e.w]
+          this.ownReload = ammo ? { weapon: e.w, at: this.time, seconds, mag: ammo.mag, reserve: ammo.reserve, hensIn: 0 } : null
+        }
         else {
           const at = this.posOf(e.s)
           if (at) audio.play("reload", { at, volume: 0.7 })
@@ -683,6 +717,7 @@ export class Game {
     $("pause").classList.toggle("hidden", which !== "pause")
     $("loadout").classList.toggle("hidden", which !== "loadout")
     if (which === "pause") this.renderPause()
+    this.syncPause()
     if (which === "loadout") {
       if (document.pointerLockElement) document.exitPointerLock()
       const el = $("loadout")
@@ -705,12 +740,25 @@ export class Game {
     }
   }
 
+  /**
+   * An Offline match stands still while a menu is open or the tab is hidden: the host stops
+   * stepping and this client stops predicting. A room on the game server never pauses.
+   */
+  private syncPause() {
+    const paused = this.running && this.room?.reach === "offline" && (this.overlay !== "none" || document.hidden)
+    if (paused === this.clock.paused) return
+    if (paused) this.clock.pause()
+    else this.clock.resume()
+    // Leaving the match is no resume: the room is already gone.
+    if (this.running) this.d.net.send({ t: "pause", paused })
+  }
+
   private renderPause() {
     const room = this.room
     if (!room) return
     const host = room.hostId === this.me
     const el = $("pause")
-    const link = `${this.d.inviteBase()}?p=${room.code}`
+    const link = inviteLink(this.d.inviteBase(), room.code, this.d.roomPassword())
     const myTeam = this.teams.get(this.me)
     const other: Team = myTeam === "benandanti" ? "malandanti" : "benandanti"
     const phase = this.snap?.phase.tag ?? "Warmup"
@@ -718,10 +766,15 @@ export class Game {
     const p = s.pause
     el.innerHTML = `
       <h2>${s.modes[room.mode].name} <small class="muted">· ${s.modes[room.mode].sub}</small></h2>
-      <div class="row" style="align-items:center;justify-content:space-between">
+      ${
+        // An Offline room has no code and no invite link: nobody else can come in.
+        room.reach === "offline"
+          ? `<div class="muted" style="font-size:12px">${p.reach.offline}</div>`
+          : `<div class="row" style="align-items:center;justify-content:space-between">
         <div><div class="muted">${p.code}</div><div class="invite">${room.code}</div></div>
-        <div style="text-align:right"><button id="p-copy">${p.copy}</button><div class="muted" style="font-size:12px;margin-top:4px">${room.visibility === "lan" ? p.visLan : p.visCode}</div></div>
-      </div>
+        <div style="text-align:right"><button id="p-copy">${p.copy}</button><div class="muted" style="font-size:12px;margin-top:4px">${p.reach[room.reach]} · ${p.access[room.access]}</div></div>
+      </div>`
+      }
       <div class="roster">${rosterHtml(room, this.me)}</div>
       ${
         host
@@ -750,10 +803,12 @@ export class Game {
       this.d.net.send({ t: "leave" })
       this.d.onLeave()
     }
-    $("p-copy").onclick = () => {
-      void navigator.clipboard?.writeText(link)
-      $("p-copy").textContent = p.copied
-    }
+    const copy = document.getElementById("p-copy")
+    if (copy)
+      copy.onclick = () => {
+        void navigator.clipboard?.writeText(link)
+        copy.textContent = p.copied
+      }
     $("p-settings").onclick = () => this.openOverlay("settings")
     if (host) {
       $("p-start").onclick = () => {
@@ -854,7 +909,9 @@ export class Game {
     if (!you || !you.alive || over) return
 
     if (turret >= 0) {
-      // Held in place (the server says so); mitraie shots are predicted like any other.
+      // In the seat behind the gun for this command's look, where the server puts me too: the eye
+      // turns with the look at once, and mitraie shots leave from it, predicted like any other.
+      this.predictor.hold(seatedBody(turretSeat(this.physics.map.turrets[turret], input.yaw)), input, this.speedScale())
       if (this.turretCooldown > 0) this.turretCooldown--
       const gun = this.snap?.turrets[turret]
       if ((buttons & BUTTON.fire) !== 0 && gun && !gun.jammed && this.turretCooldown === 0) {
@@ -928,6 +985,7 @@ export class Game {
     const physics = this.physics
     const def = WEAPONS[id]
     viewmodel.fire()
+    this.sinceShot = 0
     this.kickPitch += def.kick
     this.controls.rumble(def.kick * 4, 0.15 + def.kick * 3, def.mode === "melee" ? 90 : 60)
     if (def.mode === "melee") {
@@ -953,7 +1011,7 @@ export class Game {
         const hit = rayPose(eye, dir, { x: p.x, y: p.y, z: p.z, crouch: (p.f & FLAG_BIT.crouch) !== 0 })
         if (hit && hit.dist < reach) reach = hit.dist
       }
-      const muzzle = viewmodel.muzzleWorld(new THREE.Vector3())
+      const muzzle = this.muzzle()
       fx.tracer([muzzle.x, muzzle.y, muzzle.z], [eye.x + dir.x * reach, eye.y + dir.y * reach, eye.z + dir.z * reach], id)
       return
     }
@@ -961,7 +1019,7 @@ export class Game {
     const b = this.predictor.body
     if (!b) return
     const eye = { x: b.x, y: b.y + this.eye, z: b.z }
-    const muzzle = viewmodel.muzzleWorld(new THREE.Vector3())
+    const muzzle = this.muzzle()
     const aiming = (input.buttons & BUTTON.aim) !== 0
     const spread = aiming ? def.spread.aimed : Math.hypot(b.vx, b.vz) > 1.5 ? def.spread.moving : def.spread.still
     for (let i = 0; i < def.pellets; i++) {
@@ -978,6 +1036,12 @@ export class Game {
       fx.tracer([muzzle.x, muzzle.y, muzzle.z], end, id)
     }
     fx.muzzle([muzzle.x, muzzle.y, muzzle.z])
+  }
+
+  /** Where my shots leave from: the mitraie's own muzzle on a turret, the carried weapon's otherwise. */
+  private muzzle() {
+    const turret = this.mounted()
+    return turret >= 0 ? this.world.turretMuzzle(turret, new THREE.Vector3()) : this.d.viewmodel.muzzleWorld(new THREE.Vector3())
   }
 
   // ---------------------------------------------------------------- interpolation
@@ -1016,19 +1080,22 @@ export class Game {
 
   frame(dt: number, t: number) {
     if (!this.running) return
-    this.time = t
+    this.time = this.clock.now() / 1000
     const { camera, audio, viewmodel, fx, settings } = this.d
     const world = this.world
-    const now = performance.now() / 1000
-    if (this.offset !== null) this.renderTick = now * 60 + this.offset - INTERP_TICKS
+    if (this.offset !== null) this.renderTick = this.time * 60 + this.offset - INTERP_TICKS
 
+    const paused = this.clock.paused
     this.controls.poll(dt, this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over")
-    this.acc += Math.min(dt, 0.25)
-    while (this.acc >= DT) {
-      this.acc -= DT
-      this.fixedStep()
+    // Paused: no commands, no prediction, and the paused time never reaches the fixed tick.
+    if (!paused) {
+      this.acc += Math.min(dt, 0.25)
+      while (this.acc >= DT) {
+        this.acc -= DT
+        this.fixedStep()
+      }
+      this.predictor.decay(dt)
     }
-    this.predictor.decay(dt)
 
     const s = this.snap
     const you = s?.you ?? null
@@ -1092,21 +1159,46 @@ export class Game {
     const c = this.controls
     this.kickPitch *= Math.exp(-dt * 9)
     const turret = you?.alive ? this.mounted() : -1
-    const inHand: WeaponId = turret >= 0 ? "mitraie" : this.wanted
-    const def = WEAPONS[inHand]
     const aiming = c.isHeld("aim") && !!you?.alive
     this.aimBlend += ((aiming ? 1 : 0) - this.aimBlend) * Math.min(1, dt * 12)
-    const scoped = this.wanted === "cjampanili" && this.aimBlend > 0.85
-    const baseFov = settings.fov
-    camera.fov = baseFov + (def.aimFov - baseFov) * this.aimBlend
+    const reload = this.ownReload
+    // The reload is over once its time has run out and the server has finished it too (its magazine is then the new one).
+    if (reload && (!you?.alive || reload.weapon !== this.wanted || (this.time - reload.at >= reload.seconds && you.arsenal.action._tag !== "reload")))
+      this.ownReload = null
+    if (!paused) this.sinceShot += dt
+    // The reload's one clock: the animation, the clucks and the hen at the mouth all read this.
+    const own = this.ownReload
+    const reloadProgress = own && Math.min(1, (this.time - own.at) / own.seconds)
+    const spot = turret >= 0 ? this.physics.map.turrets[turret] : undefined
+    const view = firstPerson({
+      chosen: this.wanted,
+      mount: spot ? { turret, spot } : null,
+      look: { yaw: c.yaw, pitch: c.pitch },
+      sinceShot: this.sinceShot,
+      alive: !!you?.alive,
+      aim: this.aimBlend,
+      baseFov: settings.fov,
+      mag: you ? (this.localMag ?? you.arsenal.ammo[this.wanted].mag) : 0,
+      reserve: you?.arsenal.ammo[this.wanted].reserve ?? 0,
+      reload: own && reloadProgress !== null ? { progress: reloadProgress, mag: own.mag, reserve: own.reserve } : null
+    })
+    if (this.ownReload && view.hensIn > this.ownReload.hensIn) {
+      audio.play("cluck_gjaline")
+      this.ownReload.hensIn = view.hensIn
+    }
+    const inHand = view.inHand
+    const def = WEAPONS[inHand]
+    camera.fov = view.fov
     if (you?.arsenal.sgnape) camera.fov += Math.sin(t * 2.3) * 2
     camera.updateProjectionMatrix()
-    c.zoomScale = camera.fov / baseFov
-    this.hud.scope(scoped)
-    viewmodel.setVisible(!!you?.alive && !scoped)
+    c.zoomScale = view.lookScale
+    this.hud.scope(view.scope)
+    viewmodel.setVisible(view.drawWeapon)
 
     const b = this.predictor.body
-    const drawn = this.predictor.render(this.acc / DT)
+    // On a turret the eye sits in the seat for this frame's look; on foot, between the last two predicted ticks.
+    const seat = view.mitraie?.seat
+    const drawn = seat ? { x: seat[0], y: seat[1], z: seat[2] } : this.predictor.render(this.acc / DT)
     if (you?.alive && b && drawn) {
       this.eye += ((b.crouch ? EYE_CROUCH : EYE_STAND) - this.eye) * Math.min(1, dt * 14)
       const sm = this.predictor.smooth
@@ -1146,7 +1238,10 @@ export class Game {
         lookDx,
         lookDy,
         sgnape: you.arsenal.sgnape > 0,
-        spin: def.spinTicks > 0 ? this.localSpin / def.spinTicks : 0
+        spin: def.spinTicks > 0 ? this.localSpin / def.spinTicks : 0,
+        henAtMouth: view.henAtMouth,
+        reloadHens: view.reloadHens,
+        reload: own?.weapon === inHand ? reloadProgress : null
       })
     }
 
@@ -1170,13 +1265,15 @@ export class Game {
         turrets: s.turrets.map((tu, i): TurretVisual => {
           const mine = tu.gunner === this.me
           const gunner = tu.gunner && !mine ? this.interpolated(tu.gunner) : null
+          const pose = view.mitraie?.turret === i ? view.mitraie : null
           return {
-            yaw: mine ? c.yaw : gunner?.yaw ?? 0,
-            pitch: mine ? c.pitch : gunner?.pitch ?? 0,
+            yaw: pose ? pose.yaw : mine ? c.yaw : gunner?.yaw ?? 0,
+            pitch: pose ? pose.pitch : mine ? c.pitch : gunner?.pitch ?? 0,
             heat: tu.heat,
             jammed: tu.jammed,
             manned: tu.gunner !== null,
-            mine: mine && i === turret
+            mine: pose !== null,
+            recoil: pose?.recoil ?? 0
           }
         }),
         doors: s.doors.map((hp, i) => hp / (this.physics.map.doors[i]?.hp ?? 1)),
@@ -1201,14 +1298,14 @@ export class Game {
       const near =
         turret < 0 && you.alive && !!b && !!s &&
         this.physics.map.turrets.some((spot, i) => {
-          const seat = turretSeat(spot)
+          const seat = turretRestSeat(spot)
           return s.turrets[i]?.gunner === null && Math.hypot(b.x - seat[0], b.z - seat[2]) <= TURRET.reach && Math.abs(b.y - seat[1]) < 1.2
         })
       this.hud.turret(gun ? { heat: gun.heat, jammed: gun.jammed } : null, near)
       const speed = b ? Math.hypot(b.vx, b.vz) : 0
       const spread = aiming ? def.spread.aimed : speed > 1.5 || !b?.grounded ? def.spread.moving : def.spread.still
       const px = (Math.tan(spread) / Math.tan(((camera.fov / 2) * Math.PI) / 180)) * (innerHeight / 2)
-      this.hud.crosshair(Math.min(60, px * 1.6), you.alive && !scoped)
+      this.hud.crosshair(Math.min(60, px * 1.6), view.crosshair)
     }
     this.hud.clickToPlay(!this.controls.active && this.overlay === "none" && !this.chatting && !this.boardOpen && s?.phase.tag !== "Over")
   }

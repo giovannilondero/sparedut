@@ -6,6 +6,7 @@
 import * as THREE from "three"
 import type { Viewmodel, ViewmodelFrame } from "./contracts.ts"
 import { WEAPON_IDS, type WeaponId } from "../shared/weapons.ts"
+import { HEN_IN, HEN_RELOAD, henDrop } from "./firstperson.ts"
 import { bump, burlapTex, clamp, damp, flashTex, put, ramp, std } from "./models/kit.ts"
 import { sgnapeBottle } from "./models/props.ts"
 import { buildWeapon, remodel, type WeaponModel } from "./models/weapons.ts"
@@ -41,6 +42,17 @@ const TOSS = 0.6
 /** How far the sight stays below the line of sight when aiming (m). */
 const AIM_DROP = 0.035
 const BOLT_CYCLE = 0.65
+/** The hen cannon's hatch (weapon space): the top of its collar and its centre along the tube. */
+const HATCH_TOP = 0.166
+const HATCH_Z = -0.12
+/** Within a hen's turn at the hatch, when the hand lets her go to drop in. */
+const HEN_LET_GO = 0.5
+/** A dropped hen's size against the one at the mouth, and where the hand holds her. */
+const DROP_SCALE = 0.75
+const HEN_IN_HAND = new THREE.Vector3(-0.05, -0.005, 0.01)
+/** Where the hand brings each hen from, and the point over the hatch where it lets her go. */
+const HEN_FROM = new THREE.Vector3(-0.12, -0.06, -0.1)
+const HEN_OVER = new THREE.Vector3(0, HATCH_TOP + 0.08, HATCH_Z)
 const Y = new THREE.Vector3(0, 1, 0)
 const X = new THREE.Vector3(1, 0, 0)
 
@@ -91,7 +103,7 @@ function makeSlot(id: WeaponId): Slot {
   leftArm.visible = model.left !== null
   const rest: Slot["rest"] = []
   const parts = model.parts
-  for (const o of [parts.mag, parts.slide, parts.barrels, parts.bolt, parts.frico, parts.pouch, parts.spinner, ...(parts.shells ?? [])])
+  for (const o of [parts.mag, parts.slide, parts.barrels, parts.bolt, parts.frico, parts.pouch, parts.spinner, parts.lid, ...(parts.shells ?? [])])
     if (o) rest.push({ o, p: o.position.clone(), r: o.rotation.clone(), v: o.visible })
   model.root.visible = false
   return { id, model, hold, leftArm, leftBase, rest }
@@ -142,8 +154,6 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
   let cur: Slot | null = null
   let pending: WeaponId | null = null
   let switchT = -1 // <SWITCH_DOWN: lower; then raise
-  let reloadT = -1
-  let reloadDur = 1
   let fireT = 9
   let spinA = 0
   let rec = 0
@@ -151,6 +161,11 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
   let boltT = -1
   let tossT = -1
   let loaded = true
+  let reloadHens = 0
+  /** Whether a hen sat at the mouth when the cannon's reload began. */
+  let mouthBefore = false
+  /** The hens a cannon reload drops in: copies of the one at the mouth, made on the first reload. */
+  let drops: THREE.Object3D[] = []
   let t = 0
   let bob = 0
   let aimB = 0
@@ -177,7 +192,6 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     cur.model.root.visible = true
     cur.model.muzzle.add(flash)
     flash.scale.setScalar(cur.hold.flash)
-    reloadT = -1
     swingT = -1
     boltT = -1
   }
@@ -295,6 +309,42 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
         hand.copy(m.position).add(tmp.set(0, 0.02, 0.02))
         return ramp(p, 0.1, 0.2) - ramp(p, 0.8, 0.9)
       }
+      case "gjalinis": {
+        // brought a little to the centre and tipped forward, so the hatch on top faces the eye
+        // (a long tube: rolling it would swing its back end into the view). The lid opens, the left hand drops the hens in one at a time,
+        // the lid closes and the next hen comes up to the mouth
+        const env = ramp(p, 0, 0.1) - ramp(p, 0.9, 1)
+        A.rz += 0.1 * env
+        A.rx -= 0.12 * env
+        A.px -= 0.05 * env
+        A.py -= 0.01 * env
+        const [o0, o1] = HEN_RELOAD.lidOpen
+        const [c0, c1] = HEN_RELOAD.lidClose
+        // the lid swings right back onto the tube, towards the shooter, out of the way of the hatch
+        P.lid!.rotation.x += 2.7 * (ramp(p, o0, o1) - ramp(p, c0, c1))
+        // the hand comes from low on the left, lifts each hen over the hatch and lets go
+        const from = HEN_FROM
+        const over = HEN_OVER
+        if (drops.length < reloadHens) makeDrops(s, reloadHens)
+        hand.copy(from)
+        drops.forEach((hen, i) => {
+          const d = i < reloadHens ? henDrop(p, reloadHens, i) : 0
+          hen.visible = d > 0 && d < HEN_IN
+          if (d <= 0 || d >= 1) return
+          const lift = clamp(d / HEN_LET_GO, 0, 1)
+          const fall = clamp((d - HEN_LET_GO) / (HEN_IN - HEN_LET_GO), 0, 1)
+          const e = lift * lift * (3 - 2 * lift)
+          hen.position.lerpVectors(from, over, e)
+          hen.position.y -= (over.y - HATCH_TOP + 0.02) * fall * fall
+          hen.rotation.set(-1.2 * fall, 0, Math.sin(d * 40) * 0.25 * (1 - fall))
+          hen.scale.setScalar(DROP_SCALE * (1 - 0.55 * fall))
+          if (d < HEN_LET_GO) hand.copy(hen.position).add(HEN_IN_HAND)
+          else hand.lerpVectors(over, from, ramp(d, HEN_LET_GO, 1)).add(HEN_IN_HAND)
+        })
+        // an empty cannon: the hen comes up to the mouth from inside the tube
+        if (!mouthBefore) P.frico!.position.z += 0.06 * (1 - ramp(p, HEN_RELOAD.mouth, 0.98))
+        return ramp(p, 0.12, 0.2) - ramp(p, 0.78, 0.88)
+      }
       case "miedi": {
         // the tank is filled and pumped
         const env = ramp(p, 0, 0.12) - ramp(p, 0.88, 1)
@@ -307,6 +357,16 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
       }
       default:
         return 0
+    }
+  }
+
+  /** Copies of the hen at the mouth, for the cannon's reload (the detailed hen too, once it is in). */
+  function makeDrops(s: Slot, n: number) {
+    while (drops.length < n) {
+      const hen = s.model.parts.frico!.clone(true)
+      hen.visible = false
+      s.model.root.add(hen)
+      drops.push(hen)
     }
   }
 
@@ -336,7 +396,9 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     s.leftArm.position.copy(s.leftBase)
     A.px = A.py = A.pz = A.rx = A.ry = A.rz = 0
 
-    const reloading = reloadT >= 0
+    const reload = f.reload !== null && f.reload < 1 ? f.reload : null
+    const reloading = reload !== null
+    if (reloading) boltT = -1
     aimB = damp(aimB, f.aiming && !reloading && sw === 0 ? 1 : 0, 16, dt)
     sprintB = damp(sprintB, f.sprinting && !f.aiming && !reloading && swingT < 0 ? 1 : 0, 8, dt)
     crouchB = damp(crouchB, f.crouch ? 1 : 0, 10, dt)
@@ -393,8 +455,13 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     if (s.id === "mandi") s.model.parts.slide!.position.z += 0.03 * Math.max(0, 1 - fireT / 0.07)
     if (s.id === "cramar") s.model.parts.bolt!.position.z += 0.04 * Math.max(0, 1 - fireT / 0.05)
     if (s.id === "lanciafrico" && !reloading) s.model.parts.frico!.visible = loaded
-    // the next hen returns to the cannon's mouth a moment after the shot
-    if (s.id === "gjalinis") s.model.parts.frico!.visible = fireT > 0.45
+    // the hen at the cannon's mouth, and the hens a reload drops in, as the first-person presentation says
+    if (s.id === "gjalinis") {
+      s.model.parts.frico!.visible = f.henAtMouth
+      reloadHens = f.reloadHens
+      if (!reloading) mouthBefore = f.henAtMouth
+      for (const hen of drops) hen.visible = false
+    }
     // the Mulin's barrels turn with the spin; the miedi pumps while spraying
     if (s.id === "mulin") {
       spinA += f.spin * dt * 38
@@ -431,15 +498,8 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
 
     // reload
     let handW = 0
-    if (reloading) {
-      reloadT += dt
-      const p = clamp(reloadT / reloadDur, 0, 1)
-      handW = clamp(animateReload(s, p), 0, 1)
-      if (p >= 1) {
-        reloadT = -1
-        if (s.id === "lanciafrico") loaded = true
-      }
-    }
+    if (reload !== null) handW = clamp(animateReload(s, reload), 0, 1)
+    else if (f.reload !== null && s.id === "lanciafrico") loaded = true
     if (handW > 0.001) s.leftArm.position.lerp(hand, handW)
     s.leftArm.visible = s.model.left !== null || handW > 0.01
 
@@ -502,6 +562,11 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     remodel(id, detailed) {
       // The file may arrive in the middle of a reload: the parts go on their pivots at rest.
       const s = slots[id]
+      // the reload's hens are copies of the hen at the mouth: made again from the new one
+      if (id === "gjalinis") {
+        for (const hen of drops) hen.removeFromParent()
+        drops = []
+      }
       const now = s.rest.map(({ o }) => ({ p: o.position.clone(), r: o.rotation.clone() }))
       for (const { o, p, r } of s.rest) {
         o.position.copy(p)
@@ -521,7 +586,6 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
         return
       }
       pending = id
-      reloadT = -1
       // if it was being raised, lower it again from the same height
       if (switchT < 0) switchT = 0
       else if (switchT >= SWITCH_DOWN) switchT = SWITCH_DOWN * (1 - ramp(switchT, SWITCH_DOWN, SWITCH_DOWN + SWITCH_UP))
@@ -536,12 +600,6 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
       fireT = 0
       if (cur.id === "cjampanili") boltT = 0
       if (cur.id === "lanciafrico") loaded = false
-    },
-    reload(seconds) {
-      if (!cur || cur.id === "mescul") return
-      reloadT = 0
-      reloadDur = Math.max(0.2, seconds)
-      boltT = -1
     },
     throwBomb() {
       tossT = 0

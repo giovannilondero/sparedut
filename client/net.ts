@@ -1,13 +1,9 @@
-/** The connection to the server: typed messages in both directions. */
-import { PROTOCOL_VERSION, type ClientMessage, type ServerMessage } from "../shared/protocol.ts"
+/** The connection to the game server: typed messages in both directions. */
+import { PROTOCOL_VERSION, type ClientMessage } from "../shared/protocol.ts"
+import { HostConnection } from "./connection.ts"
 
-export type Listener = (msg: ServerMessage) => void
-
-export class Net {
+export class Net extends HostConnection {
   private ws: WebSocket | null = null
-  private listeners = new Set<Listener>()
-  private pingTimer = 0
-  rtt = 0
   open = false
   onClose: (() => void) | null = null
 
@@ -19,7 +15,7 @@ export class Net {
       ws.onopen = () => {
         this.open = true
         this.send({ t: "hello", name, version: PROTOCOL_VERSION })
-        this.pingTimer = window.setInterval(() => this.send({ t: "ping", c: performance.now(), rtt: this.rtt }), 1000)
+        this.startPing()
         resolve()
       }
       ws.onerror = () => reject(new Error("Server unreachable."))
@@ -28,23 +24,14 @@ export class Net {
         // Telling `onClose` too would start a second retry for every failed one.
         if (!this.open) return reject(new Error("Server unreachable."))
         this.open = false
-        clearInterval(this.pingTimer)
+        this.stopPing()
         this.onClose?.()
       }
-      ws.onmessage = (e) => {
-        const msg = JSON.parse(e.data as string) as ServerMessage
-        if (msg.t === "pong") this.rtt = this.rtt === 0 ? performance.now() - msg.c : this.rtt * 0.8 + (performance.now() - msg.c) * 0.2
-        for (const l of this.listeners) l(msg)
-      }
+      ws.onmessage = (e) => this.receive(e.data as string)
     })
   }
 
   send(msg: ClientMessage) {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg))
-  }
-
-  on(listener: Listener) {
-    this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
   }
 }

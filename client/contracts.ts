@@ -44,14 +44,18 @@ export interface TurretVisual {
   readonly heat: number
   readonly jammed: boolean
   readonly manned: boolean
-  /** I'm the one using it: the viewmodel draws the gun. */
+  /** I'm the one using it: the gun snaps to my aim, with no lag, and is the only gun I see. */
   readonly mine: boolean
+  /** How far my last shot throws the gun back along its barrel (m); 0 when it is not mine. */
+  readonly recoil: number
 }
 export interface WorldScene {
   /** Call every frame. `t` in seconds since startup. */
   update(dt: number, t: number, frame: WorldFrame): void
   /** Shadows and lights according to quality; can be called again mid-match. */
   setQuality(q: Quality): void
+  /** The muzzle of turret `i`'s mitraie, in the world (for its gunner's tracers and flashes). */
+  turretMuzzle(i: number, target: THREE.Vector3): THREE.Vector3
   /** Framing for the menu background: the camera slowly circles the map. */
   menuCamera(t: number, camera: THREE.PerspectiveCamera): void
   /** Removes the map from the scene and frees geometries, materials and textures. */
@@ -103,6 +107,15 @@ export interface ViewmodelFrame {
   readonly sgnape: boolean
   /** Mulin spin, from 0 to 1. */
   readonly spin: number
+  /** A hen sits at the hen cannon's mouth (from the first-person presentation). */
+  readonly henAtMouth: boolean
+  /** Hens the hen cannon's reload under way drops in (from the first-person presentation). */
+  readonly reloadHens: number
+  /**
+   * How far the reload of the weapon in hand has gone, from 0 to 1, or null when not reloading.
+   * On the match clock, like the clucks and the hens: a pause holds it where it is.
+   */
+  readonly reload: number | null
 }
 export interface Viewmodel {
   readonly scene: THREE.Scene
@@ -111,8 +124,6 @@ export interface Viewmodel {
   /** Replaces a weapon's meshes with a detailed model (`client/models/detailed.ts`). */
   remodel(id: WeaponId, detailed: THREE.Object3D): void
   fire(): void
-  /** Reload duration in seconds. */
-  reload(seconds: number): void
   throwBomb(): void
   update(dt: number, frame: ViewmodelFrame): void
   setVisible(visible: boolean): void
@@ -152,6 +163,7 @@ export type SoundName =
   | "beam_miedi"
   | "launch_gjaline"
   | "boom_gjaline"
+  | "cluck_gjaline"
   | "shot_mitraie"
   | "turret_on"
   | "turret_hot"

@@ -8,7 +8,7 @@
  */
 import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId, Team } from "../shared/map.ts"
-import type { ErrorCode } from "../shared/protocol.ts"
+import type { Access, ErrorCode, Reach } from "../shared/protocol.ts"
 import type { WeaponId } from "../shared/weapons.ts"
 
 export type Lang = "fur" | "it"
@@ -17,11 +17,12 @@ type Fn<A extends unknown[] = [string]> = (...args: A) => string
 
 /** Static HTML texts: `data-t="key"` (innerHTML) and `data-t-ph="key"` (placeholder). */
 type StaticKey =
-  | "title" | "kicker" | "sub" | "nameLabel" | "namePh" | "quick" | "quickSub" | "create" | "createSub" | "join" | "joinSub"
-  | "lanTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "visLabel" | "visLan" | "visCode"
+  | "title" | "kicker" | "sub" | "nameLabel" | "namePh" | "oneTap" | "oneTapSub" | "create" | "createSub" | "join" | "joinSub"
+  | "roomsTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "reachLabel" | "reachLan" | "reachOnline" | "reachOffline"
   | "ff" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
   | "qHigh" | "autoRes" | "showInfo" | "invert" | "keys" | "vocabTitle" | "connecting" | "chatPh" | "deathTitle" | "deathHint"
-  | "clickplay" | "language" | "mapLabel"
+  | "clickplay" | "language" | "mapLabel" | "crouchMode" | "crouchHold" | "crouchToggle"
+  | "accessLabel" | "accessOpen" | "accessPassword" | "passwordLabel" | "passwordTitle"
 
 export interface Strings {
   readonly static: Record<StaticKey, string>
@@ -36,7 +37,17 @@ export interface Strings {
   readonly errors: Record<ErrorCode, string>
   readonly menu: {
     readonly needName: string
-    readonly lanEmpty: string
+    readonly roomsEmpty: string
+    /** The chip on a room in the list. */
+    readonly reach: Record<Reach, string>
+    /** A full room in the list: shown, not selectable. */
+    readonly full: string
+    /** The mark on a room with a password in the list, read out by screen readers. */
+    readonly passwordRoom: string
+    /** The password prompt: which room asks for it. */
+    readonly passwordFor: Fn
+    /** A password the create form or the prompt refuses before sending it. */
+    readonly passwordBad: string
     readonly botsNone: string
     readonly minutes: Fn<[number]>
     readonly tag: { readonly primary: string; readonly power: string; readonly melee: string; readonly pistol: string }
@@ -53,6 +64,8 @@ export interface Strings {
     readonly down: string
     readonly lost: string
     readonly lostRetry: string
+    /** The host of an Offline room did not start in this browser. */
+    readonly offlineFailed: string
   }
   readonly hud: {
     readonly over: string
@@ -121,8 +134,8 @@ export interface Strings {
     readonly code: string
     readonly copy: string
     readonly copied: string
-    readonly visLan: string
-    readonly visCode: string
+    readonly reach: Record<Reach, string>
+    readonly access: Record<Access, string>
     readonly start: string
     readonly restart: string
     readonly hostOnly: string
@@ -247,22 +260,28 @@ const fur: Strings = {
     sub: `Bataie tra <b class="ben">Benandants</b> e <b class="mal">Malandants</b> sot dal Cjampanili`,
     nameLabel: "Il to non",
     namePh: "Toni di Glemone",
-    quick: "Zuie cuintri i bot",
-    quickSub: "Partide svelte cuintri il computer",
+    oneTap: "Zuie cuintri i bot",
+    oneTapSub: "Offline cuintri il computer, ancje cence server",
     create: "Cree une partide",
-    createSub: "In linie cul codiç o te rêt locâl",
+    createSub: "Offline, te rêt locâl o in linie",
     join: "Jentre cul codiç",
     joinSub: "Âstu un codiç di 4 letaris?",
-    lanTitle: "Partidis te rêt locâl <small>(stesse rêt)</small>",
+    roomsTitle: "Partidis viertis <small>(prime la tô rêt, po in linie)</small>",
     armarie: "Armarie",
     settings: "Impostazions",
     vocab: "Vocabolari",
     minutesLabel: "Durade",
     botsLabel: "Bot par scuadre",
     levelLabel: "Bravure dai bot",
-    visLabel: "Cui che le viôt",
-    visLan: "Rêt locâl (in liste) + codiç",
-    visCode: "Dome cul codiç (in linie)",
+    reachLabel: "Puartade",
+    reachLan: "LAN · dome te stesse rêt",
+    reachOnline: "In linie · par ducj",
+    reachOffline: "Offline (cuintri i bot)",
+    accessLabel: "Acès",
+    accessOpen: "Viert",
+    accessPassword: "Cun password",
+    passwordLabel: "Password <small>(di 1 a 32 caratars)</small>",
+    passwordTitle: "Al covente la password",
     ff: "Fûc amì (i compagns si fasin mâl)",
     back: "Indaûr <kbd>Esc</kbd>",
     createGo: "Cree e jentre",
@@ -279,6 +298,9 @@ const fur: Strings = {
     autoRes: "Risoluzion dinamiche (e sbasse la risoluzion se i FPS a calin)",
     showInfo: "Mostre lis informazions su lis prestazions (FPS, ping…) · ancje cul tast <kbd>F3</kbd>",
     invert: "Invertìs l'ass verticâl",
+    crouchMode: "Sbassâsi",
+    crouchHold: "tignint fracât il tast",
+    crouchToggle: "fracant une volte (torne a fracâ par jevâ sù)",
     keys: keysHtml(KEYS_FUR),
     vocabTitle: "Vocabolari furlan-talian",
     connecting: "Conession…",
@@ -366,11 +388,19 @@ const fur: Strings = {
     notFound: "Nissune partide cun chest codiç. Controle, o domande al host.",
     lanOnly: "Cheste partide e je dome pe rêt locâl di cui che le à creade.",
     full: "Partide plene: o sin za in sedis, come a une sagre.",
-    busy: "Masse partidis viertis sul server: torne a provâ ca di un pôc."
+    busy: "Masse partidis viertis sul server: torne a provâ ca di un pôc.",
+    passwordRequired: "Cheste partide e domande une password.",
+    wrongPassword: "Password sbaliade. Torne a provâ.",
+    tooManyAttempts: "Masse password sbaliadis: spiete un pôc e torne a provâ."
   },
   menu: {
     needName: "Prime il non!",
-    lanEmpty: "Nissune partide te rêt. Creine une!",
+    roomsEmpty: "Nissune partide viarte. Creine une!",
+    reach: { offline: "Offline", lan: "LAN", online: "In linie" },
+    full: "Plene",
+    passwordRoom: "Cun password",
+    passwordFor: (code) => `La partide ${code} e domande une password.`,
+    passwordBad: "La password e à di vê di 1 a 32 caratars.",
     botsNone: "Nissun (dome personis)",
     minutes: (n) => `${n} minûts`,
     tag: {
@@ -391,7 +421,8 @@ const fur: Strings = {
     retry: "Server no rivât. O torni a provâ…",
     down: "Il server nol rispuint. Isal impiât? (pnpm dev)",
     lost: "Conession pierdude. Mandi!",
-    lostRetry: "Conession pierdude: o torni a provâ…"
+    lostRetry: "Conession pierdude: o torni a provâ…",
+    offlineFailed: "No rivi a inviâ la partide offline: torne a cjamâ la pagjine."
   },
   hud: {
     over: "FIN",
@@ -496,8 +527,8 @@ const fur: Strings = {
     code: "Codiç de partide",
     copy: "Copie il link di invît",
     copied: "Copiât! Mandi a ducj",
-    visLan: "Visibil te rêt locâl",
-    visCode: "Dome cul codiç",
+    reach: { offline: "Offline · dome tu cuintri i bot", lan: "LAN · dome te stesse rêt", online: "In linie · par ducj" },
+    access: { open: "Viert", password: "Cun password" },
     start: "Fâs partî la partide",
     restart: "Torne a scomençâ",
     hostOnly: "L'host (👑) al fâs partî la partide.",
@@ -564,22 +595,28 @@ const it: Strings = {
     sub: `Battaglia tra <b class="ben">Benandanti</b> e <b class="mal">Malandanti</b> sotto il campanile`,
     nameLabel: "Il tuo nome",
     namePh: "Toni di Gemona",
-    quick: "Gioca contro i bot",
-    quickSub: "Partita veloce contro il computer",
+    oneTap: "Gioca contro i bot",
+    oneTapSub: "Offline contro il computer, anche senza server",
     create: "Crea una partita",
-    createSub: "Online con codice o in rete locale",
+    createSub: "Offline, in rete locale o online",
     join: "Entra con codice",
     joinSub: "Hai un codice di 4 lettere?",
-    lanTitle: "Partite in rete locale <small>(stessa rete)</small>",
+    roomsTitle: "Partite aperte <small>(prima la tua rete, poi online)</small>",
     armarie: "Armeria",
     settings: "Impostazioni",
     vocab: "Vocabolario",
     minutesLabel: "Durata",
     botsLabel: "Bot per squadra",
     levelLabel: "Bravura dei bot",
-    visLabel: "Chi la vede",
-    visLan: "Rete locale (in lista) + codice",
-    visCode: "Solo con codice (online)",
+    reachLabel: "Portata",
+    reachLan: "LAN · solo sulla stessa rete",
+    reachOnline: "Online · per tutti",
+    reachOffline: "Offline (contro i bot)",
+    accessLabel: "Accesso",
+    accessOpen: "Aperto",
+    accessPassword: "Con password",
+    passwordLabel: "Password <small>(da 1 a 32 caratteri)</small>",
+    passwordTitle: "Serve la password",
     ff: "Fuoco amico (i compagni si fanno male)",
     back: "Indietro <kbd>Esc</kbd>",
     createGo: "Crea ed entra",
@@ -596,6 +633,9 @@ const it: Strings = {
     autoRes: "Risoluzione dinamica (abbassa la risoluzione se gli FPS calano)",
     showInfo: "Mostra info prestazioni (FPS, ping…) · anche col tasto <kbd>F3</kbd>",
     invert: "Inverti asse verticale",
+    crouchMode: "Accucciarsi",
+    crouchHold: "tenendo premuto il tasto",
+    crouchToggle: "premendo una volta (ripremi per alzarti)",
     keys: keysHtml(KEYS_IT),
     vocabTitle: "Vocabolario friulano-italiano",
     connecting: "Connessione…",
@@ -683,11 +723,19 @@ const it: Strings = {
     notFound: "Nessuna partita con questo codice. Controlla, o chiedi all'host.",
     lanOnly: "Questa partita è solo per la rete locale di chi l'ha creata.",
     full: "Partita piena: siamo già in sedici, come a una sagra.",
-    busy: "Troppe partite aperte sul server: riprova tra poco."
+    busy: "Troppe partite aperte sul server: riprova tra poco.",
+    passwordRequired: "Questa partita chiede una password.",
+    wrongPassword: "Password sbagliata. Riprova.",
+    tooManyAttempts: "Troppe password sbagliate: aspetta un attimo e riprova."
   },
   menu: {
     needName: "Prima il nome!",
-    lanEmpty: "Nessuna partita in rete. Creane una!",
+    roomsEmpty: "Nessuna partita aperta. Creane una!",
+    reach: { offline: "Offline", lan: "LAN", online: "Online" },
+    full: "Piena",
+    passwordRoom: "Con password",
+    passwordFor: (code) => `La partita ${code} chiede una password.`,
+    passwordBad: "La password deve avere da 1 a 32 caratteri.",
     botsNone: "Nessuno (solo persone)",
     minutes: (n) => `${n} minuti`,
     tag: {
@@ -708,7 +756,8 @@ const it: Strings = {
     retry: "Server non raggiunto. Riprovo…",
     down: "Il server non risponde. È acceso? (pnpm dev)",
     lost: "Connessione persa. Mandi!",
-    lostRetry: "Connessione persa: riprovo…"
+    lostRetry: "Connessione persa: riprovo…",
+    offlineFailed: "Non riesco ad avviare la partita offline: ricarica la pagina."
   },
   hud: {
     over: "FINE",
@@ -824,8 +873,8 @@ const it: Strings = {
     code: "Codice partita",
     copy: "Copia il link d'invito",
     copied: "Copiato! Mandi a tutti",
-    visLan: "Visibile in rete locale",
-    visCode: "Solo con codice",
+    reach: { offline: "Offline · solo tu contro i bot", lan: "LAN · solo sulla stessa rete", online: "Online · per tutti" },
+    access: { open: "Aperto", password: "Con password" },
     start: "Fai partire la partita",
     restart: "Ricomincia",
     hostOnly: "L'host (👑) fa partire la partita.",

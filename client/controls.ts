@@ -4,6 +4,7 @@
  * Short presses (a click between two ticks) are held until the next tick.
  */
 import { BUTTON, type ButtonName } from "../shared/input.ts"
+import type { Snapshot } from "../shared/protocol.ts"
 import type { WeaponId } from "../shared/weapons.ts"
 
 const KEYS: Record<string, ButtonName> = {
@@ -38,12 +39,29 @@ const PAD_KEYS: Readonly<Record<number, string>> = {
   15: "Digit3",
   17: "KeyB"
 }
+export type CrouchMode = "hold" | "toggle"
+
 const PAD = { triangle: 3, l2: 6, r2: 7, options: 9, l3: 10 } as const
 const STICK_DEAD = 0.15
 const TRIGGER_ON = 0.35
 /** Maximum stick look speed (rad/s), before sensitivity. */
 const LOOK_YAW = 3.4
 const LOOK_PITCH = 2.4
+
+/** What the controls follow of the player, from one snapshot. */
+export interface Tracked {
+  readonly alive: boolean
+  readonly mounted: boolean
+  /**
+   * A new life began since the last snapshot. A match start kills and respawns everyone within
+   * one tick, which no snapshot shows as a death; the spawn event is never missed.
+   */
+  readonly spawned: boolean
+}
+
+/** The player `me` in a snapshot, as the controls follow it. */
+export const trackedIn = (s: Snapshot, me: string, mounted: boolean): Tracked | null =>
+  s.you && { alive: s.you.alive, mounted, spawned: s.ev.some((e) => e.t === "spawn" && e.s === me) }
 
 export interface ControlsHandlers {
   onSlot: (slot: 1 | 2 | 3 | 4) => void
@@ -67,6 +85,9 @@ export class Controls {
   kick = 0
   private held = new Set<ButtonName>()
   private latched = 0
+  private _crouchMode: CrouchMode = "hold"
+  /** With crouch as a toggle: whether the player stays crouched. */
+  private crouched = false
   private keys = new Set<string>()
   enabled = true
   /** Playing with the pad: no mouse lock to request. */
@@ -134,8 +155,37 @@ export class Controls {
   /** A narrow FOV (scope) slows down aiming. */
   zoomScale = 1
 
-  private press(b: ButtonName) {
-    this.held.add(b)
+  /** Hold: crouched while the key is down. Toggle: a press crouches, the next stands. */
+  get crouchMode() {
+    return this._crouchMode
+  }
+
+  set crouchMode(mode: CrouchMode) {
+    if (mode !== this._crouchMode) this.crouched = false
+    this._crouchMode = mode
+  }
+
+  /**
+   * What the player is doing, from each snapshot (null once out of a match).
+   * A toggled crouch never outlives a life, a turret or a match: the player
+   * respawns standing and dismounts standing.
+   */
+  track(player: Tracked | null) {
+    if (!player || !player.alive || player.mounted || player.spawned) this.crouched = false
+  }
+
+  /**
+   * A button pressed now: it reaches the next tick even if released before it.
+   * Keys stay held until their keyup; the pad's held buttons are read by `poll`.
+   */
+  private press(b: ButtonName, pad = false) {
+    if (b === "crouch" && this._crouchMode === "toggle") {
+      this.crouched = !this.crouched
+      return
+    }
+    // Jumping or sprinting stands up in the same input, so it happens at once.
+    if (b === "jump" || b === "sprint") this.crouched = false
+    if (!pad) this.held.add(b)
     this.latched |= BUTTON[b]
   }
 
@@ -199,7 +249,7 @@ export class Controls {
         this.handlers.onKey(code, true)
         if (this.enabled) {
           const b = KEYS[code]
-          if (b) this.press(b)
+          if (b) this.press(b, true)
           this.shortcut(code)
         }
       } else if (!down[n] && this.padWas[n]) this.handlers.onKey(code, false)
@@ -216,7 +266,7 @@ export class Controls {
     }
     for (const [i, code] of Object.entries(PAD_KEYS)) {
       const b = KEYS[code]
-      if (b && down[Number(i)]) this.padHeld.add(b)
+      if (b && down[Number(i)] && !(b === "crouch" && this._crouchMode === "toggle")) this.padHeld.add(b)
     }
     if (down[PAD.r2]) this.padHeld.add("fire")
     if (down[PAD.l2]) this.padHeld.add("aim")
@@ -225,6 +275,7 @@ export class Controls {
 
     this.padMove = { mx: left.x, mz: left.y === 0 ? 0 : -left.y }
     if (sprint) this.padSprint = !this.padSprint
+    if (sprint && this.padSprint) this.crouched = false
     if (this.padMove.mz < 0.3) this.padSprint = false
     if (this.padSprint) this.padHeld.add("sprint")
 
@@ -281,11 +332,12 @@ export class Controls {
     let b = 0
     for (const name of this.held) b |= BUTTON[name]
     for (const name of this.padHeld) b |= BUTTON[name]
+    if (this.crouched) b |= BUTTON.crouch
     return b
   }
 
   isHeld(b: ButtonName) {
-    return this.held.has(b) || this.padHeld.has(b)
+    return this.held.has(b) || this.padHeld.has(b) || (b === "crouch" && this.crouched)
   }
 }
 

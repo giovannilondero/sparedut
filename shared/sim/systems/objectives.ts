@@ -37,6 +37,7 @@ export const PlayObjectives = Game.System(
     machines: { match: Game.System.machine(Match) }
   },
   ({ queries, resources, events, machines }) => {
+    const { data } = queries.players
     const rules = resources.rules.get()
     const phase = machines.match.get()._tag
     if (phase === "Over") return
@@ -44,10 +45,10 @@ export const PlayObjectives = Game.System(
     const { flagBases: FLAG_BASES, hill: HILL, track } = MAPS[rules.map]
     const players = queries.players.each().map((m) => ({
       m,
-      session: m.data.player.get().session,
-      team: m.data.team.get(),
-      body: m.data.motion.get().body,
-      alive: m.data.life.get()._tag === "Alive"
+      session: data.player.get(m).session,
+      team: data.team.get(m),
+      body: data.motion.get(m).body,
+      alive: data.life.get(m)._tag === "Alive"
     }))
     const near = (b: { x: number; y: number; z: number }, at: readonly [number, number, number], r: number) => {
       const dx = b.x - at[0]
@@ -82,7 +83,7 @@ export const PlayObjectives = Game.System(
             if (near(carrier.body, FLAG_BASES[home], TOUCH + 0.4) && flags[home]._tag === "base") {
               flags[team] = { _tag: "base" }
               if (live) resources.score.update((s) => ({ ...s, [home]: s[home] + 1 }))
-              carrier.m.data.stats.update((s) => ({ ...s, caps: s.caps + 1, score: s.score + 300 }))
+              data.stats.update(carrier.m, (s) => ({ ...s, caps: s.caps + 1, score: s.score + 300 }))
               events.out.emit({ t: "flag", team, a: "captured", s: carrier.session })
             }
             break
@@ -93,7 +94,7 @@ export const PlayObjectives = Game.System(
             const enemy = enemies.find((p) => near(p.body, at, TOUCH))
             if (friend) {
               flags[team] = { _tag: "base" }
-              friend.m.data.stats.update((s) => ({ ...s, score: s.score + 50 }))
+              data.stats.update(friend.m, (s) => ({ ...s, score: s.score + 50 }))
               events.out.emit({ t: "flag", team, a: "returned", s: friend.session })
             } else if (enemy) {
               flags[team] = { _tag: "carried", by: enemy.session }
@@ -119,7 +120,7 @@ export const PlayObjectives = Game.System(
       const ticks = owner && !contested ? (owner === hill.owner ? hill.ticks + 1 : 1) : 0
       if (owner && !contested && ticks % 60 === 0) {
         if (live) resources.score.update((s) => ({ ...s, [owner]: s[owner] + 1 }))
-        for (const p of inside) p.m.data.stats.update((s) => ({ ...s, score: s.score + 5 }))
+        for (const p of inside) data.stats.update(p.m, (s) => ({ ...s, score: s.score + 5 }))
       }
       resources.hill.set({ owner, contested, ticks })
     }
@@ -149,7 +150,7 @@ export const PlayObjectives = Game.System(
       else if (now !== was && now !== "still") events.out.emit({ t: "cart", a: now })
       // Pushers earn points: two per second.
       if (!contested && idle === 0 && Math.floor(d / (CART.speed / 2)) !== Math.floor(cart.d / (CART.speed / 2))) {
-        for (const p of pushers) p.m.data.stats.update((s) => ({ ...s, score: s.score + 1 }))
+        for (const p of pushers) data.stats.update(p.m, (s) => ({ ...s, score: s.score + 1 }))
       }
       if (live) resources.score.set({ benandanti: Math.floor((d / Math.max(1, length)) * 100), malandanti: 0 })
       resources.cart.set(next)

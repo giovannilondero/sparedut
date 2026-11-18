@@ -6,7 +6,7 @@ import { MODE_IDS } from "../shared/folklore.ts"
 for (const mode of MODE_IDS) {
   test(`bots play a match: ${mode}`, async () => {
     await initPhysics()
-    const room = new Room("TEST", "nessuno", "Test", "lan", { mode, map: "glemone", minutes: 10, visibility: "code", level: "pari", ff: false })
+    const room = new Room("TEST", "nessuno", "Test", "lan", { mode, map: "glemone", minutes: 10, reach: "online", access: { kind: "open" }, level: "pari", ff: false })
     room.fillBots(6)
     room.start()
     const started = performance.now()

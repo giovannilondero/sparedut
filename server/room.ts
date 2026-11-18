@@ -15,8 +15,10 @@ import {
   type RoomSummary,
   type ServerMessage,
   type SnapOther,
-  type Snapshot,
-  type Visibility
+  type Access,
+  type Reached,
+  type RoomAccess,
+  type Snapshot
 } from "../shared/protocol.ts"
 import { createSim, type GameEvent, type Sim, type WorldView } from "../shared/sim/index.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
@@ -43,11 +45,11 @@ export interface Member {
   credit: number
 }
 
-export interface RoomSettings {
+/** A room's settings. Read the password of its access only through `admits`. */
+export type RoomSettings = Reached<RoomAccess> & {
   readonly mode: ModeId
   readonly map: MapId
   readonly minutes: number
-  readonly visibility: Visibility
   readonly level: BotLevel
   readonly ff: boolean
 }
@@ -60,6 +62,12 @@ export class Room {
   readonly members = new Map<string, Member>()
   private bots = new Map<string, BotBrain>()
   private events: GameEvent[] = []
+  /**
+   * Joins the simulation has not taken yet: it takes them at the next step. A member who leaves
+   * before then (a bot added and removed while an Offline room is paused) never enters it; within
+   * one step the simulation handles leaves before joins, and would keep them.
+   */
+  private readonly arriving = new Map<string, () => void>()
   private world: WorldView
   level: BotLevel
 
@@ -101,7 +109,7 @@ export class Room {
     }
     const team = this.smallerTeam()
     this.members.set(id, { id, name, team, bot: false, send, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
-    this.sim.join(id, name, team, false, primary)
+    this.arriving.set(id, () => this.sim.join(id, name, team, false, primary))
     return true
   }
 
@@ -114,7 +122,7 @@ export class Room {
     const primary = primaries[botCounter % primaries.length]
     this.members.set(id, { id, name, team, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
     this.bots.set(id, new BotBrain(id, this.level, navGraph(this.physics), this.physics, botCounter))
-    this.sim.join(id, name, team, true, primary)
+    this.arriving.set(id, () => this.sim.join(id, name, team, true, primary))
   }
 
   removeBot(team: Team) {
@@ -132,7 +140,7 @@ export class Room {
     if (!m) return
     this.members.delete(id)
     this.bots.delete(id)
-    this.sim.leave(id)
+    if (!this.arriving.delete(id)) this.sim.leave(id)
     if (this.hostId === id) {
       const next = this.humans[0]
       if (next) {
@@ -182,6 +190,8 @@ export class Room {
 
   /** One tick: inputs, bots, simulation. */
   step() {
+    for (const join of this.arriving.values()) join()
+    this.arriving.clear()
     // Each command is one step: deliver the ones that arrived, up to STEPS_PER_TICK
     // (the rest stays queued for the next tick). No repeated commands: the server
     // would take a step the client never took, and the camera would snap.
@@ -301,13 +311,19 @@ export class Room {
     for (const m of this.members.values()) m.send?.(msg)
   }
 
+  /** Whether a password lets a player in: always for an open room. */
+  admits(password: string | undefined): boolean {
+    const s = this.settings
+    return s.reach === "offline" || s.access.kind !== "password" || password === s.access.password
+  }
+
   summary(): RoomSummary {
     return {
       code: this.code,
       host: this.hostName,
       mode: this.settings.mode,
       map: this.settings.map,
-      visibility: this.settings.visibility,
+      ...shownReach(this.settings),
       players: this.humans.length,
       bots: this.bots.size,
       max: MAX_PLAYERS,
@@ -341,3 +357,6 @@ export function newCode(taken: (code: string) => boolean) {
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 const r3 = (n: number) => Math.round(n * 1000) / 1000
+
+/** A room's reach as the room list shows it: the access's kind, never its password. */
+const shownReach = (s: Reached<RoomAccess>): Reached<Access> => (s.reach === "offline" ? { reach: s.reach } : { reach: s.reach, access: s.access.kind })
