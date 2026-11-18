@@ -1,0 +1,28 @@
+/* Prototype A, the sheet: the match dialog's look, one scrolling column, actions pinned below. */
+.proto-a { display: flex; align-items: center; justify-content: center; padding: max(8px, env(safe-area-inset-top)) max(8px, 3vw) max(8px, env(safe-area-inset-bottom)); block-size: 100dvh; }
+.a-sheet { inline-size: min(100%, 880px); max-block-size: 100%; display: flex; flex-direction: column; overflow: clip;
+  background: rgba(16, 13, 10, 0.94); border: 1px solid var(--stone-line); border-radius: 14px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  padding: clamp(12px, 2.5vw, 18px) clamp(12px, 3vw, 22px); }
+.a-head { flex: none; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; margin-block-end: 8px; }
+.a-body { flex: 1 1 auto; min-block-size: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 14px; padding-block-end: 8px; }
+.a-who, .a-mine { display: flex; flex-direction: column; gap: 12px; }
+/* The player's own choice comes right after the teams on a phone; the chat waits at the end. */
+.a-who { display: contents; }
+.a-who > .mu-code, .a-who > .mu-live { order: 1; }
+.a-roster { order: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.a-mine { order: 3; }
+.a-who > .mu-host, .a-who > .host-only { order: 4; }
+.a-who > h3, .a-who > .mu-chat { order: 5; }
+.mu-chat-log { max-block-size: 8.5rem; }
+.a-foot { flex: none; border-block-start: 1px solid var(--stone-line); padding-block-start: 10px; }
+
+/* A wide, short screen (a phone on its side) or a desktop: two columns, each scrolling on its own. */
+@media (min-width: 700px) and (min-aspect-ratio: 4/3), (min-width: 1000px) {
+  .a-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 18px; overflow: hidden; }
+  .a-who, .a-mine { display: flex; overflow-y: auto; min-block-size: 0; padding-inline-end: 4px; }
+  .a-who > * { order: 0 !important; }
+}
+@media (min-width: 1000px) { .a-sheet { inline-size: min(100%, 1040px); max-block-size: min(100%, 820px); } .mu-chat-log { max-block-size: 11rem; } }
+/* On a phone on its side the picker's rows go narrower. */
+@media (max-height: 500px) { .a-head { margin-block-end: 4px; } .mu-code .invite { font-size: 26px; } .mu-picker-rows { grid-template-columns: 1fr; } }
+@media (max-height: 500px) { .a-head { flex-wrap: nowrap; } .a-head .mu-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }

@@ -1,0 +1,61 @@
+/* Prototype B, the field: teams on the flanks, the player's choice in the middle. */
+.proto-b { block-size: 100dvh; padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+.b-field { block-size: 100%; display: grid; gap: 10px 14px; min-block-size: 0;
+  /* Upright phone: header, the two flanks side by side, the choice; host and chat further down. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  grid-template-areas: "head head" "ben mal" "mid mid";
+  padding-block-end: 132px;
+  overflow-y: auto; }
+.b-head { grid-area: head; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 16px; }
+.b-head .mu-live { flex: 1 1 14rem; }
+.b-title { flex: 1 1 100%; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+@media (min-width: 1000px) { .b-title { flex: 0 1 auto; } }
+@media (max-height: 500px) { .b-title { flex: 0 1 auto; } .b-head { flex-wrap: nowrap; } .b-head .mu-code { flex: 1 1 auto; } }
+.b-ben { grid-area: ben; }
+.b-mal { grid-area: mal; }
+.b-flank { min-inline-size: 0; }
+.b-flank .mu-member { font-size: 13px; padding-block: 3px; }
+.b-mid { grid-area: mid; display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 14px; background: var(--stone); border: 1px solid var(--stone-line); }
+.b-mid .mu-picker { flex: 1 1 auto; align-content: start; }
+/* Upright phone: the actions stay under the thumb whatever is scrolled. */
+.b-mid-foot { position: fixed; z-index: 2; inset-inline: 0; inset-block-end: 0; padding: 10px max(10px, env(safe-area-inset-left)) max(10px, env(safe-area-inset-bottom)); background: rgba(20, 17, 14, 0.97); border-block-start: 1px solid var(--stone-line); }
+.b-side { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 12px; }
+.b-chat .mu-chat-log { max-block-size: 8rem; }
+.proto-b .mu-switch { font-size: 13px; padding: 6px 8px; }
+
+/* A phone on its side: the flanks stacked in a narrow left column, the choice in the middle, chat and host on the right. */
+@media (max-height: 500px) and (min-aspect-ratio: 4/3) {
+  .b-field { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.6fr) minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "head head head" "ben mid side" "mal mid side"; overflow: hidden; padding-block-end: 0; }
+  .b-head .invite { font-size: 22px; }
+  .b-head .mu-title { font-size: 20px; }
+  .b-flank { overflow-y: auto; }
+  .b-mid { overflow-y: auto; min-block-size: 0; padding: 8px 10px; }
+  .b-mid .mu-chosen .blurb, .b-mid .mu-chosen .tag { display: none; }
+  .b-mid .mu-chosen b { font-size: 20px; }
+  .b-mid-foot { position: sticky; margin: 0 -10px -8px; padding: 8px 10px; }
+  .b-side { grid-column: auto; grid-area: side; overflow-y: auto; }
+  .b-chat .mu-chat-log { max-block-size: 7rem; }
+  .proto-b .mu-actions { flex-wrap: nowrap; }
+  .proto-b .mu-actions .mu-note { flex: 1 1 auto; }
+}
+
+/* A desktop: three columns, Benandants | choice | Malandants, host and chat under the middle. */
+@media (min-width: 1000px) {
+  .b-field { grid-template-columns: minmax(14rem, 1fr) minmax(0, 2.2fr) minmax(14rem, 1fr); grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "head head head" "ben mid mal" "ben side mal"; overflow: hidden; padding-block-end: 0; max-inline-size: 1500px; margin-inline: auto; }
+  .b-flank { padding: 12px; border-radius: 14px; background: color-mix(in oklch, var(--night) 70%, transparent); border: 1px solid var(--stone-line); overflow-y: auto; }
+  .b-flank .mu-member { font-size: 14px; padding-block: 6px; }
+  .b-mid { overflow-y: auto; min-block-size: 0; }
+  .b-mid .mu-picker-tiles { grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); gap: 8px; }
+  .b-mid .mu-tiles { padding: 12px; gap: 4px; }
+  .b-mid .mu-tiles b { font-size: 18px; }
+  .b-mid .mu-nums { font-size: 13px; }
+  .b-mid-foot { position: sticky; margin: 0 -12px -12px; padding: 10px 12px; border-radius: 0 0 14px 14px; }
+  .b-side { grid-column: auto; grid-area: side; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+  .b-chat .mu-chat-log { max-block-size: 9rem; }
+}
+
+/* On a phone "leave" sits in the header, so the actions keep one row under the thumb. */
+.b-leave { margin-inline-start: auto; padding: 4px 10px; font-size: 13px; }
+.b-mid-foot .mu-leave { display: none; }
+@media (min-width: 1000px) { .b-leave { display: none; } .b-mid-foot .mu-leave { display: revert; } }

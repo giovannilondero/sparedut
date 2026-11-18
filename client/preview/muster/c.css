@@ -1,0 +1,52 @@
+/* Prototype C, the tabs: one panel at a time on a phone, all four side by side on a desktop. */
+.proto-c { block-size: 100dvh; }
+.c-shell { block-size: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; grid-template-areas: "head" "panels" "foot" "tabs"; }
+.c-head { grid-area: head; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: max(10px, env(safe-area-inset-top)) 14px 8px; border-block-end: 1px solid var(--stone-line); background: rgba(16, 13, 10, 0.9); }
+.c-head .mu-live { flex: 1 1 100%; }
+.c-panels { grid-area: panels; min-block-size: 0; }
+.c-panel { display: none; block-size: 100%; overflow-y: auto; padding: 12px 14px; flex-direction: column; gap: 12px; }
+.c-panel.shown { display: flex; }
+.c-ph { display: none; margin: 0; font-family: var(--serif); font-size: 18px; color: var(--gold); }
+.c-roster { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.c-chat .mu-chat { flex: 1 1 auto; justify-content: flex-end; }
+.c-chat .mu-chat-log { flex: 1 1 auto; }
+.c-foot { grid-area: foot; padding: 8px 12px; border-block-start: 1px solid var(--stone-line); background: rgba(16, 13, 10, 0.96); }
+.c-tabs { grid-area: tabs; display: grid; grid-template-columns: repeat(4, 1fr); padding-block-end: env(safe-area-inset-bottom); background: #0f0c0a; border-block-start: 1px solid var(--stone-line); }
+.c-tabs button { border: 0; border-radius: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; min-block-size: 54px; font-size: 12px; color: var(--muted); }
+.c-tabs button i { font-style: normal; font-size: 18px; line-height: 1; }
+.c-tabs button[aria-selected="true"] { color: var(--gold); box-shadow: inset 0 3px 0 var(--gold); }
+
+/* A phone on its side: the tabs become a rail on the left; the actions sit under the panel. */
+@media (max-height: 500px) and (min-aspect-ratio: 4/3) {
+  .c-shell { grid-template-columns: 76px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: "tabs head" "tabs panels" "tabs foot"; }
+  .c-head { padding: 6px 14px; }
+  .c-head .mu-title { font-size: 20px; }
+  .c-head .mu-live { flex: 1 1 auto; font-size: 15px; } .c-head .mu-live b { font-size: 20px; }
+  .c-tabs { grid-template-columns: 1fr; grid-auto-rows: 1fr; border-block-start: 0; border-inline-end: 1px solid var(--stone-line); padding-inline-start: env(safe-area-inset-left); }
+  .c-tabs button { min-block-size: 0; }
+  .c-tabs button[aria-selected="true"] { box-shadow: inset 3px 0 0 var(--gold); }
+  .c-foot { padding: 6px 12px; }
+  .proto-c .mu-actions { flex-wrap: nowrap; }
+  .proto-c .mu-actions .mu-note { flex: 1 1 auto; }
+  .c-primary .mu-picker-cards { grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); }
+}
+
+/* A desktop: no tabs; teams, primary, chat and room as four columns, the actions across the bottom. */
+@media (min-width: 1000px) {
+  .c-shell { grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: "head" "panels" "foot"; max-inline-size: 1600px; margin-inline: auto; }
+  .c-tabs { display: none; }
+  .c-head { background: none; padding: 18px 22px 10px; }
+  .c-panels { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.6fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; grid-template-areas: "teams primary chat" "teams primary room"; gap: 14px; padding: 12px 22px; }
+  .c-panel { display: flex; border-radius: 14px; background: var(--stone); border: 1px solid var(--stone-line); }
+  .c-teams { grid-area: teams; } .c-primary { grid-area: primary; } .c-chat { grid-area: chat; } .c-room { grid-area: room; block-size: auto; }
+  .c-ph { display: block; }
+  .c-primary .mu-picker-cards { grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
+  .c-roster { grid-template-columns: 1fr; }
+  .c-foot { padding: 12px 22px 18px; border: 0; background: none; }
+  .c-foot .mu-actions { max-inline-size: 760px; margin-inline-start: auto; }
+}
+
+/* On a phone "leave" sits in the header, so the actions keep one row under the thumb. */
+.c-leave { margin-inline-start: auto; padding: 4px 10px; font-size: 13px; }
+.c-foot .mu-leave { display: none; }
+@media (min-width: 1000px) { .c-leave { display: none; } .c-foot .mu-leave { display: revert; } }

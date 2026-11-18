@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Sparedût — Muster prototypes</title>
+    <link rel="stylesheet" href="../../style.css" />
+    <link rel="stylesheet" href="./kit.css" />
+    <!-- Throwaway (ticket #77, spec #72): the owner picks one layout, then this folder is deleted. -->
+    <style>
+      #app { display: block; padding: clamp(14px, 3vw, 40px); }
+      .ix { max-inline-size: 980px; margin-inline: auto; display: grid; gap: 18px; }
+      .ix > p { margin: 0; color: var(--muted); max-inline-size: 64ch; line-height: 1.5; }
+      .ix-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 14px; }
+      .ix-card { display: grid; gap: 10px; align-content: start; padding: 18px; border-radius: 14px; background: var(--stone); border: 1px solid var(--stone-line); }
+      .ix-card h2 { margin: 0; font-family: var(--serif); color: var(--gold); }
+      .ix-card h2 a { color: inherit; text-decoration: none; }
+      .ix-card p { margin: 0; font-size: 14px; line-height: 1.45; }
+      .ix-card ul { margin: 0; padding-inline-start: 18px; font-size: 13px; line-height: 1.7; color: var(--muted); }
+      .ix-card a { color: var(--gold); }
+      .ix-open { display: flex; gap: 8px; }
+      .ix-open a { flex: 1; display: grid; place-items: center; min-block-size: 44px; border-radius: 10px; border: 1px solid var(--stone-line); text-decoration: none; font-weight: 600; }
+      .ix-open a:first-child { background: linear-gradient(180deg, #f0c45d, #c68c27); color: #1d1408; border-color: #f7d483; }
+    </style>
+  </head>
+  <body>
+    <main id="app">
+      <div class="ix">
+        <div><div class="muted">Spec #72 · ticket #77 · Muster prototypes</div><h1 class="mu-title" style="font-size: 48px">Adunade</h1></div>
+        <p>Three throwaway layouts of the Muster with the same content: the two teams with each member's primary and ready mark, team and primary with
+          health and speed, the room's mode, map, length, reach, access and code, the chat, the host's bot tools and single weapon, start and the countdown.
+          Each has four screens: the Muster as its host sees it, the countdown, a player joining a match already on (score, time, confirm), and a guest in a
+          single-weapon room (picker locked). The small white bar in a corner switches variant, screen and language; it is not part of the design. Look
+          at a phone-sized window, upright and on its side, before the desktop. The Motosee is in the picker as a seventh primary, to lay out seven cards.</p>
+        <div class="ix-grid">
+          <section class="ix-card">
+            <h2><a href="./a.html">A · The sheet</a></h2>
+            <p>The match dialog grown into the Muster: one column (room, teams, your team and primary, host, chat) with the actions pinned under it. Two columns when the screen is wide.</p>
+            <div class="ix-open"><a href="./a.html">Furlan</a><a href="./a.html#lang=it">Italiano</a></div>
+            <ul><li><a href="./a.html#screen=countdown">Countdown</a> · <a href="./a.html#screen=join">joining</a> · <a href="./a.html#screen=join&storm=1">joining a Tampieste</a> · <a href="./a.html#screen=single">single weapon</a></li></ul>
+          </section>
+          <section class="ix-card">
+            <h2><a href="./b.html">B · The field</a></h2>
+            <p>The two teams on the flanks, your choice between them: the chosen primary big, the others as tiles. Changing side is a button under the other team.</p>
+            <div class="ix-open"><a href="./b.html">Furlan</a><a href="./b.html#lang=it">Italiano</a></div>
+            <ul><li><a href="./b.html#screen=countdown">Countdown</a> · <a href="./b.html#screen=join">joining</a> · <a href="./b.html#screen=join&storm=1">joining a Tampieste</a> · <a href="./b.html#screen=single">single weapon</a></li></ul>
+          </section>
+          <section class="ix-card">
+            <h2><a href="./c.html">C · The tabs</a></h2>
+            <p>On a phone, four tabs under the thumb (teams, primary, chat, room), each with the whole screen, and the actions always above them. A rail on its side; four columns on a desktop.</p>
+            <div class="ix-open"><a href="./c.html">Furlan</a><a href="./c.html#lang=it">Italiano</a></div>
+            <ul>
+              <li><a href="./c.html#screen=countdown">Countdown</a> · <a href="./c.html#screen=join">joining</a> · <a href="./c.html#screen=join&storm=1">joining a Tampieste</a> · <a href="./c.html#screen=single&tab=primary">single weapon</a></li>
+              <li>Tabs: <a href="./c.html#tab=primary">primary</a> · <a href="./c.html#tab=chat">chat</a> · <a href="./c.html#tab=room">room</a></li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>
