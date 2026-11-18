@@ -437,3 +437,17 @@ test("the update notice is never shown during a match, and appears on return to 
   model.menuShown(false)
   expect(model.updateNotice).toBe("hidden")
 })
+
+test("the icon's shortcut asks for the same match as the home screen's button, from the same settings", () => {
+  for (const over of [{}, { lastMode: "frico", lastMap: "trincee", lastMinutes: 20, lastBots: 6, lastLevel: "plevan", lastFf: true }] as const) {
+    const request = menu(over).model.oneTap()
+    expect(request.kind).toBe("send")
+    expect(menu(over).model.shortcut()).toEqual(request)
+  }
+})
+
+test("the icon's shortcut with no name is refused like the home screen's button", () => {
+  const { model } = menu({ name: "" })
+  expect(model.shortcut()).toEqual(menu({ name: "" }).model.oneTap())
+  expect(model.shortcut().kind).toBe("refused")
+})

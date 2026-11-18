@@ -40,3 +40,27 @@ test("the bare address does nothing, in the menu or during a match, with or with
   for (const playing of [true, false])
     for (const named of [true, false]) expect(decideOpening(readOpening("", ""), { playing, named })).toEqual({ kind: "nothing" })
 })
+
+test("the icon's shortcut address opens the game on the shortcut", () => {
+  expect(readOpening("?shortcut=bots", "")).toEqual({ kind: "shortcut" })
+})
+
+test("the shortcut used from the menu by a named player starts the home button's match", () => {
+  expect(decideOpening(readOpening("?shortcut=bots", ""), MENU)).toEqual({ kind: "start" })
+})
+
+test("the shortcut used from the menu with no name asks for the name and starts nothing", () => {
+  expect(decideOpening(readOpening("?shortcut=bots", ""), { playing: false, named: false })).toEqual({ kind: "askName", opening: { kind: "shortcut" } })
+})
+
+test("the shortcut used during a match does nothing, with or without a name: the match goes on", () => {
+  for (const named of [true, false]) expect(decideOpening(readOpening("?shortcut=bots", ""), { playing: true, named })).toEqual({ kind: "nothing" })
+})
+
+test("an invite's address is an invite even with the shortcut's marker: invites behave as before", () => {
+  expect(readOpening("?p=abcd&shortcut=bots", "")).toEqual({ kind: "invite", invite: { code: "ABCD", password: null } })
+})
+
+test("another value of the marker is not the shortcut", () => {
+  expect(readOpening("?shortcut=x", "")).toEqual({ kind: "none" })
+})
