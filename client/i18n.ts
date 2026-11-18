@@ -60,6 +60,17 @@ export interface Strings {
     readonly startOver: string
     /** The second press that confirms starting over: the saved progress is lost. */
     readonly startOverSure: string
+    /** The home screen's training entry (ticket #52): its completed mark and the invitation. */
+    readonly entry: {
+      readonly completed: string
+      /** Treatment a: the ribbon on the entry itself, and its close button's label. */
+      readonly ribbon: string
+      readonly close: string
+      /** Treatment b: the card across the tiles, its start and its "no, thanks". */
+      readonly invite: string
+      readonly start: string
+      readonly dismiss: string
+    }
   }
   readonly teams: Record<Team, { readonly name: string; readonly motto: string }>
   readonly modes: Record<ModeId, { readonly name: string; readonly sub: string; readonly rules: string }>
@@ -411,7 +422,15 @@ const fur: Strings = {
     locked: "Ancjemò sierade",
     restart: "Torne a tacâ la stazion",
     startOver: "Torne a tacâ dal principi",
-    startOverSure: "Sigûr? Tu pierdis dut ce che tu âs fat"
+    startOverSure: "Sigûr? Tu pierdis dut ce che tu âs fat",
+    entry: {
+      completed: "✓ Finide",
+      ribbon: "Gnûf? Tache di chi",
+      close: "No sta invidâmi plui",
+      invite: "Prime volte culì? La Dutrine ti insegne dut, une stazion ae volte, ancje cence server.",
+      start: "Scomence la Dutrine",
+      dismiss: "No, graciis"
+    }
   },
   teams: {
     benandanti: { name: "Benandants", motto: "Pal racolt e pe glesie!" },
@@ -818,7 +837,15 @@ const it: Strings = {
     locked: "Ancora chiusa",
     restart: "Ricomincia la stazione",
     startOver: "Ricomincia da capo",
-    startOverSure: "Sicuro? Perdi tutti i progressi"
+    startOverSure: "Sicuro? Perdi tutti i progressi",
+    entry: {
+      completed: "✓ Completata",
+      ribbon: "Nuovo? Comincia da qui",
+      close: "Non invitarmi più",
+      invite: "Prima volta qui? La Dutrine ti insegna tutto, una stazione alla volta, anche senza server.",
+      start: "Inizia la Dutrine",
+      dismiss: "No, grazie"
+    }
   },
   teams: {
     benandanti: { name: "Benandanti", motto: "Per il raccolto e per la chiesa!" },

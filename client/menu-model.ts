@@ -9,7 +9,7 @@ import { ACCESSES, MAX_BOTS, Password, REACHES, RoomCode, type Access, type Erro
 import type { PrimaryId } from "../shared/weapons.ts"
 import type { Lang } from "./i18n.ts"
 import type { TrainingStart } from "../shared/training/start.ts"
-import { oneTapRoom, trainingStart, type Settings } from "./settings.ts"
+import { oneTapRoom, trainingStart, type Settings, type TrainingInvitation } from "./settings.ts"
 
 export type CreateOptions = Reached<RoomAccess> & {
   readonly mode: RoomModeId
@@ -134,6 +134,18 @@ export const UPDATE_NOTICES = ["hidden", "shown", "loading"] as const
 export type UpdateNotice = (typeof UPDATE_NOTICES)[number]
 
 const UPDATE_NOTICE = { none: "hidden", waiting: "shown", loading: "loading" } as const satisfies Record<NewVersion, UpdateNotice>
+
+/** The home screen's invitation to the training: shown, or gone for good. */
+export const INVITATIONS = ["shown", "hidden"] as const
+export type Invitation = (typeof INVITATIONS)[number]
+
+const INVITATION = { open: "shown", dismissed: "hidden", started: "hidden" } as const satisfies Record<TrainingInvitation, Invitation>
+
+/** The home screen's training entry: the invitation beside it, and the mark of a training completed. */
+export interface TrainingEntry {
+  readonly invitation: Invitation
+  readonly completed: boolean
+}
 
 const NONE: Outcome = { kind: "none" }
 const refused = (reason: Refusal): Outcome => ({ kind: "refused", reason })
@@ -292,10 +304,24 @@ export class MenuModel {
     return { kind: "send", request: { t: "create", room: oneTapRoom(this.remembered), oneTap: true } }
   }
 
-  /** The home screen's training: one tap, nothing to choose; like any room it needs a name. It resumes at the first station not completed. */
+  /**
+   * The home screen's training (its entry, or the invitation's own button): one tap, nothing to
+   * choose; like any room it needs a name. It resumes at the first station not completed. Started
+   * once, the invitation is not shown again.
+   */
   training(): Outcome {
     if (!this.remembered.name) return this.needName()
+    this.change("trainingInvitation", "started")
     return { kind: "send", request: { t: "training", start: trainingStart(this.remembered.training) } }
+  }
+
+  /** The invitation's "no, thanks": never shown again in this browser. */
+  dismissInvitation() {
+    if (this.remembered.trainingInvitation === "open") this.change("trainingInvitation", "dismissed")
+  }
+
+  get trainingEntry(): TrainingEntry {
+    return { invitation: INVITATION[this.remembered.trainingInvitation], completed: this.remembered.training.completed }
   }
 
   typeCode(text: string) {
