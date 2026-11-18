@@ -375,6 +375,7 @@ export class Game {
       }
     }
     if (this.overlay === "pause") this.renderPause()
+    if (this.snap?.phase.tag === "Over") this.renderEnd()
   }
 
   private onSnapshot(s: Snapshot) {
@@ -991,16 +992,21 @@ export class Game {
       const color = winner === "pari" ? "var(--gold)" : typeof winner === "object" ? (this.won(winner) ? "var(--gold)" : "#9fd0ff") : TEAM_INFO[winner].color
       this.drawMenu("endscreen", title, `
       <div class="overlay-body"><div id="e-results"></div><p class="muted end-restart" id="e-restart"></p></div>
-      <div class="row overlay-actions"><button id="e-leave">${en.leave}</button>${host ? `<button id="e-again" class="primary">${en.again}</button>` : ""}</div>`, "end-title", color)
+      <div class="row overlay-actions"><button id="e-leave">${en.leave}</button><button id="e-again" class="primary"${host ? "" : " hidden"}>${en.again}</button></div>`, "end-title", color)
       $("e-leave").onclick = () => {
         this.d.net.send({ t: "leave" })
         this.d.onLeave()
       }
-      const again = document.getElementById("e-again")
-      if (again) again.onclick = () => this.d.net.send({ t: "start" })
+      $("e-again").onclick = () => this.d.net.send({ t: "start" })
     }
     // Not drawn yet (a scoreboard before the snapshot that ended the match): nothing to update.
     if (!document.getElementById("e-results")) return
+    // Only the host can start another match: a player who becomes host gets the button, without a redraw.
+    const again = $("e-again")
+    if (again.hidden === host) {
+      if (!host && document.activeElement === again) $("e-leave").focus()
+      again.hidden = !host
+    }
     const sub =
       winner === "pari" ? en.drawSub
       : typeof winner === "object" ? `${en.lastStanding(esc(winner.name))} · ${en.lastStandingSub}`
