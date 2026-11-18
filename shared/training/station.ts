@@ -9,6 +9,7 @@ import type { Body } from "../movement.ts"
 import type { GameEvent } from "../sim/events.ts"
 import type { ArsenalValue, ControlsValue } from "../sim/schema.ts"
 import type { WeaponId } from "../weapons.ts"
+import type { InterfaceAction } from "./interface.ts"
 
 /**
  * The controls a step can teach: its prompt names the control, and each device shows it as its
@@ -55,6 +56,8 @@ export interface Seen {
   }
   /** Every game event the simulation published this tick before the training looked (shots, hits, kills, pickups…). */
   readonly events: readonly GameEvent[]
+  /** How many reports of the step's own interface action (`StepRule.report`) arrived this tick; 0 for a step without one. */
+  readonly reported: number
 }
 
 /** A step's progress: how many times its action happened, and a number the step keeps for itself. */
@@ -73,6 +76,8 @@ export interface StepRule {
   readonly control: ControlId
   /** How many times the action must happen; the HUD shows a count when it is more than one. */
   readonly target: number
+  /** An interface step's action: the client's report of it reaches `advance` as `Seen.reported` (`./interface.ts`). */
+  readonly report?: InterfaceAction
   readonly begin: (seen: Seen) => StepProgress
   readonly advance: (seen: Seen, now: StepProgress) => StepProgress
 }

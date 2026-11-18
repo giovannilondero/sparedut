@@ -14,6 +14,7 @@ import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOt
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
 import { outsideStorm, owned, RAISE_TICKS, weaponInSlot } from "../shared/sim/rules.ts"
 import { TRAINING } from "../shared/training/index.ts"
+import type { InterfaceAction } from "../shared/training/interface.ts"
 import { WEAPONS, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
@@ -192,7 +193,7 @@ export class Game {
     this.predictor = new Predictor(stage.physics)
     this.controls = new Controls(d.renderer.domElement, {
       onSlot: (slot) => this.selectSlot(slot),
-      onLastWeapon: () => this.selectWeapon(this.lastWeapon),
+      onLastWeapon: () => this.selectWeapon(this.lastWeapon, "lastWeapon"),
       onWheel: (dir) => this.cycleWeapon(dir),
       onKey: (code, down) => this.key(code, down),
       onPause: () => this.padPause(),
@@ -688,9 +689,12 @@ export class Game {
     return this.snap?.turrets.findIndex((t) => t.gunner === this.me) ?? -1
   }
 
-  private selectWeapon(id: WeaponId) {
+  /** Changes the weapon in hand; `how` the player chose it, which a training's current step may need to hear (an interface step). */
+  private selectWeapon(id: WeaponId, how: InterfaceAction) {
     const you = this.you()
     if (!you || !owned(you.arsenal, id) || id === this.wanted) return
+    // Ahead of the input that carries the new weapon. Only a training takes it.
+    if (this.room?.mode === TRAINING.mode) this.d.net.send({ t: "report", a: how })
     this.lastWeapon = this.wanted
     this.wanted = id
     this.wantedSeq = this.seq + 1
@@ -703,7 +707,7 @@ export class Game {
     if (this.quickOpen) return
     const you = this.you()
     const id = you && weaponInSlot(you.arsenal, slot)
-    if (id) this.selectWeapon(id)
+    if (id) this.selectWeapon(id, "slot")
   }
 
   private cycleWeapon(dir: 1 | -1) {
@@ -711,7 +715,7 @@ export class Game {
     if (!you) return
     const order = pickerEntries(you.arsenal).map((e) => e.id)
     const i = order.indexOf(this.wanted)
-    this.selectWeapon(order[(i + dir + order.length) % order.length])
+    this.selectWeapon(order[(i + dir + order.length) % order.length], "cycle")
   }
 
   // ---------------------------------------------------------------- keys and overlays

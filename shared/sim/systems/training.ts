@@ -9,10 +9,10 @@
  */
 import { SAGRE_STATIONS } from "../../maps/sagre.ts"
 import { STATION_IDS, STATIONS, stepRule, stepsOf } from "../../training/index.ts"
-import type { Seen } from "../../training/station.ts"
+import type { Seen, StepRule } from "../../training/station.ts"
 import { WEAPON_IDS } from "../../weapons.ts"
 import { freshArsenal, MAX_HP } from "../rules.ts"
-import { Arsenal, Controls, Game, Life, Motion, Objective, Out, Pickups, Player, Tick, Training, type ArsenalValue } from "../schema.ts"
+import { Arsenal, Controls, Game, Life, Motion, Objective, Out, Pickups, Player, ReportInterface, Tick, Training, type ArsenalValue } from "../schema.ts"
 
 /** Where the trainee is after a station completes: at the next station's first step, or done. */
 type Next = { readonly _tag: "Step"; readonly station: number; readonly step: number; readonly count: number; readonly mark: number; readonly unlocked: number } | { readonly _tag: "Complete" }
@@ -39,25 +39,37 @@ export const PlayTraining = Game.System(
       })
     },
     resources: { tick: Game.System.readResource(Tick), objective: Game.System.writeResource(Objective), pickups: Game.System.writeResource(Pickups) },
-    events: { happened: Game.System.readEvent(Out), out: Game.System.writeEvent(Out) },
+    events: { happened: Game.System.readEvent(Out), out: Game.System.writeEvent(Out), reports: Game.System.readEvent(ReportInterface) },
     machines: { training: Game.System.updateMachine(Training) },
     nextMachines: { training: Game.System.nextState(Training) }
   },
   ({ queries, resources, events, machines, nextMachines }) => {
+    // Reports are read every tick, so that one never waits for a later tick: outside a training's step they are ignored.
+    const reports = events.reports.all()
     const state = machines.training.get()
     if (state._tag === "Off" || state._tag === "Complete") return
     const { data } = queries.players
     const trainee = queries.players.each().find((m) => !data.player.get(m).bot && data.life.get(m)._tag === "Alive")
     if (trainee === undefined) return
     const happened = events.happened.all()
+    const session = data.player.get(trainee).session
 
-    const seen = (): Seen => {
+    /** The trainee's reports of `action` this tick: an interface step accepts only its own (`StepRule.report`). */
+    const reported = (action: StepRule["report"]) => {
+      if (action === undefined) return 0
+      let n = 0
+      for (const r of reports) if (r.session === session && r.action === action) n++
+      return n
+    }
+
+    /** What the current step sees; `null` while a step begins, when no report is its own yet. */
+    const seen = (rule: StepRule | null): Seen => {
       const life = data.life.get(trainee)
       const motion = data.motion.get(trainee)
       return {
         tick: resources.tick.get(),
         me: {
-          session: data.player.get(trainee).session,
+          session,
           body: motion.body,
           yaw: motion.yaw,
           pitch: motion.pitch,
@@ -66,7 +78,8 @@ export const PlayTraining = Game.System(
           controls: data.controls.get(trainee),
           arsenal: data.arsenal.get(trainee)
         },
-        events: happened
+        events: happened,
+        reported: rule ? reported(rule.report) : 0
       }
     }
 
@@ -102,7 +115,7 @@ export const PlayTraining = Game.System(
           pitch: 0
         })
       }
-      const begun = stepRule(id, stepsOf(id)[0]).begin(seen())
+      const begun = stepRule(id, stepsOf(id)[0]).begin(seen(null))
       return { _tag: "Step", station: index, step: 0, count: begun.count, mark: begun.mark, unlocked: Math.min(STATION_IDS.length, open) }
     }
 
@@ -116,14 +129,14 @@ export const PlayTraining = Game.System(
     const id = STATION_IDS[state.station]
     const steps = stepsOf(id)
     const rule = stepRule(id, steps[state.step])
-    const now = rule.advance(seen(), { count: state.count, mark: state.mark })
+    const now = rule.advance(seen(rule), { count: state.count, mark: state.mark })
     const count = Math.min(rule.target, now.count)
     let next: Next
     if (count < rule.target) next = { _tag: "Step", station: state.station, step: state.step, count, mark: now.mark, unlocked: state.unlocked }
     else {
       events.out.emit({ t: "training", a: "step", station: id, step: steps[state.step] })
       if (state.step + 1 < steps.length) {
-        const begun = stepRule(id, steps[state.step + 1]).begin(seen())
+        const begun = stepRule(id, steps[state.step + 1]).begin(seen(null))
         next = { _tag: "Step", station: state.station, step: state.step + 1, count: begun.count, mark: begun.mark, unlocked: state.unlocked }
       } else {
         events.out.emit({ t: "training", a: "station", station: id })
