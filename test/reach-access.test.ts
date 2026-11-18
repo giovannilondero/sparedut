@@ -8,7 +8,7 @@ import type { RoomSettings } from "../server/room.ts"
 import { ClientMessage, type RoomInfo, type RoomSummary } from "../shared/protocol.ts"
 
 const base = { mode: "bataie", map: "glemone", minutes: 10, level: "pari", ff: false } as const
-const summary = { code: "ABCD", host: "Toni", mode: "bataie", map: "glemone", players: 1, bots: 0, max: 16, phase: "Warmup" } as const
+const summary = { code: "ABCD", host: "Toni", mode: "bataie", map: "glemone", players: 1, bots: 0, max: 16, phase: "Muster" } as const
 
 test("an Offline room with access, or a LAN or Online room without it, cannot be written", () => {
   const rooms: RoomSettings[] = [

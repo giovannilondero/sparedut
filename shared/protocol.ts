@@ -17,7 +17,7 @@ import { INTERFACE_ACTIONS } from "./training/interface.ts"
 import { isStepId, isStepOf, STATION_IDS, type StepId } from "./training/index.ts"
 import { DEVICES } from "./devices.ts"
 
-export const PROTOCOL_VERSION = 14
+export const PROTOCOL_VERSION = 15
 export const MAX_PLAYERS = 16
 export const SNAPSHOT_EVERY = 2 // ticks: 30 snapshots per second
 /** The longest round trip a client reports, in milliseconds. */
@@ -142,6 +142,8 @@ export interface RosterEntry {
   readonly id: string
   readonly name: string
   readonly team: Team
+  /** The primary the member enters the next match with (the one in hand in a live match). */
+  readonly primary: PrimaryId
   readonly bot: boolean
   readonly away: boolean
 }

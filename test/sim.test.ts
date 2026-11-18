@@ -4,7 +4,6 @@ import { CAMPANILE, COMUNE, GLEMONE } from "../shared/maps/glemone.ts"
 import { createPhysicsWorld, initPhysics, type PhysicsWorld } from "../shared/physics.ts"
 import { stepBody, type Body } from "../shared/movement.ts"
 import { createSim } from "../shared/sim/index.ts"
-import { WARMUP_TICKS } from "../shared/sim/rules.ts"
 
 let physics: PhysicsWorld
 beforeAll(async () => {
@@ -169,12 +168,15 @@ describe("simulation", () => {
     expect(a.current).toBe("doplete")
   })
 
-  test("the warmup ends on its own and then points count", () => {
+  test("the Muster never ends on its own: only the start begins the match", () => {
     const sim = createSim({ mode: "bataie", minutes: 5, seed: 2, physics })
     sim.join("a", "Toni", "benandanti", false, "cramar")
-    for (let i = 0; i < WARMUP_TICKS - 5; i++) sim.step()
-    expect(sim.view().phase.tag).toBe("Warmup")
-    for (let i = 0; i < 10; i++) sim.step()
+    for (let i = 0; i < 60 * 60; i++) sim.step()
+    expect(sim.view().phase.tag).toBe("Muster")
+    expect(sim.view().players[0].alive).toBe(false)
+    sim.start()
+    for (let i = 0; i < 3; i++) sim.step()
     expect(sim.view().phase.tag).toBe("Live")
+    expect(sim.view().players[0].alive).toBe(true)
   })
 })

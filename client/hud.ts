@@ -6,12 +6,12 @@ import type { Team } from "../shared/map.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type SnapSelf, type Snapshot } from "../shared/protocol.ts"
 import type { KillCause } from "../shared/sim/events.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
-import { maxHp, WARMUP_TICKS } from "../shared/sim/rules.ts"
+import { maxHp } from "../shared/sim/rules.ts"
 import type { TrainingView } from "../shared/sim/view.ts"
 import { STATION_IDS } from "../shared/training/index.ts"
 import type { Device } from "./device.ts"
 import { t } from "./i18n.ts"
-import { menuControl, playPrompt, trainingPrompt, turretPrompt } from "./prompts.ts"
+import { playPrompt, trainingPrompt, turretPrompt } from "./prompts.ts"
 import { announcesStep, NOT_SHOWN, stepMarksHtml, type PanelPlace } from "./training-panel.ts"
 import { buttonBit, TOUCH_BUTTONS, type Insets, type PickerEntry, type TouchLayout, type TouchView } from "./touch.ts"
 
@@ -235,7 +235,7 @@ export class Hud {
   }
 
   /** `outside`: I'm alive and outside the Tampieste circle. `device`: the active one, whose controls the banner names. */
-  top(snap: Snapshot, mode: ModeId, names: Map<string, string>, device: Device, outside = false) {
+  top(snap: Snapshot, mode: ModeId, names: Map<string, string>, outside = false) {
     const s = t()
     if (snap.training) {
       // A training has no score and no clock: its panel says where the trainee is.
@@ -258,13 +258,10 @@ export class Hud {
     this.text("score-ben", alone ? "" : mode === "cjar" ? `${snap.score.benandanti}%` : String(snap.score.benandanti))
     this.text("score-mal", alone ? "" : String(snap.score.malandanti))
     const phase = snap.phase
-    this.text("clock", phase.tag === "Live" ? fmtClock(phase.ends - snap.tick) : phase.tag === "Warmup" ? fmtClock(WARMUP_TICKS - snap.tick) : s.hud.over)
+    this.text("clock", phase.tag === "Live" ? fmtClock(phase.ends - snap.tick) : phase.tag === "Over" ? s.hud.over : "")
     this.text("mode-label", alone ? `${s.modes[mode].name} · ${s.modes[mode].sub}` : s.hud.modeLabel(s.modes[mode].name, MODES[mode].scoreLimit))
     this.html("objective", this.objectiveLine(snap, names))
-    this.html(
-      "banner",
-      phase.tag === "Warmup" ? s.hud.warmup(fmtClock(WARMUP_TICKS - snap.tick), menuControl(device)) : outside ? `<b class="storm">${s.hud.stormOutside}</b>` : ""
-    )
+    this.html("banner", outside ? `<b class="storm">${s.hud.stormOutside}</b>` : "")
   }
 
   /** The state of the objective in force (`snap.objective`), and nothing for any other: in a regular room it is its mode's, in a training the current step's. */

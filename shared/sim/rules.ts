@@ -23,8 +23,6 @@ export const maxHp = (primary: PrimaryId) => CLASSES[primary].hp
 export const hpFor = (primary: PrimaryId, hp: number) => Math.min(hp, maxHp(primary))
 export const ASSIST_WINDOW_TICKS = 600
 export const OVER_TICKS = 15 * 60
-/** Warmup ends on its own 30 s after creation; the host can start earlier. */
-export const WARMUP_TICKS = 30 * 60
 export const FLAG_RETURN_TICKS = 30 * 60
 
 export const otherTeam = (team: Team): Team => (team === "benandanti" ? "malandanti" : "benandanti")
