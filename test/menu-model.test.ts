@@ -206,7 +206,7 @@ test("a code typed on the home screen joins its room, cleaned of spaces and case
 
 test("single weapon is off unless chosen, and any primary can be chosen and carried into the room", () => {
   const { model, values } = menu()
-  expect(model.options.singles).toEqual([null, "cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis"])
+  expect(model.options.singles).toEqual([null, "cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis", "motosee"])
   expect(model.choices.single).toBeNull()
   expect(created(model.create())?.single).toBeNull()
   for (const primary of ["miedi", "cjampanili"] as const) {
@@ -307,7 +307,7 @@ test("the choices are every mode, map, bot skill, reach and access the game defi
     accesses: ["open", "password"],
     minutes: [5, 10, 15, 20],
     bots: [0, 1, 2, 3, 4, 5, 6, 7],
-    singles: [null, "cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis"]
+    singles: [null, "cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis", "motosee"]
   })
 })
 

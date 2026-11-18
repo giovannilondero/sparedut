@@ -41,7 +41,7 @@ const SOUTH = Math.PI
 function match(physics: PhysicsWorld, members: Member[], o: { ff?: boolean } = {}) {
   const sim = createSim({ mode: "bataie", minutes: 10, seed: 5, physics, friendlyFire: o.ff ?? false })
   for (const m of members) sim.join(m.id, m.id, m.team, false, m.primary, m.post)
-  sim.start()
+  sim.start(true)
   sim.step()
   for (let i = 0; i < SHIELD_TICKS + 5; i++) {
     for (const m of members) sim.input(m.id, stand(sim, m.id))
