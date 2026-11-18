@@ -11,40 +11,44 @@
  * `phone-menu`, `desktop-match`, `desktop-menu`). A match starts at a random spawn: look at the
  * picture, and take it again if the view is dull. When to take them again: see AGENTS.md.
  *
- * A picture is a page of the game shot at a viewport (a phone is `size` under 1000 px wide,
- * with `touch` for its controls), optionally prepared by a script run in the page, and
- * optionally composed: the shot becomes the background of an HTML page, shot in turn.
+ * A picture is a page of the game shot at a viewport (a phone is one under 1000 px wide, with
+ * `touch` for its controls), optionally prepared by a script run in the page, and optionally
+ * composed: the shot becomes the background of an HTML page, shot in turn.
  */
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
+import { SETTINGS_KEY } from "../client/settings.ts"
 import { shoot } from "./render-shot.ts"
 
 const ROOT = join(import.meta.dir, "..")
 const OUT = join(ROOT, "client/public/showcase")
 
+type Size = readonly [number, number]
+
 interface Picture {
   /** The file under `client/public/showcase/`. */
   readonly file: string
-  /** The size of the picture written, in pixels. */
-  readonly size: readonly [number, number]
   /** The page shot, under the server's address; Vêr is `?look=ver`. */
   readonly page: string
-  /** The viewport the page is shot at, `size` when not given, and its device pixel ratio. */
-  readonly viewport?: readonly [number, number]
-  readonly scale?: number
+  /** The viewport the page is shot at, and its device pixel ratio: the shot is their product. */
+  readonly viewport: Size
+  readonly scale: number
   /** A phone's touch screen. */
   readonly touch?: boolean
   /** Seconds the page runs before the shot. */
-  readonly wait?: number
+  readonly wait: number
   /** Run in the page before its own scripts: the settings a returning player has… */
   readonly setup?: string
   /** Run in the page before the shot: hides what should not show, starts a match… */
   readonly prepare?: string
-  /** An HTML page over the shot (given as `scene.png`, next to the page), shot at `size`. */
-  readonly compose?: () => string
+  /** An HTML page over the shot (given as `scene.png`, next to the page), shot at its `size` pixel for pixel: the picture written. */
+  readonly compose?: { readonly size: Size; readonly page: (size: Size) => string }
 }
+
+/** The size of the picture written, in pixels: the composed page's, or the shot's. */
+const sizeOf = (picture: Picture): Size => picture.compose?.size ?? [picture.viewport[0] * picture.scale, picture.viewport[1] * picture.scale]
 
 /** The loading screen's title (`client/index.html`): its typeface and its gold, read from the page so the two never part. */
 function loaderTitleStyle(): string {
@@ -56,9 +60,9 @@ function loaderTitleStyle(): string {
 }
 
 /** The link preview: the Duomo of Glemone in Vêr, with the title as the loading screen draws it. */
-const linkPreview = (): string => `<!doctype html>
+const linkPreview = ([width, height]: Size): string => `<!doctype html>
 <html><head><meta charset="utf-8"><style>
-  html, body { margin: 0; inline-size: 1200px; block-size: 630px; overflow: hidden; background: #14110f; }
+  html, body { margin: 0; inline-size: ${width}px; block-size: ${height}px; overflow: hidden; background: #14110f; }
   .scene { position: absolute; inset: 0; background: url(scene.png) center / cover; }
   .shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20,17,15,0) 45%, rgba(20,17,15,0.82) 88%, #14110f 100%); }
   .title { position: absolute; inset-inline: 0; inset-block-end: 46px; text-align: center; ${loaderTitleStyle()}
@@ -69,7 +73,10 @@ const linkPreview = (): string => `<!doctype html>
  * A returning player: a name typed, the training's invitation dealt with, Glemone chosen last
  * (the one-tap match plays there, the menu shows it behind); the page fills in the rest from its defaults.
  */
-const PLAYER = `localStorage.setItem('sparedut.settings', JSON.stringify({ name: 'Toni', lastMap: 'glemone', trainingInvitation: 'dismissed' }))`
+const PLAYER = `localStorage.setItem(${JSON.stringify(SETTINGS_KEY)}, JSON.stringify({ name: 'Toni', lastMap: 'glemone', trainingInvitation: 'dismissed' }))`
+
+/** The game's own page, in Vêr, as the returning player opens it: what the install prompt's screenshots show. */
+const IN_GAME = { page: "/?look=ver", wait: 8, setup: PLAYER } as const
 
 /** Waits in a page script: `pause(ms)`. */
 const PAUSE = "const pause = (ms) => new Promise((done) => setTimeout(done, ms));"
@@ -95,69 +102,39 @@ const finger = (turn: number) => `const view = document.getElementById('view'), 
   view.dispatchEvent(new PointerEvent('pointerup', at(${turn}))); await pause(1500);`
 
 /** A phone held sideways (844×390, a 6.1" phone), at twice its pixels: the shape of every `narrow` screenshot. */
-const PHONE: readonly [number, number] = [844, 390]
+const PHONE: Size = [844, 390]
 /** A laptop's window (1280×720), at 1.5 times its pixels: 1920×1080, the shape of every `wide` screenshot. */
-const DESKTOP: readonly [number, number] = [1280, 720]
+const DESKTOP: Size = [1280, 720]
 
 /** The phone's menu held upright, in the shape of the `narrow` screenshots (Chrome wants one shape per form factor): framed beside the title. */
-const portraitInLandscape = (): string => `<!doctype html>
+const portraitInLandscape = ([width, height]: Size): string => `<!doctype html>
 <html><head><meta charset="utf-8"><style>
-  html, body { margin: 0; inline-size: ${PHONE[0] * 2}px; block-size: ${PHONE[1] * 2}px; overflow: hidden; background: #14110f; }
+  html, body { margin: 0; inline-size: ${width}px; block-size: ${height}px; overflow: hidden; background: #14110f; }
   body { display: flex; align-items: center; justify-content: center; gap: 120px; }
   img { block-size: 92%; border-radius: 34px; box-shadow: 0 0 0 10px #2a241f, 0 18px 50px rgba(0,0,0,0.7); }
   .title { ${loaderTitleStyle()} font-size: 150px; animation: none; }
 </style></head><body><img src="scene.png" alt=""><div class="title">Sparedût</div></body></html>`
 
 const PICTURES: Record<string, Picture> = {
-  "phone-match": {
-    file: "phone-match.png",
-    size: [PHONE[0] * 2, PHONE[1] * 2],
-    page: "/?look=ver",
-    viewport: PHONE,
-    scale: 2,
-    touch: true,
-    wait: 8,
-    setup: PLAYER,
-    prepare: match(finger(-160))
-  },
+  "phone-match": { file: "phone-match.png", ...IN_GAME, viewport: PHONE, scale: 2, touch: true, prepare: match(finger(-160)) },
   "phone-menu": {
     file: "phone-menu.png",
-    size: [PHONE[0] * 2, PHONE[1] * 2],
-    page: "/?look=ver",
+    ...IN_GAME,
     viewport: [PHONE[1], PHONE[0]],
     scale: 2,
     touch: true,
-    wait: 8,
-    setup: PLAYER,
-    compose: portraitInLandscape
+    compose: { size: [PHONE[0] * 2, PHONE[1] * 2], page: portraitInLandscape }
   },
-  "desktop-match": {
-    file: "desktop-match.png",
-    size: [DESKTOP[0] * 1.5, DESKTOP[1] * 1.5],
-    page: "/?look=ver",
-    viewport: DESKTOP,
-    scale: 1.5,
-    wait: 8,
-    setup: PLAYER,
-    prepare: match()
-  },
-  "desktop-menu": {
-    file: "desktop-menu.png",
-    size: [DESKTOP[0] * 1.5, DESKTOP[1] * 1.5],
-    page: "/?look=ver",
-    viewport: DESKTOP,
-    scale: 1.5,
-    wait: 8,
-    setup: PLAYER
-  },
+  "desktop-match": { file: "desktop-match.png", ...IN_GAME, viewport: DESKTOP, scale: 1.5, prepare: match() },
+  "desktop-menu": { file: "desktop-menu.png", ...IN_GAME, viewport: DESKTOP, scale: 1.5 },
   "link-preview": {
     file: "link-preview.png",
-    size: [1200, 630],
     page: "/preview/world.html?map=glemone&look=ver&q=alta&cam=-2,13.6,-20,6,13.2,-60",
+    viewport: [1200, 630],
     scale: 2,
     wait: 10,
     prepare: "document.getElementById('info').style.display = 'none'",
-    compose: linkPreview
+    compose: { size: [1200, 630], page: linkPreview }
   }
 }
 
@@ -169,16 +146,16 @@ const pngSize = (file: string) => {
 
 async function take(base: string, picture: Picture, work: string): Promise<string> {
   const out = join(OUT, picture.file)
-  const viewport = picture.viewport ?? picture.size
   const scene = picture.compose ? join(work, "scene.png") : out
-  await shoot({ url: new URL(picture.page, base).href, out: scene, wait: picture.wait, setup: picture.setup, script: picture.prepare, size: viewport, scale: picture.scale, touch: picture.touch })
+  await shoot({ url: new URL(picture.page, base).href, out: scene, wait: picture.wait, setup: picture.setup, script: picture.prepare, size: picture.viewport, scale: picture.scale, touch: picture.touch })
   if (picture.compose) {
     const page = join(work, "compose.html")
-    writeFileSync(page, picture.compose())
-    await shoot({ url: pathToFileURL(page).href, out, wait: 1, size: picture.size, scale: 1 })
+    writeFileSync(page, picture.compose.page(picture.compose.size))
+    await shoot({ url: pathToFileURL(page).href, out, wait: 1, size: picture.compose.size, scale: 1 })
   }
+  // The browser rounds a fractional pixel ratio its own way: the file is checked, not trusted.
   const [w, h] = pngSize(out)
-  const [width, height] = picture.compose ? picture.size : [viewport[0] * (picture.scale ?? 1), viewport[1] * (picture.scale ?? 1)]
+  const [width, height] = sizeOf(picture)
   if (w !== width || h !== height) throw new Error(`${picture.file} is ${w}×${h}, not ${width}×${height}`)
   return out
 }
