@@ -54,7 +54,8 @@ export const HandleJoin = Game.System(
         [Motion, { body: { x: spot.at[0], y: spot.at[1], z: spot.at[2], vx: 0, vy: 0, vz: 0, grounded: true, crouch: false }, yaw: spot.yaw, pitch: 0 }],
         [Controls, { input: { ...IDLE_INPUT, yaw: spot.yaw }, previous: 0, pressed: 0, steps: [], switchTo: null, starved: 0 }],
         [Life, { _tag: "Dead", respawn: 30, killer: null }],
-        [Arsenal, freshArsenal(primaryOf(rules, j.primary), kitOf(rules))],
+        // The player's own primary stays as the next one, for when single weapon is off.
+        [Arsenal, { ...freshArsenal(primaryOf(rules, j.primary), kitOf(rules)), nextPrimary: j.primary }],
         [Stats, NO_STATS],
         [Attackers, []]
       ] as const

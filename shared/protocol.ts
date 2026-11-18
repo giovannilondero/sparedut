@@ -128,6 +128,8 @@ export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("ready"), ready: z.boolean() }),
   /** The host cancels the Muster's countdown. */
   z.object({ t: z.literal("cancel") }),
+  /** The host sets single weapon in the Muster: one primary for everybody, or null for off. */
+  z.object({ t: z.literal("single"), p: z.enum(PRIMARIES).nullable() }),
   z.object({ t: z.literal("bot"), team, delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ t: z.literal("level"), level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]) }),
   z.object({ t: z.literal("ping"), c: z.number(), rtt: z.number().min(0).max(RTT_MAX).optional() }),

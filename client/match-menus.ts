@@ -8,7 +8,7 @@ import type { Reach, RoomInfo } from "../shared/protocol.ts"
 import { TICK_RATE } from "../shared/movement.ts"
 import type { PhaseView } from "../shared/sim/view.ts"
 import { isTraining } from "../shared/training/index.ts"
-import type { PrimaryId } from "../shared/weapons.ts"
+import { PRIMARIES, type PrimaryId } from "../shared/weapons.ts"
 
 /** The menus a player opens over the match: the match menu, the loadout, the settings. */
 export const MATCH_MENUS = ["pause", "loadout", "settings"] as const
@@ -76,6 +76,15 @@ export type PrimaryPicker = { readonly _tag: "free"; readonly chosen: PrimaryId 
 
 export const primaryPicker = (room: Pick<RoomInfo, "single">, own: PrimaryId): PrimaryPicker =>
   room.single ? { _tag: "locked", chosen: room.single } : { _tag: "free", chosen: own }
+
+/** The host's single-weapon control in the Muster: off, then every primary. */
+export const SINGLE_OFF = "off"
+
+/** The control's value for the room's setting. */
+export const singleValue = (single: PrimaryId | null): string => single ?? SINGLE_OFF
+
+/** The setting a value of the control asks for: a primary, or off for anything else. */
+export const singleOf = (value: string): PrimaryId | null => PRIMARIES.find((p) => p === value) ?? null
 
 /**
  * The Muster's first focus: start, in an Offline room, whose one player is its host, so that one
