@@ -8,7 +8,7 @@ import type { Team, V3 } from "../map.ts"
 import type { Body } from "../movement.ts"
 import type { GameEvent } from "../sim/events.ts"
 import type { ArsenalValue, ControlsValue } from "../sim/schema.ts"
-import type { WeaponId } from "../weapons.ts"
+import type { PrimaryId, WeaponId } from "../weapons.ts"
 import type { InterfaceAction } from "./interface.ts"
 
 /**
@@ -102,6 +102,8 @@ export const MAX_STATION_BOTS = 4
 
 /** What arriving at a station gives the trainee and puts in force. Every weapon's ammunition is refilled unless `ammo` says otherwise. */
 export interface StationSetup {
+  /** The primary the trainee is given at the station (applied before `hold`); the trainee's own when absent. Their own comes back at the next station. */
+  readonly primary?: PrimaryId
   /** The weapon in hand on arrival; the trainee's own primary when absent. */
   readonly hold?: WeaponId
   /** Health on arrival; full when absent. */
