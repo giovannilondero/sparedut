@@ -86,7 +86,7 @@ export interface StationBot {
   readonly hp: number
 }
 
-/** What arriving at a station gives the trainee and puts in force. Every weapon's ammunition is refilled. */
+/** What arriving at a station gives the trainee and puts in force. Every weapon's ammunition is refilled unless `ammo` says otherwise. */
 export interface StationSetup {
   /** The weapon in hand on arrival; the trainee's own primary when absent. */
   readonly hold?: WeaponId
@@ -97,7 +97,17 @@ export interface StationSetup {
   /** The objective in force while the station is current. */
   readonly objective: ObjectiveId
   readonly bots: readonly StationBot[]
+  /** How much ammunition the trainee is given; all of it when absent. */
+  readonly ammo?: AmmoSetup
+  /** Pickups put back on arrival (indices in the map's `pickups`), so they are there however recently they were taken. */
+  readonly pickups?: readonly number[]
 }
+
+/**
+ * How much ammunition arriving at a station gives. `full`: every weapon's magazine and reserve,
+ * bombs and mines. `loaded`: only what is in each magazine, no reserve, no bombs or mines.
+ */
+export type AmmoSetup = "full" | "loaded"
 
 /** A station: its setup and its steps, in the order the trainee performs them (the keys' order). */
 export interface StationDef<Steps extends Readonly<Record<string, StepRule>> = Readonly<Record<string, StepRule>>> {
