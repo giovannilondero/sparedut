@@ -138,7 +138,7 @@ beforeAll(async () => {
 
 test("the prompt follows the device used last: a key, then the controller, then a finger, then the mouse again", () => {
   for (const m of [docListeners, winListeners, elListeners]) m.clear()
-  const c = new Controls(element as unknown as HTMLElement, { onSlot() {}, onLastWeapon() {}, onWheel() {}, onKey() {}, onPause() {} })
+  const c = new Controls(element as unknown as HTMLElement, { onSlot() {}, onLastWeapon() {}, onWheel() {}, onKey: () => false, onPause() {} })
   c.inMatch = true
   const s = STRINGS.fur
   const view: TrainingView = { tag: "station", station: "look", step: "walkToMarker", count: 0, target: 1, unlocked: 1 }

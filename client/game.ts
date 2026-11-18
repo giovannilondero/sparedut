@@ -753,8 +753,9 @@ export class Game {
 
   // ---------------------------------------------------------------- keys and overlays
 
-  private key(code: string, down: boolean) {
-    if (!this.running || this.chatting) return
+  /** A key pressed or released. Says whether the press was the game's own, not also the browser's: Tab when it shows the scoreboard. */
+  private key(code: string, down: boolean): boolean {
+    if (!this.running || this.chatting) return false
     if (code === "Tab") {
       // With a menu open, Tab moves through it: the scoreboard stays shut.
       const open = down && this.overlay === "none"
@@ -762,10 +763,13 @@ export class Game {
       if (open && !this.boardOpen && this.room !== null && isTraining(this.room.mode)) this.d.net.send({ t: "report", a: "board" })
       this.boardOpen = open
       this.hud.board(this.board, this.me, open)
-      return
+      return open
     }
-    if (!down) return
-    if (code === "Escape") return this.escape()
+    if (!down) return false
+    if (code === "Escape") {
+      this.escape()
+      return false
+    }
     if (this.quickOpen && /^Digit\d$/.test(code)) {
       const n = Number(code.slice(5))
       const phrase = QUICK_CHAT[(n + 9) % 10]
@@ -775,13 +779,14 @@ export class Game {
         if (this.room !== null && isTraining(this.room.mode)) this.d.net.send({ t: "report", a: "phrases" })
       }
       this.toggleQuick(false)
-      return
+      return false
     }
     // Enter presses a menu's button: chat and phrases open only over the match itself.
     const playing = this.controls.active && this.overlay === "none"
     if (code === "KeyV" && playing) this.toggleQuick(!this.quickOpen)
     if ((code === "Enter" || code === "KeyT") && playing) this.openChat()
     if (code === "KeyB") this.openOverlay(this.overlay === "loadout" ? "none" : "loadout")
+    return false
   }
 
   /** Options on the gamepad: opens the match menu, or closes it (one step at a time, like Esc). */
