@@ -13,7 +13,7 @@ export type V3 = readonly [number, number, number]
 export type Team = "benandanti" | "malandanti"
 export const TEAMS = ["benandanti", "malandanti"] as const satisfies readonly Team[]
 
-export type MapId = "glemone" | "osoppo" | "trincee" | "venzone" | "predil" | "maran"
+export type MapId = "glemone" | "osoppo" | "trincee" | "venzone" | "predil" | "maran" | "sagre"
 
 export type Mat =
   | "pietra" // grey stone of the Duomo
@@ -101,6 +101,16 @@ export interface DoorDef {
   readonly hp: number
 }
 
+/**
+ * A way that a host can close: the training's gate to the next station. Not in `blocks`, so it
+ * collides only once something closes it; the physics of a plain map leaves every way open.
+ */
+export interface GateDef {
+  readonly name: string
+  readonly min: V3
+  readonly max: V3
+}
+
 export interface Spawn {
   readonly at: V3
   readonly yaw: number
@@ -143,6 +153,8 @@ export interface MapDef {
   readonly turrets: readonly TurretSpot[]
   /** The doors to break down (not in `blocks`: the physics removes them when they give way). */
   readonly doors: readonly DoorDef[]
+  /** Ways closed until a host opens them (the training's fair has one between each two stations). */
+  readonly gates?: readonly GateDef[]
 }
 
 /** Breaks a building (porticoes included) down into the blocks that collide. */

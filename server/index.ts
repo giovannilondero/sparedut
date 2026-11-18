@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { networkInterfaces } from "node:os"
 import { join } from "node:path"
 import { isLocalHost } from "../shared/hosts.ts"
-import { MAP_IDS, MAPS } from "../shared/maps/index.ts"
+import { MAPS, ROOM_MAP_IDS } from "../shared/maps/index.ts"
 import { createPhysicsWorld, initPhysics, type PhysicsWorld } from "../shared/physics.ts"
 import { Hub, type Peer } from "./hub.ts"
 import { warmNavGraph } from "./nav.ts"
@@ -105,7 +105,7 @@ setInterval(() => hub.update(), 2)
 
 // A map's bot graph costs a few seconds of computation: better to do it right away, in
 // small pieces (one point at a time, between ticks), than at the first match on that map.
-const warm = [...MAP_IDS]
+const warm = [...ROOM_MAP_IDS]
 let warming: PhysicsWorld | null = null
 const warmNext = () => {
   if (!warming) {

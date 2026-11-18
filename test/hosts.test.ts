@@ -57,6 +57,14 @@ for (const host of HOSTS) {
       expect(me.last("room")!.room).toMatchObject({ reach: host.reach, mode: "bataie", map: "glemone", hostId: you, players: 1, bots: 3, level: "pari", ff: false })
     })
 
+    test("a regular create request on the training's map is refused", () => {
+      const { hub, connect } = harness(host.make)
+      const me = connect()
+      me.say({ ...create, map: "sagre" })
+      expect(me.got.at(-1)).toEqual({ t: "error", code: "invalid" })
+      expect(hub.rooms.size).toBe(0)
+    })
+
     test("the host's clock brings snapshots of the creator's own player, thirty a second", () => {
       const { connect, play } = harness(host.make)
       const me = connect()
