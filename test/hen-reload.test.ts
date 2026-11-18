@@ -41,6 +41,7 @@ function reloadAcrossPause(before: number, paused: number, after: number) {
       alive: true,
       aim: 0,
       baseFov: 75,
+      aspect: 16 / 9,
       mag,
       reserve,
       reload: reloading ? { progress, mag, reserve } : null,
