@@ -1,26 +1,18 @@
 /**
- * The main menu: name, language, matches, armoury, settings, glossary.
+ * The main menu: name, language, matches, armoury, settings, glossary. It draws the menu model
+ * and forwards the player's events to it; what a choice means is the model's to decide.
  */
-import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "../shared/folklore.ts"
+import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId } from "../shared/map.ts"
-import { MAP_IDS } from "../shared/maps/index.ts"
-import { Password, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
+import type { Access, Reach, RoomSummary } from "../shared/protocol.ts"
 import { PRIMARIES, WEAPON_IDS, WEAPONS, type PrimaryId } from "../shared/weapons.ts"
 import type { GameAudio } from "./contracts.ts"
 import { esc } from "./hud.ts"
-import { onLangChange, setLang, t, type Lang } from "./i18n.ts"
-import { oneTapRoom, type Settings } from "./settings.ts"
+import { onLangChange, setLang, t, type Lang, type StaticKey } from "./i18n.ts"
+import { MenuModel, SCREENS, type CreateOptions, type Outcome, type Refusal } from "./menu-model.ts"
+import type { Settings } from "./settings.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
-
-export type CreateOptions = Reached<RoomAccess> & {
-  readonly mode: ModeId
-  readonly map: MapId
-  readonly minutes: number
-  readonly bots: number
-  readonly level: BotLevel
-  readonly ff: boolean
-}
 
 export interface MenuHandlers {
   /** `oneTap`: the home screen's button, whose match starts at once, without warm-up. */
@@ -32,31 +24,23 @@ export interface MenuHandlers {
   readonly settingsChanged: () => void
 }
 
-const SCREENS = ["home", "create", "join", "password", "armarie", "settings", "vocabolari"] as const
-type ScreenName = (typeof SCREENS)[number]
-const MINUTES = [5, 10, 15, 20]
+/** The label of each reach and access among creation's choices: every member needs one. */
+const REACH_LABEL = { lan: "reachLan", online: "reachOnline", offline: "reachOffline" } as const satisfies Record<Reach, StaticKey>
+const ACCESS_LABEL = { open: "accessOpen", password: "accessPassword" } as const satisfies Record<Access, StaticKey>
 
 export class Menu {
-  private screen: ScreenName = "home"
-  private mode: ModeId
-  private map: MapId
-  private level: BotLevel
-  private roomList: readonly RoomSummary[] = []
-  /** The room the password prompt is for. */
-  private passwordCode = ""
+  private readonly model: MenuModel
   private tipIndex = Math.floor(Math.random() * 100)
 
   constructor(private readonly settings: Settings, private readonly audio: GameAudio, private readonly handlers: MenuHandlers) {
-    this.mode = settings.lastMode
-    this.map = settings.lastMap
-    this.level = settings.lastLevel
+    this.model = new MenuModel(settings, handlers.settingsChanged)
     for (const el of document.querySelectorAll<HTMLElement>("[data-go]")) {
       el.addEventListener("click", () => {
         audio.unlock()
         audio.play("ui_click")
         const go = el.dataset.go!
-        if (go === "one-tap") this.oneTap()
-        else this.go(go as ScreenName)
+        if (go === "one-tap") this.apply(this.model.oneTap())
+        else this.go(go as (typeof SCREENS)[number])
       })
     }
     for (const el of document.querySelectorAll<HTMLButtonElement>("[data-lang]")) {
@@ -73,24 +57,25 @@ export class Menu {
     // Esc: from submenus, go back to the main screen.
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape" || $("menu").classList.contains("hidden")) return
-      if (this.screen !== "home") {
+      if (this.model.back()) {
         e.preventDefault()
         audio.play("ui_click")
-        this.go("home")
+        this.render()
       } else if (document.activeElement instanceof HTMLInputElement) document.activeElement.blur()
     })
     const name = $<HTMLInputElement>("name")
     name.value = settings.name
-    name.addEventListener("input", () => {
-      settings.name = name.value.trim()
-      handlers.settingsChanged()
-    })
+    name.addEventListener("input", () => this.model.typeName(name.value))
     this.bindCreate()
     this.bindSettings()
-    $("j-go").addEventListener("click", () => this.joinCode())
-    $("j-code").addEventListener("keydown", (e) => e.key === "Enter" && this.joinCode())
-    $("pw-go").addEventListener("click", () => this.joinWithPassword())
-    $("pw-input").addEventListener("keydown", (e) => e.key === "Enter" && this.joinWithPassword())
+    const code = $<HTMLInputElement>("j-code")
+    code.addEventListener("input", () => this.model.typeCode(code.value))
+    $("j-go").addEventListener("click", () => this.apply(this.model.joinByCode()))
+    code.addEventListener("keydown", (e) => e.key === "Enter" && this.apply(this.model.joinByCode()))
+    const password = $<HTMLInputElement>("pw-input")
+    password.addEventListener("input", () => this.model.typePassword(password.value))
+    $("pw-go").addEventListener("click", () => this.apply(this.model.joinWithPassword()))
+    password.addEventListener("keydown", (e) => e.key === "Enter" && this.apply(this.model.joinWithPassword()))
     onLangChange(() => this.renderTexts())
     setLang(settings.lang)
     setInterval(() => this.showTip(), 9000)
@@ -105,7 +90,7 @@ export class Menu {
     this.renderCreate()
     this.buildArmarie()
     $("vocabolari").innerHTML = t().menu.vocab.map(([w, d]) => `<p><b>${w}</b> — ${d}</p>`).join("")
-    this.rooms(this.roomList)
+    this.renderRooms()
     $("tip").textContent = t().tips[this.tipIndex % t().tips.length]
   }
 
@@ -133,57 +118,61 @@ export class Menu {
     $("status").textContent = text
   }
 
-  private needName(): boolean {
-    if (this.settings.name) return false
-    const input = $<HTMLInputElement>("name")
-    this.go("home")
-    input.focus()
-    input.placeholder = t().menu.needName
-    return true
+  go(screen: (typeof SCREENS)[number]) {
+    this.apply(this.model.go(screen))
   }
 
-  go(screen: ScreenName) {
-    if ((screen === "create" || screen === "join" || screen === "password") && this.needName()) return
-    this.screen = screen
+  /** Acts on the model's answer: sends the request, shows why it was refused, or draws the new screen. */
+  private apply(o: Outcome) {
+    if (o.kind === "send") {
+      const r = o.request
+      if (r.t === "create") this.handlers.create(r.room, r.oneTap)
+      else this.handlers.join(r.code, r.password)
+      return
+    }
+    this.render()
+    if (o.kind === "refused") this.refused(o.reason)
+  }
+
+  private refused(reason: Refusal) {
+    if (reason === "needName") {
+      const input = $<HTMLInputElement>("name")
+      input.focus()
+      input.placeholder = t().menu.needName
+    } else if (reason === "passwordBad" && this.model.screen === "create") {
+      $("c-msg").textContent = t().menu.passwordBad
+      $("c-password").focus()
+    } else if (reason === "passwordBad") $("pw-msg").textContent = t().menu.passwordBad
+    // A code that is not four letters, or a full room, sends nothing: the screen already shows why.
+  }
+
+  /** Shows the model's screen. */
+  private render() {
+    const screen = this.model.screen
     for (const s of SCREENS) $(`menu-${s}`).classList.toggle("hidden", s !== screen)
     if (screen === "join") setTimeout(() => $("j-code").focus(), 50)
-    if (screen === "password") setTimeout(() => $("pw-input").focus(), 50)
+    if (screen === "password") {
+      $<HTMLInputElement>("pw-input").value = this.model.typedPassword
+      $("pw-for").textContent = t().menu.passwordFor(this.model.passwordFor)
+      setTimeout(() => $("pw-input").focus(), 50)
+    }
   }
 
   /** Asks for a password room's password; `message` says why the last one did not work. */
   askPassword(code: string, message = "") {
-    if (this.passwordCode !== code) $<HTMLInputElement>("pw-input").value = ""
-    this.passwordCode = code
-    $("pw-for").textContent = t().menu.passwordFor(code)
-    $("pw-msg").textContent = message
     $("menu").classList.remove("hidden")
-    this.go("password")
+    this.apply(this.model.askPassword(code))
+    $("pw-msg").textContent = message
     $<HTMLInputElement>("pw-input").select()
   }
 
-  private joinWithPassword() {
-    const password = Password.safeParse($<HTMLInputElement>("pw-input").value)
-    if (!password.success) {
-      $("pw-msg").textContent = t().menu.passwordBad
-      return
-    }
-    $("pw-msg").textContent = ""
-    this.handlers.join(this.passwordCode, password.data)
-  }
-
-  /** The home screen's "play against the bots": an Offline match in one tap. */
-  private oneTap() {
-    if (this.needName()) return
-    this.handlers.create(oneTapRoom(this.settings), true)
-  }
-
-  private joinCode() {
-    const code = $<HTMLInputElement>("j-code").value.trim().toUpperCase()
-    if (code.length === 4) this.handlers.join(code)
-  }
-
   rooms(list: readonly RoomSummary[]) {
-    this.roomList = list
+    this.model.rooms(list)
+    this.renderRooms()
+  }
+
+  private renderRooms() {
+    const list = this.model.roomList
     const ul = $("room-list")
     const s = t()
     if (!list.length) {
@@ -191,19 +180,14 @@ export class Menu {
       return
     }
     ul.innerHTML = list
-      .map((r) => {
-        const full = r.players >= r.max
+      .map(({ room: r, selectable }) => {
         const access = r.reach === "offline" ? null : r.access
         const passwordMark = access === "password" ? ` <i class="password-mark" role="img" aria-label="${s.menu.passwordRoom}" title="${s.menu.passwordRoom}">🔒</i>` : ""
-        return `<li><button data-code="${r.code}" data-access="${access ?? ""}"${full ? " disabled" : ""}><span><i class="chip ${r.reach}">${s.menu.reach[r.reach]}</i>${passwordMark} <b>${esc(r.host)}</b> · ${s.modes[r.mode].name} · ${s.maps[r.map].name}</span><span>${full ? `${s.menu.full} · ` : ""}${r.players}/${r.max}👤 ${r.bots}🤖 · ${r.code}</span></button></li>`
+        return `<li><button data-code="${r.code}"${selectable ? "" : " disabled"}><span><i class="chip ${r.reach}">${s.menu.reach[r.reach]}</i>${passwordMark} <b>${esc(r.host)}</b> · ${s.modes[r.mode].name} · ${s.maps[r.map].name}</span><span>${selectable ? "" : `${s.menu.full} · `}${r.players}/${r.max}👤 ${r.bots}🤖 · ${r.code}</span></button></li>`
       })
       .join("")
     for (const b of ul.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")) {
-      b.addEventListener("click", () => {
-        if (this.needName()) return
-        if (b.dataset.access === "password") this.askPassword(b.dataset.code!)
-        else this.handlers.join(b.dataset.code!)
-      })
+      b.addEventListener("click", () => this.apply(this.model.joinFromList(b.dataset.code!)))
     }
   }
 
@@ -211,92 +195,94 @@ export class Menu {
 
   /** Listeners only once: the cards are redrawn on every choice and every language change. */
   private bindCreate() {
+    const options = this.model.options
+    $("c-reach").innerHTML = options.reaches.map((r) => `<option value="${r}" data-t="${REACH_LABEL[r]}"></option>`).join("")
+    $("c-access").innerHTML = options.accesses.map((a) => `<option value="${a}" data-t="${ACCESS_LABEL[a]}"></option>`).join("")
     $("mode-cards").addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-mode]")
       if (!b) return
-      this.mode = b.dataset.mode as ModeId
+      this.model.chooseMode(b.dataset.mode as ModeId)
       this.audio.play("ui_click")
       this.renderCreate()
     })
     $("map-cards").addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-map]")
       if (!b) return
-      this.map = b.dataset.map as MapId
+      const map = b.dataset.map as MapId
+      this.model.chooseMap(map)
       this.audio.play("ui_click")
-      this.settings.lastMap = this.map
-      this.handlers.settingsChanged()
-      this.handlers.mapChanged(this.map)
+      this.handlers.mapChanged(map)
       this.renderCreate()
     })
     $("c-level").addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-level]")
       if (!b) return
-      this.level = b.dataset.level as BotLevel
+      this.model.chooseLevel(b.dataset.level as BotLevel)
       this.audio.play("ui_click")
       this.renderCreate()
     })
+    const minutes = $<HTMLSelectElement>("c-minutes")
+    minutes.addEventListener("change", () => this.model.chooseMinutes(Number(minutes.value)))
+    const bots = $<HTMLSelectElement>("c-bots")
+    bots.addEventListener("change", () => this.model.chooseBots(Number(bots.value)))
+    const ff = $<HTMLInputElement>("c-ff")
+    ff.addEventListener("change", () => this.model.chooseFriendlyFire(ff.checked))
     // An Offline room lives in this browser: what only the server offers (access, password) hides.
     const reach = $<HTMLSelectElement>("c-reach")
-    const showReach = () => ($("menu-create").dataset.reach = reach.value)
-    reach.addEventListener("change", showReach)
-    showReach()
+    reach.addEventListener("change", () => {
+      this.model.chooseReach(reach.value as Reach)
+      this.renderFields()
+    })
     const access = $<HTMLSelectElement>("c-access")
     access.addEventListener("change", () => {
-      $("c-password-field").hidden = access.value !== "password"
+      this.model.chooseAccess(access.value as Access)
+      this.renderFields()
       $("c-msg").textContent = ""
-      if (access.value === "password") $("c-password").focus()
+      if (this.model.fields.password) $("c-password").focus()
     })
+    const password = $<HTMLInputElement>("c-password")
+    password.addEventListener("input", () => this.model.typeRoomPassword(password.value))
     $("c-go").addEventListener("click", () => {
-      const reach = $<HTMLSelectElement>("c-reach").value as Reach
-      let roomAccess: RoomAccess = { kind: "open" }
-      if (reach !== "offline" && access.value === "password") {
-        const password = Password.safeParse($<HTMLInputElement>("c-password").value)
-        if (!password.success) {
-          $("c-msg").textContent = t().menu.passwordBad
-          $("c-password").focus()
-          return
-        }
-        roomAccess = { kind: "password", password: password.data }
-      }
-      $("c-msg").textContent = ""
-      const o: CreateOptions = {
-        mode: this.mode,
-        map: this.map,
-        minutes: Number($<HTMLSelectElement>("c-minutes").value),
-        ...(reach === "offline" ? { reach } : { reach, access: roomAccess }),
-        bots: Number($<HTMLSelectElement>("c-bots").value),
-        level: this.level,
-        ff: $<HTMLInputElement>("c-ff").checked
-      }
-      Object.assign(this.settings, { lastMode: o.mode, lastMap: o.map, lastBots: o.bots, lastLevel: o.level, lastMinutes: o.minutes })
-      this.handlers.settingsChanged()
-      this.handlers.create(o)
+      const o = this.model.create()
+      if (o.kind === "send") $("c-msg").textContent = ""
+      this.apply(o)
     })
+    const choices = this.model.choices
+    reach.value = choices.reach
+    access.value = choices.access
+    ff.checked = choices.ff
+    this.renderFields()
+  }
+
+  /** Shows only the fields that apply to the choices. */
+  private renderFields() {
+    const fields = this.model.fields
+    $("menu-create").toggleAttribute("data-access-applies", fields.access)
+    $("c-password-field").hidden = !fields.password
   }
 
   private renderCreate() {
     const s = t()
-    $("mode-cards").innerHTML = MODE_IDS.map(
+    const { options, choices } = this.model
+    $("mode-cards").innerHTML = options.modes.map(
       (id) =>
-        `<button class="card${id === this.mode ? " selected" : ""}" data-mode="${id}" aria-pressed="${id === this.mode}"><b>${s.modes[id].name}</b><small>${s.modes[id].sub}</small><small>${s.modes[id].rules}</small></button>`
+        `<button class="card${id === choices.mode ? " selected" : ""}" data-mode="${id}" aria-pressed="${id === choices.mode}"><b>${s.modes[id].name}</b><small>${s.modes[id].sub}</small><small>${s.modes[id].rules}</small></button>`
     ).join("")
-    $("map-cards").innerHTML = MAP_IDS.map(
+    $("map-cards").innerHTML = options.maps.map(
       (id) =>
-        `<button class="card${id === this.map ? " selected" : ""}" data-map="${id}" aria-pressed="${id === this.map}"><b>${s.maps[id].name}</b><small>${s.maps[id].sub}</small></button>`
+        `<button class="card${id === choices.map ? " selected" : ""}" data-map="${id}" aria-pressed="${id === choices.map}"><b>${s.maps[id].name}</b><small>${s.maps[id].sub}</small></button>`
     ).join("")
-    $("c-level").innerHTML = BOT_LEVEL_IDS.map(
+    $("c-level").innerHTML = options.levels.map(
       (l) =>
-        `<button class="card${l === this.level ? " selected" : ""}" data-level="${l}" role="radio" aria-checked="${l === this.level}"><b>${s.levels[l].name}</b><small>${s.levels[l].sub}</small></button>`
+        `<button class="card${l === choices.level ? " selected" : ""}" data-level="${l}" role="radio" aria-checked="${l === choices.level}"><b>${s.levels[l].name}</b><small>${s.levels[l].sub}</small></button>`
     ).join("")
-    // The selects are rewritten keeping the chosen value.
+    // The selects are rewritten in the active language, keeping the chosen value.
     const minutes = $<HTMLSelectElement>("c-minutes")
-    const keepMinutes = minutes.value || String(this.settings.lastMinutes)
-    minutes.innerHTML = MINUTES.map((m) => `<option value="${m}">${s.menu.minutes(m)}</option>`).join("")
-    minutes.value = keepMinutes
+    minutes.innerHTML = options.minutes.map((m) => `<option value="${m}">${s.menu.minutes(m)}</option>`).join("")
+    minutes.value = String(choices.minutes)
     const bots = $<HTMLSelectElement>("c-bots")
-    const keepBots = bots.value || String(this.settings.lastBots)
-    bots.innerHTML = Array.from({ length: 8 }, (_, i) => `<option value="${i}">${i === 0 ? s.menu.botsNone : i}</option>`).join("")
-    bots.value = keepBots
+    bots.innerHTML = options.bots.map((i) => `<option value="${i}">${i === 0 ? s.menu.botsNone : i}</option>`).join("")
+    bots.value = String(choices.bots)
   }
 
   // ---------------------------------------------------------------- armoury
