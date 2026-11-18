@@ -42,6 +42,7 @@
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "nav": "bun scripts/nav-graphs.ts",
     "models": "bun scripts/models.ts",
+    "icons": "bun scripts/icons.ts",
     "cf:dev": "alchemy dev",
     "cf:deploy": "alchemy deploy --stage prod",
     "cf:destroy": "alchemy destroy --stage prod"

@@ -44,6 +44,12 @@ kbd { font-family: var(--sans); font-size: 0.78em; padding: 0.1em 0.45em; border
 /* The prompt's root holds no box of its own: its parts open in the top layer. */
 #menu > ui-dialog { position: absolute; }
 .brand { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+/* A new version is waiting: a line across the header, under the title, on every screen of the menu. */
+.update-notice { flex: 1 0 100%; min-block-size: 44px; text-align: start; font-weight: 600; color: #1a1208;
+  background: linear-gradient(180deg, #f6d27c, var(--gold)); border-color: var(--gold-deep); }
+.update-notice:hover { background: linear-gradient(180deg, #fbe0a0, #f0c35e); }
+.update-notice:disabled { cursor: progress; opacity: 0.8; }
+.update-notice[hidden] { display: none; }
 .brand-title { margin: 0; font-family: var(--serif); font-weight: 700; font-size: clamp(28px, 1.2rem + 2.6vw, 48px); line-height: 1; letter-spacing: 0.04em;
   background: linear-gradient(180deg, #fff3cf 0%, var(--gold) 55%, var(--gold-deep) 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.45)); }
@@ -570,6 +576,12 @@ html.in-match[data-device="touch"] #perf { top: var(--free-t); left: var(--free-
 .home-tile.big { justify-content: flex-start; }
 .home-tools { grid-area: tools; display: flex; flex-wrap: wrap; gap: 8px; }
 .home-tools button { flex: 1 1 auto; min-block-size: 44px; font-size: 14px; padding: 8px 12px; background: var(--stone); }
+/* Installing the game: a tool among the others, or a line across the tools saying how to do it by hand. */
+.home-tools .install { color: var(--gold); border-color: var(--gold); }
+.install-by-hand { flex: 1 0 100%; margin: 0; padding: 8px 12px; font-size: 14px; line-height: 1.4; color: var(--ink); background: var(--stone);
+  border: 1px dashed var(--stone-line); border-radius: 10px; }
+.install-by-hand::before { content: "📲 "; }
+.home-tools .install[hidden], .install-by-hand[hidden] { display: none; }
 
 /* Join by code: label, letters, button; the letters show in capitals whatever is typed. */
 .code-join { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0; padding: 10px 12px; }

@@ -36,6 +36,10 @@ export type MenuRequest =
   | { readonly t: "join"; readonly code: string; readonly password?: string }
   /** The training: always Offline, its map and mode fixed. */
   | { readonly t: "training" }
+  /** The browser's own install prompt, opened from the install entry. */
+  | { readonly t: "install" }
+  /** The waiting new version takes over and the page reloads into it. */
+  | { readonly t: "update" }
 
 /** The answer to a choice: a request to send, a reason the screen shows, or only a new state to draw. */
 export type Outcome =
@@ -106,6 +110,29 @@ export function focusOnScreen(from: Screen, to: Screen): "first" | Screen | null
 
 /** The screens a player cannot reach without a name: they create or join a room. */
 const NEED_NAME: ReadonlySet<Screen> = new Set(["create", "password"])
+
+/**
+ * Where installing the game stands. `offered`: the browser offers its install prompt.
+ * `byHand`: it has none, but the game can be added to the home screen from its share menu (Safari
+ * on iPhone and iPad). `unavailable`: neither, or the prompt was used and not offered again yet.
+ * `installed`: this page runs installed, or installed the game.
+ */
+type Installing = "unavailable" | "offered" | "byHand" | "installed"
+
+/** What the home screen shows to install the game: a button that opens the prompt, how to do it by hand, or nothing. */
+export const INSTALL_ENTRIES = ["button", "instructions", "hidden"] as const
+export type InstallEntry = (typeof INSTALL_ENTRIES)[number]
+
+const INSTALL_ENTRY = { unavailable: "hidden", offered: "button", byHand: "instructions", installed: "hidden" } as const satisfies Record<Installing, InstallEntry>
+
+/** A new version of the game: none, downloaded and waiting, or asked to take over (the page reloads). */
+type NewVersion = "none" | "waiting" | "loading"
+
+/** The menu's notice of a new version: never over a match. */
+export const UPDATE_NOTICES = ["hidden", "shown", "loading"] as const
+export type UpdateNotice = (typeof UPDATE_NOTICES)[number]
+
+const UPDATE_NOTICE = { none: "hidden", waiting: "shown", loading: "loading" } as const satisfies Record<NewVersion, UpdateNotice>
 
 const NONE: Outcome = { kind: "none" }
 const refused = (reason: Refusal): Outcome => ({ kind: "refused", reason })
@@ -342,6 +369,60 @@ export class MenuModel {
       return refused("passwordBad")
     }
     return { kind: "send", request: { t: "join", code: this.prompt.code, password: password.data } }
+  }
+
+  // ---------------------------------------------------------------- installing and updating the game
+
+  private installing: Installing = "unavailable"
+  private newVersion: NewVersion = "none"
+  /** The menu is on screen: false during a match. */
+  private onScreen = true
+
+  /** What the page found at boot: it runs installed, or it can only be added to the home screen by hand. */
+  installSurroundings(env: { readonly installed: boolean; readonly byHand: boolean }) {
+    this.installing = env.installed ? "installed" : env.byHand ? "byHand" : "unavailable"
+  }
+
+  /** The browser offers its install prompt (`beforeinstallprompt`): again after a refusal, too. */
+  installOffered() {
+    if (this.installing !== "installed") this.installing = "offered"
+  }
+
+  /** The install entry's tap: the browser's prompt opens, and can be used only once. */
+  install(): Outcome {
+    if (this.installing !== "offered") return NONE
+    this.installing = "unavailable"
+    return { kind: "send", request: { t: "install" } }
+  }
+
+  /** The game was installed from this page (`appinstalled`). */
+  installed() {
+    this.installing = "installed"
+  }
+
+  get installEntry(): InstallEntry {
+    return INSTALL_ENTRY[this.installing]
+  }
+
+  /** A new version is downloaded and waits to take over. */
+  newVersionWaiting() {
+    if (this.newVersion === "none") this.newVersion = "waiting"
+  }
+
+  /** The menu is shown (back from a match) or hidden (a match starts). */
+  menuShown(on: boolean) {
+    this.onScreen = on
+  }
+
+  /** The update notice's tap: the new version takes over and the page reloads. Only from the menu, once. */
+  loadNewVersion(): Outcome {
+    if (this.updateNotice !== "shown") return NONE
+    this.newVersion = "loading"
+    return { kind: "send", request: { t: "update" } }
+  }
+
+  get updateNotice(): UpdateNotice {
+    return this.onScreen ? UPDATE_NOTICE[this.newVersion] : "hidden"
   }
 
   private needName(): Outcome {

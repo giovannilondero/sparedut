@@ -39,13 +39,16 @@ const STORE = "sparedut.look"
 const isLook = (s: string | null): s is LookId => !!s && s in LOOKS
 
 /** `?look=` wins and is remembered; otherwise the last one chosen. */
-export function lookFromUrl(): LookId {
-  const q = new URLSearchParams(location.search).get("look")
+export function lookFromUrl(
+  search = location.search,
+  storage: Pick<Storage, "getItem" | "setItem"> = localStorage
+): LookId {
+  const q = new URLSearchParams(search).get("look")
   if (isLook(q)) {
-    localStorage.setItem(STORE, q)
+    storage.setItem(STORE, q)
     return q
   }
-  const saved = localStorage.getItem(STORE)
+  const saved = storage.getItem(STORE)
   return isLook(saved) ? saved : "cumo"
 }
 

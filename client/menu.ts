@@ -36,6 +36,10 @@ export interface MenuHandlers {
   /** The map chosen in the menu: it becomes the background. */
   readonly mapChanged: (id: MapId) => void
   readonly settingsChanged: () => void
+  /** Opens the browser's install prompt, kept from `beforeinstallprompt`. */
+  readonly install: () => void
+  /** The waiting new version takes over; the page reloads into it. */
+  readonly update: () => void
 }
 
 type RadioGroup = HTMLElementTagNameMap["ui-radio-group"]
@@ -148,6 +152,7 @@ export class Menu {
     this.bindCreate()
     this.bindSettings()
     this.bindHome()
+    this.bindApp()
     onLangChange(() => this.renderTexts())
     setLang(settings.lang)
     setInterval(() => this.showTip(), 9000)
@@ -166,6 +171,7 @@ export class Menu {
     this.buildArmarie()
     $("vocabolari").innerHTML = t().menu.vocab.map(([w, d]) => `<p><b>${w}</b> — ${d}</p>`).join("")
     this.renderRooms(true)
+    this.renderApp()
     $("tip").textContent = t().tips[this.tipIndex % t().tips.length]
   }
 
@@ -191,6 +197,8 @@ export class Menu {
   show(on: boolean) {
     this.go("home")
     $("menu").classList.toggle("hidden", !on)
+    this.model.menuShown(on)
+    this.renderApp()
   }
 
   status(text: string) {
@@ -207,7 +215,9 @@ export class Menu {
       const r = o.request
       if (r.t === "create") this.handlers.create(r.room, r.oneTap)
       else if (r.t === "training") this.handlers.training()
-      else this.handlers.join(r.code, r.password)
+      else if (r.t === "join") this.handlers.join(r.code, r.password)
+      // The installable game's requests: the install prompt, the new version.
+      else if (r.t === "install" || r.t === "update") this.appRequest(r.t)
       return
     }
     this.render()
@@ -256,6 +266,62 @@ export class Menu {
     const focus = focusOnScreen(from, screen)
     if (focus === "first" && screen !== "home" && screen !== "password") FIRST_CONTROL[screen]()
     else if (focus !== null && focus !== "first") document.querySelector<HTMLElement>(`#menu-home [data-go="${focus}"]`)?.focus()
+  }
+
+  // ---------------------------------------------------------------- installing and updating the game
+
+  private bindApp() {
+    for (const [id, tap] of [["install", () => this.model.install()], ["update-notice", () => this.model.loadNewVersion()]] as const)
+      $(id).addEventListener("click", () => {
+        this.audio.play("ui_click")
+        this.apply(tap())
+      })
+  }
+
+  private appRequest(t: "install" | "update") {
+    this.handlers[t]()
+    this.renderApp()
+  }
+
+  /** What the page found at boot: it runs installed, or the game is added to the home screen by hand. */
+  installSurroundings(env: { readonly installed: boolean; readonly byHand: boolean }) {
+    this.model.installSurroundings(env)
+    this.renderApp()
+  }
+
+  /** The browser offers its install prompt. */
+  installOffered() {
+    this.model.installOffered()
+    this.renderApp()
+  }
+
+  /** The game was installed from this page. */
+  installed() {
+    this.model.installed()
+    this.renderApp()
+  }
+
+  /** A new version is downloaded and waiting: the menu says so, now or on return from the match. */
+  newVersionWaiting() {
+    this.model.newVersionWaiting()
+    this.renderApp()
+  }
+
+  /** The install entry and the update notice, as the model has them. */
+  private renderApp() {
+    const s = t().app
+    const entry = this.model.installEntry
+    const install = $<HTMLButtonElement>("install")
+    install.hidden = entry !== "button"
+    install.textContent = s.install
+    const byHand = $("install-by-hand")
+    byHand.hidden = entry !== "instructions"
+    byHand.textContent = s.byHand
+    const notice = this.model.updateNotice
+    const update = $<HTMLButtonElement>("update-notice")
+    update.hidden = notice === "hidden"
+    update.disabled = notice === "loading"
+    update.textContent = notice === "loading" ? s.updating : s.update
   }
 
   // ---------------------------------------------------------------- home
