@@ -101,9 +101,18 @@ export const PlayTraining = Game.System(
       }
     }
 
-    // A step's `given` (#48: the objective in force), applied on the tick the step becomes current.
+    // A step's `given`, applied on the tick the step becomes current: a primary and the weapon in hand
+    // with ammunition refilled (#44, the stalls), the objective in force (#48).
     const give = (rule: StepRule) => {
-      const objective = rule.given?.objective
+      const given = rule.given
+      if (given === undefined) return
+      if (given.primary !== undefined || given.hold !== undefined) {
+        const now = data.arsenal.get(trainee)
+        const primary = given.primary ?? now.primary
+        const fresh = freshArsenal(primary)
+        data.arsenal.set(trainee, { ...fresh, nextPrimary: now.nextPrimary, launcher: now.launcher, current: given.hold ?? (given.primary ? primary : now.current) })
+      }
+      const objective = given.objective
       if (objective === undefined) return
       resources.objective.set(objective)
       if (objective === "frico") resources.flags.set({ benandanti: { _tag: "base" }, malandanti: { _tag: "base" } })
