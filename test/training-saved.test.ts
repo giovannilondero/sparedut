@@ -35,22 +35,22 @@ function played(s: Settings, ...events: GameEvent[]) {
 test("a first-time player starts the training at station 1, with only it unlocked", () => {
   storage(null)
   const s = loadSettings()
-  expect(s.training).toEqual({ unlocked: 1, completed: false })
+  expect(s.training).toEqual(FRESH_TRAINING)
   expect(trainingStart(s.training)).toEqual({ unlocked: 1, from: "look" })
 })
 
 test("a completed station is saved: after leaving, the training starts at the first station not completed", () => {
   storage({ name: "Toni" })
   const later = played(loadSettings(), done("look"), done("course"))
-  expect(JSON.parse(store.get(KEY)!).training).toEqual({ unlocked: 3, completed: false })
-  expect(later.training).toEqual({ unlocked: 3, completed: false })
+  expect(JSON.parse(store.get(KEY)!).training).toEqual({ done: 2 })
+  expect(later.training).toEqual({ done: 2 })
   expect(trainingStart(later.training)).toEqual({ unlocked: 3, from: "always" })
   // The other settings are kept beside it.
   expect(later.name).toBe("Toni")
 })
 
 test("going back to an earlier station and completing it again unlocks nothing less", () => {
-  storage({ training: { unlocked: 6, completed: false } })
+  storage({ training: { done: 5 } })
   const later = played(loadSettings(), done("course"))
   expect(trainingStart(later.training)).toEqual({ unlocked: 6, from: "armoury" })
 })
@@ -58,7 +58,7 @@ test("going back to an earlier station and completing it again unlocks nothing l
 test("a completed training is saved: every station unlocked, and a new training starts at station 1", () => {
   storage(null)
   const later = played(loadSettings(), done("skirmish"), COMPLETE)
-  expect(later.training).toEqual({ unlocked: STATION_IDS.length, completed: true })
+  expect(later.training).toEqual({ done: STATION_IDS.length })
   expect(trainingStart(later.training)).toEqual({ unlocked: STATION_IDS.length, from: "look" })
 })
 
@@ -69,23 +69,24 @@ test("a step completed is not progress worth saving: only a whole station is", (
 })
 
 test("starting over clears the saved progress, the completion too", () => {
-  storage({ training: { unlocked: STATION_IDS.length, completed: true } })
+  storage({ training: { done: STATION_IDS.length } })
   const s = loadSettings()
   s.training = FRESH_TRAINING
   saveSettings(s)
-  expect(loadSettings().training).toEqual({ unlocked: 1, completed: false })
+  expect(loadSettings().training).toEqual({ done: 0 })
   expect(trainingStart(loadSettings().training)).toEqual({ unlocked: 1, from: "look" })
 })
 
 test("progress saved by an old or broken version falls back to a first training", () => {
-  for (const training of [null, 5, { unlocked: 0, completed: false }, { unlocked: 99, completed: false }, { unlocked: 2.5 }, { unlocked: "3", completed: "yes" }]) {
+  // The older shape (`unlocked`, `completed`) included: nothing was released with it.
+  for (const training of [null, 5, { done: -1 }, { done: 13 }, { done: 2.5 }, { done: "3" }, { unlocked: 4, completed: false }, { unlocked: 12, completed: true }]) {
     storage({ training })
     expect(loadSettings().training).toEqual(FRESH_TRAINING)
   }
 })
 
 test("the home screen's training request carries where to start", () => {
-  storage({ name: "Toni", training: { unlocked: 4, completed: false } })
+  storage({ name: "Toni", training: { done: 3 } })
   const model = new MenuModel(loadSettings(), () => {})
   expect(model.training()).toEqual({ kind: "send", request: { t: "training", start: { unlocked: 4, from: "switch" } } })
 })

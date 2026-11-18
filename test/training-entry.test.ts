@@ -36,7 +36,7 @@ function played(settings: Settings, ...events: Parameters<typeof trainingProgres
 }
 
 test("the entry asks for the training, starting where the saved progress says", () => {
-  storage({ name: "Toni", training: { unlocked: 5, completed: false } })
+  storage({ name: "Toni", training: { done: 4 } })
   expect(visit().model.training()).toEqual({ kind: "send", request: { t: "training", start: { unlocked: 5, from: "stalls" } } })
 })
 
@@ -101,7 +101,7 @@ test("the completed mark shows only once the training has been completed", () =>
 })
 
 test("starting over clears the completed mark and keeps the invitation away", () => {
-  storage({ name: "Toni", training: { unlocked: STATION_IDS.length, completed: true }, trainingInvitation: "dismissed" })
+  storage({ name: "Toni", training: { done: STATION_IDS.length }, trainingInvitation: "dismissed" })
   const { settings } = visit()
   // What the match menu's "start over" does.
   settings.training = FRESH_TRAINING
@@ -111,9 +111,9 @@ test("starting over clears the completed mark and keeps the invitation away", ()
 })
 
 test("a player who trained before the invitation existed is not invited", () => {
-  storage({ name: "Toni", training: { unlocked: 3, completed: false } })
+  storage({ name: "Toni", training: { done: 2 } })
   expect(visit().model.trainingEntry.invitation).toBe("hidden")
-  storage({ name: "Toni", training: { unlocked: STATION_IDS.length, completed: true } })
+  storage({ name: "Toni", training: { done: STATION_IDS.length } })
   expect(visit().model.trainingEntry).toEqual({ invitation: "hidden", completed: true })
 })
 
