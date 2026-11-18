@@ -115,15 +115,28 @@ const nearest = (snap: Snapshot, id: string) => {
   return (open.length ? open : others).sort((a, b) => Math.hypot(a.x - me.x, a.z - me.z) - Math.hypot(b.x - me.x, b.z - me.z))[0]
 }
 
+/** How far `p` is from a route: from its only point, or from the nearest point of any of its legs. */
+function offRoute(p: { x: number; z: number }, route: readonly (readonly number[])[]) {
+  let best = Math.hypot(p.x - route[0][0], p.z - route[0][2])
+  for (let i = 1; i < route.length; i++) {
+    const [ax, , az] = route[i - 1]
+    const [bx, , bz] = route[i]
+    const along = Math.max(0, Math.min(1, ((p.x - ax) * (bx - ax) + (p.z - az) * (bz - az)) / ((bx - ax) ** 2 + (bz - az) ** 2)))
+    best = Math.min(best, Math.hypot(p.x - (ax + along * (bx - ax)), p.z - (az + along * (bz - az))))
+  }
+  return best
+}
+
 describe("bots at a station", () => {
-  test("entering station 3 brings its bots, alive at the start of their routes", () => {
+  // By the time the trainee has walked in, a bot with a route is somewhere along it, not at its start.
+  test("entering station 3 brings its bots, alive on their routes", () => {
     const h = started()
     expect(bots(h.me, h.id)).toEqual([])
     const there = atAlways()
     const present = bots(there.me, there.id)
     expect(present).toHaveLength(BOTS.length)
     for (const bot of BOTS) {
-      expect(present.some((p) => alive(p) && p.hp === bot.hp && Math.hypot(p.x - bot.route[0][0], p.z - bot.route[0][2]) < 3)).toBe(true)
+      expect(present.some((p) => alive(p) && p.hp === bot.hp && offRoute(p, bot.route) < 1)).toBe(true)
     }
   })
 })
