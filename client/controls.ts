@@ -76,7 +76,8 @@ interface Finger {
 /** The buttons held only while a finger is on them (aim and crouch are toggles, the rest act once). */
 const HELD_BUTTONS = ["jump", "reload", "bomb", "mine", "use"] as const satisfies readonly (TouchButton & ButtonName)[]
 const isHeldButton = (r: FingerRole): r is (typeof HELD_BUTTONS)[number] => HELD_BUTTONS.some((b) => b === r)
-const isButton = (r: FingerRole): r is TouchButton => r !== "stick" && r !== "look" && r !== "fire" && r !== "weapon" && r !== "spent"
+/** A round button: one of `TOUCH_BUTTONS`, the explicit set, so a new role is never a button by accident. */
+const isButton = (r: FingerRole): r is TouchButton => (TOUCH_BUTTONS as readonly FingerRole[]).includes(r)
 
 /** What the controls follow of the player, from one snapshot. */
 export interface Tracked {
