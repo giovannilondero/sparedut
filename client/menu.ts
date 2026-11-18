@@ -104,13 +104,6 @@ function roomRow(r: RoomSummary, selectable: boolean, asButton: boolean): string
   return `<li><button class="room${selectable ? "" : " full"}" data-code="${r.code}"${selectable ? "" : " disabled"}>${inner}</button></li>`
 }
 
-/**
- * The invitation's two treatments, for the owner to choose between (`?invite=a|b`): `a`, the
- * training's entry itself invites; `b`, a card across the home screen's tiles. Delete the other
- * once chosen.
- */
-const INVITE_TREATMENT: "a" | "b" = new URLSearchParams(location.search).get("invite") === "b" ? "b" : "a"
-
 export class Menu {
   private readonly model: MenuModel
   private tipIndex = Math.floor(Math.random() * 100)
@@ -289,36 +282,31 @@ export class Menu {
   // ---------------------------------------------------------------- the training's entry
 
   private bindTraining() {
-    for (const id of ["invite-close", "invite-dismiss"])
-      $(id).addEventListener("click", () => {
-        this.audio.play("ui_click")
-        this.model.dismissInvitation()
-        this.renderTraining()
-        // The button that had focus is gone: focus stays on the training.
-        $("home-training").querySelector<HTMLElement>(".training-entry")?.focus()
-      })
+    $("invite-close").addEventListener("click", () => {
+      this.audio.play("ui_click")
+      this.model.dismissInvitation()
+      this.renderTraining()
+      // The button that had focus is gone: focus stays on the training.
+      $("home-training").querySelector<HTMLElement>(".training-entry")?.focus()
+    })
   }
 
-  /** The entry's completed mark, and the invitation in the treatment this page was opened with. */
+  /** The entry's completed mark, and the invitation: the entry edged in gold, with a ribbon and a close button. */
   private renderTraining() {
     const s = t().training.entry
     const { invitation, completed } = this.model.trainingEntry
     const inviting = invitation === "shown"
-    $("home-training").dataset.invite = inviting ? INVITE_TREATMENT : ""
+    $("home-training").toggleAttribute("data-inviting", inviting)
     const done = $("training-completed")
     done.hidden = !completed
     done.textContent = s.completed
     const ribbon = $("invite-ribbon")
-    ribbon.hidden = !(inviting && INVITE_TREATMENT === "a")
+    ribbon.hidden = !inviting
     ribbon.textContent = s.ribbon
     const close = $<HTMLButtonElement>("invite-close")
     close.hidden = ribbon.hidden
     close.setAttribute("aria-label", s.close)
     close.title = s.close
-    $("invite-card").hidden = !(inviting && INVITE_TREATMENT === "b")
-    $("invite-text").textContent = s.invite
-    $("invite-start").textContent = s.start
-    $("invite-dismiss").textContent = s.dismiss
   }
 
   // ---------------------------------------------------------------- installing and updating the game

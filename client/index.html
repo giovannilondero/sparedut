@@ -73,10 +73,8 @@
             <button id="j-go" data-t="joinGo"></button>
             <p id="j-msg" class="form-msg" role="alert"></p>
           </form>
-          <!-- The training's place: its entry, with the mark of a training completed, and the invitation
-               shown until it is dismissed or the training started (client/menu-model.ts). Two
-               treatments of the invitation for the owner to choose from, `?invite=a|b` (Menu.renderTraining):
-               a, the entry itself invites, with a ribbon and a close button; b, a card across the tiles. -->
+          <!-- The training's place: its entry, with the mark of a training completed. Until it is dismissed
+               or the training started (client/menu-model.ts), the entry itself invites: a ribbon and a close button. -->
           <div class="home-training" id="home-training">
             <div class="training-slot">
               <button class="big home-tile training-entry" data-go="training">
@@ -85,13 +83,6 @@
                 <i class="training-done" id="training-completed" hidden></i>
               </button>
               <button class="invite-close" id="invite-close" hidden>×</button>
-            </div>
-            <div class="invite-card" id="invite-card" role="group" aria-labelledby="invite-text" hidden>
-              <p id="invite-text"></p>
-              <div class="invite-actions">
-                <button class="primary" data-go="training" id="invite-start"></button>
-                <button class="invite-dismiss" id="invite-dismiss"></button>
-              </div>
             </div>
           </div>
         </div>

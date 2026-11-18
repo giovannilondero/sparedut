@@ -615,16 +615,15 @@ html.in-match[data-device="touch"] #perf { top: var(--free-t); left: var(--free-
 .home-hero > span { font-size: clamp(21px, 1rem + 1.4vw, 28px); }
 .home-hero.primary small { opacity: 0.85; }
 .home-hero .last { color: #4a3008; opacity: 1; font-weight: 600; }
-/* The training's place among the tiles: its entry, and the invitation in one of two treatments
-   (`data-invite`, set by Menu.renderTraining; ?invite=a|b until the owner chooses one). */
+/* The training's place among the tiles: its entry, which invites while `data-inviting` is set (Menu.renderTraining). */
 .home-training { display: contents; }
 .training-slot { position: relative; display: grid; min-inline-size: 0; }
 /* The completed mark sits at the tile's foot, whatever the height its row gives it. */
 .training-entry > small { padding-block-end: 8px; }
 .training-done { margin-block-start: auto; font-style: normal; font-size: 12px; font-weight: 700; color: var(--ben); }
-.training-done[hidden], .invite-ribbon[hidden], .invite-close[hidden], .invite-card[hidden] { display: none; }
-/* a: the entry itself invites, gold-edged, a ribbon hung on its top edge and a close button on its corner. */
-[data-invite="a"] .training-entry { position: relative; border-color: var(--gold); box-shadow: 0 0 18px color-mix(in oklch, var(--gold) 30%, transparent); }
+.training-done[hidden], .invite-ribbon[hidden], .invite-close[hidden] { display: none; }
+/* The invitation: the entry itself, gold-edged, a ribbon hung on its top edge and a close button on its corner. */
+[data-inviting] .training-entry { position: relative; border-color: var(--gold); box-shadow: 0 0 18px color-mix(in oklch, var(--gold) 30%, transparent); }
 .invite-ribbon { position: absolute; inset-block-start: -9px; inset-inline-start: 10px; max-inline-size: calc(100% - 44px); padding: 1px 9px; border-radius: 999px;
   background: var(--gold); color: #1d1408; font-style: normal; font-size: 11px; font-weight: 700; white-space: nowrap; overflow: clip; text-overflow: ellipsis; }
 .invite-close { position: absolute; inset-block-start: -9px; inset-inline-end: -6px; display: grid; place-items: center; inline-size: 28px; block-size: 28px; padding: 0;
@@ -632,17 +631,9 @@ html.in-match[data-device="touch"] #perf { top: var(--free-t); left: var(--free-
 /* A 44px target around a 28px circle. */
 .invite-close::after { content: ""; position: absolute; inset: min(0px, (100% - 44px) / 2); }
 @media (prefers-reduced-motion: no-preference) {
-  [data-invite="a"] .training-entry { animation: invite-glow 2.6s ease-in-out infinite alternate; }
+  [data-inviting] .training-entry { animation: invite-glow 2.6s ease-in-out infinite alternate; }
 }
 @keyframes invite-glow { from { box-shadow: 0 0 6px color-mix(in oklch, var(--gold) 20%, transparent); } to { box-shadow: 0 0 22px color-mix(in oklch, var(--gold) 45%, transparent); } }
-/* b: a card across the tiles, above them, with its own start and "no, thanks". */
-.invite-card { grid-column: 1 / -1; order: -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 12px 10px 14px;
-  background: var(--stone); border: 1px solid var(--gold); border-inline-start-width: 4px; border-radius: 12px; }
-.invite-card p { flex: 1 1 16rem; margin: 0; font-family: var(--serif); font-size: 16px; line-height: 1.35; }
-.invite-actions { flex: 1 0 auto; display: flex; gap: 8px; }
-.invite-actions button { min-block-size: 44px; }
-.invite-actions .primary { flex: 1 0 auto; }
-.invite-actions .invite-dismiss { background: transparent; color: var(--muted); }
 .home-tiles { grid-area: tiles; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; }
 .home-tile { min-inline-size: 0; background-color: var(--stone); border: 1px solid var(--stone-line); border-radius: 12px; }
 .home-tile.big > span { font-size: 19px; }
@@ -710,8 +701,6 @@ html.in-match[data-device="touch"] #perf { top: var(--free-t); left: var(--free-
   .code-join { padding-block: 8px; }
   .code-join input { flex-basis: 4.5rem; font-size: 17px; letter-spacing: 0.12em; }
   .code-join button { padding-inline: 10px; }
-  .invite-card { padding-block: 6px; }
-  .invite-card p { font-size: 14px; }
 }
 
 /* ---------------- MENU: CREATE ----------------
