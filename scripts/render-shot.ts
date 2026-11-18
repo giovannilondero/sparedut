@@ -4,6 +4,10 @@
  * Chromium browser (`BROWSER` overrides the binary).
  *
  *   bun scripts/render-shot.ts "http://localhost:5173/preview/models.html?look=ver&w=cramar&still" out.png [seconds] [js to run first]
+ *
+ * `SIZE=390x844` emulates a viewport of that size (a headless window cannot be narrower than
+ * 500 px, so a phone needs it); below 1000 px wide it is a mobile one. `SCALE=2` sets the
+ * device pixel ratio.
  */
 export {}
 
@@ -36,6 +40,11 @@ try {
       ws.addEventListener("message", on)
       ws.send(JSON.stringify({ id, method, params }))
     })
+  const size = process.env.SIZE?.match(/^(\d+)x(\d+)$/)
+  if (size) {
+    const [width, height] = [Number(size[1]), Number(size[2])]
+    await call("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: Number(process.env.SCALE ?? 1), mobile: width < 1000 })
+  }
   await Bun.sleep(Number(wait) * 1000)
   if (script) {
     await call("Runtime.evaluate", { expression: script })

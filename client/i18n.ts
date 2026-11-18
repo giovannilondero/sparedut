@@ -53,6 +53,19 @@ export interface Strings {
     readonly tag: { readonly primary: string; readonly power: string; readonly melee: string; readonly pistol: string }
     readonly stat: { readonly damage: string; readonly rate: string; readonly range: string; readonly mag: string }
     readonly vocab: readonly (readonly [string, string])[]
+    /** The training's place in the menu: reserved, with no button until the training exists. */
+    readonly training: { readonly name: string; readonly sub: string; readonly soon: string }
+    /** Entering a room: from the room list or with its code. */
+    readonly findRoom: { readonly name: string; readonly sub: string }
+    /** Room creation's parts, as steps or sections (the map's is `static.mapLabel`). */
+    readonly steps: { readonly mode: string; readonly options: string; readonly summary: string }
+    readonly next: string
+    /** Going back to a choice from a summary of the choices. */
+    readonly change: string
+    /** One line on who can see and join a room of that reach. */
+    readonly reachSub: Record<Reach, string>
+    /** The look selector's label (Cumò, Vêr). */
+    readonly look: string
   }
   readonly net: {
     readonly connecting: string
@@ -410,7 +423,18 @@ const fur: Strings = {
       pistol: "Pistole · simpri cun te"
     },
     stat: { damage: "Dam", rate: "Cjadence", range: "Puartade", mag: "Cjamadôr" },
-    vocab: VOCAB
+    vocab: VOCAB,
+    training: { name: "Allenament", sub: "Impare i comants, lis armis e lis modalitâts", soon: "Ca di pôc" },
+    findRoom: { name: "Jentre intune partide", sub: "Sielç de liste o scrîf il codiç" },
+    steps: { mode: "Modalitât", options: "Opzions", summary: "Dut pront?" },
+    next: "Indenant",
+    change: "Cambie",
+    reachSub: {
+      offline: "Dome tu cuintri i bot, in chest navigadôr",
+      lan: "Dome cui che al è te tô stesse rêt",
+      online: "Ducj a puedin viodile e jentrâ"
+    },
+    look: "Aspiet"
   },
   net: {
     connecting: "Conession al server…",
@@ -745,7 +769,18 @@ const it: Strings = {
       pistol: "Pistola · sempre con te"
     },
     stat: { damage: "Danno", rate: "Cadenza", range: "Portata", mag: "Caricatore" },
-    vocab: VOCAB
+    vocab: VOCAB,
+    training: { name: "Allenamento", sub: "Impara i comandi, le armi e le modalità", soon: "In arrivo" },
+    findRoom: { name: "Entra in una partita", sub: "Scegli dalla lista o scrivi il codice" },
+    steps: { mode: "Modalità", options: "Opzioni", summary: "Tutto pronto?" },
+    next: "Avanti",
+    change: "Cambia",
+    reachSub: {
+      offline: "Solo tu contro i bot, in questo browser",
+      lan: "Solo chi è sulla tua stessa rete",
+      online: "Tutti possono vederla ed entrare"
+    },
+    look: "Aspetto"
   },
   net: {
     connecting: "Connessione al server…",

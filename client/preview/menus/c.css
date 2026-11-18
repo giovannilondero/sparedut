@@ -1,0 +1,113 @@
+/* Prototype C, list as home. Phone portrait first; then a short landscape phone; then a desktop. */
+
+/* ---- home: the room list, with the actions under the thumb ---- */
+.c-home { min-block-size: 100%; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto auto auto 1fr auto;
+  grid-template-areas: "logo lang" "name look" "nav nav" "head head" "list list" "actions actions"; }
+.c-side, .c-main, .c-switches { display: contents; }
+.c-logo { grid-area: logo; align-self: center; font-size: 24px; }
+.c-home .lang-seg { grid-area: lang; justify-self: end; }
+.c-home .look-seg { grid-area: look; align-self: end; }
+.c-name { grid-area: name; }
+.c-nav { grid-area: nav; display: flex; flex-wrap: wrap; gap: 6px; }
+.c-chip { min-block-size: 38px; padding: 4px 12px; border-radius: 999px; font-size: 13px; background: var(--stone); }
+.c-chip.training { display: inline-flex; align-items: center; }
+.c-chip.training > span { font-family: var(--sans); font-size: 13px; font-weight: 400; }
+.c-chip.training small { display: none; }
+.c-listhead { grid-area: head; display: grid; gap: 8px; }
+.c-listhead h2 { font-size: 19px; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6); }
+.c-code { padding: 8px 10px; background: var(--stone); border: 1px solid var(--stone-line); border-radius: 12px; }
+.c-code label { white-space: nowrap; }
+.c-code input { font-size: 18px; }
+.c-list { grid-area: list; min-block-size: 0; }
+.c-list .room { background: var(--stone); }
+.c-actions { grid-area: actions; position: sticky; inset-block-end: 0; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 8px;
+  padding-block-start: 10px; background: linear-gradient(transparent, rgba(20, 17, 15, 0.95) 35%); }
+.c-onetap { display: flex; flex-direction: column; align-items: flex-start; text-align: start; padding: 8px 14px; }
+.c-onetap > span { font-family: var(--serif); font-size: 18px; }
+.c-onetap small:not(.last) { display: none; }
+.c-onetap .last { font-size: 12px; }
+.c-create { font-family: var(--serif); font-size: 17px; font-weight: 700; background: var(--stone); border-color: var(--gold); color: var(--gold); }
+.c-create b { font-size: 22px; line-height: 1; }
+
+/* ---- creation: a panel over the list ---- */
+.c-scrim { position: fixed; inset: 0; z-index: 10; background: rgba(8, 6, 4, 0.55); }
+.c-panel { position: fixed; z-index: 11; inset-block: 0; inset-inline-end: 0; inline-size: min(480px, 62vw); display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto;
+  padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) 16px;
+  background: #1d1813; border-inline-start: 1px solid var(--gold); box-shadow: -30px 0 60px rgba(0, 0, 0, 0.5); animation: c-in 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes c-in { from { translate: 30px 0; opacity: 0; } }
+.c-grab { display: none; }
+.c-phead { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-block-end: 10px; border-block-end: 1px solid var(--stone-line); }
+.c-phead .back { font-size: 14px; }
+.c-pbody { overflow: auto; padding-block: 12px; display: grid; gap: 18px; align-content: start; }
+.c-pbody fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; min-inline-size: 0; }
+.c-pbody legend { padding: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.c-radios { display: grid; border: 1px solid var(--stone-line); border-radius: 12px; overflow: clip; }
+.c-radio { display: flex; align-items: center; gap: 12px; text-align: start; padding: 9px 14px; border: 0; border-radius: 0; background: transparent; border-block-end: 1px solid var(--stone-line); }
+.c-radio:last-child { border-block-end: 0; }
+.c-radio > i { flex: none; inline-size: 18px; block-size: 18px; border-radius: 50%; border: 2px solid var(--muted); }
+.c-radio.on { background: rgba(232, 182, 76, 0.1); }
+.c-radio.on > i { border-color: var(--gold); background: radial-gradient(circle, var(--gold) 0 4px, transparent 5px); }
+.c-radio > span { display: flex; flex-direction: column; min-inline-size: 0; }
+.c-radio b { font-family: var(--serif); font-size: 16px; }
+.c-radio.on b { color: var(--gold); }
+.c-radio small { font-size: 12px; color: var(--muted); line-height: 1.3; }
+.c-access { display: grid; gap: 10px; }
+.c-access:empty { display: none; }
+.c-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.c-pfoot { display: grid; gap: 6px; padding-block-start: 10px; border-block-start: 1px solid var(--stone-line); }
+.c-pfoot .primary { min-block-size: 52px; font-size: 18px; }
+.c-pfoot .form-msg { text-align: center; }
+
+/* Phone held upright: the panel is a bottom sheet. */
+@media (orientation: portrait) and (max-width: 599px) {
+  .c-panel { inset-block-start: auto; inset-inline: 0; inline-size: auto; max-block-size: 88dvh; border-inline-start: 0; border-block-start: 1px solid var(--gold);
+    border-radius: 18px 18px 0 0; padding-block-start: 8px; box-shadow: 0 -30px 60px rgba(0, 0, 0, 0.5); animation-name: c-up; }
+  @keyframes c-up { from { translate: 0 40px; opacity: 0; } }
+  .c-grab { display: block; justify-self: center; inline-size: 44px; block-size: 5px; margin-block-end: 8px; border-radius: 3px; background: var(--muted); }
+}
+
+/* Phone in landscape and desktop: a column for the player, the list beside it. */
+@media (orientation: landscape) and (max-height: 560px), (min-width: 1000px) {
+  #app:has(.c-home) { overflow: hidden; }
+  .c-home { block-size: 100%; grid-template-columns: 300px minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "side main"; gap: 18px; }
+  .c-side { grid-area: side; display: flex; flex-direction: column; gap: 8px; min-block-size: 0; overflow: auto; }
+  .c-main { grid-area: main; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 10px; min-block-size: 0; }
+  .c-switches { display: flex; gap: 6px; }
+  .c-listhead, .c-list { grid-area: auto; }
+  .c-name { flex-direction: row; align-items: center; gap: 10px; }
+  .c-name > span { white-space: nowrap; }
+  .c-name input { flex: 1; }
+  .c-actions { position: static; display: flex; flex-direction: column; padding: 0; background: none; }
+  .c-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .c-nav .training { grid-column: 1 / -1; }
+  .c-logo { align-self: flex-start; }
+  .c-listhead { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+  .c-code input { inline-size: 7.5em; }
+  .c-listhead h2 small { display: block; margin-block-start: 2px; }
+  .c-list { overflow: auto; }
+}
+@media (orientation: landscape) and (max-height: 560px) {
+  .c-logo { font-size: 22px; }
+  .c-name input, .c-code input { min-block-size: 40px; padding-block: 4px; }
+  .c-onetap { padding-block: 4px; }
+  .c-create { min-block-size: 40px; }
+  .c-chip { min-block-size: 34px; }
+  .c-code { padding: 6px 8px; }
+  .c-code label { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); }
+  .c-code.inline { grid-template-columns: auto auto; grid-template-areas: "input go"; }
+  .c-code input { inline-size: 6.5em; font-size: 17px; min-block-size: 40px; }
+  .c-code button { min-block-size: 40px; }
+}
+@media (min-width: 1000px) and (min-height: 561px) {
+  #app { padding: clamp(18px, 3vw, 40px); }
+  .c-home { grid-template-columns: 340px minmax(0, 1fr); gap: 28px; max-inline-size: 1400px; margin-inline: auto; }
+  .c-side { gap: 14px; }
+  .c-logo { font-size: 48px; }
+  .c-onetap { padding: 12px 16px; }
+  .c-onetap > span { font-size: 22px; }
+  .c-onetap small:not(.last) { display: block; }
+  .c-create { min-block-size: 52px; font-size: 19px; }
+  .c-main { padding: 20px; background: var(--stone); border: 1px solid var(--stone-line); border-radius: 18px; backdrop-filter: blur(8px); }
+  .c-listhead h2 { font-size: 24px; }
+  .c-list .room { grid-template-columns: 6em minmax(0, 1fr) auto; padding: 12px 16px; background: rgba(255, 255, 255, 0.03); }
+}
