@@ -72,6 +72,9 @@ function selectItems(select: Select, values: readonly number[], label: (n: numbe
   select.value = String(chosen)
 }
 
+/** An access as creation names it: on its card and in the options' summary. */
+const accessLabel = (access: Access): string => (access === "password" ? `🔒 ${t().static.accessPassword}` : t().static.accessOpen)
+
 /** The element each screen shows: the password prompt opens over the home screen. */
 const SCREEN_ELEMENT = {
   home: "menu-home",
@@ -413,7 +416,7 @@ export class Menu {
     cardTexts($("c-map"), (v) => [s.maps[v as MapId].name, s.maps[v as MapId].sub])
     cardTexts($("c-level"), (v) => [s.levels[v as BotLevel].name, s.levels[v as BotLevel].sub])
     cardTexts($("c-reach"), (v) => [`<i class="chip ${v}">${s.menu.reach[v as Reach]}</i>`, s.menu.reachSub[v as Reach]])
-    cardTexts($("c-access"), (v) => [v === "password" ? `🔒 ${s.static.accessPassword}` : s.static.accessOpen, ""])
+    cardTexts($("c-access"), (v) => [accessLabel(v as Access), ""])
     selectItems($("c-minutes"), options.minutes, s.menu.minutes, choices.minutes)
     selectItems($("c-bots"), options.bots, (n) => (n === 0 ? s.menu.botsNone : String(n)), choices.bots)
     this.renderChoices()
@@ -424,13 +427,12 @@ export class Menu {
     const s = t()
     const { choices, fields } = this.model
     $("c-rules").textContent = s.modes[choices.mode].rules
-    const access = choices.access === "password" ? `🔒 ${s.static.accessPassword}` : s.static.accessOpen
     $("c-summary").textContent = [
       s.menu.minutes(choices.minutes),
       s.menu.bots(choices.bots),
       s.levels[choices.level].name,
       s.menu.reach[choices.reach],
-      ...(fields.access ? [access] : []),
+      ...(fields.access ? [accessLabel(choices.access)] : []),
       ...(choices.ff ? [s.menu.ffOn] : [])
     ].join(" · ")
     $("c-access-field").hidden = !fields.access
