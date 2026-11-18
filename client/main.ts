@@ -14,7 +14,7 @@ import { isLocalHost } from "../shared/hosts.ts"
 import { Game } from "./game.ts"
 import { inviteLink, readInvite } from "./invite.ts"
 import { t } from "./i18n.ts"
-import { createLook, lookFromUrl, mountLookSwitcher } from "./looks.ts"
+import { createLook, lookFromUrl } from "./looks.ts"
 import { loadDetailed } from "./models/detailed.ts"
 import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
@@ -37,7 +37,6 @@ renderer.toneMappingExposure = 1.05
 renderer.info.autoReset = false
 const perf = new PerfMonitor(renderer)
 const look = createLook(lookFromUrl(), renderer)
-mountLookSwitcher(look.id)
 
 /** The maximum pixel ratio per quality; dynamic resolution goes down to `minRatio`. */
 const maxRatio = () => Math.min(devicePixelRatio, settings.quality === "alta" ? 2 : settings.quality === "media" ? 1.5 : 1)
@@ -185,7 +184,7 @@ const menu = new Menu(settings, audio, {
     sendJoin(code, password)
   },
   settingsChanged: persist
-})
+}, look.id)
 
 /** Public address announced by the server: used for invite links when playing from localhost. */
 let publicUrl: string | null = null

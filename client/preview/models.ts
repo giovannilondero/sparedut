@@ -9,7 +9,7 @@ import { createAvatar, setDetailedWeapon } from "../avatars.ts"
 import type { AvatarPose } from "../contracts.ts"
 import { firstPerson } from "../firstperson.ts"
 import { createFx } from "../fx.ts"
-import { createLook, lookFromUrl, mountLookSwitcher } from "../looks.ts"
+import { createLook, lookFromUrl } from "../looks.ts"
 import { loadDetailed } from "../models/detailed.ts"
 import { createViewmodel } from "../viewmodel.ts"
 import type { PickupKind } from "../../shared/map.ts"
@@ -24,7 +24,6 @@ document.body.appendChild(renderer.domElement)
 const info = document.getElementById("info")!
 // With a look other than the current one the view is not split: first person only.
 const style = createLook(lookFromUrl(), renderer)
-mountLookSwitcher(style.id)
 
 // a bit of plaçute at sunset
 const scene = new THREE.Scene()
