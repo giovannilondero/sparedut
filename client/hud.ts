@@ -83,8 +83,9 @@ export class Hud {
     const a = you.arsenal
     const def = WEAPONS[a.current]
     const endless = def.mode === "melee" || turret
-    this.text("weapon-name", t().weapons[turret ? "mitraie" : a.current].name)
-    this.text("touch-weapon", t().weapons[turret ? "mitraie" : a.current].name)
+    this.inHand = turret ? "mitraie" : a.current
+    this.text("weapon-name", t().weapons[this.inHand].name)
+    this.text("touch-weapon", t().weapons[this.inHand].name)
     const ammo = a.ammo[a.current]
     this.text("mag", endless ? "∞" : String(localMag ?? ammo.mag))
     this.text("reserve", endless ? "" : String(ammo.reserve))
@@ -323,6 +324,9 @@ export class Hud {
     this.drawnPicker = undefined
   }
 
+  /** The weapon the vitals last showed in hand: the picker marks it. */
+  private inHand: WeaponId | null = null
+
   /** What the touch buttons last showed: compared as plain values, so a finger's move redraws nothing else. */
   private touchLayout: TouchLayout | null = null
   private drawnPressed = -1
@@ -364,12 +368,11 @@ export class Hud {
       const picker = $("touch-picker")
       picker.classList.toggle("hidden", !view.picker)
       const rects = this.touchLayout?.picker ?? []
-      const current = $("weapon-name").textContent
       picker.innerHTML = (view.picker ?? [])
         .map((e, i) => {
           const r = rects[i]
           const name = t().weapons[e.id].name
-          return r ? `<div class="${name === current ? "on" : ""}" style="left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px">${esc(name)}</div>` : ""
+          return r ? `<div class="${e.id === this.inHand ? "on" : ""}" style="left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px">${esc(name)}</div>` : ""
         })
         .join("")
     }
