@@ -2,7 +2,7 @@
  * First-person presentation: what the local player's own view shows, decided from
  * plain data. No renderer here; the frame loop and the viewmodel read the result.
  */
-import { turretAim, type TurretSpot } from "../shared/map.ts"
+import { turretAim, turretSeat, type TurretSpot, type V3 } from "../shared/map.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 
 export interface FirstPersonInput {
@@ -38,6 +38,11 @@ export interface MitraiePose {
   readonly pitch: number
   /** How far the last shot throws the gun back along its barrel (m). */
   readonly recoil: number
+  /**
+   * Where the gunner stands, behind the gun at this aim: the shared `turretSeat` of the
+   * player's own look, the one the simulation uses too, so the eye never waits for the host.
+   */
+  readonly seat: V3
 }
 
 export interface FirstPersonView {
@@ -101,7 +106,7 @@ const mitraiePose = ({ mount, look, sinceShot }: FirstPersonInput): MitraiePose 
   if (!mount) return null
   const aim = turretAim(mount.spot, look.yaw, look.pitch)
   const left = Math.max(0, 1 - sinceShot / RECOIL.seconds)
-  return { turret: mount.turret, yaw: aim.yaw, pitch: aim.pitch, recoil: RECOIL.back * left * left }
+  return { turret: mount.turret, yaw: aim.yaw, pitch: aim.pitch, recoil: RECOIL.back * left * left, seat: turretSeat(mount.spot, look.yaw) }
 }
 
 /** What the hen cannon shows: the hen at the mouth and the hens a reload drops in. */

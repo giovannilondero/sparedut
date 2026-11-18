@@ -325,7 +325,7 @@ export const VENZONE = defineMap({
   killY: -10,
   turrets: [
     { at: [-4, 0, -72], yaw: Math.PI },
-    { at: [5, 0, 77], yaw: 0 }
+    { at: [4.5, 0, 77], yaw: 0 }
   ],
   doors: []
 })

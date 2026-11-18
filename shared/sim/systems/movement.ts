@@ -5,7 +5,7 @@
 import { BUTTON, type PlayerInput } from "../../input.ts"
 import { turretAim, turretSeat } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
-import { stepBody } from "../../movement.ts"
+import { seatedBody, stepBody } from "../../movement.ts"
 import { WEAPONS } from "../../weapons.ts"
 import { owned, SGNAPE_SPEED, turretOf } from "../rules.ts"
 import { Arsenal, Controls, Damage, Flags, Game, History, Life, Match, Motion, Out, Physics, Player, Rules, Tick, Turrets, type PoseRecord } from "../schema.ts"
@@ -45,13 +45,12 @@ export const MovePlayers = Game.System(
       if (data.life.get(m)._tag !== "Alive") continue
       const session = data.player.get(m).session
       const controls = data.controls.get(m)
-      // On a turret you stay put in the seat, and the view turns only within the gun's arc.
+      // On a turret you sit behind the gun, which turns with your view within its arc.
       const mounted = turretOf(turrets, session)
       if (mounted >= 0) {
         const spot = spots[mounted]
-        const [x, y, z] = turretSeat(spot)
         const aim = turretAim(spot, controls.input.yaw, controls.input.pitch)
-        data.motion.set(m, { body: { x, y, z, vx: 0, vy: 0, vz: 0, grounded: true, crouch: false }, yaw: aim.yaw, pitch: aim.pitch })
+        data.motion.set(m, { body: seatedBody(turretSeat(spot, controls.input.yaw)), yaw: aim.yaw, pitch: aim.pitch })
         continue
       }
       const arsenal = data.arsenal.get(m)

@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
-import type { TurretSpot } from "../shared/map.ts"
-import { PRIMARIES } from "../shared/weapons.ts"
+import { turretSeat, type TurretSpot } from "../shared/map.ts"
+import { lookDir } from "../shared/movement.ts"
+import { PRIMARIES, TURRET } from "../shared/weapons.ts"
 import { firstPerson, type FirstPersonInput } from "../client/firstperson.ts"
 
 const view = (over: Partial<FirstPersonInput>) =>
@@ -91,6 +92,28 @@ test("a look a full turn away still aims the mitraie inside its arc", () => {
   const pose = view({ mount: { turret: 0, spot: SPOT }, look: { yaw: 0.7 + 0.5 + 2 * Math.PI, pitch: 0 } }).mitraie!
   expect(pose.yaw).toBeCloseTo(1.2)
 })
+
+test("the gunner sits where the simulation puts them for the same look: the seat comes from the look, not from the host", () => {
+  for (let i = 0; i <= 40; i++) {
+    const yaw = SPOT.yaw - 2 + i * 0.1
+    const pose = view({ mount: { turret: 0, spot: SPOT }, look: { yaw, pitch: 0.1 } }).mitraie!
+    expect(pose.seat).toEqual(turretSeat(SPOT, yaw))
+  }
+})
+
+for (const [name, turn] of [["at rest", 0], ["at the left end of the arc", TURRET.arc], ["at the right end of the arc", -TURRET.arc], ["past the left end", TURRET.arc + 0.6]] as const) {
+  test(`${name}, the mitraie's pivot is straight in front of the gunner's crosshair`, () => {
+    const pose = view({ mount: { turret: 0, spot: SPOT }, look: { yaw: SPOT.yaw + turn, pitch: 0.3 } }).mitraie!
+    const [x, , z] = pose.seat
+    // In the gunner's own frame: straight ahead along their aim, nothing to either side.
+    const ahead = lookDir(pose.yaw, 0)
+    const dx = SPOT.at[0] - x
+    const dz = SPOT.at[2] - z
+    expect(dx * ahead.x + dz * ahead.z).toBeCloseTo(TURRET.seat, 9)
+    expect(dx * -ahead.z + dz * ahead.x).toBeCloseTo(0, 9)
+    expect(pose.seat[1]).toBe(SPOT.at[1])
+  })
+}
 
 for (const chosen of PRIMARIES) {
   test(`mounted with the ${chosen} chosen, no carried weapon is drawn: the only gun is the mitraie on its pivot`, () => {
