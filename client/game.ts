@@ -38,6 +38,7 @@ import type { Settings } from "./settings.ts"
 import "@ui-sdk/web/dialog"
 // UI SDK's select, for the host's bot skill: opens on a tap or a key (never on hover), as a sheet on a small touch screen.
 import "@ui-sdk/web/select"
+import { takeAwayDeparted } from "./bodies.ts"
 import { alwaysChosen } from "./choice.ts"
 import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, type MatchMenu } from "./match-menus.ts"
 import { pickerEntries } from "./touch.ts"
@@ -398,6 +399,11 @@ export class Game {
     }
   }
 
+  private readonly takeAwayBody = (a: { avatar: Avatar; blob: THREE.Mesh }) => {
+    this.d.scene.remove(a.avatar.object, a.blob)
+    a.avatar.dispose()
+  }
+
   private updateRoster(room: RoomInfo) {
     this.room = room
     for (const r of room.roster) {
@@ -407,14 +413,6 @@ export class Game {
       if (a && a.team !== r.team) {
         a.avatar.setTeam(r.team)
         a.team = r.team
-      }
-    }
-    const ids = new Set(room.roster.map((r) => r.id))
-    for (const [id, a] of this.avatars) {
-      if (!ids.has(id)) {
-        this.d.scene.remove(a.avatar.object, a.blob)
-        a.avatar.dispose()
-        this.avatars.delete(id)
       }
     }
     if (this.overlay === "pause") this.renderPause()
@@ -431,6 +429,7 @@ export class Game {
     // must not speed up or slow down every drawn player.
     else this.offset += (target - this.offset) * (target > this.offset ? 0.05 : 0.01)
     const players = new Map(s.players.map((p) => [p.id, p]))
+    takeAwayDeparted(this.avatars, players, this.takeAwayBody)
     this.frames.push({ tick: s.tick, players })
     while (this.frames.length > 40) this.frames.shift()
 

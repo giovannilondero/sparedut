@@ -240,7 +240,7 @@ export class Room {
     for (const [id, brain] of this.stationBots) this.sim.input(id, brain.think(this.world))
     const events = this.sim.step()
     this.world = this.sim.view()
-    if (this.training) this.keepStationBots()
+    const swapped = this.training && this.keepStationBots()
     for (const e of events) {
       this.events.push(e)
       // Bots are furlans: now and then they comment.
@@ -250,19 +250,28 @@ export class Room {
     }
     if (this.world.tick % SNAPSHOT_EVERY === 0) this.sendSnapshots()
     if (this.world.tick % 60 === 0) this.broadcast({ t: "board", rows: this.board() })
+    // After this tick's snapshot, which still has the bots that left: the client draws a body for
+    // every player a snapshot brings and takes away only those a later roster no longer lists.
+    if (swapped) this.broadcast({ t: "room", room: this.info() })
   }
 
   get tick() {
     return this.world.tick
   }
 
-  /** A training: the current station's bots are present, and no other's. They join at the next step. */
-  private keepStationBots() {
+  /**
+   * A training: the current station's bots are present, and no other's. They join at the next step.
+   * True when a bot left or came: the members must be told, or the client keeps drawing the old
+   * station's bots where they last stood.
+   */
+  private keepStationBots(): boolean {
     const station = stationOf(this.world)
-    if (station === this.botsFor) return
+    if (station === this.botsFor) return false
+    const left = this.stationBots.size
     for (const id of [...this.stationBots.keys()]) this.removeMember(id)
     this.botsFor = station
     if (station) for (const bot of botsOf(station)) this.addStationBot(station, bot)
+    return left + this.stationBots.size > 0
   }
 
   private addStationBot(station: StationId, bot: StationBot) {
