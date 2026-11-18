@@ -5,9 +5,11 @@
  * Whichever device was used last is the active one; switching clears held buttons.
  */
 import { BUTTON, type ButtonName } from "../shared/input.ts"
+import { turretRestSeat, type TurretSpot } from "../shared/map.ts"
 import type { Snapshot } from "../shared/protocol.ts"
-import type { WeaponId } from "../shared/weapons.ts"
-import { touchLayout, type TouchView } from "./touch.ts"
+import type { ArsenalValue, TurretState } from "../shared/sim/schema.ts"
+import { TURRET, type WeaponId } from "../shared/weapons.ts"
+import { buttonBit, inCircle, inRect, pickerEntries, TOUCH_BUTTONS, touchLayout, type TouchButton, type TouchLayout, type TouchView } from "./touch.ts"
 
 const KEYS: Record<string, ButtonName> = {
   Space: "jump",
@@ -57,14 +59,23 @@ const TOUCH_LOOK = 0.006
 const TOUCH_DEAD = 0.15
 /** Stick tilt from which, pushed forward, the player sprints. */
 const TOUCH_SPRINT = 0.95
+/** Seconds a finger stays on the weapon's name before the picker opens. */
+const LONG_PRESS = 0.45
 
-/** What a finger on the canvas drives, from where it landed until it lifts. */
-type FingerRole = "stick" | "look" | "fire"
+/**
+ * What a finger on the canvas drives, from where it landed until it lifts: the stick, look,
+ * fire, a button, the weapon's name, or nothing (a tap that picked a weapon).
+ */
+type FingerRole = "stick" | "look" | "fire" | "weapon" | "spent" | TouchButton
 interface Finger {
   readonly role: FingerRole
   x: number
   y: number
 }
+/** The buttons held only while a finger is on them (aim and crouch are toggles, the rest act once). */
+const HELD_BUTTONS = ["jump", "reload", "bomb", "mine", "use"] as const satisfies readonly (TouchButton & ButtonName)[]
+const isHeldButton = (r: FingerRole): r is (typeof HELD_BUTTONS)[number] => HELD_BUTTONS.some((b) => b === r)
+const isButton = (r: FingerRole): r is TouchButton => r !== "stick" && r !== "look" && r !== "fire" && r !== "weapon" && r !== "spent"
 
 /** What the controls follow of the player, from one snapshot. */
 export interface Tracked {
@@ -75,11 +86,26 @@ export interface Tracked {
    * one tick, which no snapshot shows as a death; the spawn event is never missed.
    */
   readonly spawned: boolean
+  /** On foot within reach of a free turret: "use" would mount it. */
+  readonly nearTurret: boolean
+  /** What the player carries, for the weapon picker. */
+  readonly arsenal: ArsenalValue | null
 }
 
 /** The player `me` in a snapshot, as the controls follow it. */
-export const trackedIn = (s: Snapshot, me: string, mounted: boolean): Tracked | null =>
-  s.you && { alive: s.you.alive, mounted, spawned: s.ev.some((e) => e.t === "spawn" && e.s === me) }
+export const trackedIn = (s: Snapshot, me: string, mounted: boolean, nearTurret: boolean): Tracked | null =>
+  s.you && { alive: s.you.alive, mounted, spawned: s.ev.some((e) => e.t === "spawn" && e.s === me), nearTurret: nearTurret && !mounted, arsenal: s.you.arsenal }
+
+/** A free turret whose seat a body at `at` can reach: the one rule for the turret prompt and the touch "use" button. */
+export const freeTurretInReach = (spots: readonly TurretSpot[], turrets: readonly TurretState[], at: { readonly x: number; readonly y: number; readonly z: number } | null) => {
+  if (!at) return false
+  for (let i = 0; i < spots.length; i++) {
+    if (turrets[i]?.gunner !== null) continue
+    const seat = turretRestSeat(spots[i])
+    if (Math.hypot(at.x - seat[0], at.z - seat[2]) <= TURRET.reach && Math.abs(at.y - seat[1]) < 1.2) return true
+  }
+  return false
+}
 
 export interface ControlsHandlers {
   onSlot: (slot: 1 | 2 | 3 | 4) => void
@@ -128,7 +154,16 @@ export class Controls {
   /** Look, movement and fire go through (no menu open); the frame loop says so in `poll`. */
   private playing = true
   /** The touch controls as the HUD draws them, updated in place. */
-  readonly touchView: TouchView = { stick: { held: false, ox: 0, oy: 0, kx: 0, ky: 0 }, fire: false }
+  readonly touchView: TouchView = { stick: { held: false, ox: 0, oy: 0, kx: 0, ky: 0 }, fire: false, pressed: 0, aim: false, crouch: false, board: false, use: null, picker: null }
+  /** The layout for the canvas's current size: computed once per size, read by the input and the HUD. */
+  private layout: TouchLayout | null = null
+  /** Where the canvas sat when the last finger landed: moves are measured from there. */
+  private originX = 0
+  private originY = 0
+  /** The finger on the weapon's name, timed for a long press (by `poll`), and whether it opened the picker. */
+  private weaponFinger: { finger: Finger; held: number; opened: boolean } | null = null
+  /** What the controls follow of the player, from the last snapshot. */
+  private tracked: Tracked | null = null
 
   constructor(private readonly element: HTMLElement, private readonly handlers: ControlsHandlers) {
     document.addEventListener("pointerlockchange", () => {
@@ -196,10 +231,29 @@ export class Controls {
     this.lookDy += dy * s
   }
 
+  /** The touch layout for a canvas of this size: the same object until the size changes. */
+  relayout(size: { readonly width: number; readonly height: number }): TouchLayout {
+    const l = this.layout
+    if (l && this.layoutW === size.width && this.layoutH === size.height) return l
+    this.layoutW = size.width
+    this.layoutH = size.height
+    return (this.layout = touchLayout(size))
+  }
+  private layoutW = 0
+  private layoutH = 0
+
+  /** What "use" does now: mount a free turret within reach, dismount, or nothing (the control is hidden). */
+  get turretControl(): "use" | "dismount" | null {
+    const p = this.tracked
+    if (!p?.alive) return null
+    return p.mounted ? "dismount" : p.nearTurret ? "use" : null
+  }
+
   /**
    * A finger lands on the canvas. The first touch in a match makes touch the active device.
-   * The finger keeps the control it landed on until it lifts: fire, else the stick if no
-   * other thumb holds it and it landed in the stick's region, else look.
+   * The finger keeps the control it landed on until it lifts: an entry of the open picker,
+   * fire, a button, the weapon's name, else the stick if no other thumb holds it and it
+   * landed in the stick's region, else look.
    */
   private fingerDown(e: PointerEvent) {
     if (e.pointerType === "mouse") return this.useTouch(false)
@@ -209,38 +263,89 @@ export class Controls {
     // A finger that comes down again without an up in between (the up was lost) lets go first.
     this.fingerUp(e)
     const rect = this.element.getBoundingClientRect()
+    this.originX = rect.left
+    this.originY = rect.top
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
-    const layout = touchLayout(rect)
-    const fire = layout.fire
-    const region = layout.stick.region
-    let role: FingerRole = "look"
-    if ((x - fire.x) ** 2 + (y - fire.y) ** 2 <= fire.r ** 2) role = "fire"
-    else if (!this.touchView.stick.held && x >= region.left && x <= region.left + region.width && y >= region.top && y <= region.top + region.height) role = "stick"
-    this.fingers.set(e.pointerId, { role, x, y })
+    const layout = this.relayout(rect)
+    const role = this.roleAt(layout, x, y)
+    const finger: Finger = { role, x, y }
+    this.fingers.set(e.pointerId, finger)
     this.element.setPointerCapture?.(e.pointerId)
+    const v = this.touchView
     if (role === "fire") {
       this.touchHeld.add("fire")
       this.latched |= BUTTON.fire
-      this.touchView.fire = true
+      v.fire = true
+    } else if (role === "stick") {
+      const st = v.stick
+      st.held = true
+      st.ox = st.kx = x
+      st.oy = st.ky = y
+    } else if (role === "weapon") this.weaponFinger = { finger, held: 0, opened: false }
+    else if (isButton(role)) this.buttonDown(role)
+    this.redraw()
+  }
+
+  /** What a finger landing at (x, y) drives. A touch outside the open picker closes it and does its own job. */
+  private roleAt(layout: TouchLayout, x: number, y: number): FingerRole {
+    const picker = this.touchView.picker
+    if (picker) {
+      this.touchView.picker = null
+      for (let i = 0; i < picker.length; i++) {
+        if (!inRect(layout.picker[i], x, y)) continue
+        this.handlers.onSlot(picker[i].slot)
+        return "spent"
+      }
+      if (inRect(layout.weapon, x, y)) return "spent"
     }
-    if (role === "stick") {
-      const v = this.touchView.stick
-      v.held = true
-      v.ox = v.kx = x
-      v.oy = v.ky = y
+    if (inCircle(layout.fire, x, y)) return "fire"
+    for (const b of TOUCH_BUTTONS) if (inCircle(layout.buttons[b], x, y) && (b !== "use" || this.turretControl)) return b
+    if (inRect(layout.weapon, x, y)) return "weapon"
+    const region = layout.stick.region
+    if (!this.touchView.stick.held && inRect(region, x, y)) return "stick"
+    return "look"
+  }
+
+  /** A finger lands on a button: its action, the same one a key or a pad button has. */
+  private buttonDown(b: TouchButton) {
+    const v = this.touchView
+    v.pressed |= buttonBit(b)
+    if (isHeldButton(b)) {
+      this.press(b, true)
+      this.touchHeld.add(b)
+    } else if (b === "aim") {
+      if (this.touchHeld.has("aim")) this.touchHeld.delete("aim")
+      else this.touchHeld.add("aim")
+    } else if (b === "crouch") {
+      // A toggle whatever the setting says, on the same latch the keyboard's toggle uses.
+      this.crouched = !this.crouched
+    } else if (b === "menu") this.handlers.onPause()
+    else if (b === "board") {
+      v.board = !v.board
+      this.handlers.onKey("Tab", v.board)
+    } else if (b === "phrases") {
+      this.handlers.onKey("KeyV", true)
+      this.handlers.onKey("KeyV", false)
     }
-    this.handlers.onTouch?.(this.touchView)
+  }
+
+  /** Brings the toggles and the "use" button into the view and hands it to the HUD. */
+  private redraw() {
+    const v = this.touchView
+    v.aim = this.touchHeld.has("aim")
+    v.crouch = this.crouched
+    v.use = this.turretControl
+    this.handlers.onTouch?.(v)
   }
 
   private fingerMove(e: PointerEvent) {
     const f = this.fingers.get(e.pointerId)
     if (!f) return
-    const rect = this.element.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-    if (f.role === "stick") this.tilt(x, y, touchLayout(rect).stick.radius)
-    else this.turn((x - f.x) * TOUCH_LOOK, (y - f.y) * TOUCH_LOOK)
+    const x = e.clientX - this.originX
+    const y = e.clientY - this.originY
+    if (f.role === "stick" && this.layout) this.tilt(x, y, this.layout.stick.radius)
+    else if (f.role === "look" || f.role === "fire") this.turn((x - f.x) * TOUCH_LOOK, (y - f.y) * TOUCH_LOOK)
     f.x = x
     f.y = y
   }
@@ -263,7 +368,7 @@ export class Controls {
     const rim = len > radius ? radius / len : 1
     v.kx = v.ox + dx * rim
     v.ky = v.oy + dy * rim
-    this.handlers.onTouch?.(this.touchView)
+    this.redraw()
   }
 
   private fingerUp(e: PointerEvent) {
@@ -275,11 +380,31 @@ export class Controls {
       this.touchMove.mx = this.touchMove.mz = 0
       this.touchHeld.delete("sprint")
     }
-    if (f.role === "fire" && ![...this.fingers.values()].some((o) => o.role === "fire")) {
+    const v = this.touchView
+    const alone = ![...this.fingers.values()].some((o) => o.role === f.role)
+    if (f.role === "fire" && alone) {
       this.touchHeld.delete("fire")
-      this.touchView.fire = false
+      v.fire = false
     }
-    this.handlers.onTouch?.(this.touchView)
+    if (f.role === "weapon" && this.weaponFinger?.finger === f) {
+      const opened = this.weaponFinger.opened
+      this.weaponFinger = null
+      if (!opened) this.handlers.onWheel(1)
+      // Slid from the name onto an entry of the picker it opened: that weapon.
+      else if (v.picker && this.layout) {
+        for (let i = 0; i < v.picker.length; i++) {
+          if (!inRect(this.layout.picker[i], f.x, f.y)) continue
+          this.handlers.onSlot(v.picker[i].slot)
+          v.picker = null
+          break
+        }
+      }
+    }
+    if (isButton(f.role) && alone) {
+      v.pressed &= ~buttonBit(f.role)
+      if (isHeldButton(f.role)) this.touchHeld.delete(f.role)
+    }
+    this.redraw()
   }
 
   /**
@@ -315,7 +440,15 @@ export class Controls {
    * respawns standing and dismounts standing.
    */
   track(player: Tracked | null) {
+    const v = this.touchView
+    const before = this.crouched
+    const aimed = this.touchHeld.has("aim")
+    this.tracked = player
     if (!player || !player.alive || player.mounted || player.spawned) this.crouched = false
+    // The touch aim toggle does not outlive a life either.
+    if (!player || !player.alive || player.spawned) this.touchHeld.delete("aim")
+    // The HUD learns what a snapshot changed only when something did.
+    if (this.crouched !== before || this.touchHeld.has("aim") !== aimed || this.turretControl !== v.use) this.redraw()
   }
 
   /**
@@ -353,14 +486,23 @@ export class Controls {
     this.keys.clear()
   }
 
+  /** Lets go of every finger and touch toggle (aim, the picker, a scoreboard a tap opened). The crouch latch is not touch's alone: it stays. */
   private releaseTouch() {
-    if (this.fingers.size === 0 && this.touchHeld.size === 0) return
+    const v = this.touchView
+    if (this.fingers.size === 0 && this.touchHeld.size === 0 && !v.board && !v.picker) return
     this.fingers.clear()
     this.touchHeld.clear()
+    this.weaponFinger = null
     this.touchMove.mx = this.touchMove.mz = 0
-    this.touchView.stick.held = false
-    this.touchView.fire = false
-    this.handlers.onTouch?.(this.touchView)
+    v.stick.held = false
+    v.fire = false
+    v.pressed = 0
+    v.picker = null
+    if (v.board) {
+      v.board = false
+      this.handlers.onKey("Tab", false)
+    }
+    this.redraw()
   }
 
   private releasePad() {
@@ -388,6 +530,13 @@ export class Controls {
   poll(dt: number, playing = true) {
     this.playing = playing
     if (!this.enabled || !playing) this.releaseTouch()
+    // A finger kept on the weapon's name: the picker of the weapons the player owns.
+    const w = this.weaponFinger
+    if (w && !w.opened && (w.held += dt) >= LONG_PRESS && this.tracked?.arsenal) {
+      w.opened = true
+      this.touchView.picker = pickerEntries(this.tracked.arsenal)
+      this.redraw()
+    }
     const p = this.pad()
     if (!p) return
     const down = p.buttons.map((b, i) => (i === PAD.l2 || i === PAD.r2 ? b.value > TRIGGER_ON : b.pressed))

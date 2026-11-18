@@ -119,6 +119,9 @@ export interface Strings {
     /** Turrets: the key to mount, to dismount, the heat. */
     readonly turretUse: string
     readonly turretLeave: string
+    /** The touch button that mounts a free turret, and the one that dismounts in its place. */
+    readonly touchUse: string
+    readonly touchLeave: string
     readonly turretHeat: string
     readonly turretHot: string
   }
@@ -516,6 +519,8 @@ const fur: Strings = {
     healed: (who, n) => `+${n} a ${who}`,
     turretUse: "<kbd>E</kbd> Mitraie",
     turretLeave: "<kbd>E</kbd> / <kbd>Spazi</kbd> lasse la mitraie",
+    touchUse: "Mitraie",
+    touchLeave: "Lasse",
     turretHeat: "Calôr",
     turretHot: "SCJALDADE!"
   },
@@ -863,6 +868,8 @@ const it: Strings = {
     healed: (who, n) => `+${n} a ${who}`,
     turretUse: "<kbd>E</kbd> Mitragliatrice",
     turretLeave: "<kbd>E</kbd> / <kbd>Spazio</kbd> lascia la mitragliatrice",
+    touchUse: "Mitraglia",
+    touchLeave: "Lascia",
     turretHeat: "Calore",
     turretHot: "SURRISCALDATA!"
   },

@@ -8,7 +8,7 @@ import type { KillCause } from "../shared/sim/events.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { WARMUP_TICKS } from "../shared/sim/rules.ts"
 import { t } from "./i18n.ts"
-import type { TouchLayout, TouchView } from "./touch.ts"
+import { buttonBit, TOUCH_BUTTONS, type PickerEntry, type TouchLayout, type TouchView } from "./touch.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -75,6 +75,7 @@ export class Hud {
     const def = WEAPONS[a.current]
     const endless = def.mode === "melee" || turret
     this.text("weapon-name", t().weapons[turret ? "mitraie" : a.current].name)
+    this.text("touch-weapon", t().weapons[turret ? "mitraie" : a.current].name)
     const ammo = a.ammo[a.current]
     this.text("mag", endless ? "∞" : String(localMag ?? ammo.mag))
     this.text("reserve", endless ? "" : String(ammo.reserve))
@@ -270,7 +271,27 @@ export class Hud {
     this.style("touch", "--fire-x", `${layout.fire.x}px`)
     this.style("touch", "--fire-y", `${layout.fire.y}px`)
     this.style("touch", "--fire-r", `${layout.fire.r}px`)
+    for (const b of TOUCH_BUTTONS) {
+      const c = layout.buttons[b]
+      this.style(`touch-${b}`, "--x", `${c.x}px`)
+      this.style(`touch-${b}`, "--y", `${c.y}px`)
+      this.style(`touch-${b}`, "--r", `${c.r}px`)
+    }
+    const w = layout.weapon
+    this.style("touch", "--wx", `${w.left}px`)
+    this.style("touch", "--wy", `${w.top}px`)
+    this.style("touch", "--ww", `${w.width}px`)
+    this.style("touch", "--wh", `${w.height}px`)
+    this.touchLayout = layout
+    this.drawnPicker = undefined
   }
+
+  /** What the touch buttons last showed: compared as plain values, so a finger's move redraws nothing else. */
+  private touchLayout: TouchLayout | null = null
+  private drawnPressed = -1
+  private drawnToggles = -1
+  private drawnUse: TouchView["use"] | undefined = undefined
+  private drawnPicker: readonly PickerEntry[] | null | undefined = undefined
 
   /**
    * Draws the stick where the thumb landed and the knob under it, and fire as held.
@@ -284,6 +305,37 @@ export class Hud {
     stick.style.transform = v.held ? `translate(${v.ox}px, ${v.oy}px)` : ""
     knob.style.transform = v.held ? `translate(${v.kx - v.ox}px, ${v.ky - v.oy}px)` : ""
     $("touch-fire").classList.toggle("held", view.fire)
+    if (view.pressed !== this.drawnPressed) {
+      this.drawnPressed = view.pressed
+      for (const b of TOUCH_BUTTONS) $(`touch-${b}`).classList.toggle("held", (view.pressed & buttonBit(b)) !== 0)
+    }
+    const toggles = (view.aim ? 1 : 0) | (view.crouch ? 2 : 0) | (view.board ? 4 : 0)
+    if (toggles !== this.drawnToggles) {
+      this.drawnToggles = toggles
+      $("touch-aim").classList.toggle("on", view.aim)
+      $("touch-crouch").classList.toggle("on", view.crouch)
+      $("touch-board").classList.toggle("on", view.board)
+    }
+    if (view.use !== this.drawnUse) {
+      this.drawnUse = view.use
+      const use = $("touch-use")
+      use.classList.toggle("hidden", !view.use)
+      use.textContent = view.use === "dismount" ? t().hud.touchLeave : t().hud.touchUse
+    }
+    if (view.picker !== this.drawnPicker) {
+      this.drawnPicker = view.picker
+      const picker = $("touch-picker")
+      picker.classList.toggle("hidden", !view.picker)
+      const rects = this.touchLayout?.picker ?? []
+      const current = $("weapon-name").textContent
+      picker.innerHTML = (view.picker ?? [])
+        .map((e, i) => {
+          const r = rects[i]
+          const name = t().weapons[e.id].name
+          return r ? `<div class="${name === current ? "on" : ""}" style="left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px">${esc(name)}</div>` : ""
+        })
+        .join("")
+    }
   }
 }
 
