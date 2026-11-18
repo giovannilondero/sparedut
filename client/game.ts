@@ -428,7 +428,8 @@ export class Game {
       this.wasAlive = you.alive
       this.seated = you.alive && this.mounted() >= 0
       const mounted = this.mounted() >= 0
-      this.controls.track(trackedIn(s, this.me, mounted, you.alive && !mounted && this.predictor.body !== null && freeTurretInReach(this.physics.map.turrets, s.turrets, this.predictor.body) >= 0))
+      const body = this.predictor.body
+      this.controls.track(trackedIn(s, this.me, { mounted, freeTurret: body !== null && freeTurretInReach(this.physics.map.turrets, s.turrets, body) >= 0 }))
       // The server has already seen my last weapon switch and holds a different one: it
       // switched it itself (lanciafrico pickup, armoury, respawn) or rejected the switch. Follow it.
       const server = you.arsenal.current

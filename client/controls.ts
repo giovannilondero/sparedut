@@ -93,9 +93,12 @@ export interface Tracked {
   readonly arsenal: ArsenalValue | null
 }
 
-/** The player `me` in a snapshot, as the controls follow it. */
-export const trackedIn = (s: Snapshot, me: string, mounted: boolean, nearTurret: boolean): Tracked | null =>
-  s.you && { alive: s.you.alive, mounted, spawned: s.ev.some((e) => e.t === "spawn" && e.s === me), nearTurret: nearTurret && !mounted, arsenal: s.you.arsenal }
+/**
+ * The player `me` in a snapshot, as the controls follow it. `at.mounted`: on a turret's seat;
+ * `at.freeTurret`: a free turret within reach (`freeTurretInReach`), which counts only on foot.
+ */
+export const trackedIn = (s: Snapshot, me: string, at: { readonly mounted: boolean; readonly freeTurret: boolean }): Tracked | null =>
+  s.you && { alive: s.you.alive, mounted: at.mounted, spawned: s.ev.some((e) => e.t === "spawn" && e.s === me), nearTurret: at.freeTurret && !at.mounted, arsenal: s.you.arsenal }
 
 export interface ControlsHandlers {
   onSlot: (slot: Slot) => void
