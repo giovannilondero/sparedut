@@ -239,12 +239,14 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
  * A step to do arrives where the player is looking: large above the crosshair and edged in gold,
  * then it glides to its corner (`Hud.training` sets `announce` when the step changes). While the
  * game waits for the player to take the controls it waits there too, and arrives once they have.
+ * Under an open match menu it keeps to its corner, and arrives when the menu closes.
  * On touch the panel is already first in the free area. With reduced motion it does not travel: it
  * fades out in the middle and in at its place.
  */
 #training { --mid: translate(calc(50vw - 14px - 50%), calc(30vh - 14px - 50%)) scale(1.6); --call-back: rgba(10, 8, 6, 0.9); --call-glow: 0 0 28px color-mix(in oklch, var(--gold) 35%, transparent); }
 #hud:not(.touch) #training.announce { animation: training-arrive 3.8s; }
 #hud:not(.touch):has(#clickplay:not(.hidden)) #training.announce { animation: none; transform: var(--mid); border-color: var(--gold); background-color: var(--call-back); box-shadow: var(--call-glow); }
+#hud:has(ui-dialog-content.overlay:not([hidden])) #training.announce { animation: none; }
 @keyframes training-arrive {
   0% { opacity: 0; transform: var(--mid) scale(1.12); animation-timing-function: ease-out; }
   6% { opacity: 1; transform: var(--mid) scale(1); border-color: var(--gold); background-color: var(--call-back); box-shadow: var(--call-glow); }
