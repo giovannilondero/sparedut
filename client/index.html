@@ -204,7 +204,13 @@
       <div id="pause" class="hidden overlay"></div>
       <div id="settings-ingame" class="hidden overlay"></div>
       <div id="endscreen" class="hidden overlay"></div>
-      <div id="clickplay" class="hidden" data-t="clickplay"></div>
+      <div id="clickplay" class="hidden"><div class="for-mouse" data-t="clickplay"></div><div class="for-touch" data-t="tapplay"></div></div>
+
+      <!-- Touch controls (layout A): drawn where client/touch.ts places them; the canvas below takes the fingers. -->
+      <div id="touch" class="hidden" aria-hidden="true">
+        <div id="touch-stick"><i id="touch-knob"></i></div>
+        <div id="touch-fire"></div>
+      </div>
     </div>
 
     <div id="toast" class="hidden"></div>
