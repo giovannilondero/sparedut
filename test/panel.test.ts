@@ -269,8 +269,13 @@ describe("carrying the panel", () => {
   test("the next match puts the panel back on the wall and takes it from its carrier", () => {
     const sim = match([{ id: "a", at: inside(), yaw: FACING }])
     expect(torn(hold(sim, "a", PANEL_TEAR_TICKS + 5, useHeld), "a")).toBe(true)
+    // The host ends the match (back to the Muster), then starts the next one.
     sim.start()
     hold(sim, "a", 10, { yaw: FACING })
+    expect(sim.view().phase.tag).toBe("Muster")
+    sim.start()
+    hold(sim, "a", 10, { yaw: FACING })
+    expect(sim.view().phase.tag).toBe("Live")
     expect(sim.view().panels).toEqual([{ tag: "wall" }])
     expect(me(sim, "a").arsenal.power).toBeNull()
     expect(torn(hold(sim, "a", PANEL_TEAR_TICKS + 5, useHeld), "a")).toBe(true)

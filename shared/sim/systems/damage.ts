@@ -5,8 +5,8 @@
 import { STREAK_AT } from "../../folklore.ts"
 import { foesStandDown, killsScore, spared, SPARED_HP } from "../../training/spared.ts"
 import type { KillCause } from "../events.ts"
-import { absorb, ASSIST_WINDOW_TICKS, currentStation, hostile, MAX_HP, RESPAWN_TICKS } from "../rules.ts"
-import { Attackers, Damage, Game, Heal, Life, Match, Motion, Out, Player, Rules, Score, Stats, TeamOf, Tick, Training } from "../schema.ts"
+import { absorb, ASSIST_WINDOW_TICKS, currentStation, hostile, maxHp, RESPAWN_TICKS } from "../rules.ts"
+import { Arsenal, Attackers, Damage, Game, Heal, Life, Match, Motion, Out, Player, Rules, Score, Stats, TeamOf, Tick, Training } from "../schema.ts"
 
 /** Causes that can also hit whoever launched them (the others, on oneself, count as a fall). */
 const SELF_HARM: ReadonlySet<KillCause> = new Set(["sgnape", "lanciafrico", "mine", "tampieste"])
@@ -24,7 +24,8 @@ export const ApplyDamage = Game.System(
           life: Game.Query.write(Life),
           stats: Game.Query.write(Stats),
           attackers: Game.Query.write(Attackers),
-          motion: Game.Query.write(Motion)
+          motion: Game.Query.write(Motion),
+          arsenal: Game.Query.read(Arsenal)
         }
       })
     },
@@ -62,8 +63,10 @@ export const ApplyDamage = Game.System(
       const target = bySession.get(h.target)
       if (!target) continue
       const life = data.life.get(target)
-      if (life._tag !== "Alive" || life.hp >= MAX_HP) continue
-      const gained = Math.min(MAX_HP - life.hp, h.amount)
+      // Every heal stops at the class's health.
+      const ceiling = maxHp(data.arsenal.get(target).primary)
+      if (life._tag !== "Alive" || life.hp >= ceiling) continue
+      const gained = Math.min(ceiling - life.hp, h.amount)
       data.life.update(target, { state: "Alive", data: (l) => ({ hp: l.hp + gained, armor: l.armor, shield: l.shield }) })
       if (h.healer !== h.target) {
         const healer = bySession.get(h.healer)

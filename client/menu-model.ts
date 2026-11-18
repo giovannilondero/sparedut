@@ -6,8 +6,8 @@
 import { BOT_LEVEL_IDS, ROOM_MODE_IDS, type BotLevel, type RoomModeId } from "../shared/folklore.ts"
 import { ROOM_MAP_IDS, type RoomMapId } from "../shared/maps/index.ts"
 import { ACCESSES, MAX_BOTS, Password, REACHES, RoomCode, type Access, type ErrorCode, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
-import type { PrimaryId } from "../shared/weapons.ts"
-import type { Lang } from "./i18n.ts"
+import { CLASSES, type PrimaryId } from "../shared/weapons.ts"
+import type { Lang, Strings } from "./i18n.ts"
 import type { TrainingStart } from "../shared/training/start.ts"
 import { oneTapRoom, trainingCompleted, trainingStart, type Settings, type TrainingInvitation } from "./settings.ts"
 
@@ -26,13 +26,18 @@ export type Remembered = Settings
 /** The settings form's values: the same form in the menu and in a match. */
 export type FormSetting = "sensitivity" | "fov" | "master" | "music" | "quality" | "crouch" | "autoRes" | "showInfo" | "invertY"
 
+/** A primary's class as the armoury and the Muster show it: its health, and its speed as a share of the walk. */
+export const classFigures = (s: Strings, primary: PrimaryId): readonly (readonly [label: string, value: string])[] => [
+  [s.menu.stat.health, `${CLASSES[primary].hp}`],
+  [s.menu.stat.speed, `${Math.round(CLASSES[primary].speed * 100)}%`]
+]
+
 export const SCREENS = ["home", "create", "password", "armarie", "settings", "vocabolari"] as const
 export type Screen = (typeof SCREENS)[number]
 
 /** What the menu asks the game to do. */
 export type MenuRequest =
-  /** `oneTap`: the home screen's button, whose match starts at once, without warm-up. */
-  | { readonly t: "create"; readonly room: CreateOptions; readonly oneTap: boolean }
+  | { readonly t: "create"; readonly room: CreateOptions }
   /** `password` only once the player typed one. */
   | { readonly t: "join"; readonly code: string; readonly password?: string }
   /** The training: always Offline, its map and mode fixed. */
@@ -295,13 +300,13 @@ export class MenuModel {
     }
     Object.assign(this.remembered, { lastMode: room.mode, lastMap: room.map, lastBots: room.bots, lastLevel: room.level, lastMinutes: room.minutes, lastFf: room.ff })
     this.save()
-    return { kind: "send", request: { t: "create", room, oneTap: false } }
+    return { kind: "send", request: { t: "create", room } }
   }
 
-  /** The home screen's "play against the bots": an Offline room in one tap, with the remembered values, its match started at once. */
+  /** The home screen's "play against the bots": an Offline room in one tap, with the remembered values. It stops on the Muster, like any room. */
   oneTap(): Outcome {
     if (!this.remembered.name) return this.needName()
-    return { kind: "send", request: { t: "create", room: oneTapRoom(this.remembered), oneTap: true } }
+    return { kind: "send", request: { t: "create", room: oneTapRoom(this.remembered) } }
   }
 
   /**

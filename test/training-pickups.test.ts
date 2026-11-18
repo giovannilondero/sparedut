@@ -9,7 +9,7 @@ import { turretRestSeat } from "../shared/map.ts"
 import { SAGRE, SAGRE_STATIONS } from "../shared/maps/sagre.ts"
 import { initPhysics } from "../shared/physics.ts"
 import type { GameEvent } from "../shared/sim/events.ts"
-import { MAX_HP } from "../shared/sim/rules.ts"
+import { maxHp } from "../shared/sim/rules.ts"
 import { STATION_IDS, type StationId } from "../shared/training/index.ts"
 import { WEAPONS } from "../shared/weapons.ts"
 import { harness } from "./harness.ts"
@@ -69,7 +69,7 @@ describe("station 8: pickups", () => {
   test("the player arrives hurt, without armour and low on ammunition, with every pickup there", () => {
     const { snap } = reach("pickups")
     const you = snap().you!
-    expect(you.hp).toBeLessThan(MAX_HP)
+    expect(you.hp).toBeLessThan(maxHp(you.arsenal.primary))
     expect(you.armor).toBe(0)
     expect(you.arsenal.ammo.cramar.reserve).toBeLessThan(WEAPONS.cramar.reserve)
     expect(you.arsenal.bombs).toBe(0)

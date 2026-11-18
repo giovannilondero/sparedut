@@ -9,6 +9,7 @@
 import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId, Team } from "../shared/map.ts"
 import type { Access, ErrorCode, Reach } from "../shared/protocol.ts"
+import type { PhaseView } from "../shared/sim/view.ts"
 import type { StationId } from "../shared/training/index.ts"
 import type { WeaponId } from "../shared/weapons.ts"
 import type { Device } from "./device.ts"
@@ -102,6 +103,8 @@ export interface Strings {
     readonly reach: Record<Reach, string>
     /** A full room in the list: shown, not selectable. */
     readonly full: string
+    /** A room's phase in the list: in its Muster, in a match, showing a match's results. */
+    readonly phase: Record<PhaseView["tag"], string>
     /** The mark on a room with a password in the list, read out by screen readers. */
     readonly passwordRoom: string
     /** The password prompt: which room asks for it. */
@@ -115,7 +118,7 @@ export interface Strings {
     readonly ffOn: string
     readonly minutes: Fn<[number]>
     readonly tag: { readonly primary: string; readonly power: string; readonly melee: string; readonly pistol: string }
-    readonly stat: { readonly damage: string; readonly rate: string; readonly range: string; readonly mag: string }
+    readonly stat: { readonly damage: string; readonly rate: string; readonly range: string; readonly mag: string; readonly health: string; readonly speed: string }
     readonly vocab: readonly (readonly [string, string])[]
     /** One line on who can see and join a room of that reach. */
     readonly reachSub: Record<Reach, string>
@@ -146,8 +149,6 @@ export interface Strings {
     readonly contested: string
     readonly hillOwned: Fn
     readonly hillFree: string
-    /** `menu`: the active device's control for the match menu (`menuControl`). */
-    readonly warmup: Fn<[string, string]>
     readonly streak: Fn<[string, number]>
     readonly deathBy: Fn
     readonly deathSelf: string
@@ -249,6 +250,13 @@ export interface Strings {
     readonly restartIn: Fn<[number]>
     readonly leave: string
     readonly again: string
+  }
+  /** The Muster: the room before a match, where players choose a team and a primary and the host starts. */
+  readonly muster: {
+    readonly title: string
+    readonly primary: string
+    readonly chat: string
+    readonly chatPlaceholder: string
   }
   readonly perf: { readonly snaps: string; readonly players: string; readonly corrections: string; readonly hide: string; readonly menu: string; readonly dynRes: string }
   readonly tips: readonly string[]
@@ -550,6 +558,7 @@ const fur: Strings = {
     codeBad: "Il codiç al à 4 letaris.",
     reach: { offline: "Offline", lan: "LAN", online: "In linie" },
     full: "Plene",
+    phase: { Muster: "Adunade", Live: "In partide", Over: "Partide finide" },
     passwordRoom: "Cun password",
     passwordFor: (code) => `La partide ${code} e domande une password.`,
     passwordBad: "La password e à di vê di 1 a 32 caratars.",
@@ -563,7 +572,7 @@ const fur: Strings = {
       melee: "Cuarp a cuarp · simpri cun te",
       pistol: "Pistole · simpri cun te"
     },
-    stat: { damage: "Dam", rate: "Cjadence", range: "Puartade", mag: "Cjamadôr" },
+    stat: { damage: "Dam", rate: "Cjadence", range: "Puartade", mag: "Cjamadôr", health: "Salût", speed: "Velocitât" },
     vocab: VOCAB,
     reachSub: {
       offline: "Dome tu cuintri i bot, in chest navigadôr",
@@ -594,13 +603,12 @@ const fur: Strings = {
     contested: "Contindude!",
     hillOwned: (team) => `Plaçute: ${team}`,
     hillFree: "Plaçute libare",
-    warmup: (left, menu) => `Riscjaldament: i ponts no contin. Si partìs tra ${left}, o l'host al fâs partî subite dal menù (${menu})`,
     streak: (name, n) => `${name} · ${n} di file`,
     deathBy: (name) => `Ti à fat fûr <b>${name}</b>`,
     deathSelf: "Tu ti sês fat mâl di bessôl",
     respawnIn: (s) => `Si torne in pîts tra ${s}…`,
     shield: "✨ Protezût",
-    board: ["Non", "Ponts", "Copâts", "Muarts", "Ajûts", "Frics", "Serie", "Ping"],
+    board: ["Non", "Arme", "Ponts", "Copâts", "Muarts", "Ajûts", "Frics", "Serie", "Ping"],
     kill: {
       mescul: ["al à messedât come la polente", "al à mesculât", "al à dât une mesculade a"],
       mandi: ["al à saludât par simpri", "al à dit Mandi a", "al à fat la riverence a"],
@@ -711,7 +719,7 @@ const fur: Strings = {
     reach: { offline: "Offline · dome tu cuintri i bot", lan: "LAN · dome te stesse rêt", online: "In linie · par ducj" },
     access: { open: "Viert", password: "Cun password" },
     start: "Fâs partî la partide",
-    restart: "Torne a scomençâ",
+    restart: "Finìs la partide e torne ae Adunade",
     hostOnly: "L'host (👑) al fâs partî la partide.",
     host: "Host:",
     addBot: (team) => `+ bot ${team}`,
@@ -736,9 +744,15 @@ const fur: Strings = {
     kills: (n) => `${n} copâts`,
     row: (n) => `${n} di file`,
     heads: (n) => `${n} tal cjâf`,
-    restartIn: (s) => `Si torne a scomençâ tra ${s} seconts…`,
+    restartIn: (s) => `Si torne ae Adunade tra ${s} seconts…`,
     leave: "Va fûr",
-    again: "Subit un altri zîr!"
+    again: "Subit ae Adunade"
+  },
+  muster: {
+    title: "Adunade",
+    primary: "Arme principâl",
+    chat: "Cjacaris",
+    chatPlaceholder: "Scrîf ai altris e frache Invio"
   },
   perf: { snaps: "istantanis", players: "zuiadôrs", corrections: "corezions", hide: "F3 par platâ", menu: "menù", dynRes: "ris. dinamiche" },
   tips: [
@@ -978,6 +992,7 @@ const it: Strings = {
     codeBad: "Il codice ha 4 lettere.",
     reach: { offline: "Offline", lan: "LAN", online: "Online" },
     full: "Piena",
+    phase: { Muster: "Adunata", Live: "In partita", Over: "Partita finita" },
     passwordRoom: "Con password",
     passwordFor: (code) => `La partita ${code} chiede una password.`,
     passwordBad: "La password deve avere da 1 a 32 caratteri.",
@@ -991,7 +1006,7 @@ const it: Strings = {
       melee: "Corpo a corpo · sempre con te",
       pistol: "Pistola · sempre con te"
     },
-    stat: { damage: "Danno", rate: "Cadenza", range: "Portata", mag: "Caricatore" },
+    stat: { damage: "Danno", rate: "Cadenza", range: "Portata", mag: "Caricatore", health: "Salute", speed: "Velocità" },
     vocab: VOCAB,
     reachSub: {
       offline: "Solo tu contro i bot, in questo browser",
@@ -1022,13 +1037,12 @@ const it: Strings = {
     contested: "Contesa!",
     hillOwned: (team) => `Piazzetta: ${team}`,
     hillFree: "Piazzetta libera",
-    warmup: (left, menu) => `Riscaldamento: i punti non contano. Si parte tra ${left}, o l'host fa partire subito dal menu (${menu})`,
     streak: (name, n) => `${name} · ${n} di fila`,
     deathBy: (name) => `Ti ha fatto fuori <b>${name}</b>`,
     deathSelf: "Ti sei fatto male da solo",
     respawnIn: (s) => `Si torna in piedi tra ${s}…`,
     shield: "✨ Protetto",
-    board: ["Nome", "Punti", "Uccisioni", "Morti", "Assist", "Catture", "Serie", "Ping"],
+    board: ["Nome", "Arma", "Punti", "Uccisioni", "Morti", "Assist", "Catture", "Serie", "Ping"],
     kill: {
       mescul: ["ha girato come la polenta", "ha rimestato", "ha dato una mestolata a"],
       mandi: ["ha salutato per sempre", "ha detto Mandi a", "ha fatto la riverenza a"],
@@ -1150,7 +1164,7 @@ const it: Strings = {
     reach: { offline: "Offline · solo tu contro i bot", lan: "LAN · solo sulla stessa rete", online: "Online · per tutti" },
     access: { open: "Aperto", password: "Con password" },
     start: "Fai partire la partita",
-    restart: "Ricomincia",
+    restart: "Chiudi la partita e torna all'Adunata",
     hostOnly: "L'host (👑) fa partire la partita.",
     host: "Host:",
     addBot: (team) => `+ bot ${team}`,
@@ -1175,9 +1189,15 @@ const it: Strings = {
     kills: (n) => `${n} uccisioni`,
     row: (n) => `${n} di fila`,
     heads: (n) => `${n} in testa`,
-    restartIn: (s) => `Si ricomincia tra ${s} secondi…`,
+    restartIn: (s) => `Si torna all'Adunata tra ${s} secondi…`,
     leave: "Esci",
-    again: "Subito un altro giro!"
+    again: "Subito all'Adunata"
+  },
+  muster: {
+    title: "Adunata",
+    primary: "Arma principale",
+    chat: "Chiacchiere",
+    chatPlaceholder: "Scrivi agli altri e premi Invio"
   },
   perf: { snaps: "istantanee", players: "giocatori", corrections: "correzioni", hide: "F3 per nascondere", menu: "menu", dynRes: "ris. dinamica" },
   tips: [

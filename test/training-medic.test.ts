@@ -11,7 +11,8 @@ import { eyeHeight } from "../shared/movement.ts"
 import { initPhysics } from "../shared/physics.ts"
 import { FLAG_BIT, type SnapOther } from "../shared/protocol.ts"
 import type { GameEvent } from "../shared/sim/events.ts"
-import { MAX_HP } from "../shared/sim/rules.ts"
+import { maxHp } from "../shared/sim/rules.ts"
+import { STATION_BOT_HP } from "../shared/training/station.ts"
 import { TO_RESTORE, WOUNDED_HP } from "../shared/training/stations/medic.ts"
 import { harness } from "./harness.ts"
 import { Trainee } from "./trainee/index.ts"
@@ -95,7 +96,7 @@ describe("station 10: the medic", () => {
     expect(view.count).toBeGreaterThan(0)
     expect(view.count).toBeLessThan(view.target)
     // What is left on the panel is what the teammate still lacks.
-    expect(view.target - view.count).toBe(MAX_HP - teammate()!.hp)
+    expect(view.target - view.count).toBe(STATION_BOT_HP - teammate()!.hp)
     expect(steps(events)).toEqual([])
   })
 
@@ -107,7 +108,7 @@ describe("station 10: the medic", () => {
       return hpAtStep >= 0
     })
     expect(steps(events)).toEqual(["heal"])
-    expect(hpAtStep).toBe(MAX_HP)
+    expect(hpAtStep).toBe(STATION_BOT_HP)
     expect(events).toContainEqual({ t: "training", a: "station", station: "medic" })
     const restored = events.reduce((n, e) => n + (e.t === "heal" ? e.n : 0), 0)
     expect(restored).toBe(TO_RESTORE)
@@ -129,7 +130,7 @@ describe("station 10: the medic", () => {
     const mate = teammate()!.id
     const events = drive(60 * 5, () => ({}))
     expect(events.filter((e) => (e.t === "shot" || e.t === "melee" || e.t === "launch") && e.s === mate)).toEqual([])
-    expect(snap().you!.hp).toBe(MAX_HP)
+    expect(snap().you!.hp).toBe(maxHp(snap().you!.arsenal.primary))
   })
 })
 

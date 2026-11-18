@@ -71,7 +71,7 @@ describe("starting the training", () => {
     expect(snap.training).toEqual({ tag: "station", station: "look", step: "lookAround", count: 0, target: 1, unlocked: 1, completed: false })
   })
 
-  test("no warm-up and no end: the training is still live long after a match would have ended", () => {
+  test("no Muster and no end: the training is still live long after a match would have ended", () => {
     const h = started()
     h.play(60 * 60)
     expect(h.me.last("snap")!.phase.tag).toBe("Live")

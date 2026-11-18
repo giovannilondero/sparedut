@@ -36,7 +36,10 @@ export interface WeaponDef {
   readonly scope: boolean
   /** Vertical view kick per shot (radians). */
   readonly kick: number
-  /** Movement speed multiplier with the weapon in hand. */
+  /**
+   * Movement speed multiplier with the weapon in hand. 1 for every primary: what makes a class slow
+   * or quick is its base speed (`CLASSES`). The things every class carries keep their own.
+   */
   readonly moveScale: number
   /** Number key. */
   readonly slot: 1 | 2 | 3 | 4
@@ -126,7 +129,7 @@ export const WEAPONS = {
     aimFov: 65,
     scope: false,
     kick: 0.07,
-    moveScale: 1.02,
+    moveScale: 1,
     slot: 1,
     spinTicks: 0,
     shell: null
@@ -147,7 +150,7 @@ export const WEAPONS = {
     aimFov: 20,
     scope: true,
     kick: 0.06,
-    moveScale: 0.9,
+    moveScale: 1,
     slot: 1,
     spinTicks: 0,
     shell: null
@@ -168,7 +171,7 @@ export const WEAPONS = {
     aimFov: 68,
     scope: false,
     kick: 0.006,
-    moveScale: 0.78,
+    moveScale: 1,
     slot: 1,
     spinTicks: 45,
     shell: null
@@ -189,7 +192,7 @@ export const WEAPONS = {
     aimFov: 72,
     scope: false,
     kick: 0,
-    moveScale: 1.06,
+    moveScale: 1,
     slot: 1,
     spinTicks: 0,
     shell: null
@@ -232,7 +235,7 @@ export const WEAPONS = {
     aimFov: 68,
     scope: false,
     kick: 0.06,
-    moveScale: 0.96,
+    moveScale: 1,
     slot: 1,
     spinTicks: 0,
     shell: "gjaline"
@@ -311,10 +314,32 @@ export type PowerId = "lanciafrico" | "panel"
 export const PANEL_TEAR_TICKS = 120
 export const PANEL_REACH = 1.8
 
+/** What a class adds beyond health and speed: the medic's healing (`MEDIC_AURA`, and the beam's heal on teammates). */
+export type ClassTrait = "medic"
+
+/** A class: what the primary makes of whoever carries it. Every class carries the same pistol, Mescul, bombs and mines. */
+export interface ClassDef {
+  /** Maximum health: spawned with, and the ceiling of every heal. */
+  readonly hp: number
+  /** Base speed, multiplied by the weapon in hand's `moveScale` and the other modifiers (`speedScale`). */
+  readonly speed: number
+  readonly trait: ClassTrait | null
+}
+
+/** The primary is the class. Starting values, to be tuned by playing. */
+export const CLASSES = {
+  cramar: { hp: 100, speed: 1.0, trait: null },
+  doplete: { hp: 110, speed: 1.05, trait: null },
+  cjampanili: { hp: 75, speed: 0.95, trait: null },
+  mulin: { hp: 150, speed: 0.8, trait: null },
+  miedi: { hp: 90, speed: 1.05, trait: "medic" },
+  gjalinis: { hp: 100, speed: 0.95, trait: null }
+} as const satisfies Record<PrimaryId, ClassDef>
+
 /** The Cassele dal Miedi on enemies: damage per hit (the heal on teammates is `damage`). */
 export const BEAM_DAMAGE = 5
 
-/** Whoever has the miedi as primary is the medic: heals themselves and nearby teammates. */
+/** The Miedi class's trait, the medic: heals themselves and nearby teammates. */
 export const MEDIC_AURA = {
   /** Radius (m) of the passive heal. */
   radius: 6,

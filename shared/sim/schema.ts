@@ -311,16 +311,19 @@ export const Game = Schema.bind(
   Root
 )
 
-/** The match: warmup, live (until tick `ends`), over. */
+/**
+ * The match: the Muster (nobody on the map, until the host starts), live (until tick `ends`),
+ * over (the results, until tick `restarts`, then the Muster again).
+ */
 export const Match = Game.StateMachine("Sparedut/Match", {
-  Warmup: {},
+  Muster: {},
   Live: z.object({ ends: z.number().int() }),
   /** The winner: a team, nobody, or (La Tampieste) the last one standing. */
   Over: z.object({
     winner: z.union([z.enum(["benandanti", "malandanti", "pari"]), z.object({ player: z.string(), name: z.string() })]),
     restarts: z.number().int()
   })
-})
+}, { transitions: { Muster: ["Live"], Live: ["Over", "Muster"], Over: ["Muster"] } })
 
 /** Where an arrival puts the trainee: see `Training.Arriving`. */
 export const ARRIVAL_PLACES = ["walked", "facingStart", "keepingLook"] as const

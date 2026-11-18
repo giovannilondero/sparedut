@@ -12,7 +12,7 @@ import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, seatedBody, sprinting } from 
 import type { PhysicsWorld } from "../shared/physics.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
-import { outsideStorm, owned, RAISE_TICKS, weaponInSlot } from "../shared/sim/rules.ts"
+import { outsideStorm, owned, RAISE_TICKS, speedScale, weaponInSlot } from "../shared/sim/rules.ts"
 import { isTraining } from "../shared/training/index.ts"
 import { closedGates, viewedStation } from "../shared/training/gates.ts"
 import type { InterfaceAction } from "../shared/training/interface.ts"
@@ -40,7 +40,7 @@ import "@ui-sdk/web/dialog"
 import "@ui-sdk/web/select"
 import { takeAwayDeparted } from "./bodies.ts"
 import { alwaysChosen } from "./choice.ts"
-import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, type MatchMenu } from "./match-menus.ts"
+import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, musterFocus, musterTeams, type MatchMenu } from "./match-menus.ts"
 import { pickerEntries } from "./touch.ts"
 import { onViewportChange } from "./viewport.ts"
 
@@ -49,14 +49,17 @@ type SelectElement = HTMLElementTagNameMap["ui-select"]
 
 /**
  * Each in-match menu's dialog and the content the game draws into it: the menus the player opens,
- * and the end screen, which the match opens and no Esc step leads to.
+ * and the end screen and the Muster, which the match opens and no Esc step leads to.
  */
 const MENU_PARTS = {
   pause: ["pause-dialog", "pause"],
   loadout: ["loadout-dialog", "loadout"],
   settings: ["settings-dialog", "settings-ingame"],
-  end: ["end-dialog", "endscreen"]
-} as const satisfies Record<Exclude<MatchMenu, "none"> | "end", readonly [string, string]>
+  end: ["end-dialog", "endscreen"],
+  muster: ["muster-dialog", "muster"]
+} as const satisfies Record<Exclude<MatchMenu, "none"> | "end" | "muster", readonly [string, string]>
+/** The Muster's chat keeps this many of the last messages. */
+const MUSTER_CHAT_LINES = 30
 /** The contents of the menus the player opens, for `closest`: built once. */
 const OPENED_CONTENT = MATCH_MENUS.map((m) => `#${MENU_PARTS[m][1]}`).join(", ")
 
@@ -183,6 +186,10 @@ export class Game {
   private escapeInPopup = false
   /** Whether the match menu was last drawn for the host (its host tools), null before it is drawn. */
   private pauseHost: boolean | null = null
+  /** Whether the Muster was last drawn for the host (start and the host tools), null before it is drawn. */
+  private musterHost: boolean | null = null
+  /** The room's last chat messages, drawn in the Muster. */
+  private musterChat: string[] = []
   /** Where the armoury was opened from: Esc goes back there. */
   private loadoutFrom: "none" | "pause" = "none"
   /** When the browser released the pointer lock: the same Esc must not also close the pause menu. */
@@ -237,7 +244,7 @@ export class Game {
       const locked = document.pointerLockElement === d.renderer.domElement
       if (!locked) this.unlockedAt = performance.now()
       // Touch taking over drops the lock: that is no reason to open the match menu.
-      if (!locked && !this.controls.touchActive && this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over" && !this.trainingEnded) this.openOverlay("pause")
+      if (!locked && !this.controls.touchActive && this.overlay === "none" && !this.chatting && this.snap?.phase.tag === "Live" && !this.trainingEnded) this.openOverlay("pause")
       if (locked && this.overlay !== "none") this.openOverlay("none")
     })
     $("quickchat").addEventListener("click", (e) => {
@@ -291,6 +298,9 @@ export class Game {
     this.trainingEnded = false
     this.choosing = isTraining(room.mode) && listOnEntry(this.d.settings.training)
     this.entering = false
+    this.lastPhase = ""
+    this.musterHost = null
+    this.musterChat = []
     this.clock = new MatchClock(() => performance.now())
     this.applySettings()
     this.updateRoster(room)
@@ -300,6 +310,8 @@ export class Game {
     this.controls.inMatch = true
     document.documentElement.classList.add("in-match")
     this.placeTouch()
+    // A room opens on its Muster: the pointer stays free for its screen, which the first snapshot opens.
+    if (room.phase === "Muster") return
     if (!this.choosing) this.controls.lock()
     this.hud.announce(t().modes[room.mode].name, t().modes[room.mode].rules)
   }
@@ -316,6 +328,8 @@ export class Game {
     this.hud.show(false)
     this.openOverlay("none")
     $<DialogElement>(MENU_PARTS.end[0]).open = false
+    $<DialogElement>(MENU_PARTS.muster[0]).open = false
+    document.documentElement.classList.remove("in-muster")
     this.d.viewmodel.setVisible(false)
     if (document.pointerLockElement) document.exitPointerLock()
     this.controls.track(null)
@@ -394,6 +408,9 @@ export class Game {
         return
       case "chat":
         this.hud.chat(msg.name, msg.team, msg.text)
+        this.musterChat.push(`<div>${msg.team ? `<b style="color:${TEAM_INFO[msg.team].color}">${esc(msg.name)}</b>` : `<b>${esc(msg.name)}</b>`}: ${esc(msg.text)}</div>`)
+        if (this.musterChat.length > MUSTER_CHAT_LINES) this.musterChat.shift()
+        if (this.inMuster) this.renderMusterChat()
         this.d.audio.play("chat", { volume: 0.5 })
         return
     }
@@ -417,6 +434,12 @@ export class Game {
     }
     if (this.overlay === "pause") this.renderPause()
     if (this.snap?.phase.tag === "Over") this.renderEnd()
+    if (this.inMuster) this.renderMuster()
+  }
+
+  /** The room is in its Muster: nobody on the map, its screen open. */
+  private get inMuster() {
+    return this.snap?.phase.tag === "Muster"
   }
 
   private onSnapshot(s: Snapshot) {
@@ -504,12 +527,25 @@ export class Game {
     const tag = s.phase.tag
     if (tag === this.lastPhase) return
     this.lastPhase = tag
+    // The Muster's screen stands in for the world: the HUD's readouts go, and the world is not drawn (`render`).
+    document.documentElement.classList.toggle("in-muster", tag === "Muster")
+    if (tag !== "Muster") $<DialogElement>(MENU_PARTS.muster[0]).open = false
     if (tag === "Over") {
       if (document.pointerLockElement) document.exitPointerLock()
       this.renderEnd(true)
     } else {
       $<DialogElement>(MENU_PARTS.end[0]).open = false
       if (tag === "Live" && this.overlay === "none" && !this.choosing) this.controls.lock()
+    }
+    if (tag === "Muster") {
+      if (document.pointerLockElement) document.exitPointerLock()
+      if (this.chatting) this.closeChat()
+      this.toggleQuick(false)
+      this.boardOpen = false
+      this.hud.board(this.board, this.me, false)
+      this.controls.releaseAll()
+      this.openOverlay("none")
+      this.renderMuster(true)
     }
     if (this.overlay === "pause") this.renderPause()
   }
@@ -805,7 +841,8 @@ export class Game {
 
   /** A key pressed or released. Says whether the press was the game's own, not also the browser's: Tab when it shows the scoreboard. */
   private key(code: string, down: boolean): boolean {
-    if (!this.running || this.chatting) return false
+    // The Muster's screen takes the keys: its own controls, its own chat.
+    if (!this.running || this.chatting || this.inMuster) return false
     if (code === "Tab") {
       // With a menu open, Tab moves through it: the scoreboard stays shut.
       const open = down && this.overlay === "none"
@@ -841,7 +878,7 @@ export class Game {
 
   /** Options on the gamepad: opens the match menu, or closes it (one step at a time, like Esc). */
   private padPause() {
-    if (!this.running || this.chatting) return
+    if (!this.running || this.chatting || this.inMuster) return
     if (this.overlay === "none") {
       if (document.pointerLockElement) document.exitPointerLock()
       this.openOverlay("pause")
@@ -1013,10 +1050,63 @@ export class Game {
     if (training) return
     $("p-roster").innerHTML = rosterHtml(room, this.me)
     $("p-team").textContent = p.switchTeam(s.teams[this.otherTeam()].name)
-    if (!host) return
-    $("p-start").textContent = (this.snap?.phase.tag ?? "Warmup") === "Warmup" ? p.start : p.restart
-    const level = $<SelectElement>("p-level")
+    if (host) this.syncLevel("p", room)
+  }
+
+  /** The host's bot skill as the room has it: set back from code, so only the host's own choice is sent (`bindBotTools`). */
+  private syncLevel(prefix: "p" | "m", room: RoomInfo) {
+    const level = $<SelectElement>(`${prefix}-level`)
     if (level.value !== room.level) level.value = room.level
+  }
+
+  /** The room's code and invite link, or for an Offline room that nobody else can come in. */
+  private roomCodeHtml(prefix: "p" | "m", room: RoomInfo) {
+    const p = t().pause
+    return room.reach === "offline"
+      ? `<div class="muted pause-reach">${p.reach.offline}</div>`
+      : `<div class="pause-code">
+        <div><div class="muted">${p.code}</div><div class="invite">${room.code}</div></div>
+        <div class="pause-share"><button id="${prefix}-copy">${p.copy}</button><div class="muted pause-reach">${p.reach[room.reach]} · ${p.access[room.access]}</div></div>
+      </div>`
+  }
+
+  private bindCopy(prefix: "p" | "m", room: RoomInfo) {
+    const copy = document.getElementById(`${prefix}-copy`)
+    if (copy)
+      copy.onclick = () => {
+        void navigator.clipboard?.writeText(inviteLink(this.d.inviteBase(), room.code, this.d.roomPassword()))
+        copy.textContent = t().pause.copied
+      }
+  }
+
+  /** The host's bots, a side at a time, and their skill: the same in the match menu and in the Muster. */
+  private botToolsHtml(prefix: "p" | "m", room: RoomInfo) {
+    const s = t()
+    const p = s.pause
+    const ben = TEAM_INFO.benandanti.short
+    const mal = TEAM_INFO.malandanti.short
+    return `<div class="host-bots">
+          <button data-bot="benandanti:1">${p.addBot(ben)}</button><button data-bot="benandanti:-1">${p.removeBot(ben)}</button>
+          <button data-bot="malandanti:1">${p.addBot(mal)}</button><button data-bot="malandanti:-1">${p.removeBot(mal)}</button>
+        </div>
+        <ui-select id="${prefix}-level" class="host-level" presentation="auto" default-value="${room.level}">
+          <ui-select-label>${p.level}</ui-select-label>
+          <ui-select-trigger><button><ui-select-value></ui-select-value></button></ui-select-trigger>
+          <ui-select-content class="select-list level-list">${BOT_LEVEL_IDS.map((l) => `<ui-select-item value="${l}">${s.levels[l].name}<ui-select-item-indicator aria-hidden="true">✓</ui-select-item-indicator></ui-select-item>`).join("")}</ui-select-content>
+        </ui-select>`
+  }
+
+  private bindBotTools(el: HTMLElement, prefix: "p" | "m") {
+    for (const b of el.querySelectorAll<HTMLButtonElement>("[data-bot]")) {
+      b.onclick = () => {
+        const [team, delta] = b.dataset.bot!.split(":")
+        this.d.net.send({ t: "bot", team: team as Team, delta: Number(delta) as 1 | -1 })
+      }
+    }
+    // The room's update sets the value back from code ("imperative"): only the host's own choice is sent.
+    $<SelectElement>(`${prefix}-level`).addEventListener("valuechange", alwaysChosen((level, reason) => {
+      if (reason !== "imperative") this.d.net.send({ t: "level", level: level as BotLevel })
+    }))
   }
 
   private otherTeam(): Team {
@@ -1029,20 +1119,13 @@ export class Game {
     const el = $("pause")
     const s = t()
     const p = s.pause
-    const ben = TEAM_INFO.benandanti.short
-    const mal = TEAM_INFO.malandanti.short
     this.drawMenu(MENU_PARTS.pause[1], `${s.modes[room.mode].name} <small class="muted">· ${s.modes[room.mode].sub}</small>`, `
       <div class="overlay-body">
       ${
         // An Offline room (a training too) has no code and no invite link: nobody else can come in.
         training
           ? `<div class="muted pause-reach">${this.entering ? s.training.chooseStation : s.training.menuLine}</div>`
-          : room.reach === "offline"
-          ? `<div class="muted pause-reach">${p.reach.offline}</div>`
-          : `<div class="pause-code">
-        <div><div class="muted">${p.code}</div><div class="invite">${room.code}</div></div>
-        <div class="pause-share"><button id="p-copy">${p.copy}</button><div class="muted pause-reach">${p.reach[room.reach]} · ${p.access[room.access]}</div></div>
-      </div>`
+          : this.roomCodeHtml("p", room)
       }
       ${training ? stationListHtml(stationEntries(this.snap?.training ?? null), s, this.entering ? entryChoice(this.snap?.training ?? null).continues : null) : `<div class="roster" id="p-roster"></div>`}
       ${
@@ -1050,16 +1133,8 @@ export class Game {
           ? ""
           : host
           ? `<div class="host-tools"><span class="host-label">👑 ${p.host}</span>
-        <button id="p-start" class="primary"></button>
-        <div class="host-bots">
-          <button data-bot="benandanti:1">${p.addBot(ben)}</button><button data-bot="benandanti:-1">${p.removeBot(ben)}</button>
-          <button data-bot="malandanti:1">${p.addBot(mal)}</button><button data-bot="malandanti:-1">${p.removeBot(mal)}</button>
-        </div>
-        <ui-select id="p-level" class="host-level" presentation="auto" default-value="${room.level}">
-          <ui-select-label>${p.level}</ui-select-label>
-          <ui-select-trigger><button><ui-select-value></ui-select-value></button></ui-select-trigger>
-          <ui-select-content class="select-list level-list">${BOT_LEVEL_IDS.map((l) => `<ui-select-item value="${l}">${s.levels[l].name}<ui-select-item-indicator aria-hidden="true">✓</ui-select-item-indicator></ui-select-item>`).join("")}</ui-select-content>
-        </ui-select>
+        <button id="p-start" class="primary">${p.restart}</button>
+        ${this.botToolsHtml("p", room)}
       </div>`
           : `<div class="muted host-only">${p.hostOnly}</div>`
       }
@@ -1082,30 +1157,99 @@ export class Game {
       this.d.net.send({ t: "leave" })
       this.d.onLeave()
     }
-    const copy = document.getElementById("p-copy")
-    if (copy)
-      copy.onclick = () => {
-        void navigator.clipboard?.writeText(inviteLink(this.d.inviteBase(), room.code, this.d.roomPassword()))
-        copy.textContent = p.copied
-      }
+    this.bindCopy("p", room)
     $("p-settings").onclick = () => this.openOverlay("settings")
     if (training) this.bindTrainingMenu(el)
     if (!host) return
+    // The host's restart ends this match: the room goes back to the Muster, whose screen the next snapshot opens.
     $("p-start").onclick = () => {
       this.d.net.send({ t: "start" })
       this.openOverlay("none")
-      this.controls.lock()
     }
-    for (const b of el.querySelectorAll<HTMLButtonElement>("[data-bot]")) {
-      b.onclick = () => {
-        const [team, delta] = b.dataset.bot!.split(":")
-        this.d.net.send({ t: "bot", team: team as Team, delta: Number(delta) as 1 | -1 })
+    this.bindBotTools(el, "p")
+  }
+
+  /**
+   * The Muster's screen: drawn whole when the room enters it (or the host changes), else only its
+   * roster, team button and bot skill are redrawn on each room update, so focus stays.
+   */
+  private renderMuster(full = false) {
+    const room = this.room
+    if (!room || !this.inMuster) return
+    const host = room.hostId === this.me
+    if (full || host !== this.musterHost) this.buildMuster(room, host)
+    const s = t()
+    const teams = musterTeams(room)
+    $("m-roster").innerHTML = (["benandanti", "malandanti"] as const)
+      .map(
+        (team) =>
+          `<ul><li style="color:${TEAM_INFO[team].color};font-family:var(--serif)"><b>${s.teams[team].name}</b></li>${teams[team]
+            .map((m) => `<li${m.id === this.me ? ' style="color:var(--gold)"' : ""}>${esc(m.name)}${m.bot ? " 🤖" : ""}${m.host ? " 👑" : ""} <span class="muted">· ${s.weapons[m.primary].name}</span></li>`)
+            .join("")}</ul>`
+      )
+      .join("")
+    $("m-team").textContent = s.pause.switchTeam(s.teams[this.otherTeam()].name)
+    if (host) this.syncLevel("m", room)
+  }
+
+  private buildMuster(room: RoomInfo, host: boolean) {
+    const wasOpen = $<DialogElement>(MENU_PARTS.muster[0]).open
+    this.musterHost = host
+    const s = t()
+    const p = s.pause
+    const m = s.muster
+    this.drawMenu(MENU_PARTS.muster[1], m.title, `
+      <div class="overlay-body">
+        <div class="muted pause-reach">${s.modes[room.mode].name} · ${s.maps[room.map].name} · ${s.menu.minutes(room.minutes)}</div>
+        ${this.roomCodeHtml("m", room)}
+        <div class="roster" id="m-roster"></div>
+        ${host ? `<div class="host-tools"><span class="host-label">👑 ${p.host}</span>${this.botToolsHtml("m", room)}</div>` : `<div class="muted host-only">${p.hostOnly}</div>`}
+        <h3>${m.primary}</h3>
+        <div class="weapons" id="muster-armarie"></div>
+        <h3>${m.chat}</h3>
+        <div class="muster-chat" id="m-chat-log" role="log"></div>
+        <input id="m-chat" class="muster-chat-input" maxlength="120" placeholder="${m.chatPlaceholder}" aria-label="${m.chat}" />
+      </div>
+      <div class="row overlay-actions">
+        ${host ? `<button id="m-start" class="primary">${p.start}</button>` : ""}
+        <button id="m-team"></button>
+        <button id="m-leave">${p.leave}</button>
+      </div>`)
+    const el = $(MENU_PARTS.muster[1])
+    this.bindCopy("m", room)
+    // The primary the player enters with; the browser remembers it for the next room.
+    this.d.menu.buildArmarie($("muster-armarie"), (primary) => this.d.net.send({ t: "primary", p: primary }))
+    this.renderMusterChat()
+    const chat = $<HTMLInputElement>("m-chat")
+    chat.addEventListener("keydown", (e) => {
+      // Typing is the chat's: no key reaches the game's controls.
+      e.stopPropagation()
+      if (e.key !== "Enter") return
+      const text = chat.value.trim()
+      if (text) this.d.net.send({ t: "chat", text })
+      chat.value = ""
+    })
+    $("m-team").onclick = () => this.d.net.send({ t: "team", team: this.otherTeam() })
+    $("m-leave").onclick = () => {
+      this.d.net.send({ t: "leave" })
+      this.d.onLeave()
+    }
+    if (host) {
+      this.bindBotTools(el, "m")
+      $("m-start").onclick = () => {
+        this.d.net.send({ t: "start" })
+        // Still inside the press: the one moment the browser grants the pointer lock the match needs.
+        this.controls.lock()
       }
     }
-    // The room's update sets the value back from code ("imperative"): only the host's own choice is sent.
-    $<SelectElement>("p-level").addEventListener("valuechange", alwaysChosen((level, reason) => {
-      if (reason !== "imperative") this.d.net.send({ t: "level", level: level as BotLevel })
-    }))
+    if (!wasOpen) this.openMenu(...MENU_PARTS.muster, musterFocus({ host, reach: room.reach }))
+  }
+
+  private renderMusterChat() {
+    const log = document.getElementById("m-chat-log")
+    if (!log) return
+    log.innerHTML = this.musterChat.join("")
+    log.scrollTop = log.scrollHeight
   }
 
   /**
@@ -1234,11 +1378,12 @@ export class Game {
 
   // ---------------------------------------------------------------- fixed tick
 
+  /** The simulation's own speed: the class, the weapon asked for, the sgnape, the frico carried. */
   private speedScale() {
     const you = this.you()
     if (!you) return 1
-    const a = you.arsenal
-    return WEAPONS[this.wanted].moveScale * (a.sgnape > 0 ? 1.3 : 1) * (this.snap?.players.find((p) => p.id === this.me && p.f & FLAG_BIT.carrier) ? 0.9 : 1)
+    const carrier = this.snap?.players.some((p) => p.id === this.me && p.f & FLAG_BIT.carrier) ?? false
+    return speedScale(you.arsenal, this.wanted, carrier)
   }
 
   private fixedStep() {
@@ -1246,7 +1391,8 @@ export class Game {
     const { mx, mz } = c.move()
     let buttons = c.buttons()
     const you = this.you()
-    const over = this.snap?.phase.tag === "Over"
+    // Outside a live match (the Muster, the results) nobody moves or fires.
+    const over = this.snap?.phase.tag !== "Live"
     if (over || this.overlay !== "none") buttons = 0
     // At the turret the view stays within the arc the gun can turn through.
     const turret = you?.alive ? this.mounted() : -1
@@ -1446,7 +1592,7 @@ export class Game {
     if (this.offset !== null) this.renderTick = this.time * 60 + this.offset - INTERP_TICKS
 
     const paused = this.clock.paused
-    this.controls.poll(dt, this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over" && !this.trainingEnded)
+    this.controls.poll(dt, this.overlay === "none" && !this.chatting && this.snap?.phase.tag === "Live" && !this.trainingEnded)
     // Paused: no commands, no prediction, and the paused time never reaches the fixed tick.
     if (!paused) {
       this.acc += Math.min(dt, 0.25)
@@ -1648,12 +1794,13 @@ export class Game {
       fx.projectiles(s.proj)
       const outside = !!s.storm && !!you?.alive && !!b && outsideStorm(s.storm, b)
       this.hud.spectating = mode === "tampieste" && s.phase.tag === "Live"
-      this.hud.top(s, mode ?? "bataie", this.names, this.controls.device, outside)
+      this.hud.top(s, mode ?? "bataie", this.names, outside)
       this.hud.training(s.training, this.controls.device)
       // A step this device cannot perform: shown as such, then the host is told, and completes it.
       const unavailable = this.unavailableSteps.check(s.training, this.controls.device, performance.now())
       if (unavailable) this.d.net.send(unavailable)
-      this.hud.death(you, this.names, Math.floor(this.seed / 7))
+      // In the Muster nobody is on the map: nobody is dead either.
+      this.hud.death(s.phase.tag === "Muster" ? null : you, this.names, Math.floor(this.seed / 7))
       if (s.phase.tag === "Over" && Math.floor(t) !== Math.floor(t - dt)) this.renderEnd()
     }
     fx.update(dt, camera)
@@ -1672,7 +1819,7 @@ export class Game {
       const px = (Math.tan(spread) / Math.tan(((camera.fov / 2) * Math.PI) / 180)) * (innerHeight / 2)
       this.hud.crosshair(Math.min(60, px * 1.6), view.crosshair)
     }
-    const free = this.overlay === "none" && !this.chatting && s?.phase.tag !== "Over" && !this.trainingEnded
+    const free = this.overlay === "none" && !this.chatting && s?.phase.tag === "Live" && !this.trainingEnded
     const device = this.controls.device
     this.hud.clickToPlay(!this.controls.active && free && !this.boardOpen, device)
     this.hud.layFor(device)
@@ -1685,6 +1832,8 @@ export class Game {
   }
 
   render() {
+    // The Muster's screen covers the world: nothing of it is drawn.
+    if (this.running && this.inMuster) return
     const { renderer, look, scene, camera, viewmodel } = this.d
     renderer.info.reset()
     look.render(scene, camera, viewmodel)

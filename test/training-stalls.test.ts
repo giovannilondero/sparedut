@@ -142,8 +142,8 @@ describe("station 5: the stalls", () => {
   test("the Dopiete's step needs a hit from close, with the Dopiete", () => {
     const h = at("doplete")
     expect(hitsOnOthers(h, hitWith(h, { from: PLACE.stalls.doplete.at, at: "doplete", weapon: "mandi", trigger: "pull", aim: "always" }))).toBe(1)
-    // From the Cramâr's stall, three times as far.
-    expect(hitsOnOthers(h, hitWith(h, { from: PLACE.stalls.cramar.at, at: "doplete", weapon: "doplete", trigger: "pull", aim: "always" }))).toBe(1)
+    // From the Cramâr's stall, three times as far: the blast lands (one pellet or more of it) and does not count.
+    expect(hitsOnOthers(h, hitWith(h, { from: PLACE.stalls.cramar.at, at: "doplete", weapon: "doplete", trigger: "pull", aim: "always" }))).toBeGreaterThanOrEqual(1)
     expect(view(h)).toMatchObject({ step: "doplete", count: 0 })
     expect(steps(hitWith(h, { from: PLACE.stalls.doplete.at, at: "doplete", weapon: "doplete", trigger: "pull", aim: "always" }))).toEqual(["doplete"])
   })

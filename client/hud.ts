@@ -6,12 +6,12 @@ import type { Team } from "../shared/map.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type SnapSelf, type Snapshot } from "../shared/protocol.ts"
 import type { KillCause } from "../shared/sim/events.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
-import { WARMUP_TICKS } from "../shared/sim/rules.ts"
+import { maxHp } from "../shared/sim/rules.ts"
 import type { TrainingView } from "../shared/sim/view.ts"
 import { STATION_IDS } from "../shared/training/index.ts"
 import type { Device } from "./device.ts"
 import { t } from "./i18n.ts"
-import { menuControl, panelPrompt, playPrompt, trainingPrompt, turretPrompt } from "./prompts.ts"
+import { panelPrompt, playPrompt, trainingPrompt, turretPrompt } from "./prompts.ts"
 import { announcesStep, NOT_SHOWN, stepMarksHtml, type PanelPlace } from "./training-panel.ts"
 import { buttonBit, TOUCH_BUTTONS, type Insets, type PickerEntry, type TouchLayout, type TouchView } from "./touch.ts"
 
@@ -139,13 +139,15 @@ export class Hud {
   vitals(you: SnapSelf | null, slot: { owned: (id: WeaponId) => boolean }, localMag: number | null, turret = false) {
     if (!you) return
     const hp = Math.max(0, you.hp)
+    // The bar and the ring are full at the class's health, whatever it is.
+    const share = Math.min(100, Math.round((hp / maxHp(you.arsenal.primary)) * 100))
     this.text("hp", String(hp))
-    this.style("hp-bar", "width", `${hp}%`)
-    this.toggleOn($("hp").parentElement!, "hp-low", "low", hp < 30 && you.alive)
+    this.style("hp-bar", "width", `${share}%`)
+    this.toggleOn($("hp").parentElement!, "hp-low", "low", share < 30 && you.alive)
     this.text("armor", String(you.armor))
     this.style("armor-bar", "width", `${you.armor}%`)
     // The touch HUD draws the two as rings around their icons.
-    this.style("vitals", "--hp", String(hp))
+    this.style("vitals", "--hp", String(share))
     this.style("vitals", "--armor", String(you.armor))
     const a = you.arsenal
     const def = WEAPONS[a.current]
@@ -244,7 +246,7 @@ export class Hud {
   }
 
   /** `outside`: I'm alive and outside the Tampieste circle. `device`: the active one, whose controls the banner names. */
-  top(snap: Snapshot, mode: ModeId, names: Map<string, string>, device: Device, outside = false) {
+  top(snap: Snapshot, mode: ModeId, names: Map<string, string>, outside = false) {
     const s = t()
     if (snap.training) {
       // A training has no score and no clock: its panel says where the trainee is.
@@ -267,13 +269,10 @@ export class Hud {
     this.text("score-ben", alone ? "" : mode === "cjar" ? `${snap.score.benandanti}%` : String(snap.score.benandanti))
     this.text("score-mal", alone ? "" : String(snap.score.malandanti))
     const phase = snap.phase
-    this.text("clock", phase.tag === "Live" ? fmtClock(phase.ends - snap.tick) : phase.tag === "Warmup" ? fmtClock(WARMUP_TICKS - snap.tick) : s.hud.over)
+    this.text("clock", phase.tag === "Live" ? fmtClock(phase.ends - snap.tick) : phase.tag === "Over" ? s.hud.over : "")
     this.text("mode-label", alone ? `${s.modes[mode].name} · ${s.modes[mode].sub}` : s.hud.modeLabel(s.modes[mode].name, MODES[mode].scoreLimit))
     this.html("objective", this.objectiveLine(snap, names))
-    this.html(
-      "banner",
-      phase.tag === "Warmup" ? s.hud.warmup(fmtClock(WARMUP_TICKS - snap.tick), menuControl(device)) : outside ? `<b class="storm">${s.hud.stormOutside}</b>` : ""
-    )
+    this.html("banner", outside ? `<b class="storm">${s.hud.stormOutside}</b>` : "")
   }
 
   /** The state of the objective in force (`snap.objective`), and nothing for any other: in a regular room it is its mode's, in a training the current step's. */
@@ -499,11 +498,11 @@ export function boardHtml(rows: readonly BoardRow[], me: string) {
       const list = rows.filter((r) => r.team === team).sort((a, b) => b.score - a.score)
       const info = t().teams[team]
       return `<h3 style="color:${TEAM_INFO[team].color}">${info.name} <small style="color:var(--muted);font-size:13px">· ${info.motto}</small></h3>
-      <table><tr>${t().hud.board.map((h) => `<th>${h}</th>`).join("")}</tr>
+      <table><tr>${t().hud.board.map((h, i) => (i === 1 ? `<th class="primary">${h}</th>` : `<th>${h}</th>`)).join("")}</tr>
       ${list
         .map(
           (r) =>
-            `<tr class="${r.id === me ? "me" : ""}"><td>${esc(r.name)}${r.bot ? " 🤖" : ""}</td><td>${r.score}</td><td>${r.kills}</td><td>${r.deaths}</td><td>${r.assists}</td><td>${r.caps}</td><td>${r.best}</td><td>${r.bot ? "—" : r.ping}</td></tr>`
+            `<tr class="${r.id === me ? "me" : ""}"><td>${esc(r.name)}${r.bot ? " 🤖" : ""}</td><td class="primary">${t().weapons[r.primary].name}</td><td>${r.score}</td><td>${r.kills}</td><td>${r.deaths}</td><td>${r.assists}</td><td>${r.caps}</td><td>${r.best}</td><td>${r.bot ? "—" : r.ping}</td></tr>`
         )
         .join("")}</table>`
     })

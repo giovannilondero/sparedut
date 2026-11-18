@@ -79,7 +79,7 @@ export const UseWeapons = Game.System(
   },
   ({ queries, resources, services, events, machines, commands }) => {
     const { data } = queries.players
-    if (machines.match.get()._tag === "Over") return
+    if (machines.match.get()._tag !== "Live") return
     const tick = resources.tick.get()
     const rules = resources.rules.get()
     const history = resources.history.get()

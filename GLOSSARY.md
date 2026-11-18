@@ -16,6 +16,11 @@ One round played inside a room, from its start to its end. A room hosts many mat
 _Italian_: Partita
 _Avoid_: Game, round
 
+**Muster**:
+The phase of a room before a match starts, where players pick a team and a primary and the host starts the match. Nobody is on the map during it.
+_Italian_: Adunata
+_Avoid_: Warmup, riscaldamento, lobby, stanza di preparazione, ready room
+
 **Room list**:
 The rooms a player can reach, shown before joining.
 _Avoid_: Server browser, LAN list
@@ -29,6 +34,11 @@ _Avoid_: Visibility, public/private, solo, single player, quick play
 Whether a room lets anyone within its reach in (**Open**) or asks for a password (**Password**).
 _Italian_: Accesso
 _Avoid_: Closed, locked, private
+
+**Single weapon**:
+A room setting that gives every player the same primary, chosen by the host, and takes away the rest of what they carry except the melee weapon. It is either off or one of the primaries.
+_Italian_: Arma unica
+_Avoid_: Single-weapon mode, modalità arma singola, weapon lock
 
 ### Training
 
@@ -47,6 +57,18 @@ _Avoid_: Stage, level, chapter
 A single action the player must perform at a station before the training moves on.
 _Italian_: Passo
 _Avoid_: Task, objective, hint
+
+### Armoury
+
+**Primary**:
+The weapon a player chooses for a match. It cannot be changed while the match is on.
+_Italian_: Arma principale
+_Avoid_: Main weapon, loadout
+
+**Class**:
+What a player is in a match, set by their primary: it fixes their health, their speed and any trait, such as the medic's healing.
+_Italian_: Classe
+_Avoid_: Role, character, hero
 
 ### World
 

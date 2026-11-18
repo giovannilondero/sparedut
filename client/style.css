@@ -133,6 +133,7 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr)); gap: 3px 14px; }
 .stat { display: grid; grid-template-columns: 5.5em 1fr; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
 .stat i { display: block; height: 5px; border-radius: 3px; background: linear-gradient(90deg, var(--gold-deep), var(--gold)); }
+.stat.figure b { font: 600 12px/1 var(--sans); color: var(--ink); font-variant-numeric: tabular-nums; }
 
 /* Words in rows, not in balanced columns: scrolling down a phone reads every column at once, never back up to the next one. */
 .vocab { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr)); gap: 8px 28px; font-size: 15px; line-height: 1.5; }
@@ -339,6 +340,8 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 #board th, .overlay th { text-align: right; font-weight: 500; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; padding: 4px 8px; }
 #board td, .overlay td { text-align: right; padding: 4px 8px; font-variant-numeric: tabular-nums; border-top: 1px solid rgba(255, 255, 255, 0.05); }
 #board th:first-child, #board td:first-child, .overlay td:first-child, .overlay th:first-child { text-align: left; }
+/* Each player's primary, the name of a weapon: read with the name, not with the numbers. */
+#board .primary, .overlay .primary { text-align: left; }
 #board tr.me td { color: var(--gold); }
 #board h3, .overlay h3 { font-family: var(--serif); margin: 10px 0 4px; font-size: 18px; }
 .overlay :is(h2, ui-dialog-title) { display: block; font-family: var(--serif); font-weight: 700; color: var(--gold); margin: 0 0 8px; font-size: clamp(22px, 1rem + 1.6vw, 28px); }
@@ -349,6 +352,11 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 .overlay .roster li { padding: 3px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
 .overlay .host-tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 8px; font-size: 13px; }
 .overlay .host-tools button { min-block-size: var(--tap); padding: 5px 9px; font-size: 13px; }
+/* The Muster stands in for the world: the HUD's readouts go, and a plain ground covers the canvas, which is not drawn. */
+html.in-muster #hud { background: var(--night); }
+html.in-muster #hud-free, html.in-muster #death, html.in-muster #board { visibility: hidden; }
+#muster .muster-chat { max-block-size: 9rem; overflow-y: auto; font-size: 14px; padding: 4px 0; }
+#muster .muster-chat-input { inline-size: 100%; min-block-size: var(--tap); margin-block-start: 4px; }
 
 .end-title { display: block; font-family: var(--serif); font-size: clamp(36px, 5vw, 64px); text-align: center; margin: 0; }
 .awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 10px; margin: 14px 0; }

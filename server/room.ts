@@ -22,7 +22,7 @@ import {
 } from "../shared/protocol.ts"
 import { createSim, type GameEvent, type PostValue, type Sim, type WorldView } from "../shared/sim/index.ts"
 import { isTraining, TRAINING, type StationId } from "../shared/training/index.ts"
-import type { StationBot } from "../shared/training/station.ts"
+import { STATION_BOT_PRIMARY, type StationBot } from "../shared/training/station.ts"
 import type { TrainingStart } from "../shared/training/start.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 import { BotBrain } from "./bot.ts"
@@ -35,14 +35,14 @@ const MAX_QUEUE = 20
 const STEPS_PER_TICK = 3
 /** Steps that can accumulate during lag, to be caught up afterwards. */
 const MAX_CREDIT = 12
-/** What a station's bot carries: a bot that fires uses it. */
-const STATION_BOT_PRIMARY: PrimaryId = "cramar"
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
 export interface Member {
   readonly id: string
   name: string
   team: Team
+  /** The primary chosen: the roster shows it, and the member enters a match with it. */
+  primary: PrimaryId
   readonly bot: boolean
   send: ((msg: ServerMessage) => void) | null
   queue: PlayerInput[]
@@ -128,7 +128,7 @@ export class Room {
       this.removeMember(bot.id)
     }
     const team = this.training ? "benandanti" : this.smallerTeam()
-    this.members.set(id, { id, name, team, bot: false, send, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
+    this.members.set(id, { id, name, team, primary, bot: false, send, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
     this.arriving.set(id, () => this.sim.join(id, name, team, false, primary))
     return true
   }
@@ -149,7 +149,7 @@ export class Room {
     const used = new Set([...this.members.values()].map((m) => m.name))
     const name = BOT_NAMES[team].find((n) => !used.has(n)) ?? `${BOT_NAMES[team][0]} ${botCounter}`
     const primary = primaryFor(botCounter)
-    this.members.set(id, { id, name, team, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
+    this.members.set(id, { id, name, team, primary, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
     this.arriving.set(id, () => this.sim.join(id, name, team, true, primary, post))
     return id
   }
@@ -192,6 +192,13 @@ export class Room {
     }
     m.team = team
     this.sim.team(id, team)
+  }
+
+  setPrimary(id: string, primary: PrimaryId) {
+    const m = this.members.get(id)
+    if (!m) return
+    m.primary = primary
+    this.sim.primary(id, primary)
   }
 
   queueInput(id: string, input: PlayerInput) {
@@ -356,6 +363,7 @@ export class Room {
       name: p.name,
       team: p.team,
       bot: p.bot,
+      primary: p.arsenal.primary,
       kills: p.stats.kills,
       deaths: p.stats.deaths,
       assists: p.stats.assists,
@@ -399,7 +407,7 @@ export class Room {
       minutes: this.settings.minutes,
       level: this.level,
       ff: this.settings.ff,
-      roster: [...this.members.values()].map((m) => ({ id: m.id, name: m.name, team: m.team, bot: m.bot, away: false }))
+      roster: [...this.members.values()].map((m) => ({ id: m.id, name: m.name, team: m.team, primary: m.primary, bot: m.bot, away: false }))
     }
   }
 

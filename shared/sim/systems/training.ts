@@ -13,7 +13,7 @@ import { STATION_IDS, STATIONS, stepRule, stepsOf, TRAINING } from "../../traini
 import type { Seen, StepRule } from "../../training/station.ts"
 import { hasControl } from "../../training/controls.ts"
 import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS } from "../../weapons.ts"
-import { freshArsenal, freshDoors, FRESH_CART, FRESH_FLAGS, FRESH_HILL, MAX_HP, stormOnCourse } from "../rules.ts"
+import { freshArsenal, freshDoors, FRESH_CART, FRESH_FLAGS, FRESH_HILL, hpFor, maxHp, stormOnCourse } from "../rules.ts"
 import {
   Arsenal,
   Cart,
@@ -168,6 +168,8 @@ export const PlayTraining = Game.System(
         const primary = given.primary ?? now.primary
         const fresh = freshArsenal(primary)
         data.arsenal.set(trainee, { ...fresh, nextPrimary: now.nextPrimary, power: now.power, current: given.hold ?? (given.primary ? primary : now.current) })
+        const life = data.life.get(trainee)
+        if (life._tag === "Alive") data.life.update(trainee, { state: "Alive", data: (l) => ({ hp: hpFor(primary, l.hp), armor: l.armor, shield: l.shield }) })
       }
       if (given.pickups) {
         const back = given.pickups
@@ -212,7 +214,8 @@ export const PlayTraining = Game.System(
         const back = setup.pickups
         resources.pickups.set(resources.pickups.get().map((p, i) => (back.includes(i) ? { _tag: "up" as const } : p)))
       }
-      data.life.update(trainee, { state: "Alive", data: (alive) => ({ hp: setup.hp ?? MAX_HP, armor: setup.armor ?? 0, shield: alive.shield }) })
+      // A station that fixes the trainee's health wins over the class; otherwise the class's is full.
+      data.life.update(trainee, { state: "Alive", data: (alive) => ({ hp: setup.hp ?? maxHp(given.primary), armor: setup.armor ?? 0, shield: alive.shield }) })
       if (place !== "walked") {
         // Placed away from a turret it was manning (restarting the turret's station): off it.
         if (resources.turrets.get().some((t) => t.gunner === session)) resources.turrets.set(resources.turrets.get().map((t) => (t.gunner === session ? { ...t, gunner: null } : t)))

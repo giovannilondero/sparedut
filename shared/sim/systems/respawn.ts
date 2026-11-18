@@ -1,11 +1,11 @@
 /**
- * The dead count down ticks and respawn at their team's safest point.
+ * The dead count down ticks and respawn at their team's safest point, only while a match is live.
  * In a live Tampieste there's no respawning: one life only. A member with a post (a bot the
- * training keeps at a station) always comes back at it, with its health.
+ * training keeps at a station) always comes back at it, with its health; anyone else with their class's.
  */
 import { Random } from "@typeonce/ritmo"
 import { IDLE_INPUT } from "../../input.ts"
-import { chooseSpawn, everyoneAlone, START_GRACE_TICKS, freshArsenal, hostile, MAX_HP, SHIELD_TICKS, spawnsFor } from "../rules.ts"
+import { chooseSpawn, everyoneAlone, START_GRACE_TICKS, freshArsenal, hostile, maxHp, SHIELD_TICKS, spawnsFor } from "../rules.ts"
 import { MAPS } from "../../maps/index.ts"
 import { Arsenal, Attackers, Controls, Game, Life, Match, Motion, Out, Player, Post, Rng, Rules, TeamOf, Tick } from "../schema.ts"
 
@@ -37,7 +37,8 @@ export const Respawn = Game.System(
     const map = MAPS[rules.map]
     // Match start respawns everyone (Tampieste included); after that, whoever dies stays to watch.
     const started = match._tag === "Live" && resources.tick.get() - (match.ends - rules.timeLimitTicks) > START_GRACE_TICKS
-    const hold = match._tag === "Over" || (started && everyoneAlone(rules))
+    // In the Muster nobody is on the map, and after a match nobody comes back.
+    const hold = match._tag !== "Live" || (started && everyoneAlone(rules))
     const all = queries.players.each()
     const rng = Random.draw(resources.rng)
     for (const m of all) {
@@ -56,7 +57,7 @@ export const Respawn = Game.System(
         .map((o) => data.motion.get(o).body)
       const post = data.post?.get(m)
       const spot = post ?? chooseSpawn(spawnsFor(map, rules, team), enemies, rng.next() * 1000)
-      data.life.transition(m, { from: "Dead", to: "Alive", data: { hp: post?.hp ?? MAX_HP, armor: 0, shield: SHIELD_TICKS } })
+      data.life.transition(m, { from: "Dead", to: "Alive", data: { hp: post?.hp ?? maxHp(data.arsenal.get(m).nextPrimary), armor: 0, shield: SHIELD_TICKS } })
       data.motion.set(m, {
         body: { x: spot.at[0], y: spot.at[1], z: spot.at[2], vx: 0, vy: 0, vz: 0, grounded: true, crouch: false },
         yaw: spot.yaw,

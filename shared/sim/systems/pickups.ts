@@ -5,7 +5,7 @@
 import type { PickupKind } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
 import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS } from "../../weapons.ts"
-import { MAX_ARMOR, MAX_HP, SGNAPE_TICKS } from "../rules.ts"
+import { MAX_ARMOR, maxHp, SGNAPE_TICKS } from "../rules.ts"
 import { Arsenal, Game, Life, Match, Motion, Out, Pickups, Player, Rules, type ArsenalValue } from "../schema.ts"
 
 export const RESPAWN_OF = {
@@ -32,7 +32,7 @@ export const CollectPickups = Game.System(
   },
   ({ queries, resources, events, machines }) => {
     const { data } = queries.players
-    if (machines.match.get()._tag === "Over") return
+    if (machines.match.get()._tag !== "Live") return
     const states = resources.pickups.get()
     const next = states.map((s) => (s._tag === "down" ? (s.ticks <= 1 ? { _tag: "up" as const } : { _tag: "down" as const, ticks: s.ticks - 1 }) : s))
     const players = queries.players.each()
@@ -49,8 +49,8 @@ export const CollectPickups = Game.System(
         let used = true
         switch (spot.kind) {
           case "frico":
-            if (life.hp >= MAX_HP) used = false
-            else data.life.update(m, { state: "Alive", data: (l) => ({ hp: Math.min(MAX_HP, l.hp + 40), armor: l.armor, shield: l.shield }) })
+            if (life.hp >= maxHp(a.primary)) used = false
+            else data.life.update(m, { state: "Alive", data: (l) => ({ hp: Math.min(maxHp(a.primary), l.hp + 40), armor: l.armor, shield: l.shield }) })
             break
           case "gubane":
             if (life.armor >= MAX_ARMOR) used = false
