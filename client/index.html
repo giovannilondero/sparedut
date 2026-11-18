@@ -73,8 +73,10 @@
             <button id="j-go" data-t="joinGo"></button>
             <p id="j-msg" class="form-msg" role="alert"></p>
           </form>
-          <!-- The training's place: its entry goes here once the training exists. Nothing is shown or focusable until then. -->
-          <div class="home-training" hidden></div>
+          <!-- The training's place. For now a plain button; its proper entry, completed mark and invitation come with the home layout. -->
+          <div class="home-training">
+            <button class="big home-tile" data-go="training"><span data-t="training"></span><small data-t="trainingSub"></small></button>
+          </div>
         </div>
         <section class="home-rooms" aria-labelledby="rooms-title">
           <h2 id="rooms-title" data-t="roomsTitle"></h2>
@@ -234,6 +236,8 @@
       <div id="killfeed"></div>
       <div id="announce"></div>
       <div id="banner"></div>
+      <!-- The training: the station, the step to do, the confirmation of a step done. -->
+      <div id="training" class="hidden" role="status"><div id="training-station"></div><div id="training-step"></div><div id="training-done"></div></div>
 
       <div id="hud-status">
       <div id="vitals">

@@ -13,6 +13,7 @@ import type { PhysicsWorld } from "../shared/physics.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
 import { outsideStorm, owned, RAISE_TICKS, weaponInSlot } from "../shared/sim/rules.ts"
+import { TRAINING } from "../shared/training/index.ts"
 import { WEAPONS, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
@@ -659,6 +660,20 @@ export class Game {
         }
         return
       }
+      case "training": {
+        const tr = t().training
+        if (e.a === "step") {
+          this.hud.trainingDone()
+          audio.play("flag_returned", { volume: 0.6 })
+        } else if (e.a === "station") {
+          this.hud.announce(tr.stationDone, tr.stations[e.station])
+          audio.play("bells", { volume: 0.7 })
+        } else {
+          this.hud.announce(tr.complete, tr.completeSub)
+          audio.play("victory")
+        }
+        return
+      }
     }
   }
 
@@ -887,11 +902,14 @@ export class Game {
   private renderPause(full = false) {
     const room = this.room
     if (!room) return
-    const host = room.hostId === this.me
+    // A training has no host tools and no teams to switch: its player is the host of nothing.
+    const training = room.mode === TRAINING.mode
+    const host = room.hostId === this.me && !training
     if (full || host !== this.pauseHost) this.buildPause(room, host)
     const s = t()
     const p = s.pause
     $("p-roster").innerHTML = rosterHtml(room, this.me)
+    if (training) return
     $("p-team").textContent = p.switchTeam(s.teams[this.otherTeam()].name)
     if (!host) return
     $("p-start").textContent = (this.snap?.phase.tag ?? "Warmup") === "Warmup" ? p.start : p.restart
@@ -905,6 +923,7 @@ export class Game {
 
   private buildPause(room: RoomInfo, host: boolean) {
     this.pauseHost = host
+    const training = room.mode === TRAINING.mode
     const el = $("pause")
     const s = t()
     const p = s.pause
@@ -913,8 +932,10 @@ export class Game {
     this.drawMenu(MENU_PARTS.pause[1], `${s.modes[room.mode].name} <small class="muted">· ${s.modes[room.mode].sub}</small>`, `
       <div class="overlay-body">
       ${
-        // An Offline room has no code and no invite link: nobody else can come in.
-        room.reach === "offline"
+        // An Offline room (a training too) has no code and no invite link: nobody else can come in.
+        training
+          ? `<div class="muted pause-reach">${s.training.menuLine}</div>`
+          : room.reach === "offline"
           ? `<div class="muted pause-reach">${p.reach.offline}</div>`
           : `<div class="pause-code">
         <div><div class="muted">${p.code}</div><div class="invite">${room.code}</div></div>
@@ -923,7 +944,9 @@ export class Game {
       }
       <div class="roster" id="p-roster"></div>
       ${
-        host
+        training
+          ? ""
+          : host
           ? `<div class="host-tools"><span class="host-label">👑 ${p.host}</span>
         <button id="p-start" class="primary"></button>
         <div class="host-bots">
@@ -941,7 +964,7 @@ export class Game {
       </div>
       <div class="row overlay-actions">
         <button id="p-resume" class="primary">${s.loadout.resume}</button>
-        <button id="p-team"></button>
+        ${training ? "" : `<button id="p-team"></button>`}
         <button id="p-loadout">${s.loadout.title}</button>
         <button id="p-settings">${s.static.settings}</button>
         <button id="p-leave">${p.leave}</button>
@@ -950,7 +973,8 @@ export class Game {
       this.openOverlay("none")
       this.controls.lock()
     }
-    $("p-team").onclick = () => this.d.net.send({ t: "team", team: this.otherTeam() })
+    const team = document.getElementById("p-team")
+    if (team) team.onclick = () => this.d.net.send({ t: "team", team: this.otherTeam() })
     $("p-loadout").onclick = () => this.openOverlay("loadout")
     $("p-leave").onclick = () => {
       this.d.net.send({ t: "leave" })
@@ -1455,6 +1479,7 @@ export class Game {
       const outside = !!s.storm && !!you?.alive && !!b && outsideStorm(s.storm, b)
       this.hud.spectating = mode === "tampieste" && s.phase.tag === "Live"
       this.hud.top(s, mode ?? "bataie", this.names, this.controls.device, outside)
+      this.hud.training(s.training, this.controls.device)
       this.hud.death(you, this.names, Math.floor(this.seed / 7))
       if (s.phase.tag === "Over" && Math.floor(t) !== Math.floor(t - dt)) this.renderEnd()
     }

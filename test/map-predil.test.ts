@@ -1,12 +1,12 @@
 import { expect, test } from "bun:test"
-import { MODE_IDS } from "../shared/folklore.ts"
+import { ROOM_MODE_IDS } from "../shared/folklore.ts"
 import { IDLE_INPUT } from "../shared/input.ts"
 import { PREDIL } from "../shared/maps/predil.ts"
 import { stepBody, type Body } from "../shared/movement.ts"
 import { createPhysicsWorld, initPhysics } from "../shared/physics.ts"
 import { playBots } from "./play.ts"
 
-for (const mode of MODE_IDS) {
+for (const mode of ROOM_MODE_IDS) {
   test(`bots play a match at Cave dal Predil: ${mode}`, async () => {
     await initPhysics()
     const { kills, view: v } = playBots("predil", mode)

@@ -11,6 +11,7 @@ import { PlayObjectives } from "./systems/objectives.ts"
 import { FlyProjectiles } from "./systems/projectiles.ts"
 import { Respawn } from "./systems/respawn.ts"
 import { StormDamage } from "./systems/storm.ts"
+import { PlayTraining } from "./systems/training.ts"
 import { MountTurrets } from "./systems/turrets.ts"
 import { UseWeapons } from "./systems/weapons.ts"
 import { Game } from "./schema.ts"
@@ -35,6 +36,7 @@ export const simulate = Game.Schedule(
   RecordHistory,
   CollectPickups,
   PlayObjectives,
+  PlayTraining,
   Game.Schedule.applyDeferred(),
   Game.Schedule.applyStateTransitions()
 )

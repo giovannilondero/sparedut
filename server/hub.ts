@@ -4,7 +4,7 @@
 import { ClientMessage, PROTOCOL_VERSION, SERVER_REACHES, type Reach, type ServerMessage } from "../shared/protocol.ts"
 import { TICK_RATE } from "../shared/movement.ts"
 import type { NetworkId } from "./network.ts"
-import { newCode, Room } from "./room.ts"
+import { newCode, Room, TRAINING_ROOM } from "./room.ts"
 
 export interface Peer {
   readonly network: NetworkId
@@ -124,11 +124,7 @@ export class Hub {
         return
       case "create": {
         if (!this.reaches.includes(msg.reach)) return this.send(peer, { t: "error", code: "invalid" })
-        const mine = [...this.rooms.values()].filter((r) => r.networkKey === peer.network.key).length
-        if (this.rooms.size >= MAX_ROOMS || mine >= MAX_ROOMS_PER_NETWORK) return this.send(peer, { t: "error", code: "busy" })
-        this.leave(peer)
-        const code = newCode((c) => this.rooms.has(c))
-        const created = new Room(code, id, peer.name || "Furlan", peer.network.key, {
+        const created = this.openRoom(peer, msg.primary, {
           mode: msg.mode,
           map: msg.map,
           minutes: msg.minutes,
@@ -136,11 +132,16 @@ export class Hub {
           level: msg.level,
           ff: msg.ff
         })
-        this.rooms.set(code, created)
-        this.enter(peer, created, msg.primary)
+        if (!created) return
         created.fillBots(msg.bots)
         this.roomChanged(created)
-        console.log(`🏰 Room ${code} (${msg.mode} on ${msg.map}, ${msg.reach === "offline" ? msg.reach : `${msg.reach}, ${msg.access.kind}`}) by ${peer.name}`)
+        console.log(`🏰 Room ${created.code} (${msg.mode} on ${msg.map}, ${msg.reach === "offline" ? msg.reach : `${msg.reach}, ${msg.access.kind}`}) by ${peer.name}`)
+        return
+      }
+      case "training": {
+        // Always an Offline room: only a host that makes those (the player's browser) makes a training.
+        if (!this.reaches.includes(TRAINING_ROOM.reach)) return this.send(peer, { t: "error", code: "invalid" })
+        if (this.openRoom(peer, msg.primary, TRAINING_ROOM)) console.log(`🎓 Training for ${peer.name}`)
         return
       }
       case "join": {
@@ -182,6 +183,8 @@ export class Hub {
         return
     }
     if (!room) return
+    // A training has no host tools, and its player stays a Benandante.
+    if (room.training && (msg.t === "team" || msg.t === "start" || msg.t === "bot" || msg.t === "level")) return
     switch (msg.t) {
       case "input":
         room.queueInput(id, msg.i)
@@ -214,6 +217,21 @@ export class Hub {
         this.roomChanged(room)
         return
     }
+  }
+
+  /** Makes a room with `peer` in it as its host; null, with an error sent, when the host is too busy. */
+  private openRoom(peer: Peer, primary: Parameters<Room["addHuman"]>[2], settings: Room["settings"]): Room | null {
+    const mine = [...this.rooms.values()].filter((r) => r.networkKey === peer.network.key).length
+    if (this.rooms.size >= MAX_ROOMS || mine >= MAX_ROOMS_PER_NETWORK) {
+      this.send(peer, { t: "error", code: "busy" })
+      return null
+    }
+    this.leave(peer)
+    const code = newCode((c) => this.rooms.has(c))
+    const room = new Room(code, peer.id!, peer.name || "Furlan", peer.network.key, settings)
+    this.rooms.set(code, room)
+    this.enter(peer, room, primary)
+    return room
   }
 
   close(peer: Peer) {

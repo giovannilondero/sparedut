@@ -223,6 +223,12 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 #announce .sub { display: block; font-size: 0.45em; color: var(--ink); font-style: italic; font-weight: 400; letter-spacing: 0; }
 #announce.pop { animation: pop 2.6s ease-out forwards; }
 @keyframes pop { 0% { opacity: 0; transform: translateX(-50%) scale(1.6); } 10% { opacity: 1; transform: translateX(-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
+#training { position: absolute; top: 14px; left: 14px; max-width: min(360px, 40vw); padding: 8px 12px; background: rgba(10, 8, 6, 0.72); border: 1px solid var(--stone-line); border-radius: 10px; font-size: 14px; display: grid; gap: 4px; }
+#training-station { font-family: var(--serif); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); }
+#training-step .count { color: var(--gold); white-space: nowrap; }
+#training-done { color: var(--ben); font-weight: bold; }
+#training-done:empty { display: none; }
+#training-done.pop { animation: rise 0.3s ease-out; }
 #banner { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); font-size: 14px; background: rgba(10, 8, 6, 0.7); padding: 6px 14px; border-radius: 8px; border: 1px solid var(--stone-line); }
 #banner:empty { display: none; }
 #banner .storm { color: #9fd0ff; animation: storm-pulse 0.8s ease-in-out infinite alternate; }
@@ -470,7 +476,7 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #hud-free, #hud-status { display: contents; }
 #hud.touch #hud-free { position: absolute; inset-inline-start: var(--free-l); inset-block-start: var(--free-t); inline-size: var(--free-w); block-size: var(--free-h);
   display: flex; flex-direction: column; align-items: center; gap: 4px; }
-#hud.touch :is(#turret-prompt, #turret-hud, #topbar, #killfeed, #banner, #chat) { position: static; inset: auto; transform: none; }
+#hud.touch :is(#turret-prompt, #turret-hud, #topbar, #killfeed, #banner, #chat, #training) { position: static; inset: auto; transform: none; }
 /* The score on one line: the two numbers in their team's colour around the clock. The objective, when the mode has one, on a line under it. */
 #hud.touch #topbar { order: 0; max-inline-size: 100%; flex-wrap: wrap; align-items: baseline; justify-content: center; column-gap: 10px; padding: 2px 12px;
   border-radius: 12px; border: 1px solid var(--stone-line); background: rgba(10, 8, 6, 0.72); }
@@ -563,6 +569,7 @@ html.in-match[data-device="touch"] #perf { top: var(--free-t); left: var(--free-
 .home-hero > span { font-size: clamp(21px, 1rem + 1.4vw, 28px); }
 .home-hero.primary small { opacity: 0.85; }
 .home-hero .last { color: #4a3008; opacity: 1; font-weight: 600; }
+.home-training { display: contents; }
 .home-tiles { grid-area: tiles; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; }
 .home-tile { min-inline-size: 0; background-color: var(--stone); border: 1px solid var(--stone-line); border-radius: 12px; }
 .home-tile.big > span { font-size: 19px; }

@@ -3,7 +3,7 @@
  * Client messages are validated with zod: the server doesn't trust them.
  */
 import { z } from "zod"
-import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "./folklore.ts"
+import { BOT_LEVEL_IDS, ROOM_MODE_IDS, type BotLevel, type ModeId, type RoomModeId } from "./folklore.ts"
 import { PlayerInputSchema, type PlayerInput } from "./input.ts"
 import type { MapId, Team } from "./map.ts"
 import { ROOM_MAP_IDS, type RoomMapId } from "./maps/index.ts"
@@ -11,10 +11,10 @@ import type { Body } from "./movement.ts"
 import type { GameEvent } from "./sim/events.ts"
 import type { ArsenalValue, FlagState, HillValue, TurretState } from "./sim/schema.ts"
 import type { StormValue } from "./sim/rules.ts"
-import type { CartView, PhaseView } from "./sim/view.ts"
+import type { CartView, PhaseView, TrainingView } from "./sim/view.ts"
 import { PRIMARIES, type PrimaryId, type ProjectileKind, type WeaponId } from "./weapons.ts"
 
-export const PROTOCOL_VERSION = 13
+export const PROTOCOL_VERSION = 14
 export const MAX_PLAYERS = 16
 export const SNAPSHOT_EVERY = 2 // ticks: 30 snapshots per second
 /** The longest round trip a client reports, in milliseconds. */
@@ -73,7 +73,7 @@ export const RoomCode = z.string().trim().toUpperCase().length(4)
 /** What every `create` carries, whatever its reach. */
 const createRoom = {
   t: z.literal("create"),
-  mode: z.enum(MODE_IDS as [ModeId, ...ModeId[]]),
+  mode: z.enum(ROOM_MODE_IDS as [RoomModeId, ...RoomModeId[]]),
   map: z.enum(ROOM_MAP_IDS as [RoomMapId, ...RoomMapId[]]),
   minutes: z.number().int().min(2).max(30),
   bots: z.number().int().min(0).max(MAX_BOTS),
@@ -89,6 +89,11 @@ export const ClientMessage = z.discriminatedUnion("t", [
     z.object({ ...createRoom, reach: z.literal("offline") }).strict(),
     z.object({ ...createRoom, reach: z.enum(SERVER_REACHES), access: RoomAccess })
   ]),
+  /**
+   * The training: an Offline room of its own kind, one player, on the fair in the Dutrine mode.
+   * Only the in-browser host makes one; it has no code, no list entry and no host tools.
+   */
+  z.object({ t: z.literal("training"), primary: z.enum(PRIMARIES) }).strict(),
   z.object({
     t: z.literal("join"),
     code: RoomCode,
@@ -190,6 +195,8 @@ export interface Snapshot {
   readonly doors: readonly number[]
   readonly players: readonly SnapOther[]
   readonly you: SnapSelf | null
+  /** Only in a training: where the trainee is in it. */
+  readonly training: TrainingView | null
   readonly ev: readonly GameEvent[]
 }
 

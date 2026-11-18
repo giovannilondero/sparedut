@@ -1,6 +1,6 @@
 import { beforeAll, expect, test } from "bun:test"
 import { playBots } from "./play.ts"
-import { MODE_IDS } from "../shared/folklore.ts"
+import { ROOM_MODE_IDS } from "../shared/folklore.ts"
 import { IDLE_INPUT } from "../shared/input.ts"
 import { trackLength, trackPoint } from "../shared/map.ts"
 import { GATE, VENZONE } from "../shared/maps/venzone.ts"
@@ -45,7 +45,7 @@ test("the cjars di fen at Vençon take you to the top of the gates", () => {
   }
 })
 
-for (const mode of MODE_IDS) {
+for (const mode of ROOM_MODE_IDS) {
   test(`bots play at Vençon: ${mode}`, async () => {
     const { kills, view: v, msPerTick: ms } = playBots("venzone", mode)
     console.log("venzone", mode, { msPerTick: ms.toFixed(2), score: v.score, kills })

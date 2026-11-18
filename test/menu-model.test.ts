@@ -348,6 +348,23 @@ test("a screen opens on its first control, and going back lands on the home scre
   expect(focusOnScreen("home", "home")).toBeNull()
 })
 
+test("the training starts in one tap from the home screen, with nothing to choose", () => {
+  const { model } = menu()
+  expect(model.training()).toEqual({ kind: "send", request: { t: "training" } })
+})
+
+test("the training, like any room, needs a name first", () => {
+  const { model } = menu({ name: "" })
+  expect(model.training()).toEqual({ kind: "refused", reason: "needName" })
+  expect(model.screen).toBe("home")
+})
+
+test("the create form does not offer the training's mode or map", () => {
+  const { model } = menu()
+  expect(model.options.modes).not.toContain("dutrine")
+  expect(model.options.maps).not.toContain("sagre")
+})
+
 // ---------------------------------------------------------------- installing and updating the game
 
 test("the install entry is a button while the browser offers to install, and one tap asks it to", () => {

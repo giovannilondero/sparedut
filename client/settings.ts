@@ -1,5 +1,5 @@
 /** Player settings, saved in the browser. */
-import type { BotLevel, ModeId } from "../shared/folklore.ts"
+import { ROOM_MODE_IDS, type BotLevel, type RoomModeId } from "../shared/folklore.ts"
 import { ROOM_MAP_IDS, type RoomMapId } from "../shared/maps/index.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 import type { CrouchMode } from "./controls.ts"
@@ -23,7 +23,7 @@ export interface Settings {
   showInfo: boolean
   /** Dynamic resolution: lowers the resolution when FPS drops. */
   autoRes: boolean
-  lastMode: ModeId
+  lastMode: RoomModeId
   /** The last chosen map: it's also the menu background. */
   lastMap: RoomMapId
   lastBots: number
@@ -60,6 +60,7 @@ export function loadSettings(): Settings {
     const s: Settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") }
     // A value saved by an old version (or a removed map) falls back to the default.
     if (!ROOM_MAP_IDS.includes(s.lastMap)) s.lastMap = DEFAULTS.lastMap
+    if (!ROOM_MODE_IDS.includes(s.lastMode)) s.lastMode = DEFAULTS.lastMode
     if (s.crouch !== "hold" && s.crouch !== "toggle") s.crouch = DEFAULTS.crouch
     if (typeof s.lastFf !== "boolean") s.lastFf = DEFAULTS.lastFf
     return s

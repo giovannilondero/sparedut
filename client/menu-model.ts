@@ -3,7 +3,7 @@
  * code and the password being typed, the latest room list. It turns choices into requests and says
  * why a request is refused; the menu's DOM renders it and forwards the player's events to it.
  */
-import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "../shared/folklore.ts"
+import { BOT_LEVEL_IDS, ROOM_MODE_IDS, type BotLevel, type RoomModeId } from "../shared/folklore.ts"
 import { ROOM_MAP_IDS, type RoomMapId } from "../shared/maps/index.ts"
 import { ACCESSES, MAX_BOTS, Password, REACHES, RoomCode, type Access, type ErrorCode, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
@@ -11,7 +11,7 @@ import type { Lang } from "./i18n.ts"
 import { oneTapRoom, type Settings } from "./settings.ts"
 
 export type CreateOptions = Reached<RoomAccess> & {
-  readonly mode: ModeId
+  readonly mode: RoomModeId
   readonly map: RoomMapId
   readonly minutes: number
   readonly bots: number
@@ -34,6 +34,8 @@ export type MenuRequest =
   | { readonly t: "create"; readonly room: CreateOptions; readonly oneTap: boolean }
   /** `password` only once the player typed one. */
   | { readonly t: "join"; readonly code: string; readonly password?: string }
+  /** The training: always Offline, its map and mode fixed. */
+  | { readonly t: "training" }
   /** The browser's own install prompt, opened from the install entry. */
   | { readonly t: "install" }
   /** The waiting new version takes over and the page reloads into it. */
@@ -72,7 +74,7 @@ const REACH_PLACE = { lan: 0, online: 1, offline: 2 } as const satisfies Record<
 
 /** What creation offers, from the sets the game defines: a new mode or map appears here by itself. */
 export const MENU_OPTIONS = {
-  modes: MODE_IDS,
+  modes: ROOM_MODE_IDS,
   maps: ROOM_MAP_IDS,
   levels: BOT_LEVEL_IDS,
   reaches: [...REACHES].sort((a, b) => REACH_PLACE[a] - REACH_PLACE[b]),
@@ -84,7 +86,7 @@ export const MENU_OPTIONS = {
 
 /** Creation's choices as they stand. */
 export interface Choices {
-  readonly mode: ModeId
+  readonly mode: RoomModeId
   readonly map: RoomMapId
   readonly minutes: number
   readonly bots: number
@@ -137,7 +139,7 @@ const refused = (reason: Refusal): Outcome => ({ kind: "refused", reason })
 
 export class MenuModel {
   private current: Screen = "home"
-  private mode: ModeId
+  private mode: RoomModeId
   private map: RoomMapId
   private minutes: number
   private bots: number
@@ -222,7 +224,7 @@ export class MenuModel {
     this.save()
   }
 
-  chooseMode(mode: ModeId) {
+  chooseMode(mode: RoomModeId) {
     this.mode = mode
   }
 
@@ -287,6 +289,12 @@ export class MenuModel {
   oneTap(): Outcome {
     if (!this.remembered.name) return this.needName()
     return { kind: "send", request: { t: "create", room: oneTapRoom(this.remembered), oneTap: true } }
+  }
+
+  /** The home screen's training: one tap, nothing to choose; like any room it needs a name. */
+  training(): Outcome {
+    if (!this.remembered.name) return this.needName()
+    return { kind: "send", request: { t: "training" } }
   }
 
   typeCode(text: string) {
