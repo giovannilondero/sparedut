@@ -36,7 +36,7 @@ test("a first-time player starts the training at station 1, with only it unlocke
   storage(null)
   const s = loadSettings()
   expect(s.training).toEqual(FRESH_TRAINING)
-  expect(trainingStart(s.training)).toEqual({ unlocked: 1, from: "look" })
+  expect(trainingStart(s.training)).toEqual({ unlocked: 1, from: "look", completed: false })
 })
 
 test("a completed station is saved: after leaving, the training starts at the first station not completed", () => {
@@ -44,7 +44,7 @@ test("a completed station is saved: after leaving, the training starts at the fi
   const later = played(loadSettings(), done("look"), done("course"))
   expect(JSON.parse(store.get(KEY)!).training).toEqual({ done: 2 })
   expect(later.training).toEqual({ done: 2 })
-  expect(trainingStart(later.training)).toEqual({ unlocked: 3, from: "always" })
+  expect(trainingStart(later.training)).toEqual({ unlocked: 3, from: "always", completed: false })
   // The other settings are kept beside it.
   expect(later.name).toBe("Toni")
 })
@@ -52,14 +52,14 @@ test("a completed station is saved: after leaving, the training starts at the fi
 test("going back to an earlier station and completing it again unlocks nothing less", () => {
   storage({ training: { done: 5 } })
   const later = played(loadSettings(), done("course"))
-  expect(trainingStart(later.training)).toEqual({ unlocked: 6, from: "armoury" })
+  expect(trainingStart(later.training)).toEqual({ unlocked: 6, from: "armoury", completed: false })
 })
 
 test("a completed training is saved: every station unlocked, and a new training starts at station 1", () => {
   storage(null)
   const later = played(loadSettings(), done("skirmish"), COMPLETE)
   expect(later.training).toEqual({ done: STATION_IDS.length })
-  expect(trainingStart(later.training)).toEqual({ unlocked: STATION_IDS.length, from: "look" })
+  expect(trainingStart(later.training)).toEqual({ unlocked: STATION_IDS.length, from: "look", completed: true })
 })
 
 test("a step completed is not progress worth saving: only a whole station is", () => {
@@ -74,7 +74,7 @@ test("starting over clears the saved progress, the completion too", () => {
   s.training = FRESH_TRAINING
   saveSettings(s)
   expect(loadSettings().training).toEqual({ done: 0 })
-  expect(trainingStart(loadSettings().training)).toEqual({ unlocked: 1, from: "look" })
+  expect(trainingStart(loadSettings().training)).toEqual({ unlocked: 1, from: "look", completed: false })
 })
 
 test("progress saved by an old or broken version falls back to a first training", () => {
@@ -88,5 +88,5 @@ test("progress saved by an old or broken version falls back to a first training"
 test("the home screen's training request carries where to start", () => {
   storage({ name: "Toni", training: { done: 3 } })
   const model = new MenuModel(loadSettings(), () => {})
-  expect(model.training()).toEqual({ kind: "send", request: { t: "training", start: { unlocked: 4, from: "switch" } } })
+  expect(model.training()).toEqual({ kind: "send", request: { t: "training", start: { unlocked: 4, from: "switch", completed: false } } })
 })

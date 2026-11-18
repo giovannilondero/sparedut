@@ -61,7 +61,7 @@ export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: H
     },
     machines: Game.Runtime.machines(
       Game.Runtime.machine(Match, training ? { _tag: "Live", ends: 0 } : { _tag: "Warmup" }),
-      Game.Runtime.machine(Training, training ? { _tag: "Arriving", station: first.station, unlocked: first.unlocked, place: "facingStart" } : { _tag: "Off" })
+      Game.Runtime.machine(Training, training ? { _tag: "Arriving", station: first.station, unlocked: first.unlocked, completed: first.completed, place: "facingStart" } : { _tag: "Off" })
     ),
     ...(debug ? { debug } : {})
   })

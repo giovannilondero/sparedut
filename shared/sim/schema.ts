@@ -317,7 +317,9 @@ export type ArrivalPlace = (typeof ARRIVAL_PLACES)[number]
 /**
  * The training's progress (`shared/training/`): which station, which step, how far the step has
  * got. A regular room is `Off` for good. Stations and steps are indices into `STATION_IDS` and
- * the station's `stepsOf`. `unlocked`: how many stations, from the first, the trainee may go to.
+ * the station's `stepsOf`. `unlocked`: how many stations, from the first, the trainee may go to;
+ * `completed`: the training was completed once (only with all of them unlocked), so every station
+ * is completed, not only those before the last unlocked one.
  */
 export const Training = Game.StateMachine(
   "Sparedut/Training",
@@ -329,7 +331,7 @@ export const Training = Game.StateMachine(
      * facing along the street (a training's first arrival) or keeping their look (going to a
      * station: the client owns the look, and a turn it did not make would complete a look step).
      */
-    Arriving: z.object({ station: z.number().int(), unlocked: z.number().int(), place: z.enum(ARRIVAL_PLACES) }),
+    Arriving: z.object({ station: z.number().int(), unlocked: z.number().int(), completed: z.boolean(), place: z.enum(ARRIVAL_PLACES) }),
     /**
      * At a station, on one of its steps: `count`, how many times its action happened; `mark`, the one
      * number the step keeps (`StepProgress`), whose meaning is the step's own: the yaw it began at
@@ -337,7 +339,7 @@ export const Training = Game.StateMachine(
      * a score (when a scoring step began), an index (the primary held when the armoury opened) or
      * 1 or 0 (whether the trainee was already inside, for a step that asks to go in).
      */
-    Step: z.object({ station: z.number().int(), step: z.number().int(), count: z.number().int(), mark: z.number(), unlocked: z.number().int() }),
+    Step: z.object({ station: z.number().int(), step: z.number().int(), count: z.number().int(), mark: z.number(), unlocked: z.number().int(), completed: z.boolean() }),
     /** Every station done: all of them unlocked. */
     Complete: {}
   },

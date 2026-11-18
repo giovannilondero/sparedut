@@ -142,7 +142,7 @@ export class Hub {
       case "training": {
         // Always an Offline room: only a host that makes those (the player's browser) makes a training.
         if (!this.reaches.includes(TRAINING_ROOM.reach)) return this.send(peer, { t: "error", code: "invalid" })
-        const start = { unlocked: msg.unlocked ?? FIRST_START.unlocked, from: msg.from ?? FIRST_START.from }
+        const start = { unlocked: msg.unlocked ?? FIRST_START.unlocked, from: msg.from ?? FIRST_START.from, completed: msg.completed ?? FIRST_START.completed }
         if (this.openRoom(peer, msg.primary, TRAINING_ROOM, start)) console.log(`🎓 Training for ${peer.name}`)
         return
       }

@@ -10,13 +10,13 @@ import { STATION_IDS } from "../shared/training/index.ts"
 const states = (entries: ReturnType<typeof stationEntries>) => entries.map((e) => e.state)
 
 test("on a first run: the stations before are completed, the current one is marked, the rest locked", () => {
-  const entries = stationEntries({ tag: "station", station: "always", step: null, count: 0, target: 0, unlocked: 3 })
+  const entries = stationEntries({ tag: "station", station: "always", step: null, count: 0, target: 0, unlocked: 3, completed: false })
   expect(entries.map((e) => [e.station, e.n])).toEqual(STATION_IDS.map((s, i) => [s, i + 1]))
   expect(states(entries)).toEqual(["done", "done", "current", ...Array(STATION_IDS.length - 3).fill("locked")])
 })
 
 test("back at an earlier station: the furthest one reached is open, not completed", () => {
-  const entries = stationEntries({ tag: "station", station: "look", step: "lookAround", count: 0, target: 1, unlocked: 4 })
+  const entries = stationEntries({ tag: "station", station: "look", step: "lookAround", count: 0, target: 1, unlocked: 4, completed: false })
   expect(states(entries).slice(0, 5)).toEqual(["current", "done", "done", "open", "locked"])
 })
 
@@ -25,7 +25,7 @@ test("a completed training: every station completed and choosable, none current"
 })
 
 test("only the stations that can be chosen are buttons that act; locked ones are disabled", () => {
-  const html = stationListHtml(stationEntries({ tag: "station", station: "course", step: null, count: 0, target: 0, unlocked: 2 }), STRINGS.it)
+  const html = stationListHtml(stationEntries({ tag: "station", station: "course", step: null, count: 0, target: 0, unlocked: 2, completed: false }), STRINGS.it)
   expect(html).toContain('data-station="look"')
   expect(html).toContain('data-station="course"')
   expect(html).not.toContain('data-station="always"')

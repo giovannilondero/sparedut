@@ -1,4 +1,4 @@
-/** Station 12: win the skirmish against the bots, then open the scoreboard and send a quick phrase, reporting each as the client does. */
+/** Station 12: win the skirmish against the bots, then open the scoreboard, send a quick phrase and a chat message, reporting each as the client does. */
 import { BUTTON } from "../../shared/input.ts"
 import { eyeHeight } from "../../shared/movement.ts"
 import { FLAG_BIT, type SnapOther } from "../../shared/protocol.ts"
@@ -49,5 +49,6 @@ const report =
 export const SKIRMISH: Drivers<"skirmish"> = {
   win: fight,
   board: report("board"),
-  phrases: report("phrases")
+  phrases: report("phrases"),
+  chat: report("chat")
 }

@@ -118,7 +118,8 @@ export function loadSettings(): Settings {
 /** Where a new training starts: the first station not completed, or station 1 once it has all been completed. */
 export function trainingStart(p: TrainingProgress): TrainingStart {
   const unlocked = unlockedOf(p)
-  return { unlocked, from: trainingCompleted(p) ? STATION_IDS[0] : STATION_IDS[unlocked - 1] }
+  const completed = trainingCompleted(p)
+  return { unlocked, from: completed ? STATION_IDS[0] : STATION_IDS[unlocked - 1], completed }
 }
 
 /** The progress after a training event: a station completed unlocks the next, the training completed unlocks all. */
