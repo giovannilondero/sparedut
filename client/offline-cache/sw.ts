@@ -8,10 +8,12 @@
  * - fetch: `routeOf` decides; the page and the listed files come from this build's cache, the
  *   Vêr look's files from the Vêr cache, which keeps them the first time they are fetched.
  *
- * A new worker waits until no page runs the old build: a page keeps the files of its own build.
+ * A new worker waits until no page runs the old build (a page keeps the files of its own build),
+ * or until a page asks it to take over (`TAKE_OVER`, see `./update.ts`).
  */
 import { cacheName, staleCaches, staleVerCaches, verCacheName } from "./caches.ts"
 import { routeOf, storable, type Route } from "./route.ts"
+import { TAKE_OVER } from "./update.ts"
 
 declare const self: ServiceWorkerGlobalScope
 /** Written in front of the bundle by the build. */
@@ -66,4 +68,9 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const answer = answers[routeOf(event.request, self.location.origin, LISTED)]
   if (answer) event.respondWith(answer(event.request))
+})
+
+// The page asks a waiting version to take over (`./update.ts`): a game too old for the server.
+self.addEventListener("message", (event) => {
+  if (event.data === TAKE_OVER) void self.skipWaiting()
 })

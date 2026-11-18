@@ -40,6 +40,18 @@ pnpm cf:destroy
 Il primo deploy installa nell'account lo stato di Alchemy, condiviso con la CI.
 Un deploy chiude le partite in corso.
 
+## Installare il gioco
+
+Dalla build di produzione (il deploy, o `pnpm build && pnpm start` aperto da `localhost`) il gioco si installa come un'app:
+si apre a schermo intero, senza le barre del browser, in orizzontale e in verticale, e dopo la prima visita online si apre anche senza rete.
+
+- **Chrome, Edge, Brave** (computer e Android): l'icona di installazione nella barra degli indirizzi, oppure *Installa app* / *Aggiungi a schermata Home* nel menu del browser.
+- **Safari su iPhone e iPad**: *Condividi* → *Aggiungi alla schermata Home*.
+- **Safari su Mac**: *File* → *Aggiungi al Dock*.
+
+Installato, il gioco chiede al browser di non cancellare i suoi dati (la cache, le impostazioni, i progressi della Dutrine).
+L'installazione chiede HTTPS: da un indirizzo di rete locale in `http://` il gioco si gioca ma non si installa.
+
 ## Partite
 
 - **Zuie cuintri i bot**: una partita offline contro la CPU, subito e senza riscaldamento, con modalità, mappa, durata, bot e bravura dell'ultima partita creata (la prima volta quelli di partenza) e fuoco amico spento.
@@ -130,6 +142,7 @@ Stack dalle linee guida (`giovannilondero/game-dev-guidelines`, 3D): **Ritmo** (
 - `server/nav-graphs.ts`: i grafi dei bot precalcolati (costano decine di secondi di CPU); `pnpm nav` li rifà quando cambia una mappa, il movimento o la fisica, e `test/nav.test.ts` controlla che siano aggiornati
 - `client/`: rendering Three.js (mondo, avatar, arma in prima persona, effetti), audio sintetizzato con Howler, predizione e interpolazione, HUD e menu
 - `client/looks.ts`: i due stili grafici; **Vêr** carica le superfici fotografate di `client/public/tex/` e le armi di `client/public/models/`, esportate dagli script Blender di `assets/blender/` (`pnpm models`)
+- `client/public/manifest.webmanifest`, `client/public/icons/`, `client/installed.ts`: il gioco installabile; le icone vengono da `favicon.svg` (`pnpm icons` le ridisegna con Brave senza finestra)
 - `test/`: test senza browser della simulazione, del grafo dei bot e di partite intere fra bot
 
 Rete: il server è autoritativo; il client predice il proprio movimento con la stessa fisica e rigioca i comandi non confermati,

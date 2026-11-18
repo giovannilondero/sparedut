@@ -21,6 +21,8 @@ import { Net } from "./net.ts"
 import { BrowserHostConnection } from "./offline.ts"
 import { registerServiceWorker } from "./offline-cache/register.ts"
 import { keepVerFilesOnceControlled, lookToShow, verState } from "./offline-cache/ver.ts"
+import { SelfUpdate } from "./offline-cache/self-update.ts"
+import { keepStorage, runsInstalled } from "./installed.ts"
 import { Link } from "./connection.ts"
 import { PerfMonitor } from "./perf.ts"
 import { loadSettings, saveSettings } from "./settings.ts"
@@ -43,7 +45,7 @@ const chosenLook = lookFromUrl()
 // Vêr chosen with no network and never fetched: Cumò for this page, and the saved choice kept,
 // so Vêr comes back by itself once it can load (`client/offline-cache/ver.ts`). Asked only when
 // the browser says it is offline: online, the boot waits for nothing (and the `load` listeners
-// below are added before the page's `load`, which a top-level await would let pass).
+// below are added before the page's `load`, which a top-level await can let pass).
 const shownLook = lookToShow(
   chosenLook,
   chosenLook === "ver" && !navigator.onLine ? await verState({ caches: "caches" in globalThis ? caches : undefined, fetch: (url, init) => fetch(url, init) }) : "reachable"
@@ -146,6 +148,25 @@ const browserHostConnection = new BrowserHostConnection()
 /** What the game talks to: the server, or the browser's host while in an Offline room. */
 const link = new Link([net, browserHostConnection])
 const offline = () => link.uses(browserHostConnection)
+// After one visit online the game opens with no network (`client/offline-cache/`): production
+// build only, after the page has loaded so the worker's downloads don't compete with the boot.
+// `navigator.serviceWorker` is missing over plain http on a LAN address: the game plays as before.
+const serviceWorkers = navigator.serviceWorker as ServiceWorkerContainer | undefined
+const registration = new Promise<ServiceWorkerRegistration | null>((resolve) => {
+  const register = () => resolve(registerServiceWorker({ production: import.meta.env.PROD, container: serviceWorkers }))
+  // The top-level await for Vêr with no network (above) can let `load` pass before this line.
+  if (document.readyState === "complete") register()
+  else addEventListener("load", register, { once: true })
+})
+/** A cached game too old for the server updates itself; a match or an Offline room is never cut. */
+const selfUpdate = new SelfUpdate({
+  registration,
+  container: serviceWorkers,
+  session: sessionStorage,
+  reload: () => location.reload(),
+  tell: (notice) => toast(t().tooOld[notice]),
+  playing: () => Boolean(game?.active) || offline()
+})
 browserHostConnection.onError = (error) => {
   console.error("The Offline room's host failed:", error)
   toast(t().net.offlineFailed)
@@ -262,6 +283,7 @@ function backToMenu() {
   game?.stop()
   menu.show(true)
   audio.menuMusic(true)
+  selfUpdate.atMenu()
 }
 
 link.on((msg: ServerMessage) => {
@@ -295,6 +317,8 @@ link.on((msg: ServerMessage) => {
     case "error":
       // A password room: ask for it, saying why when the last one did not work.
       if (msg.code === "passwordRequired" || msg.code === "wrongPassword" || msg.code === "tooManyAttempts") menu.hostRefused(joining, msg.code)
+      // Too old for the server: fetch the new version and reload into it, once (or say why not).
+      else if (msg.code === "version") selfUpdate.refused()
       else toast(t().errors[msg.code])
       return
   }
@@ -387,11 +411,8 @@ requestAnimationFrame(() =>
   })
 )
 
-// After one visit online the game opens with no network (`client/offline-cache/`): production
-// build only, after the page has loaded so the worker's downloads don't compete with the boot.
-// `navigator.serviceWorker` is missing over plain http on a LAN address: the game plays as before.
-addEventListener(
-  "load",
-  () => void registerServiceWorker({ production: import.meta.env.PROD, container: navigator.serviceWorker as ServiceWorkerContainer | undefined }),
-  { once: true }
-)
+// Installed, the game asks the browser to keep its storage (cache, settings, training progress):
+// at every start, since the browser may only grant it later, and in the tab that installs it.
+const storage = navigator.storage as StorageManager | undefined
+void keepStorage({ installed: runsInstalled({ matchMedia: (q) => matchMedia(q), fullscreenElement: document.fullscreenElement, standalone: (navigator as { standalone?: boolean }).standalone }), storage })
+addEventListener("appinstalled", () => void keepStorage({ installed: true, storage }), { once: true })
