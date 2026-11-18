@@ -82,7 +82,7 @@ export interface CartView {
 /**
  * The training's progress, as the trainee's HUD shows it: the station, the current step (null
  * while arriving), how many times its action happened out of how many, and how many stations,
- * from the first, are unlocked.
+ * from the first, are unlocked, and whether the training was completed once (every station completed).
  */
 export type TrainingView =
   | {
@@ -92,6 +92,7 @@ export type TrainingView =
       readonly count: number
       readonly target: number
       readonly unlocked: number
+      readonly completed: boolean
     }
   | { readonly tag: "complete" }
 
@@ -178,11 +179,11 @@ export const ViewWorld = Game.Inspector(
     const progress = machines.training.get()
     let training: TrainingView | null = null
     if (progress._tag === "Complete") training = { tag: "complete" }
-    else if (progress._tag === "Arriving") training = { tag: "station", station: STATION_IDS[progress.station], step: null, count: 0, target: 0, unlocked: progress.unlocked }
+    else if (progress._tag === "Arriving") training = { tag: "station", station: STATION_IDS[progress.station], step: null, count: 0, target: 0, unlocked: progress.unlocked, completed: progress.completed }
     else if (progress._tag === "Step") {
       const station = STATION_IDS[progress.station]
       const step = stepsOf(station)[progress.step]
-      training = { tag: "station", station, step, count: progress.count, target: stepRule(station, step).target, unlocked: progress.unlocked }
+      training = { tag: "station", station, step, count: progress.count, target: stepRule(station, step).target, unlocked: progress.unlocked, completed: progress.completed }
     }
     const storm = objective === "storm" && match._tag === "Live" ? stormNow(map, rules, match.ends - rules.timeLimitTicks, resources.stormCourse.get(), tick) : null
     return {

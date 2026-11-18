@@ -60,7 +60,8 @@ export const CONTROL_TEXT: { readonly [L in Lang]: ControlTexts } = {
     mine: { keyboard: "<kbd>F</kbd>", pad: PAD.mine, touch: TOUCH.mine },
     use: { keyboard: "<kbd>E</kbd>", pad: PAD.use, touch: `<kbd>${TOUCH_USE.fur.use}</kbd>/<kbd>${TOUCH_USE.fur.leave}</kbd>` },
     board: { keyboard: "<kbd>Tab</kbd>", pad: PAD.board, touch: TOUCH.board },
-    phrases: { keyboard: "<kbd>V</kbd>", touch: TOUCH.phrases }
+    phrases: { keyboard: "<kbd>V</kbd>", touch: TOUCH.phrases },
+    chat: { keyboard: "<kbd>Enter</kbd> o <kbd>T</kbd>" }
   },
   it: {
     look: { keyboard: "<kbd>Mouse</kbd>", pad: "<kbd>Stick destro</kbd>", touch: "il <kbd>dito sullo schermo</kbd>" },
@@ -79,6 +80,7 @@ export const CONTROL_TEXT: { readonly [L in Lang]: ControlTexts } = {
     mine: { keyboard: "<kbd>F</kbd>", pad: PAD.mine, touch: TOUCH.mine },
     use: { keyboard: "<kbd>E</kbd>", pad: PAD.use, touch: `<kbd>${TOUCH_USE.it.use}</kbd>/<kbd>${TOUCH_USE.it.leave}</kbd>` },
     board: { keyboard: "<kbd>Tab</kbd>", pad: PAD.board, touch: TOUCH.board },
-    phrases: { keyboard: "<kbd>V</kbd>", touch: TOUCH.phrases }
+    phrases: { keyboard: "<kbd>V</kbd>", touch: TOUCH.phrases },
+    chat: { keyboard: "<kbd>Invio</kbd> o <kbd>T</kbd>" }
   }
 }

@@ -19,7 +19,7 @@ import type { InterfaceAction } from "../shared/training/interface.ts"
 import { UnavailableSteps } from "./training-unavailable.ts"
 import type { StationId } from "../shared/training/index.ts"
 import { FRESH_TRAINING, trainingProgressed } from "./settings.ts"
-import { stationEntries, stationListHtml } from "./training-menu.ts"
+import { entryChoice, listOnEntry, stationButtonId, stationEntries, stationListHtml } from "./training-menu.ts"
 import { WEAPONS, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
@@ -168,6 +168,13 @@ export class Game {
   private readonly unavailableSteps = new UnavailableSteps()
   /** The training's completion screen is open: like a match's end, no menu opens over it and no command goes out. */
   private trainingEnded = false
+  /**
+   * A training entered with saved progress: its station list opens before play, on the first
+   * snapshot that shows the trainee there, and the pointer is not taken until a station is chosen.
+   */
+  private choosing = false
+  /** The match menu is the station list opened on entry: it says which station continues. */
+  private entering = false
   private chatting = false
   private quickOpen = false
   private overlay: MatchMenu = "none"
@@ -241,7 +248,11 @@ export class Game {
       e.stopPropagation()
       if (e.key === "Enter") {
         const text = chat.value.trim()
-        if (text) d.net.send({ t: "chat", text })
+        if (text) {
+          d.net.send({ t: "chat", text })
+          // Sending a typed message is a training's interface step; opening the chat is not.
+          if (this.room !== null && isTraining(this.room.mode)) d.net.send({ t: "report", a: "chat" })
+        }
         this.closeChat()
       }
       if (e.key === "Escape") this.closeChat()
@@ -277,6 +288,8 @@ export class Game {
     this.ownReload = null
     this.sinceShot = Infinity
     this.trainingEnded = false
+    this.choosing = isTraining(room.mode) && listOnEntry(this.d.settings.training)
+    this.entering = false
     this.clock = new MatchClock(() => performance.now())
     this.applySettings()
     this.updateRoster(room)
@@ -286,7 +299,7 @@ export class Game {
     this.controls.inMatch = true
     document.documentElement.classList.add("in-match")
     this.placeTouch()
-    this.controls.lock()
+    if (!this.choosing) this.controls.lock()
     this.hud.announce(t().modes[room.mode].name, t().modes[room.mode].rules)
   }
 
@@ -470,6 +483,14 @@ export class Game {
     }
     for (const e of s.ev) this.event(e)
     if (prev?.phase.tag !== s.phase.tag) this.phaseChanged(s)
+    // Entered with progress: the station list, as soon as the trainee is there. Opening it pauses the training.
+    if (this.choosing && you?.alive && s.training?.tag === "station") {
+      this.choosing = false
+      if (this.overlay === "none") {
+        this.entering = true
+        this.openOverlay("pause", stationButtonId(entryChoice(s.training).focus))
+      }
+    }
   }
 
   private phaseChanged(s: Snapshot) {
@@ -481,7 +502,7 @@ export class Game {
       this.renderEnd(true)
     } else {
       $<DialogElement>(MENU_PARTS.end[0]).open = false
-      if (tag === "Live" && this.overlay === "none") this.controls.lock()
+      if (tag === "Live" && this.overlay === "none" && !this.choosing) this.controls.lock()
     }
     if (this.overlay === "pause") this.renderPause()
   }
@@ -847,8 +868,11 @@ export class Game {
     if (form.parentElement?.id !== "settings-home") $("settings-home").append(form)
   }
 
-  private openOverlay(which: MatchMenu) {
+  /** Opens a match menu (or none); `focus`, the control that takes the focus in place of the usual one. */
+  private openOverlay(which: MatchMenu, focus?: string) {
     const previous = this.overlay
+    // The list on entry is the match menu once: left, it comes back as the match menu.
+    if (which !== "pause") this.entering = false
     if (which === "loadout" && previous !== "loadout") this.loadoutFrom = previous === "pause" ? "pause" : "none"
     this.overlay = which
     if (which === "settings" && previous !== "settings") {
@@ -862,7 +886,7 @@ export class Game {
       if (document.pointerLockElement) document.exitPointerLock()
       if (previous !== "loadout") this.renderLoadout()
     }
-    this.showMenus(previous)
+    this.showMenus(previous, focus)
     this.syncPause()
   }
 
@@ -870,7 +894,7 @@ export class Game {
    * Closes every menu but the open one, then opens it with focus where `focusOnOpen` says. With
    * none open, focus leaves the menus: keys go back to the game.
    */
-  private showMenus(previous: MatchMenu) {
+  private showMenus(previous: MatchMenu, focus?: string) {
     const active = document.activeElement
     for (const menu of MATCH_MENUS) {
       if (menu !== this.overlay) $<DialogElement>(MENU_PARTS[menu][0]).open = false
@@ -882,7 +906,7 @@ export class Game {
     const [id, content] = MENU_PARTS[this.overlay]
     const dialog = $<DialogElement>(id)
     if (dialog.open) return
-    this.openMenu(id, content, focusOnOpen(this.overlay, previous))
+    this.openMenu(id, content, focus ?? focusOnOpen(this.overlay, previous))
   }
 
   /**
@@ -983,7 +1007,7 @@ export class Game {
       ${
         // An Offline room (a training too) has no code and no invite link: nobody else can come in.
         training
-          ? `<div class="muted pause-reach">${s.training.menuLine}</div>`
+          ? `<div class="muted pause-reach">${this.entering ? s.training.chooseStation : s.training.menuLine}</div>`
           : room.reach === "offline"
           ? `<div class="muted pause-reach">${p.reach.offline}</div>`
           : `<div class="pause-code">
@@ -991,7 +1015,7 @@ export class Game {
         <div class="pause-share"><button id="p-copy">${p.copy}</button><div class="muted pause-reach">${p.reach[room.reach]} · ${p.access[room.access]}</div></div>
       </div>`
       }
-      ${training ? stationListHtml(stationEntries(this.snap?.training ?? null), s) : `<div class="roster" id="p-roster"></div>`}
+      ${training ? stationListHtml(stationEntries(this.snap?.training ?? null), s, this.entering ? entryChoice(this.snap?.training ?? null).continues : null) : `<div class="roster" id="p-roster"></div>`}
       ${
         training
           ? ""

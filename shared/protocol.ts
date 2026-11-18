@@ -102,7 +102,9 @@ export const ClientMessage = z.discriminatedUnion("t", [
       primary: z.enum(PRIMARIES),
       /** The browser's saved progress (`shared/training/start.ts`); absent, a first training. */
       unlocked: z.number().int().min(1).max(STATION_IDS.length).optional(),
-      from: z.enum(STATION_IDS).optional()
+      from: z.enum(STATION_IDS).optional(),
+      /** The training was completed once (`TrainingStart.completed`); absent, not. */
+      completed: z.boolean().optional()
     })
     .strict(),
   z.object({

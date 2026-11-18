@@ -30,7 +30,9 @@ export const CONTROL_DEVICES = {
   mine: EVERY,
   use: EVERY,
   board: EVERY,
-  phrases: ["keyboard", "touch"]
+  phrases: ["keyboard", "touch"],
+  /** Typing a message needs a keyboard: neither the controller nor the touch screen has a chat. */
+  chat: ["keyboard"]
 } as const satisfies Record<ControlId, readonly Device[]>
 
 /** The devices that have control `C`: the prompt tables name it for these and only these. */

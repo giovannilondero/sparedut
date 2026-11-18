@@ -37,7 +37,9 @@ export const CONTROL_IDS = [
   /** Mounting and dismounting a turret. */
   "use",
   "board",
-  "phrases"
+  "phrases",
+  /** Typing a chat message and sending it. */
+  "chat"
 ] as const
 export type ControlId = (typeof CONTROL_IDS)[number]
 
@@ -85,9 +87,19 @@ export interface StepRule {
   readonly report?: InterfaceAction
   /** What the trainee is given, and the objective put in force, on the tick the step becomes current. */
   readonly given?: StepGiven
+  /** What the station's foes do while the step is current (`FOE_STANCES`); `fight` when absent. */
+  readonly foes?: FoeStance
   readonly begin: (seen: Seen) => StepProgress
   readonly advance: (seen: Seen, now: StepProgress) => StepProgress
 }
+
+/**
+ * What a station's foes (its bots that fire) do while a step is current: `fight` as in a match, or
+ * `standDown`: they hold their fire and walk back to their posts, and nothing they do harms the
+ * trainee (station 12 once the skirmish is won, so its interface steps are tried in peace).
+ */
+export const FOE_STANCES = ["fight", "standDown"] as const
+export type FoeStance = (typeof FOE_STANCES)[number]
 
 /**
  * What a step gives the trainee on the tick it becomes current. A step without it changes nothing:

@@ -3,7 +3,7 @@
  * after respawn. Armor, deaths, kills, assists, streaks, points.
  */
 import { STREAK_AT } from "../../folklore.ts"
-import { killsScore, spared, SPARED_HP } from "../../training/spared.ts"
+import { foesStandDown, killsScore, spared, SPARED_HP } from "../../training/spared.ts"
 import type { KillCause } from "../events.ts"
 import { absorb, ASSIST_WINDOW_TICKS, currentStation, hostile, MAX_HP, RESPAWN_TICKS } from "../rules.ts"
 import { Attackers, Damage, Game, Heal, Life, Match, Motion, Out, Player, Rules, Score, Stats, TeamOf, Tick, Training } from "../schema.ts"
@@ -55,6 +55,8 @@ export const ApplyDamage = Game.System(
     const sparing = station !== null && spared(station)
     // Kills score in a Bataie di Gnot, and in the training's skirmish, which is one.
     const scoring = rules.mode === "bataie" || (training._tag === "Step" && killsScore(training.station))
+    // Once the skirmish is won its foes stand down: nothing of theirs harms the trainee for the rest of the station.
+    const harmless = training._tag === "Step" && foesStandDown(training.station, training.step)
 
     for (const h of heals) {
       const target = bySession.get(h.target)
@@ -79,6 +81,7 @@ export const ApplyDamage = Game.System(
       const self = hit.attacker === hit.victim
       const victimTeam = data.team.get(victim)
       if (attacker && !self && !hostile(rules, data.team.get(attacker), victimTeam)) continue
+      if (harmless && attacker && data.player.get(attacker).bot && !data.player.get(victim).bot) continue
       if (life.shield > 0 && hit.weapon !== "fall") continue
 
       if (hit.push) {
