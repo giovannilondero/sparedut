@@ -8,6 +8,7 @@ import { Hub, type Clock } from "../server/hub.ts"
 import { ROOM_MODE_IDS } from "../shared/folklore.ts"
 import { initPhysics } from "../shared/physics.ts"
 import { harness } from "./harness.ts"
+import { FLAG_BIT, type Snapshot } from "../shared/protocol.ts"
 
 beforeAll(() => initPhysics())
 
@@ -36,6 +37,63 @@ for (const host of HOSTS) {
       expect(me.last("room")!.room).toMatchObject({ reach: host.reach, mode: "bataie", map: "glemone", hostId: you, players: 1, bots: 3, level: "pari", ff: false })
     })
 
+    test("a new room is in the Muster: nobody is on the map, moves, fires, is hit or takes a pickup", () => {
+      const { connect, play } = harness(host.make)
+      const me = connect()
+      me.say({ ...create, bots: 4 })
+      play(2)
+      const first = me.last("snap")!
+      expect(first.phase.tag).toBe("Muster")
+      // Ten seconds of a player pushing forward and firing, and of bots thinking.
+      for (let i = 0; i < 600; i++) {
+        me.say({ t: "input", i: { seq: i + 1, mx: 0, mz: 1, yaw: 0, pitch: 0, buttons: 1, weapon: "cramar", view: 0 } })
+        play(1)
+      }
+      const snaps = me.got.filter((m) => m.t === "snap")
+      expect(snaps.every((s) => s.phase.tag === "Muster")).toBe(true)
+      expect(snaps.every((s) => s.players.every((p) => (p.f & FLAG_BIT.alive) === 0) && s.you?.alive === false)).toBe(true)
+      const last = me.last("snap")!
+      expect(last.players.map((p) => [p.x, p.z])).toEqual(first.players.map((p) => [p.x, p.z]))
+      expect(last.pickups).not.toContain("0")
+      expect(snaps.flatMap((s) => s.ev).filter((e) => e.t === "shot" || e.t === "melee" || e.t === "hit" || e.t === "pick" || e.t === "spawn")).toEqual([])
+    })
+
+    test("the roster carries every member's team and primary, and a change to either shows at once", () => {
+      const { connect } = harness(host.make)
+      const me = connect()
+      me.say({ ...create, primary: "mulin" })
+      const { you } = me.last("joined")!
+      const roster = () => me.last("room")!.room.roster
+      const mine = () => roster().find((r) => r.id === you)!
+      expect(mine()).toMatchObject({ team: "benandanti", primary: "mulin" })
+      expect(roster().filter((r) => r.bot).every((r) => typeof r.primary === "string")).toBe(true)
+      me.say({ t: "primary", p: "cjampanili" })
+      expect(mine().primary).toBe("cjampanili")
+      me.say({ t: "team", team: "malandanti" })
+      expect(mine().team).toBe("malandanti")
+    })
+
+    test("on start every member and bot enters the map together, with the team and primary shown for them", () => {
+      const { connect, play } = harness(host.make)
+      const me = connect()
+      me.say({ ...create, bots: 4 })
+      me.say({ t: "primary", p: "doplete" })
+      play(30)
+      me.say({ t: "start" })
+      const shown = me.last("room")!.room.roster
+      let entered: Snapshot | undefined
+      for (let i = 0; i < 10 && !entered; i++) {
+        play(1)
+        const snap = me.last("snap")
+        if (snap?.players.some((p) => p.f & FLAG_BIT.alive)) entered = snap
+      }
+      expect(entered!.phase.tag).toBe("Live")
+      // Everybody at once: nobody on the map before the others.
+      expect(entered!.players.every((p) => p.f & FLAG_BIT.alive)).toBe(true)
+      expect(entered!.players.map((p) => [p.id, p.w]).sort()).toEqual(shown.map((r) => [r.id, r.primary]).sort())
+      expect(entered!.you?.arsenal.primary).toBe("doplete")
+    })
+
     test("a regular create request on the training's map is refused", () => {
       const { hub, connect } = harness(host.make)
       const me = connect()
@@ -56,6 +114,7 @@ for (const host of HOSTS) {
       const { connect, play } = harness(host.make)
       const me = connect()
       me.say(create)
+      me.say({ t: "start" })
       play(60)
       const snaps = me.got.filter((m) => m.t === "snap")
       expect(snaps).toHaveLength(30)
@@ -65,29 +124,65 @@ for (const host of HOSTS) {
       expect(last.players).toHaveLength(4)
     })
 
-    test("host tools: start, restart, bots and their skill", () => {
+    test("host tools in the Muster: bots and their skill", () => {
       const { connect, play } = harness(host.make)
       const me = connect()
       me.say(create)
       play(2)
-      expect(me.last("snap")!.phase.tag).toBe("Warmup")
-      me.say({ t: "start" })
-      play(2)
-      const live = me.last("snap")!.phase
-      expect(live.tag).toBe("Live")
-      play(120)
-      me.say({ t: "start" })
-      play(2)
-      const restarted = me.last("snap")!.phase
-      expect(restarted.tag === "Live" && live.tag === "Live" && restarted.ends > live.ends).toBe(true)
+      expect(me.last("snap")!.phase.tag).toBe("Muster")
       me.say({ t: "bot", team: "malandanti", delta: 1 })
       expect(me.last("room")!.room.bots).toBe(4)
       me.say({ t: "bot", team: "benandanti", delta: -1 })
       expect(me.last("room")!.room.roster.filter((r) => r.bot && r.team === "benandanti")).toHaveLength(0)
       me.say({ t: "level", level: "plevan" })
       expect(me.last("room")!.room.level).toBe("plevan")
+      play(2)
+      // The bots added in the Muster are in the room, off the map like everybody else.
+      expect(me.last("snap")!.players).toHaveLength(4)
+      expect(me.last("snap")!.phase.tag).toBe("Muster")
     })
 
+    test("the host's restart during a live match ends it and returns the room to the Muster", () => {
+      const { connect, play } = harness(host.make)
+      const me = connect()
+      me.say(create)
+      me.say({ t: "start" })
+      play(120)
+      expect(me.last("snap")!.phase.tag).toBe("Live")
+      expect(me.last("snap")!.you?.alive).toBe(true)
+      me.say({ t: "start" })
+      play(2)
+      expect(me.last("snap")!.phase.tag).toBe("Muster")
+      expect(me.last("snap")!.players.every((p) => (p.f & FLAG_BIT.alive) === 0)).toBe(true)
+      // And there it stays: the next match waits for the host.
+      play(60 * 60)
+      expect(me.last("snap")!.phase.tag).toBe("Muster")
+      me.say({ t: "start" })
+      play(2)
+      expect(me.last("snap")!.phase.tag).toBe("Live")
+    })
+
+    test("after the results the room is in the Muster again, and stays there until the host starts", () => {
+      const { connect, play } = harness(host.make)
+      const me = connect()
+      me.say({ ...create, minutes: 2, bots: 0 })
+      me.say({ t: "start" })
+      for (let s = 0; s < 130 && me.last("snap")?.phase.tag !== "Over"; s++) play(60)
+      const over = me.last("snap")!.phase
+      expect(over.tag).toBe("Over")
+      if (over.tag !== "Over") return
+      play(over.restarts - me.last("snap")!.tick - 2)
+      expect(me.last("snap")!.phase.tag).toBe("Over")
+      play(4)
+      expect(me.last("snap")!.phase.tag).toBe("Muster")
+      expect(me.last("snap")!.you?.alive).toBe(false)
+      play(60 * 60)
+      expect(me.last("snap")!.phase.tag).toBe("Muster")
+      me.say({ t: "start" })
+      play(10)
+      expect(me.last("snap")!.phase.tag).toBe("Live")
+      expect(me.last("snap")!.you?.alive).toBe(true)
+    }, 30_000)
   })
 }
 
@@ -101,6 +196,67 @@ describe("the game server", () => {
     play(60)
     expect(me.last("snap")!.tick).toBe(90)
     expect(me.got.some((m) => m.t === "error")).toBe(false)
+  })
+})
+
+describe("the Muster on the game server", () => {
+  const join = (code: string) => ({ t: "join", code, primary: "miedi" })
+
+  test("only the host can start", () => {
+    const { connect, play } = harness(HOSTS[0].make)
+    const host = connect()
+    host.say(HOSTS_CREATE.online)
+    const other = connect()
+    other.say(join(host.last("joined")!.room.code))
+    other.say({ t: "start" })
+    play(60)
+    expect(other.last("snap")!.phase.tag).toBe("Muster")
+    host.say({ t: "start" })
+    play(2)
+    expect(other.last("snap")!.phase.tag).toBe("Live")
+  })
+
+  test("a member who joins sees everybody's team and primary in the roster", () => {
+    const { connect } = harness(HOSTS[0].make)
+    const host = connect()
+    host.say({ ...HOSTS_CREATE.online, primary: "mulin" })
+    const other = connect()
+    other.say(join(host.last("joined")!.room.code))
+    const { room, you } = other.last("joined")!
+    expect(room.roster.find((r) => r.id === host.last("joined")!.you)?.primary).toBe("mulin")
+    expect(room.roster.find((r) => r.id === you)?.primary).toBe("miedi")
+    // The host sees the newcomer too.
+    expect(host.last("room")!.room.roster.find((r) => r.id === you)?.primary).toBe("miedi")
+  })
+
+  test("the host passing to another member during the Muster leaves a room that can still be started", () => {
+    const { connect, play } = harness(HOSTS[0].make)
+    const host = connect()
+    host.say(HOSTS_CREATE.online)
+    const other = connect()
+    other.say(join(host.last("joined")!.room.code))
+    play(10)
+    host.say({ t: "leave" })
+    expect(other.last("room")!.room.hostId).toBe(other.last("joined")!.you)
+    play(10)
+    expect(other.last("snap")!.phase.tag).toBe("Muster")
+    other.say({ t: "start" })
+    play(10)
+    expect(other.last("snap")!.phase.tag).toBe("Live")
+    expect(other.last("snap")!.you?.alive).toBe(true)
+  })
+
+  test("the room list shows the Muster as a room's phase, then the match", () => {
+    const { connect, play } = harness(HOSTS[0].make)
+    const host = connect()
+    host.say(HOSTS_CREATE.online)
+    const browsing = connect()
+    browsing.say({ t: "list" })
+    expect(browsing.last("rooms")!.rooms.map((r) => r.phase)).toEqual(["Muster"])
+    host.say({ t: "start" })
+    play(2)
+    browsing.say({ t: "list" })
+    expect(browsing.last("rooms")!.rooms.map((r) => r.phase)).toEqual(["Live"])
   })
 })
 
@@ -155,8 +311,9 @@ describe("pause in an Offline room", () => {
     const snap = me.last("snap")!
     expect(snap.tick).toBe(122)
     expect(snap.players).toHaveLength(5)
-    // Restarted while paused: the new match ends later than the one that was playing.
-    expect(snap.phase.tag === "Live" && live.tag === "Live" && snap.phase.ends > live.ends).toBe(true)
+    // Restarted while paused: the match that was playing ended, and the room is in the Muster.
+    expect(live.tag).toBe("Live")
+    expect(snap.phase.tag).toBe("Muster")
   })
 })
 

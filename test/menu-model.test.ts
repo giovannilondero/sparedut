@@ -45,7 +45,6 @@ test("a LAN room with open access is created with the choices on the screen", ()
     kind: "send",
     request: {
       t: "create",
-      oneTap: false,
       room: { mode: "bataie", map: "glemone", minutes: 10, bots: 4, level: "pari", ff: false, reach: "lan", access: { kind: "open" } }
     }
   })
@@ -197,7 +196,7 @@ test("a setting changed in the form is remembered at once; the value it already 
 })
 
 const room = (code: string, over: object = {}) =>
-  ({ code, host: "Toni", mode: "bataie", map: "glemone", players: 2, bots: 4, max: 16, phase: "Warmup", reach: "lan", access: "open", ...over }) as const
+  ({ code, host: "Toni", mode: "bataie", map: "glemone", players: 2, bots: 4, max: 16, phase: "Muster", reach: "lan", access: "open", ...over }) as const
 
 test("a code typed on the home screen joins its room, cleaned of spaces and case", () => {
   const { model } = menu()
@@ -250,11 +249,11 @@ test("joining is refused without a name, from the list as by code", () => {
   expect(model.joinByCode()).toEqual({ kind: "refused", reason: "needName" })
 })
 
-test("the one-tap match is an Offline room with the remembered values, started at once", () => {
+test("the one-tap match asks for an Offline room with the remembered values, and nothing more: no start of its own", () => {
   const { model } = menu({ lastMode: "frico", lastMap: "trincee", lastMinutes: 20, lastBots: 6, lastLevel: "plevan" })
   expect(model.oneTap()).toEqual({
     kind: "send",
-    request: { t: "create", oneTap: true, room: { mode: "frico", map: "trincee", minutes: 20, reach: "offline", bots: 6, level: "plevan", ff: false } }
+    request: { t: "create", room: { mode: "frico", map: "trincee", minutes: 20, reach: "offline", bots: 6, level: "plevan", ff: false } }
   })
 })
 

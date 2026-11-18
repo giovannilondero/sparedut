@@ -35,7 +35,7 @@ export const MovePlayers = Game.System(
   },
   ({ queries, resources, services, events, machines }) => {
     const { data } = queries.players
-    if (machines.match.get()._tag === "Over") return
+    if (machines.match.get()._tag !== "Live") return
     const flags = resources.flags.get()
     const turrets = resources.turrets.get()
     const spots = MAPS[resources.rules.get().map].turrets

@@ -31,7 +31,7 @@ export const CollectPickups = Game.System(
   },
   ({ queries, resources, events, machines }) => {
     const { data } = queries.players
-    if (machines.match.get()._tag === "Over") return
+    if (machines.match.get()._tag !== "Live") return
     const states = resources.pickups.get()
     const next = states.map((s) => (s._tag === "down" ? (s.ticks <= 1 ? { _tag: "up" as const } : { _tag: "down" as const, ticks: s.ticks - 1 }) : s))
     const players = queries.players.each()

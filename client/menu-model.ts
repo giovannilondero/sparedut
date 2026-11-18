@@ -31,8 +31,7 @@ export type Screen = (typeof SCREENS)[number]
 
 /** What the menu asks the game to do. */
 export type MenuRequest =
-  /** `oneTap`: the home screen's button, whose match starts at once, without warm-up. */
-  | { readonly t: "create"; readonly room: CreateOptions; readonly oneTap: boolean }
+  | { readonly t: "create"; readonly room: CreateOptions }
   /** `password` only once the player typed one. */
   | { readonly t: "join"; readonly code: string; readonly password?: string }
   /** The training: always Offline, its map and mode fixed. */
@@ -295,13 +294,13 @@ export class MenuModel {
     }
     Object.assign(this.remembered, { lastMode: room.mode, lastMap: room.map, lastBots: room.bots, lastLevel: room.level, lastMinutes: room.minutes, lastFf: room.ff })
     this.save()
-    return { kind: "send", request: { t: "create", room, oneTap: false } }
+    return { kind: "send", request: { t: "create", room } }
   }
 
-  /** The home screen's "play against the bots": an Offline room in one tap, with the remembered values, its match started at once. */
+  /** The home screen's "play against the bots": an Offline room in one tap, with the remembered values. It stops on the Muster, like any room. */
   oneTap(): Outcome {
     if (!this.remembered.name) return this.needName()
-    return { kind: "send", request: { t: "create", room: oneTapRoom(this.remembered), oneTap: true } }
+    return { kind: "send", request: { t: "create", room: oneTapRoom(this.remembered) } }
   }
 
   /**
