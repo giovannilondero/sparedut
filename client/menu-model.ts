@@ -26,6 +26,7 @@ export interface Remembered {
   lastMinutes: number
   lastBots: number
   lastLevel: BotLevel
+  lastFf: boolean
 }
 
 export const SCREENS = ["home", "create", "password", "armarie", "settings", "vocabolari"] as const
@@ -108,7 +109,7 @@ export class MenuModel {
   private minutes: number
   private bots: number
   private level: BotLevel
-  private ff = false
+  private ff: boolean
   private reach: Reach = MENU_OPTIONS.reaches[0]
   private access: Access = MENU_OPTIONS.accesses[0]
   private roomPassword = ""
@@ -127,6 +128,7 @@ export class MenuModel {
     this.minutes = remembered.lastMinutes
     this.bots = remembered.lastBots
     this.level = remembered.lastLevel
+    this.ff = remembered.lastFf
   }
 
   get screen(): Screen {
@@ -222,7 +224,7 @@ export class MenuModel {
       ff: this.ff,
       ...(this.reach === "offline" ? { reach: this.reach } : { reach: this.reach, access })
     }
-    Object.assign(this.remembered, { lastMode: room.mode, lastMap: room.map, lastBots: room.bots, lastLevel: room.level, lastMinutes: room.minutes })
+    Object.assign(this.remembered, { lastMode: room.mode, lastMap: room.map, lastBots: room.bots, lastLevel: room.level, lastMinutes: room.minutes, lastFf: room.ff })
     this.save()
     return { kind: "send", request: { t: "create", room, oneTap: false } }
   }

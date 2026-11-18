@@ -10,9 +10,12 @@ import { PRIMARIES, WEAPON_IDS, WEAPONS, type PrimaryId } from "../shared/weapon
 import "@ui-sdk/web/radio"
 // UI SDK's dialog, for the password prompt: focus moved in and back, Tab kept inside, Esc and outside presses close it.
 import "@ui-sdk/web/dialog"
+// UI SDK's select (a bottom sheet on a small touch screen) and collapsible (creation's "options").
+import "@ui-sdk/web/select"
+import "@ui-sdk/web/collapsible"
 import type { GameAudio } from "./contracts.ts"
 import { esc } from "./hud.ts"
-import { onLangChange, setLang, t, type Lang, type StaticKey } from "./i18n.ts"
+import { onLangChange, setLang, t, type Lang } from "./i18n.ts"
 import { MenuModel, SCREENS, type CreateOptions, type Outcome, type PasswordRefusal, type PromptProblem, type Refusal, type Screen } from "./menu-model.ts"
 import { oneTapRoom, type Settings } from "./settings.ts"
 
@@ -28,9 +31,35 @@ export interface MenuHandlers {
   readonly settingsChanged: () => void
 }
 
-/** The label of each reach and access among creation's choices: every member needs one. */
-const REACH_LABEL = { lan: "reachLan", online: "reachOnline", offline: "reachOffline" } as const satisfies Record<Reach, StaticKey>
-const ACCESS_LABEL = { open: "accessOpen", password: "accessPassword" } as const satisfies Record<Access, StaticKey>
+type RadioGroup = HTMLElementTagNameMap["ui-radio-group"]
+type Select = HTMLElementTagNameMap["ui-select"]
+
+/**
+ * Fills a UI SDK radio group with one card per value: one Tab stop, the arrow keys inside, the radio
+ * role. `choose` hears the player's choice; the group never lets the choice go back to none.
+ */
+function cardGroup(group: RadioGroup, values: readonly string[], choose: (value: string) => void) {
+  group.innerHTML = values.map((v) => `<ui-radio class="card" value="${v}"><b></b><small></small></ui-radio>`).join("")
+  group.addEventListener("valuechange", (e) => {
+    if (e.detail.value === null) return e.preventDefault()
+    choose(e.detail.value as string)
+  })
+}
+
+/** Writes each card's name (HTML) and line (text) in the active language. */
+function cardTexts(group: RadioGroup, text: (value: string) => readonly [string, string]) {
+  for (const card of group.querySelectorAll<HTMLElement>("ui-radio")) {
+    const [name, line] = text(card.getAttribute("value")!)
+    card.querySelector("b")!.innerHTML = name
+    card.querySelector("small")!.textContent = line
+  }
+}
+
+/** A UI SDK select over numbers: its items rewritten in the active language, keeping the chosen one. */
+function selectItems(select: Select, values: readonly number[], label: (n: number) => string, chosen: number) {
+  select.querySelector("ui-select-content")!.innerHTML = values.map((n) => `<ui-select-item value="${n}">${label(n)}</ui-select-item>`).join("")
+  select.value = String(chosen)
+}
 
 /** The element each screen shows: the password prompt opens over the home screen. */
 const SCREEN_ELEMENT = {
@@ -83,6 +112,8 @@ export class Menu {
     // closes the password prompt: while it is open, Esc is the prompt's.
     window.addEventListener("keydown", (e) => {
       if (e.key !== "Escape" || $("menu").classList.contains("hidden") || this.model.screen === "password") return
+      // An open list of creation's options closes on its own Esc, and the screen stays.
+      if ([...document.querySelectorAll<Select>("#menu-create ui-select")].some((select) => select.open)) return
       if (this.model.back()) {
         e.preventDefault()
         audio.play("ui_click")
@@ -165,8 +196,11 @@ export class Menu {
       input.placeholder = t().menu.needName
       input.setAttribute("aria-invalid", "true")
     } else if (reason === "passwordBad" && this.model.screen === "create") {
+      // The password is folded under "options": they open to show the field the message is about.
       $("c-msg").textContent = t().menu.passwordBad
-      $("c-password").focus()
+      $("c-password").setAttribute("aria-invalid", "true")
+      $<HTMLElementTagNameMap["ui-collapsible"]>("c-options").open = true
+      requestAnimationFrame(() => $("c-password").focus())
     } else if (reason === "passwordBad") $<HTMLInputElement>("pw-input").select()
     else if (reason === "codeBad") {
       $("j-msg").textContent = t().menu.codeBad
@@ -176,9 +210,14 @@ export class Menu {
     // A full room, or one gone from the list, sends nothing: the list already shows why.
   }
 
+  /** The screen last shown, to know where focus goes when it changes. */
+  private shown: Screen = "home"
+
   /** Shows the model's screen. */
   private render() {
     const screen = this.model.screen
+    const from = this.shown
+    this.shown = screen
     const shown = SCREEN_ELEMENT[screen]
     for (const s of SCREENS) $(SCREEN_ELEMENT[s]).classList.toggle("hidden", SCREEN_ELEMENT[s] !== shown)
     if (screen === "home") this.renderOneTap()
@@ -186,6 +225,9 @@ export class Menu {
     if (screen === "password") this.renderPrompt()
     // Opened from code: UI SDK moves focus to the field and, on closing, back to what had it before.
     prompt.open = screen === "password"
+    // Creation opens on its first choice, and going back lands on the button that opened it.
+    if (from !== screen && screen === "create") $<RadioGroup>("c-mode").api.focus()
+    else if (from === "create" && screen === "home") document.querySelector<HTMLElement>('#menu-home [data-go="create"]')?.focus()
   }
 
   // ---------------------------------------------------------------- home
@@ -279,99 +321,102 @@ export class Menu {
 
   // ---------------------------------------------------------------- create match
 
-  /** Listeners only once: the cards are redrawn on every choice and every language change. */
+  /** Listeners only once: the cards are built here and only their texts change with the language. */
   private bindCreate() {
-    const options = this.model.options
-    const reach = $<HTMLElementTagNameMap["ui-radio-group"]>("c-reach")
-    reach.innerHTML = options.reaches.map((r) => `<ui-radio class="card" value="${r}"><b data-t="${REACH_LABEL[r]}"></b></ui-radio>`).join("")
-    $("c-access").innerHTML = options.accesses.map((a) => `<option value="${a}" data-t="${ACCESS_LABEL[a]}"></option>`).join("")
-    $("mode-cards").addEventListener("click", (e) => {
-      const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-mode]")
-      if (!b) return
-      this.model.chooseMode(b.dataset.mode as ModeId)
+    const { options, choices } = this.model
+    const chosen = () => {
       this.audio.play("ui_click")
-      this.renderCreate()
+      this.renderChoices()
+    }
+    cardGroup($("c-mode"), options.modes, (v) => {
+      this.model.chooseMode(v as ModeId)
+      chosen()
     })
-    $("map-cards").addEventListener("click", (e) => {
-      const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-map]")
-      if (!b) return
-      const map = b.dataset.map as MapId
-      this.model.chooseMap(map)
-      this.audio.play("ui_click")
-      this.handlers.mapChanged(map)
-      this.renderCreate()
+    cardGroup($("c-map"), options.maps, (v) => {
+      this.model.chooseMap(v as MapId)
+      this.handlers.mapChanged(v as MapId)
+      chosen()
     })
-    $("c-level").addEventListener("click", (e) => {
-      const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-level]")
-      if (!b) return
-      this.model.chooseLevel(b.dataset.level as BotLevel)
-      this.audio.play("ui_click")
-      this.renderCreate()
+    cardGroup($("c-level"), options.levels, (v) => {
+      this.model.chooseLevel(v as BotLevel)
+      chosen()
     })
-    const minutes = $<HTMLSelectElement>("c-minutes")
-    minutes.addEventListener("change", () => this.model.chooseMinutes(Number(minutes.value)))
-    const bots = $<HTMLSelectElement>("c-bots")
-    bots.addEventListener("change", () => this.model.chooseBots(Number(bots.value)))
-    const ff = $<HTMLInputElement>("c-ff")
-    ff.addEventListener("change", () => this.model.chooseFriendlyFire(ff.checked))
     // An Offline room lives in this browser: what only the server offers (access, password) hides.
-    reach.addEventListener("valuechange", (e) => {
-      // The group allows no value; the model always holds one, so a change to none is refused.
-      if (e.detail.value === null) return e.preventDefault()
-      this.model.chooseReach(e.detail.value as Reach)
-      this.audio.play("ui_click")
-      this.renderFields()
+    cardGroup($("c-reach"), options.reaches, (v) => {
+      this.model.chooseReach(v as Reach)
+      chosen()
     })
-    const access = $<HTMLSelectElement>("c-access")
-    access.addEventListener("change", () => {
-      this.model.chooseAccess(access.value as Access)
-      this.renderFields()
-      $("c-msg").textContent = ""
-      if (this.model.fields.password) $("c-password").focus()
+    cardGroup($("c-access"), options.accesses, (v) => {
+      this.model.chooseAccess(v as Access)
+      chosen()
+    })
+    const number = (id: string, choose: (n: number) => void) =>
+      $<Select>(id).addEventListener("valuechange", (e) => {
+        if (e.detail.value === null) return e.preventDefault()
+        choose(Number(e.detail.value))
+        this.renderChoices()
+      })
+    number("c-minutes", (n) => this.model.chooseMinutes(n))
+    number("c-bots", (n) => this.model.chooseBots(n))
+    const ff = $<HTMLInputElement>("c-ff")
+    ff.addEventListener("change", () => {
+      this.model.chooseFriendlyFire(ff.checked)
+      this.renderChoices()
+    })
+    // Opened, the options come into view: on a phone they open below the cards, under the create button.
+    $<HTMLElementTagNameMap["ui-collapsible"]>("c-options").addEventListener("openchange", (e) => {
+      if (!e.detail.value) return
+      const smooth = matchMedia("(prefers-reduced-motion: no-preference)").matches
+      requestAnimationFrame(() => $("c-options").scrollIntoView({ block: "start", behavior: smooth ? "smooth" : "auto" }))
     })
     const password = $<HTMLInputElement>("c-password")
-    password.addEventListener("input", () => this.model.typeRoomPassword(password.value))
+    password.addEventListener("input", () => {
+      this.model.typeRoomPassword(password.value)
+      $("c-msg").textContent = ""
+      password.removeAttribute("aria-invalid")
+    })
     $("c-go").addEventListener("click", () => {
       const o = this.model.create()
       if (o.kind === "send") $("c-msg").textContent = ""
       this.apply(o)
     })
-    const choices = this.model.choices
-    reach.value = choices.reach
-    access.value = choices.access
+    for (const [id, value] of [["c-mode", choices.mode], ["c-map", choices.map], ["c-level", choices.level], ["c-reach", choices.reach], ["c-access", choices.access]] as const) {
+      $<RadioGroup>(id).value = value
+    }
     ff.checked = choices.ff
-    this.renderFields()
   }
 
-  /** Shows only the fields that apply to the choices. */
-  private renderFields() {
-    const fields = this.model.fields
-    $("menu-create").toggleAttribute("data-access-applies", fields.access)
-    $("c-password-field").hidden = !fields.password
-  }
-
+  /** Creation's texts in the active language: the cards, the lists, then what depends on the choices. */
   private renderCreate() {
     const s = t()
     const { options, choices } = this.model
-    $("mode-cards").innerHTML = options.modes.map(
-      (id) =>
-        `<button class="card${id === choices.mode ? " selected" : ""}" data-mode="${id}" aria-pressed="${id === choices.mode}"><b>${s.modes[id].name}</b><small>${s.modes[id].sub}</small><small>${s.modes[id].rules}</small></button>`
-    ).join("")
-    $("map-cards").innerHTML = options.maps.map(
-      (id) =>
-        `<button class="card${id === choices.map ? " selected" : ""}" data-map="${id}" aria-pressed="${id === choices.map}"><b>${s.maps[id].name}</b><small>${s.maps[id].sub}</small></button>`
-    ).join("")
-    $("c-level").innerHTML = options.levels.map(
-      (l) =>
-        `<button class="card${l === choices.level ? " selected" : ""}" data-level="${l}" role="radio" aria-checked="${l === choices.level}"><b>${s.levels[l].name}</b><small>${s.levels[l].sub}</small></button>`
-    ).join("")
-    // The selects are rewritten in the active language, keeping the chosen value.
-    const minutes = $<HTMLSelectElement>("c-minutes")
-    minutes.innerHTML = options.minutes.map((m) => `<option value="${m}">${s.menu.minutes(m)}</option>`).join("")
-    minutes.value = String(choices.minutes)
-    const bots = $<HTMLSelectElement>("c-bots")
-    bots.innerHTML = options.bots.map((i) => `<option value="${i}">${i === 0 ? s.menu.botsNone : i}</option>`).join("")
-    bots.value = String(choices.bots)
+    cardTexts($("c-mode"), (v) => [s.modes[v as ModeId].name, s.modes[v as ModeId].sub])
+    cardTexts($("c-map"), (v) => [s.maps[v as MapId].name, s.maps[v as MapId].sub])
+    cardTexts($("c-level"), (v) => [s.levels[v as BotLevel].name, s.levels[v as BotLevel].sub])
+    cardTexts($("c-reach"), (v) => [`<i class="chip ${v}">${s.menu.reach[v as Reach]}</i>`, s.menu.reachSub[v as Reach]])
+    cardTexts($("c-access"), (v) => [v === "password" ? `🔒 ${s.static.accessPassword}` : s.static.accessOpen, ""])
+    selectItems($("c-minutes"), options.minutes, s.menu.minutes, choices.minutes)
+    selectItems($("c-bots"), options.bots, (n) => (n === 0 ? s.menu.botsNone : String(n)), choices.bots)
+    this.renderChoices()
+  }
+
+  /** What follows from the choices: the chosen mode's rules, the options' one-line summary, the fields that apply. */
+  private renderChoices() {
+    const s = t()
+    const { choices, fields } = this.model
+    $("c-rules").textContent = s.modes[choices.mode].rules
+    const access = choices.access === "password" ? `🔒 ${s.static.accessPassword}` : s.static.accessOpen
+    $("c-summary").textContent = [
+      s.menu.minutes(choices.minutes),
+      s.menu.bots(choices.bots),
+      s.levels[choices.level].name,
+      s.menu.reach[choices.reach],
+      ...(fields.access ? [access] : []),
+      ...(choices.ff ? [s.menu.ffOn] : [])
+    ].join(" · ")
+    $("c-access-field").hidden = !fields.access
+    $("c-password-field").hidden = !fields.password
+    if (!fields.password) $("c-msg").textContent = ""
   }
 
   // ---------------------------------------------------------------- armoury
