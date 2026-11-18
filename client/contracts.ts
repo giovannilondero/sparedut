@@ -111,6 +111,11 @@ export interface ViewmodelFrame {
   readonly henAtMouth: boolean
   /** Hens the hen cannon's reload under way drops in (from the first-person presentation). */
   readonly reloadHens: number
+  /**
+   * How far the reload of the weapon in hand has gone, from 0 to 1, or null when not reloading.
+   * On the match clock, like the clucks and the hens: a pause holds it where it is.
+   */
+  readonly reload: number | null
 }
 export interface Viewmodel {
   readonly scene: THREE.Scene
@@ -119,8 +124,6 @@ export interface Viewmodel {
   /** Replaces a weapon's meshes with a detailed model (`client/models/detailed.ts`). */
   remodel(id: WeaponId, detailed: THREE.Object3D): void
   fire(): void
-  /** Reload duration in seconds. */
-  reload(seconds: number): void
   throwBomb(): void
   update(dt: number, frame: ViewmodelFrame): void
   setVisible(visible: boolean): void

@@ -4,7 +4,7 @@
 import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "../shared/folklore.ts"
 import type { MapId } from "../shared/map.ts"
 import { MAP_IDS } from "../shared/maps/index.ts"
-import { Password, type Reach, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
+import { Password, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
 import { PRIMARIES, WEAPON_IDS, WEAPONS, type PrimaryId } from "../shared/weapons.ts"
 import type { GameAudio } from "./contracts.ts"
 import { esc } from "./hud.ts"
@@ -13,13 +13,10 @@ import { oneTapRoom, type Settings } from "./settings.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 
-export interface CreateOptions {
+export type CreateOptions = Reached<RoomAccess> & {
   readonly mode: ModeId
   readonly map: MapId
   readonly minutes: number
-  readonly reach: Reach
-  /** Absent for Offline: a room in this browser has nobody to keep out. */
-  readonly access?: RoomAccess
   readonly bots: number
   readonly level: BotLevel
   readonly ff: boolean
@@ -58,7 +55,7 @@ export class Menu {
         audio.unlock()
         audio.play("ui_click")
         const go = el.dataset.go!
-        if (go === "quick") this.quick()
+        if (go === "one-tap") this.oneTap()
         else this.go(go as ScreenName)
       })
     }
@@ -175,7 +172,7 @@ export class Menu {
   }
 
   /** The home screen's "play against the bots": an Offline match in one tap. */
-  private quick() {
+  private oneTap() {
     if (this.needName()) return
     this.handlers.create(oneTapRoom(this.settings), true)
   }
@@ -187,7 +184,7 @@ export class Menu {
 
   rooms(list: readonly RoomSummary[]) {
     this.roomList = list
-    const ul = $("lan-list")
+    const ul = $("room-list")
     const s = t()
     if (!list.length) {
       ul.innerHTML = `<li class="muted">${s.menu.roomsEmpty}</li>`
@@ -196,8 +193,9 @@ export class Menu {
     ul.innerHTML = list
       .map((r) => {
         const full = r.players >= r.max
-        const lock = r.access === "password" ? ` <i class="lock" role="img" aria-label="${s.menu.locked}" title="${s.menu.locked}">🔒</i>` : ""
-        return `<li><button data-code="${r.code}" data-access="${r.access ?? ""}"${full ? " disabled" : ""}><span><i class="chip ${r.reach}">${s.menu.reach[r.reach]}</i>${lock} <b>${esc(r.host)}</b> · ${s.modes[r.mode].name} · ${s.maps[r.map].name}</span><span>${full ? `${s.menu.full} · ` : ""}${r.players}/${r.max}👤 ${r.bots}🤖 · ${r.code}</span></button></li>`
+        const access = r.reach === "offline" ? null : r.access
+        const passwordMark = access === "password" ? ` <i class="password-mark" role="img" aria-label="${s.menu.passwordRoom}" title="${s.menu.passwordRoom}">🔒</i>` : ""
+        return `<li><button data-code="${r.code}" data-access="${access ?? ""}"${full ? " disabled" : ""}><span><i class="chip ${r.reach}">${s.menu.reach[r.reach]}</i>${passwordMark} <b>${esc(r.host)}</b> · ${s.modes[r.mode].name} · ${s.maps[r.map].name}</span><span>${full ? `${s.menu.full} · ` : ""}${r.players}/${r.max}👤 ${r.bots}🤖 · ${r.code}</span></button></li>`
       })
       .join("")
     for (const b of ul.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")) {
@@ -265,8 +263,7 @@ export class Menu {
         mode: this.mode,
         map: this.map,
         minutes: Number($<HTMLSelectElement>("c-minutes").value),
-        reach,
-        ...(reach === "offline" ? {} : { access: roomAccess }),
+        ...(reach === "offline" ? { reach } : { reach, access: roomAccess }),
         bots: Number($<HTMLSelectElement>("c-bots").value),
         level: this.level,
         ff: $<HTMLInputElement>("c-ff").checked

@@ -18,7 +18,7 @@ import { createLook, lookFromUrl, mountLookSwitcher } from "./looks.ts"
 import { loadDetailed } from "./models/detailed.ts"
 import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
-import { BrowserHost } from "./offline.ts"
+import { BrowserHostConnection } from "./offline.ts"
 import { Link } from "./connection.ts"
 import { PerfMonitor } from "./perf.ts"
 import { loadSettings, saveSettings } from "./settings.ts"
@@ -119,11 +119,11 @@ window.addEventListener("keydown", (e: KeyboardEvent) => {
 
 const net = new Net()
 /** An Offline room's host, in a worker of this page: started on create, ended on leave. */
-const browserHost = new BrowserHost()
+const browserHostConnection = new BrowserHostConnection()
 /** What the game talks to: the server, or the browser's host while in an Offline room. */
-const link = new Link([net, browserHost])
-const offline = () => link.uses(browserHost)
-browserHost.onError = (error) => {
+const link = new Link([net, browserHostConnection])
+const offline = () => link.uses(browserHostConnection)
+browserHostConnection.onError = (error) => {
   console.error("The Offline room's host failed:", error)
   toast(t().net.offlineFailed)
   if (offline()) leaveOffline()
@@ -131,7 +131,7 @@ browserHost.onError = (error) => {
 }
 /** Back to the server: the browser's host and its Offline room end. */
 function leaveOffline() {
-  browserHost.close()
+  browserHostConnection.close()
   link.use(net)
 }
 const persist = () => {
@@ -159,14 +159,16 @@ const menu = new Menu(settings, audio, {
       // The room lives in this page: the game server need not be reachable.
       autostart = oneTap
       roomPassword = null
-      link.use(browserHost)
-      browserHost.open(settings.name)
-      browserHost.send({ t: "create", ...o, primary: settings.primary })
+      // An invite still in the address must not pull the player out when the server comes back.
+      forgetRoomAddress()
+      link.use(browserHostConnection)
+      browserHostConnection.open(settings.name)
+      browserHostConnection.send({ t: "create", ...o, primary: settings.primary })
       return
     }
     if (!ensureOnline()) return
     autostart = oneTap
-    roomPassword = o.access?.kind === "password" ? o.access.password : null
+    roomPassword = o.access.kind === "password" ? o.access.password : null
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
     net.send({ t: "create", ...o, primary: settings.primary })
   },
@@ -223,6 +225,11 @@ function ensureOnline() {
   return false
 }
 
+/** The address no longer names a room: nothing joins it again on its own. */
+function forgetRoomAddress() {
+  history.replaceState(null, "", location.pathname)
+}
+
 function backToMenu() {
   game?.stop()
   menu.show(true)
@@ -254,7 +261,7 @@ link.on((msg: ServerMessage) => {
     case "left":
       if (offline()) leaveOffline()
       roomPassword = null
-      history.replaceState(null, "", location.pathname)
+      forgetRoomAddress()
       backToMenu()
       return
     case "error":
@@ -284,7 +291,8 @@ async function connect() {
     connecting = false
     menu.status(t().net.connected(settings.name || t().net.stranger))
     net.send({ t: "list" })
-    const invite = readInvite(location.search, location.hash)
+    // An invite joins on its own only from the menu: never over a room in progress.
+    const invite = game?.active || offline() ? null : readInvite(location.search, location.hash)
     if (invite && settings.name) {
       menu.status(t().net.invite(invite.code))
       sendJoin(invite.code, invite.password ?? undefined)
@@ -298,6 +306,8 @@ async function connect() {
 net.onClose = () => {
   if (game?.active && !offline()) {
     toast(t().net.lost)
+    roomPassword = null
+    forgetRoomAddress()
     backToMenu()
   }
   menu.status(t().net.lostRetry)

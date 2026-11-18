@@ -16,7 +16,7 @@ import { outsideStorm, owned, RAISE_TICKS } from "../shared/sim/rules.ts"
 import { TURRET, WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
-import { Controls } from "./controls.ts"
+import { Controls, trackedIn } from "./controls.ts"
 import { boardHtml, esc, Hud, rosterHtml } from "./hud.ts"
 import { t } from "./i18n.ts"
 import type { Look } from "./looks.ts"
@@ -208,6 +208,7 @@ export class Game {
     this.wantedSeq = 0
     this.shownWeapon = null
     this.ownReload = null
+    this.sinceShot = Infinity
     this.clock = new MatchClock(() => performance.now())
     this.applySettings()
     this.updateRoster(room)
@@ -353,7 +354,7 @@ export class Game {
         else this.predictor.reconcile(you.body, you.seq, true)
       }
       this.wasAlive = you.alive
-      this.controls.track({ alive: you.alive, mounted: this.mounted() >= 0 })
+      this.controls.track(trackedIn(s, this.me, this.mounted() >= 0))
       // The server has already seen my last weapon switch and holds a different one: it
       // switched it itself (lanciafrico pickup, armoury, respawn) or rejected the switch. Follow it.
       const server = you.arsenal.current
@@ -544,7 +545,6 @@ export class Game {
           const seconds = WEAPONS[e.w].reloadTicks / 60
           const ammo = this.you()?.arsenal.ammo[e.w]
           this.ownReload = ammo ? { weapon: e.w, at: this.time, seconds, mag: ammo.mag, reserve: ammo.reserve, hensIn: 0 } : null
-          this.d.viewmodel.reload(seconds)
         }
         else {
           const at = this.posOf(e.s)
@@ -765,7 +765,7 @@ export class Game {
           ? `<div class="muted" style="font-size:12px">${p.reach.offline}</div>`
           : `<div class="row" style="align-items:center;justify-content:space-between">
         <div><div class="muted">${p.code}</div><div class="invite">${room.code}</div></div>
-        <div style="text-align:right"><button id="p-copy">${p.copy}</button><div class="muted" style="font-size:12px;margin-top:4px">${p.reach[room.reach]}${room.access ? ` · ${p.access[room.access]}` : ""}</div></div>
+        <div style="text-align:right"><button id="p-copy">${p.copy}</button><div class="muted" style="font-size:12px;margin-top:4px">${p.reach[room.reach]} · ${p.access[room.access]}</div></div>
       </div>`
       }
       <div class="roster">${rosterHtml(room, this.me)}</div>
@@ -1157,6 +1157,9 @@ export class Game {
     if (reload && (!you?.alive || reload.weapon !== this.wanted || (this.time - reload.at >= reload.seconds && you.arsenal.action._tag !== "reload")))
       this.ownReload = null
     if (!paused) this.sinceShot += dt
+    // The reload's one clock: the animation, the clucks and the hen at the mouth all read this.
+    const own = this.ownReload
+    const reloadProgress = own && Math.min(1, (this.time - own.at) / own.seconds)
     const spot = turret >= 0 ? this.physics.map.turrets[turret] : undefined
     const view = firstPerson({
       chosen: this.wanted,
@@ -1168,7 +1171,7 @@ export class Game {
       baseFov: settings.fov,
       mag: you ? (this.localMag ?? you.arsenal.ammo[this.wanted].mag) : 0,
       reserve: you?.arsenal.ammo[this.wanted].reserve ?? 0,
-      reload: this.ownReload && { progress: Math.min(1, (this.time - this.ownReload.at) / this.ownReload.seconds), mag: this.ownReload.mag, reserve: this.ownReload.reserve }
+      reload: own && reloadProgress !== null ? { progress: reloadProgress, mag: own.mag, reserve: own.reserve } : null
     })
     if (this.ownReload && view.hensIn > this.ownReload.hensIn) {
       audio.play("cluck_gjaline")
@@ -1226,7 +1229,8 @@ export class Game {
         sgnape: you.arsenal.sgnape > 0,
         spin: def.spinTicks > 0 ? this.localSpin / def.spinTicks : 0,
         henAtMouth: view.henAtMouth,
-        reloadHens: view.reloadHens
+        reloadHens: view.reloadHens,
+        reload: own?.weapon === inHand ? reloadProgress : null
       })
     }
 
