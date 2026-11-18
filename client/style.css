@@ -520,6 +520,15 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #hud.touch #turret-prompt { order: 4; font-size: 13px; }
 #hud.touch #turret-hud { order: 5; inline-size: min(260px, 100%); padding: 3px 10px; display: flex; align-items: center; gap: 8px; font-size: 13px; }
 #hud.touch #turret-hud .bar { flex: 1; margin: 0; }
+/*
+ * The training's panel on touch: first in the free area, as wide as it allows, never down to the
+ * crosshair (the screen's middle). A training has no score: the empty score bar is not drawn.
+ */
+#hud.touch #training { order: -1; max-inline-size: 100%; max-block-size: calc(50dvh - var(--free-t) - 20px); overflow: hidden; padding: 6px 10px; font-size: 13px; line-height: 1.35; }
+#hud.touch #training-station { font-size: 11px; }
+#hud.touch:has(#training:not(.hidden)) #topbar { display: none; }
+#training-step kbd { white-space: nowrap; }
+#training-step .unavailable { color: var(--muted); font-style: italic; }
 
 /* Health and armour: a ring around each icon, the number beside it (--x/--y/--w/--h from the layout, --hp/--armor from the match). */
 #hud.touch #vitals { inset: auto; inset-inline-start: var(--x); inset-block-start: var(--y); inline-size: var(--w); block-size: var(--h); flex-direction: row; align-items: center; gap: 8px; }

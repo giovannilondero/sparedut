@@ -1,12 +1,13 @@
 /**
  * The dead count down ticks and respawn at their team's safest point.
- * In a live Tampieste there's no respawning: one life only.
+ * In a live Tampieste there's no respawning: one life only. A member with a post (a bot the
+ * training keeps at a station) always comes back at it, with its health.
  */
 import { Random } from "@typeonce/ritmo"
 import { IDLE_INPUT } from "../../input.ts"
 import { chooseSpawn, everyoneAlone, START_GRACE_TICKS, freshArsenal, hostile, MAX_HP, SHIELD_TICKS, spawnsFor } from "../rules.ts"
 import { MAPS } from "../../maps/index.ts"
-import { Arsenal, Attackers, Controls, Game, Life, Match, Motion, Out, Player, Rng, Rules, TeamOf, Tick } from "../schema.ts"
+import { Arsenal, Attackers, Controls, Game, Life, Match, Motion, Out, Player, Post, Rng, Rules, TeamOf, Tick } from "../schema.ts"
 
 export const Respawn = Game.System(
   "Sparedut/Respawn",
@@ -16,6 +17,7 @@ export const Respawn = Game.System(
         selection: {
           player: Game.Query.read(Player),
           team: Game.Query.read(TeamOf),
+          post: Game.Query.optional(Post),
           life: Game.Query.write(Life),
           motion: Game.Query.write(Motion),
           controls: Game.Query.write(Controls),
@@ -52,8 +54,9 @@ export const Respawn = Game.System(
       const enemies = all
         .filter((o) => o !== m && hostile(rules, team, data.team.get(o)) && data.life.get(o)._tag === "Alive")
         .map((o) => data.motion.get(o).body)
-      const spot = chooseSpawn(spawnsFor(map, rules, team), enemies, rng.next() * 1000)
-      data.life.transition(m, { from: "Dead", to: "Alive", data: { hp: MAX_HP, armor: 0, shield: SHIELD_TICKS } })
+      const post = data.post?.get(m)
+      const spot = post ?? chooseSpawn(spawnsFor(map, rules, team), enemies, rng.next() * 1000)
+      data.life.transition(m, { from: "Dead", to: "Alive", data: { hp: post?.hp ?? MAX_HP, armor: 0, shield: SHIELD_TICKS } })
       data.motion.set(m, {
         body: { x: spot.at[0], y: spot.at[1], z: spot.at[2], vx: 0, vy: 0, vz: 0, grounded: true, crouch: false },
         yaw: spot.yaw,

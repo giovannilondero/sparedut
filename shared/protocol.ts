@@ -3,7 +3,7 @@
  * Client messages are validated with zod: the server doesn't trust them.
  */
 import { z } from "zod"
-import { BOT_LEVEL_IDS, ROOM_MODE_IDS, type BotLevel, type ModeId, type RoomModeId } from "./folklore.ts"
+import { BOT_LEVEL_IDS, ROOM_MODE_IDS, type BotLevel, type ModeId, type ObjectiveId, type RoomModeId } from "./folklore.ts"
 import { PlayerInputSchema, type PlayerInput } from "./input.ts"
 import type { MapId, Team } from "./map.ts"
 import { ROOM_MAP_IDS, type RoomMapId } from "./maps/index.ts"
@@ -195,6 +195,8 @@ export interface Snapshot {
   readonly t: "snap"
   readonly tick: number
   readonly phase: PhaseView
+  /** The objective in force: the HUD and the world's markers show its state, and no other's. */
+  readonly objective: ObjectiveId
   readonly score: Readonly<Record<Team, number>>
   readonly flags: Readonly<Record<Team, FlagState>>
   readonly hill: HillValue

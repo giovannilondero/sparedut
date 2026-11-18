@@ -8,7 +8,7 @@ import type { Team, V3 } from "../map.ts"
 import type { Body } from "../movement.ts"
 import type { GameEvent } from "../sim/events.ts"
 import type { ArsenalValue, ControlsValue } from "../sim/schema.ts"
-import type { WeaponId } from "../weapons.ts"
+import type { PrimaryId, WeaponId } from "../weapons.ts"
 import type { InterfaceAction } from "./interface.ts"
 
 /**
@@ -58,6 +58,8 @@ export interface Seen {
   readonly events: readonly GameEvent[]
   /** How many reports of the step's own interface action (`StepRule.report`) arrived this tick; 0 for a step without one. */
   readonly reported: number
+  /** Each team's score, which an objective in force raises (`PlayObjectives`). */
+  readonly score: Readonly<Record<Team, number>>
 }
 
 /** A step's progress: how many times its action happened, and a number the step keeps for itself. */
@@ -78,21 +80,47 @@ export interface StepRule {
   readonly target: number
   /** An interface step's action: the client's report of it reaches `advance` as `Seen.reported` (`./interface.ts`). */
   readonly report?: InterfaceAction
+  /** What the trainee is given, and the objective put in force, on the tick the step becomes current. */
+  readonly given?: StepGiven
   readonly begin: (seen: Seen) => StepProgress
   readonly advance: (seen: Seen, now: StepProgress) => StepProgress
 }
 
-/** A bot at a station: kept present by the host while the station is current. */
+/**
+ * What a step gives the trainee on the tick it becomes current. A step without it changes nothing:
+ * the objective in force stays the one before it (the station's, for its first step).
+ */
+export interface StepGiven {
+  /** The primary carried for the step (station 5's stalls: one each). Giving a weapon refills every weapon's ammunition; the primary chosen for the next respawn stays the trainee's own. */
+  readonly primary?: PrimaryId
+  /** The weapon in hand as the step begins. */
+  readonly hold?: WeaponId
+  /** The objective put in force, its state fresh (the frico at its bases, the plaçute free, the cjar at the start). */
+  readonly objective?: ObjectiveId
+}
+
+/**
+ * A bot at a station: kept present by the host while the station is current, gone when it is not
+ * (`server/station-bot.ts`). It spawns, and comes back after the usual respawn delay when killed,
+ * at the first point of its route, with `hp` health.
+ */
 export interface StationBot {
   readonly team: Team
   /** The points it walks, back and forth; a single point is a bot standing still. */
   readonly route: readonly V3[]
+  /** False: it walks its route and never fires. True: an ordinary bot at the room's skill, which leaves its route to fight. */
   readonly fires: boolean
+  /** Its health on every spawn (`MAX_HP` is full). */
   readonly hp: number
 }
 
+/** The most bots a station keeps present, so never more alive at once: the host keeps the first ones its setup lists. */
+export const MAX_STATION_BOTS = 4
+
 /** What arriving at a station gives the trainee and puts in force. Every weapon's ammunition is refilled unless `ammo` says otherwise. */
 export interface StationSetup {
+  /** The primary the trainee is given at the station (applied before `hold`); the trainee's own when absent. Their own comes back at the next station. */
+  readonly primary?: PrimaryId
   /** The weapon in hand on arrival; the trainee's own primary when absent. */
   readonly hold?: WeaponId
   /** Health on arrival; full when absent. */
@@ -106,6 +134,8 @@ export interface StationSetup {
   readonly ammo?: AmmoSetup
   /** Pickups put back on arrival (indices in the map's `pickups`), so they are there however recently they were taken. */
   readonly pickups?: readonly number[]
+  /** Bombs and mines given back whenever the last one is used while the station is current, so a miss never leaves a step undoable. */
+  readonly restock?: boolean
 }
 
 /**

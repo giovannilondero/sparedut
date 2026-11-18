@@ -10,7 +10,7 @@ import type { PrimaryId } from "../weapons.ts"
 import type { GameEvent } from "./events.ts"
 import { freshDoors, freshTurrets } from "./rules.ts"
 import { simulate } from "./schedule.ts"
-import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, GoToStation, StartMatch, Training, type PickupState } from "./schema.ts"
+import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, GoToStation, StartMatch, Training, type PickupState, type PostValue } from "./schema.ts"
 import type { InterfaceAction } from "../training/interface.ts"
 import { STATION_IDS, TRAINING, type StationId } from "../training/index.ts"
 import { arrival, FIRST_START, type TrainingStart } from "../training/start.ts"
@@ -71,7 +71,9 @@ export function createSim(options: SimOptions) {
   const runtime = makeRuntime(options)
 
   return {
-    join: (session: string, name: string, team: Team, bot: boolean, primary: PrimaryId) => runtime.send(Join, { session, name, team, bot, primary }),
+    /** A player arrives; with a `post`, it always spawns there, with the post's health. */
+    join: (session: string, name: string, team: Team, bot: boolean, primary: PrimaryId, post: PostValue | null = null) =>
+      runtime.send(Join, { session, name, team, bot, primary, post }),
     leave: (session: string) => runtime.send(Leave, { session }),
     input: (session: string, input: PlayerInput) => runtime.send(InputArrived, { session, input }),
     team: (session: string, team: Team) => runtime.send(ChangeTeam, { session, team }),
@@ -96,3 +98,4 @@ export function createSim(options: SimOptions) {
 export { simulate }
 export type { WorldView, PlayerView, PhaseView } from "./view.ts"
 export type { GameEvent } from "./events.ts"
+export type { PostValue } from "./schema.ts"

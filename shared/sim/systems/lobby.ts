@@ -16,6 +16,7 @@ import {
   Life,
   Motion,
   Player,
+  Post,
   Rules,
   Stats,
   TeamOf
@@ -36,7 +37,7 @@ export const HandleJoin = Game.System(
     queries: { members: Members },
     resources: { rules: Game.System.readResource(Rules) },
     events: { join: Game.System.readEvent(Join) },
-    commands: Game.System.commands(Game.System.spawns(Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers))
+    commands: Game.System.commands(Game.System.spawns(Player, TeamOf, Post, Motion, Controls, Life, Arsenal, Stats, Attackers))
   },
   ({ queries, resources, events, commands }) => {
     const { data } = queries.members
@@ -45,8 +46,8 @@ export const HandleJoin = Game.System(
     for (const j of events.join.all()) {
       if (present.has(j.session)) continue
       present.add(j.session)
-      const spot = spawns[j.team][0]
-      const draft = Game.Command.spawn(
+      const spot = j.post ?? spawns[j.team][0]
+      const components = [
         [Player, { session: j.session, name: j.name, bot: j.bot }],
         [TeamOf, j.team],
         [Motion, { body: { x: spot.at[0], y: spot.at[1], z: spot.at[2], vx: 0, vy: 0, vz: 0, grounded: true, crouch: false }, yaw: spot.yaw, pitch: 0 }],
@@ -55,8 +56,8 @@ export const HandleJoin = Game.System(
         [Arsenal, freshArsenal(j.primary)],
         [Stats, NO_STATS],
         [Attackers, []]
-      )
-      commands.spawn(draft)
+      ] as const
+      commands.spawn(j.post ? Game.Command.spawn(...components, [Post, j.post]) : Game.Command.spawn(...components))
     }
   }
 )
