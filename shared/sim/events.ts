@@ -3,6 +3,7 @@
  * (sounds, tracers, kill feed, announcements).
  */
 import type { PickupKind, Team } from "../map.ts"
+import type { StationId, StepId } from "../training/index.ts"
 import type { ProjectileKind, WeaponId } from "../weapons.ts"
 
 export type P3 = readonly [number, number, number]
@@ -36,3 +37,7 @@ export type GameEvent =
   /** Feathers from a gjaline that burst on you: you can't see anything for a while. */
   | { readonly t: "plumis"; readonly v: string; readonly n: number }
   | { readonly t: "match"; readonly a: "start" | "end"; readonly winner: Winner | null }
+  /** The training: a step, a station, the whole training completed. */
+  | { readonly t: "training"; readonly a: "step"; readonly station: StationId; readonly step: StepId }
+  | { readonly t: "training"; readonly a: "station"; readonly station: StationId }
+  | { readonly t: "training"; readonly a: "complete" }

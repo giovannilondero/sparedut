@@ -13,6 +13,13 @@ import type { PhysicsWorld } from "../shared/physics.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
 import { outsideStorm, owned, RAISE_TICKS, weaponInSlot } from "../shared/sim/rules.ts"
+import { isTraining } from "../shared/training/index.ts"
+import { closedGates, viewedStation } from "../shared/training/gates.ts"
+import type { InterfaceAction } from "../shared/training/interface.ts"
+import { UnavailableSteps } from "./training-unavailable.ts"
+import type { StationId } from "../shared/training/index.ts"
+import { FRESH_TRAINING, trainingProgressed } from "./settings.ts"
+import { entryChoice, listOnEntry, stationButtonId, stationEntries, stationListHtml } from "./training-menu.ts"
 import { WEAPONS, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
@@ -31,6 +38,7 @@ import type { Settings } from "./settings.ts"
 import "@ui-sdk/web/dialog"
 // UI SDK's select, for the host's bot skill: opens on a tap or a key (never on hover), as a sheet on a small touch screen.
 import "@ui-sdk/web/select"
+import { takeAwayDeparted } from "./bodies.ts"
 import { alwaysChosen } from "./choice.ts"
 import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, type MatchMenu } from "./match-menus.ts"
 import { pickerEntries } from "./touch.ts"
@@ -89,6 +97,8 @@ export interface GameDeps {
   readonly createAvatar: (team: Team, name: string) => Avatar
   readonly saveSettings: () => void
   readonly onLeave: () => void
+  /** Leaves the room, and once the host has let go of it starts the home screen's one-tap match (the training's completion screen). */
+  readonly leaveForOneTap: () => void
   /** Origin and path for invite links (the public address when playing from localhost). */
   readonly inviteBase: () => string
   /** The room's password, if this client knows it: it goes into the invite link's fragment. */
@@ -112,6 +122,10 @@ export class Game {
   private predictor: Predictor
   private world: WorldScene
   private physics: PhysicsWorld
+  /** The map's gates closed (true) or open, as the last snapshot's training says: what prediction collides with and the world draws. */
+  private gates: readonly boolean[] = []
+  /** The station the gates were last closed for (`viewedStation`). */
+  private gatesAt: number | null = null
   private room: RoomInfo | null = null
   private me = ""
   private snap: Snapshot | null = null
@@ -151,6 +165,17 @@ export class Game {
   private teams = new Map<string, Team>()
   private board: readonly BoardRow[] = []
   private boardOpen = false
+  /** A training's steps the active device cannot perform: the host hears of them (#50). */
+  private readonly unavailableSteps = new UnavailableSteps()
+  /** The training's completion screen is open: like a match's end, no menu opens over it and no command goes out. */
+  private trainingEnded = false
+  /**
+   * A training entered with saved progress: its station list opens before play, on the first
+   * snapshot that shows the trainee there, and the pointer is not taken until a station is chosen.
+   */
+  private choosing = false
+  /** The match menu is the station list opened on entry: it says which station continues. */
+  private entering = false
   private chatting = false
   private quickOpen = false
   private overlay: MatchMenu = "none"
@@ -191,7 +216,7 @@ export class Game {
     this.predictor = new Predictor(stage.physics)
     this.controls = new Controls(d.renderer.domElement, {
       onSlot: (slot) => this.selectSlot(slot),
-      onLastWeapon: () => this.selectWeapon(this.lastWeapon),
+      onLastWeapon: () => this.selectWeapon(this.lastWeapon, "lastWeapon"),
       onWheel: (dir) => this.cycleWeapon(dir),
       onKey: (code, down) => this.key(code, down),
       onPause: () => this.padPause(),
@@ -212,7 +237,7 @@ export class Game {
       const locked = document.pointerLockElement === d.renderer.domElement
       if (!locked) this.unlockedAt = performance.now()
       // Touch taking over drops the lock: that is no reason to open the match menu.
-      if (!locked && !this.controls.touchActive && this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over") this.openOverlay("pause")
+      if (!locked && !this.controls.touchActive && this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over" && !this.trainingEnded) this.openOverlay("pause")
       if (locked && this.overlay !== "none") this.openOverlay("none")
     })
     $("quickchat").addEventListener("click", (e) => {
@@ -224,7 +249,11 @@ export class Game {
       e.stopPropagation()
       if (e.key === "Enter") {
         const text = chat.value.trim()
-        if (text) d.net.send({ t: "chat", text })
+        if (text) {
+          d.net.send({ t: "chat", text })
+          // Sending a typed message is a training's interface step; opening the chat is not.
+          if (this.room !== null && isTraining(this.room.mode)) d.net.send({ t: "report", a: "chat" })
+        }
         this.closeChat()
       }
       if (e.key === "Escape") this.closeChat()
@@ -251,12 +280,17 @@ export class Game {
     const stage = this.d.loadMap(room.map)
     this.world = stage.world
     this.physics = stage.physics
+    // A map's physics may be reused from an earlier room: its gates are set again from the first snapshot.
+    this.gates = []
     this.predictor = new Predictor(stage.physics)
     this.wanted = this.d.settings.primary
     this.wantedSeq = 0
     this.shownWeapon = null
     this.ownReload = null
     this.sinceShot = Infinity
+    this.trainingEnded = false
+    this.choosing = isTraining(room.mode) && listOnEntry(this.d.settings.training)
+    this.entering = false
     this.clock = new MatchClock(() => performance.now())
     this.applySettings()
     this.updateRoster(room)
@@ -266,7 +300,7 @@ export class Game {
     this.controls.inMatch = true
     document.documentElement.classList.add("in-match")
     this.placeTouch()
-    this.controls.lock()
+    if (!this.choosing) this.controls.lock()
     this.hud.announce(t().modes[room.mode].name, t().modes[room.mode].rules)
   }
 
@@ -365,6 +399,11 @@ export class Game {
     }
   }
 
+  private readonly takeAwayBody = (a: { avatar: Avatar; blob: THREE.Mesh }) => {
+    this.d.scene.remove(a.avatar.object, a.blob)
+    a.avatar.dispose()
+  }
+
   private updateRoster(room: RoomInfo) {
     this.room = room
     for (const r of room.roster) {
@@ -374,14 +413,6 @@ export class Game {
       if (a && a.team !== r.team) {
         a.avatar.setTeam(r.team)
         a.team = r.team
-      }
-    }
-    const ids = new Set(room.roster.map((r) => r.id))
-    for (const [id, a] of this.avatars) {
-      if (!ids.has(id)) {
-        this.d.scene.remove(a.avatar.object, a.blob)
-        a.avatar.dispose()
-        this.avatars.delete(id)
       }
     }
     if (this.overlay === "pause") this.renderPause()
@@ -398,6 +429,7 @@ export class Game {
     // must not speed up or slow down every drawn player.
     else this.offset += (target - this.offset) * (target > this.offset ? 0.05 : 0.01)
     const players = new Map(s.players.map((p) => [p.id, p]))
+    takeAwayDeparted(this.avatars, players, this.takeAwayBody)
     this.frames.push({ tick: s.tick, players })
     while (this.frames.length > 40) this.frames.shift()
 
@@ -405,6 +437,14 @@ export class Game {
     this.snap = s
     // Broken-down doors no longer stop predicted movement or shots.
     this.physics.setDoors(s.doors.map((hp) => hp > 0))
+    // The training's closed ways stop predicted movement as they stop it on the host.
+    const gates = this.physics.map.gates?.length ?? 0
+    const at = viewedStation(s.training)
+    if (gates !== this.gates.length || at !== this.gatesAt) {
+      this.gates = closedGates(gates, at)
+      this.gatesAt = at
+      this.physics.setGates(this.gates)
+    }
     const you = s.you
     if (you) {
       const mine = players.get(this.me)
@@ -442,6 +482,14 @@ export class Game {
     }
     for (const e of s.ev) this.event(e)
     if (prev?.phase.tag !== s.phase.tag) this.phaseChanged(s)
+    // Entered with progress: the station list, as soon as the trainee is there. Opening it pauses the training.
+    if (this.choosing && you?.alive && s.training?.tag === "station") {
+      this.choosing = false
+      if (this.overlay === "none") {
+        this.entering = true
+        this.openOverlay("pause", stationButtonId(entryChoice(s.training).focus))
+      }
+    }
   }
 
   private phaseChanged(s: Snapshot) {
@@ -453,7 +501,7 @@ export class Game {
       this.renderEnd(true)
     } else {
       $<DialogElement>(MENU_PARTS.end[0]).open = false
-      if (tag === "Live" && this.overlay === "none") this.controls.lock()
+      if (tag === "Live" && this.overlay === "none" && !this.choosing) this.controls.lock()
     }
     if (this.overlay === "pause") this.renderPause()
   }
@@ -601,7 +649,8 @@ export class Game {
         return
       }
       case "hill":
-        if (this.room?.mode === "culine") this.hud.announce(e.team ? t().game.hillTaken(t().teams[e.team].name) : t().hud.hillFree)
+        // Only the plaçute in force publishes it: a culine room, or the training's plaçute step.
+        this.hud.announce(e.team ? t().game.hillTaken(t().teams[e.team].name) : t().hud.hillFree)
         return
       case "pad": {
         const at = this.posOf(e.s)
@@ -659,6 +708,26 @@ export class Game {
         }
         return
       }
+      case "training": {
+        // Saved per completed station, with the other settings: the next training resumes from it.
+        const progress = trainingProgressed(this.d.settings.training, e)
+        if (progress !== this.d.settings.training) {
+          this.d.settings.training = progress
+          this.d.saveSettings()
+        }
+        const tr = t().training
+        if (e.a === "step") {
+          this.hud.trainingDone()
+          audio.play("flag_returned", { volume: 0.6 })
+        } else if (e.a === "station") {
+          this.hud.announce(tr.stationDone, tr.stations[e.station])
+          audio.play("bells", { volume: 0.7 })
+        } else {
+          audio.play("victory")
+          this.showTrainingComplete()
+        }
+        return
+      }
     }
   }
 
@@ -673,9 +742,12 @@ export class Game {
     return this.snap?.turrets.findIndex((t) => t.gunner === this.me) ?? -1
   }
 
-  private selectWeapon(id: WeaponId) {
+  /** Changes the weapon in hand; `how` the player chose it, which a training's current step may need to hear (an interface step). */
+  private selectWeapon(id: WeaponId, how: InterfaceAction) {
     const you = this.you()
     if (!you || !owned(you.arsenal, id) || id === this.wanted) return
+    // Ahead of the input that carries the new weapon. Only a training takes it.
+    if (this.room !== null && isTraining(this.room.mode)) this.d.net.send({ t: "report", a: how })
     this.lastWeapon = this.wanted
     this.wanted = id
     this.wantedSeq = this.seq + 1
@@ -688,7 +760,7 @@ export class Game {
     if (this.quickOpen) return
     const you = this.you()
     const id = you && weaponInSlot(you.arsenal, slot)
-    if (id) this.selectWeapon(id)
+    if (id) this.selectWeapon(id, "slot")
   }
 
   private cycleWeapon(dir: 1 | -1) {
@@ -696,34 +768,45 @@ export class Game {
     if (!you) return
     const order = pickerEntries(you.arsenal).map((e) => e.id)
     const i = order.indexOf(this.wanted)
-    this.selectWeapon(order[(i + dir + order.length) % order.length])
+    this.selectWeapon(order[(i + dir + order.length) % order.length], "cycle")
   }
 
   // ---------------------------------------------------------------- keys and overlays
 
-  private key(code: string, down: boolean) {
-    if (!this.running || this.chatting) return
+  /** A key pressed or released. Says whether the press was the game's own, not also the browser's: Tab when it shows the scoreboard. */
+  private key(code: string, down: boolean): boolean {
+    if (!this.running || this.chatting) return false
     if (code === "Tab") {
       // With a menu open, Tab moves through it: the scoreboard stays shut.
       const open = down && this.overlay === "none"
+      // Opening the scoreboard is a training's interface step: only a training takes the report.
+      if (open && !this.boardOpen && this.room !== null && isTraining(this.room.mode)) this.d.net.send({ t: "report", a: "board" })
       this.boardOpen = open
       this.hud.board(this.board, this.me, open)
-      return
+      return open
     }
-    if (!down) return
-    if (code === "Escape") return this.escape()
+    if (!down) return false
+    if (code === "Escape") {
+      this.escape()
+      return false
+    }
     if (this.quickOpen && /^Digit\d$/.test(code)) {
       const n = Number(code.slice(5))
       const phrase = QUICK_CHAT[(n + 9) % 10]
-      if (phrase) this.d.net.send({ t: "chat", text: phrase })
+      if (phrase) {
+        this.d.net.send({ t: "chat", text: phrase })
+        // Sending a quick phrase is a training's interface step.
+        if (this.room !== null && isTraining(this.room.mode)) this.d.net.send({ t: "report", a: "phrases" })
+      }
       this.toggleQuick(false)
-      return
+      return false
     }
     // Enter presses a menu's button: chat and phrases open only over the match itself.
     const playing = this.controls.active && this.overlay === "none"
     if (code === "KeyV" && playing) this.toggleQuick(!this.quickOpen)
     if ((code === "Enter" || code === "KeyT") && playing) this.openChat()
     if (code === "KeyB") this.openOverlay(this.overlay === "loadout" ? "none" : "loadout")
+    return false
   }
 
   /** Options on the gamepad: opens the match menu, or closes it (one step at a time, like Esc). */
@@ -784,8 +867,11 @@ export class Game {
     if (form.parentElement?.id !== "settings-home") $("settings-home").append(form)
   }
 
-  private openOverlay(which: MatchMenu) {
+  /** Opens a match menu (or none); `focus`, the control that takes the focus in place of the usual one. */
+  private openOverlay(which: MatchMenu, focus?: string) {
     const previous = this.overlay
+    // The list on entry is the match menu once: left, it comes back as the match menu.
+    if (which !== "pause") this.entering = false
     if (which === "loadout" && previous !== "loadout") this.loadoutFrom = previous === "pause" ? "pause" : "none"
     this.overlay = which
     if (which === "settings" && previous !== "settings") {
@@ -799,7 +885,7 @@ export class Game {
       if (document.pointerLockElement) document.exitPointerLock()
       if (previous !== "loadout") this.renderLoadout()
     }
-    this.showMenus(previous)
+    this.showMenus(previous, focus)
     this.syncPause()
   }
 
@@ -807,7 +893,7 @@ export class Game {
    * Closes every menu but the open one, then opens it with focus where `focusOnOpen` says. With
    * none open, focus leaves the menus: keys go back to the game.
    */
-  private showMenus(previous: MatchMenu) {
+  private showMenus(previous: MatchMenu, focus?: string) {
     const active = document.activeElement
     for (const menu of MATCH_MENUS) {
       if (menu !== this.overlay) $<DialogElement>(MENU_PARTS[menu][0]).open = false
@@ -819,7 +905,7 @@ export class Game {
     const [id, content] = MENU_PARTS[this.overlay]
     const dialog = $<DialogElement>(id)
     if (dialog.open) return
-    this.openMenu(id, content, focusOnOpen(this.overlay, previous))
+    this.openMenu(id, content, focus ?? focusOnOpen(this.overlay, previous))
   }
 
   /**
@@ -887,10 +973,14 @@ export class Game {
   private renderPause(full = false) {
     const room = this.room
     if (!room) return
-    const host = room.hostId === this.me
+    // A training has no host tools and no teams to switch: its player is the host of nothing.
+    const training = isTraining(room.mode)
+    const host = room.hostId === this.me && !training
     if (full || host !== this.pauseHost) this.buildPause(room, host)
     const s = t()
     const p = s.pause
+    // A training's menu has its station list in place of the roster.
+    if (training) return
     $("p-roster").innerHTML = rosterHtml(room, this.me)
     $("p-team").textContent = p.switchTeam(s.teams[this.otherTeam()].name)
     if (!host) return
@@ -905,6 +995,7 @@ export class Game {
 
   private buildPause(room: RoomInfo, host: boolean) {
     this.pauseHost = host
+    const training = isTraining(room.mode)
     const el = $("pause")
     const s = t()
     const p = s.pause
@@ -913,17 +1004,21 @@ export class Game {
     this.drawMenu(MENU_PARTS.pause[1], `${s.modes[room.mode].name} <small class="muted">· ${s.modes[room.mode].sub}</small>`, `
       <div class="overlay-body">
       ${
-        // An Offline room has no code and no invite link: nobody else can come in.
-        room.reach === "offline"
+        // An Offline room (a training too) has no code and no invite link: nobody else can come in.
+        training
+          ? `<div class="muted pause-reach">${this.entering ? s.training.chooseStation : s.training.menuLine}</div>`
+          : room.reach === "offline"
           ? `<div class="muted pause-reach">${p.reach.offline}</div>`
           : `<div class="pause-code">
         <div><div class="muted">${p.code}</div><div class="invite">${room.code}</div></div>
         <div class="pause-share"><button id="p-copy">${p.copy}</button><div class="muted pause-reach">${p.reach[room.reach]} · ${p.access[room.access]}</div></div>
       </div>`
       }
-      <div class="roster" id="p-roster"></div>
+      ${training ? stationListHtml(stationEntries(this.snap?.training ?? null), s, this.entering ? entryChoice(this.snap?.training ?? null).continues : null) : `<div class="roster" id="p-roster"></div>`}
       ${
-        host
+        training
+          ? ""
+          : host
           ? `<div class="host-tools"><span class="host-label">👑 ${p.host}</span>
         <button id="p-start" class="primary"></button>
         <div class="host-bots">
@@ -941,7 +1036,7 @@ export class Game {
       </div>
       <div class="row overlay-actions">
         <button id="p-resume" class="primary">${s.loadout.resume}</button>
-        <button id="p-team"></button>
+        ${training ? `<button id="p-restart"${this.snap?.training?.tag === "station" ? "" : " disabled"}>${s.training.restart}</button><button id="p-over">${s.training.startOver}</button>` : `<button id="p-team"></button>`}
         <button id="p-loadout">${s.loadout.title}</button>
         <button id="p-settings">${s.static.settings}</button>
         <button id="p-leave">${p.leave}</button>
@@ -950,7 +1045,8 @@ export class Game {
       this.openOverlay("none")
       this.controls.lock()
     }
-    $("p-team").onclick = () => this.d.net.send({ t: "team", team: this.otherTeam() })
+    const team = document.getElementById("p-team")
+    if (team) team.onclick = () => this.d.net.send({ t: "team", team: this.otherTeam() })
     $("p-loadout").onclick = () => this.openOverlay("loadout")
     $("p-leave").onclick = () => {
       this.d.net.send({ t: "leave" })
@@ -963,6 +1059,7 @@ export class Game {
         copy.textContent = p.copied
       }
     $("p-settings").onclick = () => this.openOverlay("settings")
+    if (training) this.bindTrainingMenu(el)
     if (!host) return
     $("p-start").onclick = () => {
       this.d.net.send({ t: "start" })
@@ -981,9 +1078,73 @@ export class Game {
     }))
   }
 
+  /**
+   * The training's match menu: a station from the list, restart this station, start over. Each
+   * closes the menu, so the training resumes there. Starting over takes a second press: it
+   * clears the saved progress.
+   */
+  private bindTrainingMenu(el: HTMLElement) {
+    const resume = () => {
+      this.openOverlay("none")
+      this.controls.lock()
+    }
+    const goTo = (station: StationId) => {
+      this.d.net.send({ t: "goTo", station })
+      resume()
+    }
+    for (const b of el.querySelectorAll<HTMLButtonElement>("[data-station]")) b.onclick = () => goTo(b.dataset.station as StationId)
+    $("p-restart").onclick = () => {
+      const view = this.snap?.training
+      if (view?.tag === "station") goTo(view.station)
+    }
+    const over = $("p-over")
+    over.onclick = () => {
+      if (!over.classList.contains("confirm")) {
+        over.classList.add("confirm")
+        over.textContent = t().training.startOverSure
+        return
+      }
+      this.d.settings.training = FRESH_TRAINING
+      this.d.saveSettings()
+      this.d.net.send({ t: "startOver" })
+      resume()
+    }
+  }
+
   /** Did I win (my team, or me alone in Tampieste)? */
   private won(winner: Winner) {
     return typeof winner === "object" ? winner.player === this.me : winner === this.teams.get(this.me)
+  }
+
+  /**
+   * The training's completion screen, in the end screen's dialog: three ways on. Home leaves the
+   * training; the one-tap match leaves it and starts the home screen's match at once; the station
+   * list opens the training's match menu, where the stations are listed (#51).
+   */
+  private showTrainingComplete() {
+    const tr = t().training
+    this.trainingEnded = true
+    if (document.pointerLockElement) document.exitPointerLock()
+    this.controls.releaseAll()
+    this.drawMenu(MENU_PARTS.end[1], tr.complete, `
+      <div class="overlay-body"><p class="end-sub">${tr.completeSub}</p></div>
+      <div class="row overlay-actions training-done">
+        <button id="c-home">${tr.done.home}</button>
+        <button id="c-stations">${tr.stationList}</button>
+        <button id="c-play" class="primary">${t().static.oneTap}</button>
+      </div>`, "end-title", "var(--gold)")
+    const leave = () => {
+      this.d.net.send({ t: "leave" })
+      this.d.onLeave()
+    }
+    $("c-home").onclick = leave
+    $("c-play").onclick = () => this.d.leaveForOneTap()
+    $("c-stations").onclick = () => {
+      this.trainingEnded = false
+      $<DialogElement>(MENU_PARTS.end[0]).open = false
+      this.openOverlay("pause")
+    }
+    this.openMenu(...MENU_PARTS.end, "c-play")
   }
 
   /**
@@ -1255,7 +1416,7 @@ export class Game {
     if (this.offset !== null) this.renderTick = this.time * 60 + this.offset - INTERP_TICKS
 
     const paused = this.clock.paused
-    this.controls.poll(dt, this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over")
+    this.controls.poll(dt, this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over" && !this.trainingEnded)
     // Paused: no commands, no prediction, and the paused time never reaches the fixed tick.
     if (!paused) {
       this.acc += Math.min(dt, 0.25)
@@ -1428,8 +1589,9 @@ export class Game {
       }
       world.update(dt, t, {
         pickups: [...s.pickups].map((ch) => ch === "1"),
-        flags: mode === "frico" ? { benandanti: flagPos("benandanti"), malandanti: flagPos("malandanti") } : null,
-        hill: mode === "culine" ? { owner: s.hill.owner, contested: s.hill.contested } : null,
+        // The markers of the objective in force only: the mode's in a room, the current step's in a training.
+        flags: s.objective === "frico" ? { benandanti: flagPos("benandanti"), malandanti: flagPos("malandanti") } : null,
+        hill: s.objective === "placute" ? { owner: s.hill.owner, contested: s.hill.contested } : null,
         cart: s.cart ? { at: s.cart.at, yaw: s.cart.yaw, contested: s.cart.contested, pushers: s.cart.pushers } : null,
         storm: s.storm,
         turrets: s.turrets.map((tu, i): TurretVisual => {
@@ -1447,6 +1609,7 @@ export class Game {
           }
         }),
         doors: s.doors.map((hp, i) => hp / (this.physics.map.doors[i]?.hp ?? 1)),
+        gates: this.gates,
         camera
       })
       // The casot's disco: audible only nearby, and muffled while the door is closed.
@@ -1455,6 +1618,10 @@ export class Game {
       const outside = !!s.storm && !!you?.alive && !!b && outsideStorm(s.storm, b)
       this.hud.spectating = mode === "tampieste" && s.phase.tag === "Live"
       this.hud.top(s, mode ?? "bataie", this.names, this.controls.device, outside)
+      this.hud.training(s.training, this.controls.device)
+      // A step this device cannot perform: shown as such, then the host is told, and completes it.
+      const unavailable = this.unavailableSteps.check(s.training, this.controls.device, performance.now())
+      if (unavailable) this.d.net.send(unavailable)
       this.hud.death(you, this.names, Math.floor(this.seed / 7))
       if (s.phase.tag === "Over" && Math.floor(t) !== Math.floor(t - dt)) this.renderEnd()
     }
@@ -1471,7 +1638,7 @@ export class Game {
       const px = (Math.tan(spread) / Math.tan(((camera.fov / 2) * Math.PI) / 180)) * (innerHeight / 2)
       this.hud.crosshair(Math.min(60, px * 1.6), view.crosshair)
     }
-    const free = this.overlay === "none" && !this.chatting && s?.phase.tag !== "Over"
+    const free = this.overlay === "none" && !this.chatting && s?.phase.tag !== "Over" && !this.trainingEnded
     const device = this.controls.device
     this.hud.clickToPlay(!this.controls.active && free && !this.boardOpen, device)
     this.hud.layFor(device)

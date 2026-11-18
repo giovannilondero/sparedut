@@ -36,7 +36,7 @@ beforeAll(async () => {
 /** A player at the keyboard, with the mouse locked on the game. */
 const keyboard = (mode: "hold" | "toggle") => {
   listeners.clear()
-  const c = new Controls(element as unknown as HTMLElement, { onSlot() {}, onLastWeapon() {}, onWheel() {}, onKey() {}, onPause() {} })
+  const c = new Controls(element as unknown as HTMLElement, { onSlot() {}, onLastWeapon() {}, onWheel() {}, onKey: () => false, onPause() {} })
   c.crouchMode = mode
   doc.pointerLockElement = element
   fire("pointerlockchange")
@@ -50,7 +50,7 @@ const keyboard = (mode: "hold" | "toggle") => {
 const controller = (mode: "hold" | "toggle") => {
   listeners.clear()
   doc.pointerLockElement = null
-  const c = new Controls(element as unknown as HTMLElement, { onSlot() {}, onLastWeapon() {}, onWheel() {}, onKey() {}, onPause() {} })
+  const c = new Controls(element as unknown as HTMLElement, { onSlot() {}, onLastWeapon() {}, onWheel() {}, onKey: () => false, onPause() {} })
   c.crouchMode = mode
   const set = (i: number, on: boolean) => (pad.buttons[i] = { pressed: on, value: on ? 1 : 0 })
   const down = (i: number) => (set(i, true), c.poll(1 / 60))
@@ -167,7 +167,7 @@ test("with toggle, the crouch is cleared on respawn, on mounting a turret and on
 
 test("hold is the default and crouches only while the key or ◯ is held, as before", () => {
   listeners.clear()
-  expect(new Controls(element as unknown as HTMLElement, { onSlot() {}, onLastWeapon() {}, onWheel() {}, onKey() {}, onPause() {} }).crouchMode).toBe("hold")
+  expect(new Controls(element as unknown as HTMLElement, { onSlot() {}, onLastWeapon() {}, onWheel() {}, onKey: () => false, onPause() {} }).crouchMode).toBe("hold")
 
   const k = keyboard("hold")
   k.down("KeyC")

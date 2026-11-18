@@ -1,12 +1,12 @@
 import { expect, test } from "bun:test"
-import { MODE_IDS } from "../shared/folklore.ts"
+import { ROOM_MODE_IDS } from "../shared/folklore.ts"
 import { IDLE_INPUT } from "../shared/input.ts"
 import { BOARDWALK_Y, LAND, LANTERNS, MARAN, PONT, RAILS, SEA, TREES } from "../shared/maps/maran.ts"
 import { stepBody, type Body } from "../shared/movement.ts"
 import { createPhysicsWorld, initPhysics } from "../shared/physics.ts"
 import { playBots } from "./play.ts"
 
-for (const mode of MODE_IDS) {
+for (const mode of ROOM_MODE_IDS) {
   test(`bots play a match at Lagune di Maran: ${mode}`, async () => {
     await initPhysics()
     const { kills, view: v } = playBots("maran", mode)

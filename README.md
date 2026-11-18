@@ -40,6 +40,18 @@ pnpm cf:destroy
 Il primo deploy installa nell'account lo stato di Alchemy, condiviso con la CI.
 Un deploy chiude le partite in corso.
 
+## Installare il gioco
+
+Dalla build di produzione (il deploy, o `pnpm build && pnpm start` aperto da `localhost`) il gioco si installa come un'app:
+si apre a schermo intero, senza le barre del browser, in orizzontale e in verticale, e dopo la prima visita online si apre anche senza rete.
+
+- **Chrome, Edge, Brave** (computer e Android): l'icona di installazione nella barra degli indirizzi, oppure *Installa app* / *Aggiungi a schermata Home* nel menu del browser.
+- **Safari su iPhone e iPad**: *Condividi* → *Aggiungi alla schermata Home*.
+- **Safari su Mac**: *File* → *Aggiungi al Dock*.
+
+Installato, il gioco chiede al browser di non cancellare i suoi dati (la cache, le impostazioni, i progressi della Dutrine).
+L'installazione chiede HTTPS: da un indirizzo di rete locale in `http://` il gioco si gioca ma non si installa.
+
 ## Partite
 
 - **Zuie cuintri i bot**: una partita offline contro la CPU, subito e senza riscaldamento, con modalità, mappa, durata, bot e bravura dell'ultima partita creata (la prima volta quelli di partenza) e fuoco amico spento.
@@ -114,6 +126,40 @@ stick sinistro muoversi (analogico) · stick destro guardare · `R2` sparare · 
 `R3` mescul · `L1` bomba · `R1` mina · `Share` classifica · `Touchpad` armeria · `Options` menu di partita. Il pad vibra quando spari e quando ti colpiscono.
 I menu fuori dalla partita si usano ancora col mouse.
 
+## La Dutrine
+
+La **Dutrine** è l'allenamento: un giocatore solo, sempre offline (anche senza server), sulla sua piccola mappa, la **Sagre dal Frico**:
+una sagra di paese con le stazioni come bancarelle in fila lungo la strada e, in fondo, una piazzetta per le modalità e la scaramuccia.
+Si apre dalla schermata iniziale (*Impare a zuiâ*) e serve un nome, come per ogni stanza. Si gioca da Benandante, senza fuoco amico,
+senza riscaldamento, orologio né punteggio limite: finisce quando l'ultimo passo è fatto.
+La prima volta si parte dalla stazione 1; poi, entrando, si apre prima l'elenco delle stazioni (a gioco fermo),
+con quella da cui continuare già scelta; a Dutrine finita una volta sono tutte segnate come fatte e si sceglie liberamente.
+
+Ogni stazione chiede alcuni passi, in ordine; il pannello dice la stazione, a che passo si è e quanti ne restano (un segno per passo),
+il passo con il comando del dispositivo in uso (tastiera, controller o touch) e quante volte manca. La strada verso la stazione dopo resta sbarrata finché la stazione non è finita.
+
+| | |
+|---|---|
+| 1. Cjale e cjamine | guardarsi attorno e camminare |
+| 2. Il percors | saltare la sbarra, passare accucciati sotto la trave, correre |
+| 3. Simpri cun te | la Mandi, mirare, ricaricare, il mescul, sfondare una porta |
+| 4. Gambiâ arme | per numero, l'arma precedente, con la rotella |
+| 5. Lis bancjarelis | le armi principali, una bancarella ciascuna (la Cassele è dal medico) |
+| 6. La armarie | scegliere la propria arma principale |
+| 7. Bombis e minis | la bomba di sgnape e la mina di Raibl |
+| 8. Robe di cjapâ sù | frico, gubane, sgnape, munizions |
+| 9. La torete e il Lanciafrico | salire sulla torretta, surriscaldarla, scendere; raccogliere e sparare il Lanciafrico |
+| 10. Il miedi | curare un compagno ferito con la Cassele dal Miedi |
+| 11. Lis modalitâts | portare a casa il frico, tenere la plaçute, spingere il cjar, restare dentro la tempesta |
+| 12. La scaramucie | vincere una breve Bataie di Gnot contro due bot che sparano, aprire la classifica, mandare una frase rapida, scrivere un messaggio in chat |
+
+Prima della scaramuccia i bot delle stazioni non sparano e non si muore: un colpo che ucciderebbe lascia un punto di salute.
+Nella scaramuccia i bot sparano, alla bravura più bassa (Zovin), si muore davvero e si rinasce dalla parte della scaramuccia;
+la vincono i Benandanti a 5 punti, uno per nemico abbattuto, contati da quando comincia; vinta, i bot smettono di sparare e tornano al loro posto.
+Un passo che il dispositivo in uso non ha (le frasi rapide sul controller, l'arma precedente e la chat sul controller e sul touch)
+è segnato come non disponibile e si completa da solo.
+Alla fine la schermata della Dutrine offre tre strade: tornare all'inizio, l'elenco delle stazioni, una partita contro i bot in un tocco.
+
 ## Struttura
 
 Stack dalle linee guida (`giovannilondero/game-dev-guidelines`, 3D): **Ritmo** (ECS e simulazione) + **Three.js** + **Howler.js** + **Rapier 3D**.
@@ -125,11 +171,13 @@ Stack dalle linee guida (`giovannilondero/game-dev-guidelines`, 3D): **Ritmo** (
 - `shared/weapons.ts`, `shared/folklore.ts`: armi, squadre, modalità, bot (solo dati, senza lingua)
 - `client/i18n.ts`: tutti i testi in friulano e italiano: menu, HUD, battute, consigli, vocabolario
 - `shared/protocol.ts`: messaggi client ↔ server, validati con zod
+- `shared/training/`: la Dutrine come dati: stazioni e passi in ordine, cosa completa ogni passo, quali dispositivi hanno ogni comando; i testi sono in `client/training-text/`, il giocatore automatico dei test in `test/trainee/`
 - `server/`: server autoritativo Bun (stanze, rete locale, codici), bot e loro grafo di navigazione; `worker.ts` è lo stesso server in un Durable Object
 - `client/offline.ts`, `client/host.worker.ts`: le stanze offline, ospitate in un worker del browser dallo stesso `Hub` del server (vedi `docs/adr/0001-offline-rooms-hosted-in-the-browser.md`)
 - `server/nav-graphs.ts`: i grafi dei bot precalcolati (costano decine di secondi di CPU); `pnpm nav` li rifà quando cambia una mappa, il movimento o la fisica, e `test/nav.test.ts` controlla che siano aggiornati
 - `client/`: rendering Three.js (mondo, avatar, arma in prima persona, effetti), audio sintetizzato con Howler, predizione e interpolazione, HUD e menu
 - `client/looks.ts`: i due stili grafici; **Vêr** carica le superfici fotografate di `client/public/tex/` e le armi di `client/public/models/`, esportate dagli script Blender di `assets/blender/` (`pnpm models`)
+- `client/public/manifest.webmanifest`, `client/public/icons/`, `client/installed.ts`: il gioco installabile; le icone vengono da `favicon.svg` (`pnpm icons` le ridisegna con Brave senza finestra)
 - `test/`: test senza browser della simulazione, del grafo dei bot e di partite intere fra bot
 
 Rete: il server è autoritativo; il client predice il proprio movimento con la stessa fisica e rigioca i comandi non confermati,

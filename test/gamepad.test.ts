@@ -26,7 +26,10 @@ const make = () => {
     onSlot: (s) => calls.push(`slot${s}`),
     onLastWeapon: () => calls.push("last"),
     onWheel: (d) => calls.push(`wheel${d}`),
-    onKey: (code, down) => calls.push(`${code}:${down ? "down" : "up"}`),
+    onKey: (code, down) => {
+      calls.push(`${code}:${down ? "down" : "up"}`)
+      return false
+    },
     onPause: () => calls.push("pause")
   })
   return { c, calls }

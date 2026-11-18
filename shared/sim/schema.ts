@@ -8,11 +8,14 @@
 import { Descriptor, Random, Schema } from "@typeonce/ritmo"
 import { z } from "zod"
 import type { PlayerInput } from "../input.ts"
-import type { MapId, Team } from "../map.ts"
+import type { MapId, Team, V3 } from "../map.ts"
 import type { Body } from "../movement.ts"
 import type { PhysicsWorld } from "../physics.ts"
-import type { ModeId } from "../folklore.ts"
+import type { ModeId, ObjectiveId } from "../folklore.ts"
 import type { PrimaryId, ProjectileKind, WeaponId } from "../weapons.ts"
+import type { InterfaceAction } from "../training/interface.ts"
+import type { StationId, StepId } from "../training/index.ts"
+import type { Device } from "../devices.ts"
 import type { GameEvent, KillCause } from "./events.ts"
 
 export const Root = Schema.defineRoot("Sparedut")
@@ -26,6 +29,17 @@ export interface PlayerInfo {
 }
 export const Player = Descriptor.Component<PlayerInfo>()("Sparedut/Player")
 export const TeamOf = Descriptor.Component<Team>()("Sparedut/Team")
+
+/**
+ * A member that always (re)spawns at one place, with a given health: a bot the training keeps at a
+ * station. Members without one spawn at their team's spawn points with full health.
+ */
+export interface PostValue {
+  readonly at: V3
+  readonly yaw: number
+  readonly hp: number
+}
+export const Post = Descriptor.Component<PostValue>()("Sparedut/Post")
 
 export interface MotionValue {
   readonly body: Body
@@ -148,6 +162,8 @@ export interface RulesValue {
   readonly friendlyFire: boolean
 }
 export const Rules = Descriptor.Resource<RulesValue>()("Sparedut/Rules")
+/** The objective in force: the objective systems read this, never the mode. A regular room derives it from its mode. */
+export const Objective = Descriptor.Resource<ObjectiveId>()("Sparedut/Objective")
 export const Tick = Descriptor.Resource<number>()("Sparedut/Tick")
 export const Score = Descriptor.Resource<Readonly<Record<Team, number>>>()("Sparedut/Score")
 
@@ -174,6 +190,22 @@ export interface CartValue {
   readonly idle: number
 }
 export const Cart = Descriptor.Resource<CartValue>()("Sparedut/Cart")
+
+/**
+ * A storm on a course of its own (the training's, `StepGiven.storm`): closing on (`x`, `z`) from
+ * `from` to `to` metres over `ticks` ticks from tick `start`, then holding. Null where the storm
+ * follows the match clock instead (a regular room's Tampieste, `stormAt`); read only while the
+ * storm is the objective in force.
+ */
+export interface StormCourseValue {
+  readonly x: number
+  readonly z: number
+  readonly from: number
+  readonly to: number
+  readonly start: number
+  readonly ticks: number
+}
+export const StormCourse = Descriptor.Resource<StormCourseValue | null>()("Sparedut/StormCourse")
 
 /** A turret (one per `map.turrets`, same order). */
 export interface TurretState {
@@ -209,14 +241,27 @@ export const Rng = Descriptor.ConstructedResource(Random.codec)("Sparedut/Rng")
 
 // --- Events -----------------------------------------------------------------
 
-/** From the host: a player arrives (human or bot). */
-export const Join = Descriptor.Event<{ readonly session: string; readonly name: string; readonly team: Team; readonly bot: boolean; readonly primary: PrimaryId }>()("Sparedut/Join")
+/** From the host: a player arrives (human or bot), with a post when it always spawns at one place. */
+export const Join = Descriptor.Event<{
+  readonly session: string
+  readonly name: string
+  readonly team: Team
+  readonly bot: boolean
+  readonly primary: PrimaryId
+  readonly post: PostValue | null
+}>()("Sparedut/Join")
 export const Leave = Descriptor.Event<{ readonly session: string }>()("Sparedut/Leave")
 export const InputArrived = Descriptor.Event<{ readonly session: string; readonly input: PlayerInput }>()("Sparedut/InputArrived")
 export const ChangeTeam = Descriptor.Event<{ readonly session: string; readonly team: Team }>()("Sparedut/ChangeTeam")
 export const ChangePrimary = Descriptor.Event<{ readonly session: string; readonly primary: PrimaryId }>()("Sparedut/ChangePrimary")
 /** The host starts (or restarts) the match. */
 export const StartMatch = Descriptor.Event<{}>()("Sparedut/StartMatch")
+/** From the host, only in a training: the client's report of an interface step (`shared/training/interface.ts`). */
+export const ReportInterface = Descriptor.Event<{ readonly session: string; readonly action: InterfaceAction }>()("Sparedut/ReportInterface")
+/** From the host, only in a training: the client says its active device has no control for this step (`shared/training/controls.ts`). */
+export const StepUnavailable = Descriptor.Event<{ readonly session: string; readonly station: StationId; readonly step: StepId; readonly device: Device }>()("Sparedut/StepUnavailable")
+/** From the host, only in a training: the trainee goes to a station (`station`, an index) or starts over. */
+export const GoToStation = Descriptor.Event<{ readonly session: string; readonly to: { readonly _tag: "station"; readonly station: number } | { readonly _tag: "startOver" } }>()("Sparedut/GoToStation")
 
 export interface DamageValue {
   readonly victim: string
@@ -246,10 +291,10 @@ export const Physics = Descriptor.Service<PhysicsWorld>()("Sparedut/Physics")
 
 export const Game = Schema.bind(
   Schema.fragment({
-    components: { Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers, Projectile },
+    components: { Player, TeamOf, Post, Motion, Controls, Life, Arsenal, Stats, Attackers, Projectile },
     requires: [Schema.requires(Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers)],
-    resources: { Rules, Tick, Score, Flags, Hill, Cart, Pickups, Turrets, Doors, History, Rng },
-    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, Damage, Heal, DoorHit, Out }
+    resources: { Rules, Objective, Tick, Score, Flags, Hill, Cart, StormCourse, Pickups, Turrets, Doors, History, Rng },
+    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, ReportInterface, GoToStation, StepUnavailable, Damage, Heal, DoorHit, Out }
   }),
   Root
 )
@@ -264,3 +309,39 @@ export const Match = Game.StateMachine("Sparedut/Match", {
     restarts: z.number().int()
   })
 })
+
+/** Where an arrival puts the trainee: see `Training.Arriving`. */
+export const ARRIVAL_PLACES = ["walked", "facingStart", "keepingLook"] as const
+export type ArrivalPlace = (typeof ARRIVAL_PLACES)[number]
+
+/**
+ * The training's progress (`shared/training/`): which station, which step, how far the step has
+ * got. A regular room is `Off` for good. Stations and steps are indices into `STATION_IDS` and
+ * the station's `stepsOf`. `unlocked`: how many stations, from the first, the trainee may go to;
+ * `completed`: the training was completed once (only with all of them unlocked), so every station
+ * is completed, not only those before the last unlocked one.
+ */
+export const Training = Game.StateMachine(
+  "Sparedut/Training",
+  {
+    Off: {},
+    /**
+     * On the way into a station: its setup is applied on the first tick the trainee is alive.
+     * `place` (`ARRIVAL_PLACES`): left where they are (walked in), or put at the station's start,
+     * facing along the street (a training's first arrival) or keeping their look (going to a
+     * station: the client owns the look, and a turn it did not make would complete a look step).
+     */
+    Arriving: z.object({ station: z.number().int(), unlocked: z.number().int(), completed: z.boolean(), place: z.enum(ARRIVAL_PLACES) }),
+    /**
+     * At a station, on one of its steps: `count`, how many times its action happened; `mark`, the one
+     * number the step keeps (`StepProgress`), whose meaning is the step's own: the yaw it began at
+     * (station 1's look), an x (where the sprint began), a tick (the last report, the storm's start),
+     * a score (when a scoring step began), an index (the primary held when the armoury opened) or
+     * 1 or 0 (whether the trainee was already inside, for a step that asks to go in).
+     */
+    Step: z.object({ station: z.number().int(), step: z.number().int(), count: z.number().int(), mark: z.number(), unlocked: z.number().int(), completed: z.boolean() }),
+    /** Every station done: all of them unlocked. */
+    Complete: {}
+  },
+  { transitions: { Off: [], Arriving: ["Step", "Complete"], Step: ["Complete", "Arriving"], Complete: ["Arriving"] } }
+)

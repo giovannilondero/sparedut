@@ -10,7 +10,7 @@ export const TEAM_INFO = {
   malandanti: { short: "MAL", color: "#d0435a" }
 } as const satisfies Record<Team, { readonly short: string; readonly color: string }>
 
-export type ModeId = "bataie" | "frico" | "culine" | "cjar" | "tampieste"
+export type ModeId = "bataie" | "frico" | "culine" | "cjar" | "tampieste" | "dutrine"
 
 export const MODES = {
   /** Team deathmatch. */
@@ -22,10 +22,51 @@ export const MODES = {
   /** Payload: the Benandanti push the cjar to the end; the score is the percentage of the way. */
   cjar: { id: "cjar", scoreLimit: 100 },
   /** Free-for-all, one life, the storm closes in: last one standing wins. */
-  tampieste: { id: "tampieste", scoreLimit: 1 }
+  tampieste: { id: "tampieste", scoreLimit: 1 },
+  /** The training: no score, no clock; it ends when its last step completes (`shared/training/`). */
+  dutrine: { id: "dutrine", scoreLimit: 0 }
 } as const satisfies Record<ModeId, { readonly id: ModeId; readonly scoreLimit: number }>
 
+/** Every mode, the training's included. */
 export const MODE_IDS = Object.keys(MODES) as ModeId[]
+
+/**
+ * Whether a regular room can choose the mode. The training's cannot: the create form does not
+ * offer it and the regular create request refuses it. A new mode does not compile until it says.
+ */
+const CHOOSABLE = {
+  bataie: true,
+  frico: true,
+  culine: true,
+  cjar: true,
+  tampieste: true,
+  dutrine: false
+} as const satisfies Record<ModeId, boolean>
+
+/** A mode a regular room can be created with. */
+export type RoomModeId = { [K in ModeId]: (typeof CHOOSABLE)[K] extends true ? K : never }[ModeId]
+
+const isRoomMode = (id: ModeId): id is RoomModeId => CHOOSABLE[id]
+
+/** The modes a regular room can choose, in the order of `MODES`. */
+export const ROOM_MODE_IDS: readonly RoomModeId[] = MODE_IDS.filter(isRoomMode)
+
+/**
+ * The objective in force: which objective system plays. At most one at a time.
+ * `placute` is the hill of Re de Plaçute, `storm` the Tampieste's closing circle.
+ */
+export type ObjectiveId = "none" | "frico" | "placute" | "cjar" | "storm"
+
+/** The objective each mode puts in force when the room is made. */
+export const MODE_OBJECTIVE = {
+  bataie: "none",
+  frico: "frico",
+  culine: "placute",
+  cjar: "cjar",
+  tampieste: "storm",
+  /** The training puts in force the objective of the station it is at. */
+  dutrine: "none"
+} as const satisfies Record<ModeId, ObjectiveId>
 
 /**
  * Quick chat (V key): sent as chat text, so it stays in Friulian for

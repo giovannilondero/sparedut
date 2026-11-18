@@ -4,7 +4,7 @@
  */
 import type { MapDef, Spawn, Team } from "../map.ts"
 import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../weapons.ts"
-import type { Ammo, ArsenalValue, RulesValue, StatsValue, TurretState } from "./schema.ts"
+import type { Ammo, ArsenalValue, CartValue, FlagState, HillValue, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
 
 export const MAX_HP = 100
 export const MAX_ARMOR = 100
@@ -68,6 +68,16 @@ export function stormAt(map: MapDef, rules: RulesValue, start: number, tick: num
   return { x, z, radius: far + (STORM_MIN_RADIUS - far) * k }
 }
 
+/** The safe circle of a storm on its own course (the training's): it closes from the course's start, then holds. */
+export function stormOnCourse(course: StormCourseValue, tick: number): StormValue {
+  const k = Math.min(1, Math.max(0, (tick - course.start) / Math.max(1, course.ticks)))
+  return { x: course.x, z: course.z, radius: course.from + (course.to - course.from) * k }
+}
+
+/** The safe circle now: on its own course when one is set, else from the match clock (`stormAt`), as in every regular room. */
+export const stormNow = (map: MapDef, rules: RulesValue, matchStart: number, course: StormCourseValue | null, tick: number): StormValue =>
+  course ? stormOnCourse(course, tick) : stormAt(map, rules, matchStart, tick)
+
 export const outsideStorm = (storm: StormValue, p: { x: number; z: number }) => (p.x - storm.x) ** 2 + (p.z - storm.z) ** 2 > storm.radius * storm.radius
 
 // --- Spingi il Cjar ------------------------------------------------------------------------
@@ -114,6 +124,15 @@ export const owned = (a: ArsenalValue, id: WeaponId) =>
 
 /** The weapon a number key selects: the one in that slot the player owns (in slot 1, the primary), or null. */
 export const weaponInSlot = (a: ArsenalValue, slot: Slot): WeaponId | null => WEAPON_IDS.find((id) => WEAPONS[id].slot === slot && owned(a, id)) ?? null
+
+/** Each objective's state as a match starts it, and as the training puts it in force: both frico at their bases, the plaçute free, the cjar at the start of its track. */
+export const FRESH_FLAGS: Readonly<Record<Team, FlagState>> = { benandanti: { _tag: "base" }, malandanti: { _tag: "base" } }
+export const FRESH_HILL: HillValue = { owner: null, contested: false, ticks: 0 }
+export const FRESH_CART: CartValue = { d: 0, pushers: 0, contested: false, idle: 0 }
+
+/** The station the trainee is at, arriving or on one of its steps (an index in `STATION_IDS`); null outside a training or once it is complete. */
+export const currentStation = (training: { readonly _tag: "Off" | "Complete" } | { readonly _tag: "Arriving" | "Step"; readonly station: number }): number | null =>
+  training._tag === "Arriving" || training._tag === "Step" ? training.station : null
 
 /** Cool, free turrets and intact doors: how they are at match start. */
 export const freshTurrets = (map: MapDef): TurretState[] => map.turrets.map(() => ({ gunner: null, heat: 0, jammed: false, cooldown: 0 }))

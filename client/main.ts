@@ -19,6 +19,11 @@ import { loadDetailed } from "./models/detailed.ts"
 import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
 import { BrowserHostConnection } from "./offline.ts"
+import { registerServiceWorker } from "./offline-cache/register.ts"
+import { keepVerFilesOnceControlled, lookToShow, verState } from "./offline-cache/ver.ts"
+import { SelfUpdate } from "./offline-cache/self-update.ts"
+import { loadNewVersion, watchNewVersion } from "./offline-cache/update.ts"
+import { addsToHomeScreenByHand, keepStorage, runsInstalled } from "./installed.ts"
 import { Link } from "./connection.ts"
 import { PerfMonitor } from "./perf.ts"
 import { loadSettings, saveSettings } from "./settings.ts"
@@ -37,7 +42,16 @@ renderer.toneMappingExposure = 1.05
 // The draw call and triangle count covers world and weapon: the frame resets it.
 renderer.info.autoReset = false
 const perf = new PerfMonitor(renderer)
-const look = createLook(lookFromUrl(), renderer)
+const chosenLook = lookFromUrl()
+// Vêr chosen with no network and never fetched: Cumò for this page, and the saved choice kept,
+// so Vêr comes back by itself once it can load (`client/offline-cache/ver.ts`). Asked only when
+// the browser says it is offline: online, the boot waits for nothing (and the `load` listeners
+// below are added before the page's `load`, which a top-level await can let pass).
+const shownLook = lookToShow(
+  chosenLook,
+  chosenLook === "ver" && !navigator.onLine ? await verState({ caches: "caches" in globalThis ? caches : undefined, fetch: (url, init) => fetch(url, init) }) : "reachable"
+)
+const look = createLook(shownLook.look, renderer)
 
 /** The maximum pixel ratio per quality; dynamic resolution goes down to `minRatio`. */
 const maxRatio = () => Math.min(devicePixelRatio, settings.quality === "alta" ? 2 : settings.quality === "media" ? 1.5 : 1)
@@ -95,6 +109,14 @@ if (look.id === "ver")
     }
     viewmodel.remodel(id, model)
   })
+// On the first visit Vêr's files arrive before the service worker controls the page: kept once it does.
+if (look.id === "ver" && import.meta.env.PROD)
+  keepVerFilesOnceControlled({
+    container: navigator.serviceWorker as ServiceWorkerContainer | undefined,
+    fetched: () => performance.getEntriesByType("resource").map((entry) => entry.name),
+    fetch: (url) => fetch(url),
+    origin: location.origin
+  })
 const audio = createAudio()
 audio.setVolumes(settings.master, settings.music)
 onViewportChange(() => viewport() !== sized && resize())
@@ -127,6 +149,25 @@ const browserHostConnection = new BrowserHostConnection()
 /** What the game talks to: the server, or the browser's host while in an Offline room. */
 const link = new Link([net, browserHostConnection])
 const offline = () => link.uses(browserHostConnection)
+// After one visit online the game opens with no network (`client/offline-cache/`): production
+// build only, after the page has loaded so the worker's downloads don't compete with the boot.
+// `navigator.serviceWorker` is missing over plain http on a LAN address: the game plays as before.
+const serviceWorkers = navigator.serviceWorker as ServiceWorkerContainer | undefined
+const registration = new Promise<ServiceWorkerRegistration | null>((resolve) => {
+  const register = () => resolve(registerServiceWorker({ production: import.meta.env.PROD, container: serviceWorkers }))
+  // The top-level await for Vêr with no network (above) can let `load` pass before this line.
+  if (document.readyState === "complete") register()
+  else addEventListener("load", register, { once: true })
+})
+/** A cached game too old for the server updates itself; a match or an Offline room is never cut. */
+const selfUpdate = new SelfUpdate({
+  registration,
+  container: serviceWorkers,
+  session: sessionStorage,
+  reload: () => location.reload(),
+  tell: (notice) => toast(t().tooOld[notice]),
+  playing: () => Boolean(game?.active) || offline()
+})
 browserHostConnection.onError = (error) => {
   console.error("The Offline room's host failed:", error)
   toast(t().net.offlineFailed)
@@ -179,6 +220,16 @@ const menu = new Menu(settings, audio, {
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
     net.send({ t: "create", ...o, primary: settings.primary })
   },
+  training: (start) => {
+    // Like an Offline room: in this page, with or without the game server, entered from the tap.
+    game?.requestFullscreen()
+    autostart = false
+    roomPassword = null
+    forgetRoomAddress()
+    link.use(browserHostConnection)
+    browserHostConnection.open(settings.name)
+    browserHostConnection.send({ t: "training", primary: settings.primary, ...start })
+  },
   mapChanged: (id) => {
     if (!game?.active) loadMap(id)
   },
@@ -188,8 +239,12 @@ const menu = new Menu(settings, audio, {
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
     sendJoin(code, password)
   },
-  settingsChanged: persist
+  settingsChanged: persist,
+  install: promptInstall,
+  // The menu asks only from the menu: never over a match.
+  update: () => void registration.then((reg) => loadNewVersion(reg, serviceWorkers, () => location.reload()))
 }, look.id)
+if (shownLook.fellBack) toast(t().net.verOffline)
 
 /** Public address announced by the server: used for invite links when playing from localhost. */
 let publicUrl: string | null = null
@@ -197,6 +252,8 @@ const inviteBase = () => `${publicUrl && isLocalHost(location.hostname) ? public
 
 /** The home screen's one-tap match against the bots starts right away, without warm-up. */
 let autostart = false
+/** What to do once the room is left (its `left` message): a match asked for while leaving waits for it. */
+let afterLeft: (() => void) | null = null
 const physicsReady = initPhysics().then(() => {
   game = new Game({
     renderer,
@@ -213,6 +270,11 @@ const physicsReady = initPhysics().then(() => {
     createAvatar,
     saveSettings: () => saveSettings(settings),
     onLeave: backToMenu,
+    leaveForOneTap: () => {
+      afterLeft = () => menu.oneTap()
+      link.send({ t: "leave" })
+      backToMenu()
+    },
     inviteBase,
     roomPassword: () => roomPassword
   })
@@ -242,12 +304,15 @@ function backToMenu() {
   game?.stop()
   menu.show(true)
   audio.menuMusic(true)
+  selfUpdate.atMenu()
 }
 
 link.on((msg: ServerMessage) => {
   switch (msg.t) {
     case "welcome":
       publicUrl = msg.publicUrl
+      // Only the game server's word counts: the in-browser host is this very build, it always accepts.
+      if (!offline()) selfUpdate.welcomed()
       return
     case "public":
       publicUrl = msg.url
@@ -271,10 +336,17 @@ link.on((msg: ServerMessage) => {
       roomPassword = null
       forgetRoomAddress()
       backToMenu()
+      if (afterLeft) {
+        const then = afterLeft
+        afterLeft = null
+        then()
+      }
       return
     case "error":
       // A password room: ask for it, saying why when the last one did not work.
       if (msg.code === "passwordRequired" || msg.code === "wrongPassword" || msg.code === "tooManyAttempts") menu.hostRefused(joining, msg.code)
+      // Too old for the server: fetch the new version and reload into it, once (or say why not).
+      else if (msg.code === "version") selfUpdate.refused()
       else toast(t().errors[msg.code])
       return
   }
@@ -345,7 +417,7 @@ const loop = (now: number) => {
     game?.menuFrame()
     world.menuCamera(time, camera)
     camera.updateMatrixWorld()
-    world.update(dt, time, { pickups: [], flags: null, hill: null, cart: null, storm: null, turrets: [], doors: [], camera })
+    world.update(dt, time, { pickups: [], flags: null, hill: null, cart: null, storm: null, turrets: [], doors: [], gates: [], camera })
     fx.update(dt, camera)
     renderer.info.reset()
     look.render(scene, camera)
@@ -366,3 +438,32 @@ requestAnimationFrame(() =>
     setTimeout(() => loader.remove(), 1000)
   })
 )
+
+// Installed, the game asks the browser to keep its storage (cache, settings, training progress):
+// at every start, since the browser may only grant it later, and in the tab that installs it.
+const storage = navigator.storage as StorageManager | undefined
+const installed = runsInstalled({ matchMedia: (q) => matchMedia(q), fullscreenElement: document.fullscreenElement, standalone: (navigator as { standalone?: boolean }).standalone })
+void keepStorage({ installed, storage })
+addEventListener("appinstalled", () => void keepStorage({ installed: true, storage }), { once: true })
+
+// The menu's install entry: the browser's own prompt where it has one, how to do it by hand on
+// iPhone and iPad, nothing once installed. Then its update notice when a new version waits.
+/** `beforeinstallprompt`, which no TypeScript library describes yet. */
+interface InstallPromptEvent extends Event {
+  prompt(): Promise<unknown>
+}
+/** The browser's install prompt, kept for the entry's tap: it can be shown once. */
+let installPrompt: InstallPromptEvent | null = null
+menu.installSurroundings({ installed, byHand: addsToHomeScreenByHand(navigator) })
+addEventListener("beforeinstallprompt", (e) => {
+  // The browser's own banner stays away: the menu offers it.
+  e.preventDefault()
+  installPrompt = e as InstallPromptEvent
+  menu.installOffered()
+})
+addEventListener("appinstalled", () => menu.installed())
+function promptInstall() {
+  void installPrompt?.prompt().catch((error: unknown) => console.warn("install prompt refused", error))
+  installPrompt = null
+}
+void registration.then((reg) => reg && watchNewVersion(reg, () => Boolean(serviceWorkers?.controller), () => menu.newVersionWaiting()))

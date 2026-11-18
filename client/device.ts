@@ -1,9 +1,7 @@
-/**
- * The input devices a player can hold: keyboard and mouse, a controller, or touch. The active
- * one is whichever was used last (`Controls.device`); prompts name its controls.
- */
-export const DEVICES = ["keyboard", "pad", "touch"] as const
-export type Device = (typeof DEVICES)[number]
+/** The input devices (defined in `shared/devices.ts`, where the training's step table reads them too). */
+import type { Device } from "../shared/devices.ts"
+
+export { DEVICES, type Device } from "../shared/devices.ts"
 
 /** The device a pointer belongs to: a finger or a pen is touch, a mouse goes with the keyboard. */
 export const pointerDevice = (pointerType: string): Device | null =>

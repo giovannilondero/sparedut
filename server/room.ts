@@ -20,10 +20,14 @@ import {
   type RoomAccess,
   type Snapshot
 } from "../shared/protocol.ts"
-import { createSim, type GameEvent, type Sim, type WorldView } from "../shared/sim/index.ts"
+import { createSim, type GameEvent, type PostValue, type Sim, type WorldView } from "../shared/sim/index.ts"
+import { isTraining, TRAINING, type StationId } from "../shared/training/index.ts"
+import type { StationBot } from "../shared/training/station.ts"
+import type { TrainingStart } from "../shared/training/start.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 import { BotBrain } from "./bot.ts"
 import { navGraph } from "./nav.ts"
+import { botsOf, FoeBrain, postOf, RouteBrain, stationGraph, stationOf, type Brain } from "./station-bot.ts"
 
 /** Pending commands per player: beyond this the client is running ahead and the old ones are dropped. */
 const MAX_QUEUE = 20
@@ -31,6 +35,8 @@ const MAX_QUEUE = 20
 const STEPS_PER_TICK = 3
 /** Steps that can accumulate during lag, to be caught up afterwards. */
 const MAX_CREDIT = 12
+/** What a station's bot carries: a bot that fires uses it. */
+const STATION_BOT_PRIMARY: PrimaryId = "cramar"
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
 export interface Member {
@@ -54,6 +60,9 @@ export type RoomSettings = Reached<RoomAccess> & {
   readonly ff: boolean
 }
 
+/** A training's settings: the request fixes them all. Always Offline, on the fair, in the Dutrine. */
+export const TRAINING_ROOM: RoomSettings = { reach: "offline", mode: TRAINING.mode, map: TRAINING.map, minutes: 0, level: "zovin", ff: false }
+
 let botCounter = 0
 
 export class Room {
@@ -61,6 +70,10 @@ export class Room {
   readonly sim: Sim
   readonly members = new Map<string, Member>()
   private bots = new Map<string, BotBrain>()
+  /** A training's bots: the current station's, kept present by `keepStationBots`. */
+  private stationBots = new Map<string, Brain>()
+  /** The station whose bots are present. */
+  private botsFor: StationId | null = null
   private events: GameEvent[] = []
   /**
    * Joins the simulation has not taken yet: it takes them at the next step. A member who leaves
@@ -76,12 +89,19 @@ export class Room {
     public hostId: string,
     public hostName: string,
     readonly networkKey: string,
-    readonly settings: RoomSettings
+    readonly settings: RoomSettings,
+    /** A training's start, from its request (`shared/training/start.ts`). */
+    start?: TrainingStart
   ) {
     this.level = settings.level
     this.physics = createPhysicsWorld(MAPS[settings.map])
-    this.sim = createSim({ mode: settings.mode, minutes: settings.minutes, friendlyFire: settings.ff, seed: Math.floor(Math.random() * 2 ** 31), physics: this.physics })
+    this.sim = createSim({ mode: settings.mode, minutes: settings.minutes, friendlyFire: settings.ff, seed: Math.floor(Math.random() * 2 ** 31), physics: this.physics, ...(start ? { training: start } : {}) })
     this.world = this.sim.view()
+  }
+
+  /** A training: one player, a Benandante, and no host tools. */
+  get training() {
+    return isTraining(this.settings.mode)
   }
 
   get humans() {
@@ -107,7 +127,7 @@ export class Room {
       if (!bot) return false
       this.removeMember(bot.id)
     }
-    const team = this.smallerTeam()
+    const team = this.training ? "benandanti" : this.smallerTeam()
     this.members.set(id, { id, name, team, bot: false, send, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
     this.arriving.set(id, () => this.sim.join(id, name, team, false, primary))
     return true
@@ -115,14 +135,23 @@ export class Room {
 
   addBot(team: Team) {
     if (this.full) return
-    const used = new Set([...this.members.values()].map((m) => m.name))
-    const name = BOT_NAMES[team].find((n) => !used.has(n)) ?? `${BOT_NAMES[team][0]} ${++botCounter}`
-    const id = `bot-${++botCounter}`
     const primaries: PrimaryId[] = ["cramar", "cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis", "cramar"]
-    const primary = primaries[botCounter % primaries.length]
-    this.members.set(id, { id, name, team, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
+    const id = this.seatBot(team, (n) => primaries[n % primaries.length], null)
     this.bots.set(id, new BotBrain(id, this.level, navGraph(this.physics), this.physics, botCounter))
-    this.arriving.set(id, () => this.sim.join(id, name, team, true, primary))
+  }
+
+  /**
+   * A bot's seat in the room: a new id, a name of its team no member has, its member record, and
+   * its join at the next step with the primary `primaryFor` its number picks and its post, if any.
+   */
+  private seatBot(team: Team, primaryFor: (n: number) => PrimaryId, post: PostValue | null): string {
+    const id = `bot-${++botCounter}`
+    const used = new Set([...this.members.values()].map((m) => m.name))
+    const name = BOT_NAMES[team].find((n) => !used.has(n)) ?? `${BOT_NAMES[team][0]} ${botCounter}`
+    const primary = primaryFor(botCounter)
+    this.members.set(id, { id, name, team, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
+    this.arriving.set(id, () => this.sim.join(id, name, team, true, primary, post))
+    return id
   }
 
   removeBot(team: Team) {
@@ -140,6 +169,7 @@ export class Room {
     if (!m) return
     this.members.delete(id)
     this.bots.delete(id)
+    this.stationBots.delete(id)
     if (!this.arriving.delete(id)) this.sim.leave(id)
     if (this.hostId === id) {
       const next = this.humans[0]
@@ -207,8 +237,10 @@ export class Room {
       }
     }
     for (const [id, brain] of this.bots) this.sim.input(id, brain.think(this.world))
+    for (const [id, brain] of this.stationBots) this.sim.input(id, brain.think(this.world))
     const events = this.sim.step()
     this.world = this.sim.view()
+    const swapped = this.training && this.keepStationBots()
     for (const e of events) {
       this.events.push(e)
       // Bots are furlans: now and then they comment.
@@ -218,11 +250,37 @@ export class Room {
     }
     if (this.world.tick % SNAPSHOT_EVERY === 0) this.sendSnapshots()
     if (this.world.tick % 60 === 0) this.broadcast({ t: "board", rows: this.board() })
+    // The roster names and colours the bodies the client draws from the snapshots: it must have the
+    // new bots before the first snapshot that brings them, or they are drawn nameless in the wrong colours.
+    if (swapped) this.broadcast({ t: "room", room: this.info() })
   }
 
   get tick() {
     return this.world.tick
   }
+
+  /**
+   * A training: the current station's bots are present, and no other's. They join at the next step.
+   * True when a bot left or came: the members must be told, or the client keeps drawing the old
+   * station's bots where they last stood.
+   */
+  private keepStationBots(): boolean {
+    const station = stationOf(this.world)
+    if (station === this.botsFor) return false
+    const left = this.stationBots.size
+    for (const id of [...this.stationBots.keys()]) this.removeMember(id)
+    this.botsFor = station
+    if (station) for (const bot of botsOf(station)) this.addStationBot(station, bot)
+    return left + this.stationBots.size > 0
+  }
+
+  private addStationBot(station: StationId, bot: StationBot) {
+    const post = postOf(station, bot)
+    const id = this.seatBot(bot.team, () => STATION_BOT_PRIMARY, post)
+    const route = new RouteBrain(id, bot.route, post.yaw)
+    this.stationBots.set(id, bot.fires ? new FoeBrain(new BotBrain(id, this.level, stationGraph(navGraph(this.physics), station), this.physics, botCounter), route) : route)
+  }
+
 
   private sendSnapshots() {
     const w = this.world
@@ -254,6 +312,7 @@ export class Room {
       t: "snap",
       tick: w.tick,
       phase: w.phase,
+      objective: w.objective,
       score: w.score,
       flags: w.flags,
       hill: w.hill,
@@ -264,6 +323,7 @@ export class Room {
       pickups: w.pickups.map((p) => (p ? "1" : "0")).join(""),
       proj: w.projectiles.map((p) => [p.kind, r2(p.x), r2(p.y), r2(p.z)] as const),
       players: others,
+      training: w.training,
       ev: this.events
     }
     this.events = []
@@ -325,7 +385,7 @@ export class Room {
       map: this.settings.map,
       ...shownReach(this.settings),
       players: this.humans.length,
-      bots: this.bots.size,
+      bots: this.bots.size + this.stationBots.size,
       max: MAX_PLAYERS,
       phase: this.world.phase.tag
     }

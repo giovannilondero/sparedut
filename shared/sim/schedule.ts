@@ -1,6 +1,7 @@
 /** One simulation tick, in the order things happen. */
 import { ApplyDamage } from "./systems/damage.ts"
 import { BreakDoors } from "./systems/doors.ts"
+import { CloseGates } from "./systems/gates.ts"
 import { ApplyInputs } from "./systems/input.ts"
 import { MedicAura } from "./systems/medic.ts"
 import { HandleJoin, HandleLeave, HandleTeamChanges } from "./systems/lobby.ts"
@@ -11,6 +12,7 @@ import { PlayObjectives } from "./systems/objectives.ts"
 import { FlyProjectiles } from "./systems/projectiles.ts"
 import { Respawn } from "./systems/respawn.ts"
 import { StormDamage } from "./systems/storm.ts"
+import { PlayTraining } from "./systems/training.ts"
 import { MountTurrets } from "./systems/turrets.ts"
 import { UseWeapons } from "./systems/weapons.ts"
 import { Game } from "./schema.ts"
@@ -25,6 +27,7 @@ export const simulate = Game.Schedule(
   MatchFlow,
   Respawn,
   MountTurrets,
+  CloseGates,
   MovePlayers,
   UseWeapons,
   FlyProjectiles,
@@ -35,6 +38,7 @@ export const simulate = Game.Schedule(
   RecordHistory,
   CollectPickups,
   PlayObjectives,
+  PlayTraining,
   Game.Schedule.applyDeferred(),
   Game.Schedule.applyStateTransitions()
 )

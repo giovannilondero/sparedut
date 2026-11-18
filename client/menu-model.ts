@@ -3,17 +3,17 @@
  * code and the password being typed, the latest room list. It turns choices into requests and says
  * why a request is refused; the menu's DOM renders it and forwards the player's events to it.
  */
-import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "../shared/folklore.ts"
-import type { MapId } from "../shared/map.ts"
-import { MAP_IDS } from "../shared/maps/index.ts"
+import { BOT_LEVEL_IDS, ROOM_MODE_IDS, type BotLevel, type RoomModeId } from "../shared/folklore.ts"
+import { ROOM_MAP_IDS, type RoomMapId } from "../shared/maps/index.ts"
 import { ACCESSES, MAX_BOTS, Password, REACHES, RoomCode, type Access, type ErrorCode, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 import type { Lang } from "./i18n.ts"
-import { oneTapRoom, type Settings } from "./settings.ts"
+import type { TrainingStart } from "../shared/training/start.ts"
+import { oneTapRoom, trainingCompleted, trainingStart, type Settings, type TrainingInvitation } from "./settings.ts"
 
 export type CreateOptions = Reached<RoomAccess> & {
-  readonly mode: ModeId
-  readonly map: MapId
+  readonly mode: RoomModeId
+  readonly map: RoomMapId
   readonly minutes: number
   readonly bots: number
   readonly level: BotLevel
@@ -35,6 +35,12 @@ export type MenuRequest =
   | { readonly t: "create"; readonly room: CreateOptions; readonly oneTap: boolean }
   /** `password` only once the player typed one. */
   | { readonly t: "join"; readonly code: string; readonly password?: string }
+  /** The training: always Offline, its map and mode fixed. */
+  | { readonly t: "training"; readonly start: TrainingStart }
+  /** The browser's own install prompt, opened from the install entry. */
+  | { readonly t: "install" }
+  /** The waiting new version takes over and the page reloads into it. */
+  | { readonly t: "update" }
 
 /** The answer to a choice: a request to send, a reason the screen shows, or only a new state to draw. */
 export type Outcome =
@@ -69,8 +75,8 @@ const REACH_PLACE = { lan: 0, online: 1, offline: 2 } as const satisfies Record<
 
 /** What creation offers, from the sets the game defines: a new mode or map appears here by itself. */
 export const MENU_OPTIONS = {
-  modes: MODE_IDS,
-  maps: MAP_IDS,
+  modes: ROOM_MODE_IDS,
+  maps: ROOM_MAP_IDS,
   levels: BOT_LEVEL_IDS,
   reaches: [...REACHES].sort((a, b) => REACH_PLACE[a] - REACH_PLACE[b]),
   accesses: ACCESSES,
@@ -81,8 +87,8 @@ export const MENU_OPTIONS = {
 
 /** Creation's choices as they stand. */
 export interface Choices {
-  readonly mode: ModeId
-  readonly map: MapId
+  readonly mode: RoomModeId
+  readonly map: RoomMapId
   readonly minutes: number
   readonly bots: number
   readonly level: BotLevel
@@ -106,13 +112,48 @@ export function focusOnScreen(from: Screen, to: Screen): "first" | Screen | null
 /** The screens a player cannot reach without a name: they create or join a room. */
 const NEED_NAME: ReadonlySet<Screen> = new Set(["create", "password"])
 
+/**
+ * Where installing the game stands. `offered`: the browser offers its install prompt.
+ * `byHand`: it has none, but the game can be added to the home screen from its share menu (Safari
+ * on iPhone and iPad). `unavailable`: neither, or the prompt was used and not offered again yet.
+ * `installed`: this page runs installed, or installed the game.
+ */
+type Installing = "unavailable" | "offered" | "byHand" | "installed"
+
+/** What the home screen shows to install the game: a button that opens the prompt, how to do it by hand, or nothing. */
+export const INSTALL_ENTRIES = ["button", "instructions", "hidden"] as const
+export type InstallEntry = (typeof INSTALL_ENTRIES)[number]
+
+const INSTALL_ENTRY = { unavailable: "hidden", offered: "button", byHand: "instructions", installed: "hidden" } as const satisfies Record<Installing, InstallEntry>
+
+/** A new version of the game: none, downloaded and waiting, or asked to take over (the page reloads). */
+type NewVersion = "none" | "waiting" | "loading"
+
+/** The menu's notice of a new version: never over a match. */
+export const UPDATE_NOTICES = ["hidden", "shown", "loading"] as const
+export type UpdateNotice = (typeof UPDATE_NOTICES)[number]
+
+const UPDATE_NOTICE = { none: "hidden", waiting: "shown", loading: "loading" } as const satisfies Record<NewVersion, UpdateNotice>
+
+/** The home screen's invitation to the training: shown, or gone for good. */
+export const INVITATIONS = ["shown", "hidden"] as const
+export type Invitation = (typeof INVITATIONS)[number]
+
+const INVITATION = { open: "shown", dismissed: "hidden", started: "hidden" } as const satisfies Record<TrainingInvitation, Invitation>
+
+/** The home screen's training entry: the invitation beside it, and the mark of a training completed. */
+export interface TrainingEntry {
+  readonly invitation: Invitation
+  readonly completed: boolean
+}
+
 const NONE: Outcome = { kind: "none" }
 const refused = (reason: Refusal): Outcome => ({ kind: "refused", reason })
 
 export class MenuModel {
   private current: Screen = "home"
-  private mode: ModeId
-  private map: MapId
+  private mode: RoomModeId
+  private map: RoomMapId
   private minutes: number
   private bots: number
   private level: BotLevel
@@ -196,12 +237,12 @@ export class MenuModel {
     this.save()
   }
 
-  chooseMode(mode: ModeId) {
+  chooseMode(mode: RoomModeId) {
     this.mode = mode
   }
 
   /** The map is remembered at once: it becomes the menu's background. */
-  chooseMap(map: MapId) {
+  chooseMap(map: RoomMapId) {
     this.map = map
     this.remembered.lastMap = map
     this.save()
@@ -261,6 +302,26 @@ export class MenuModel {
   oneTap(): Outcome {
     if (!this.remembered.name) return this.needName()
     return { kind: "send", request: { t: "create", room: oneTapRoom(this.remembered), oneTap: true } }
+  }
+
+  /**
+   * The home screen's training (its entry, or the invitation's own button): one tap, nothing to
+   * choose; like any room it needs a name. It resumes at the first station not completed. Started
+   * once, the invitation is not shown again.
+   */
+  training(): Outcome {
+    if (!this.remembered.name) return this.needName()
+    this.change("trainingInvitation", "started")
+    return { kind: "send", request: { t: "training", start: trainingStart(this.remembered.training) } }
+  }
+
+  /** The invitation's "no, thanks": never shown again in this browser. */
+  dismissInvitation() {
+    if (this.remembered.trainingInvitation === "open") this.change("trainingInvitation", "dismissed")
+  }
+
+  get trainingEntry(): TrainingEntry {
+    return { invitation: INVITATION[this.remembered.trainingInvitation], completed: trainingCompleted(this.remembered.training) }
   }
 
   typeCode(text: string) {
@@ -335,6 +396,60 @@ export class MenuModel {
       return refused("passwordBad")
     }
     return { kind: "send", request: { t: "join", code: this.prompt.code, password: password.data } }
+  }
+
+  // ---------------------------------------------------------------- installing and updating the game
+
+  private installing: Installing = "unavailable"
+  private newVersion: NewVersion = "none"
+  /** The menu is on screen: false during a match. */
+  private onScreen = true
+
+  /** What the page found at boot: it runs installed, or it can only be added to the home screen by hand. */
+  installSurroundings(env: { readonly installed: boolean; readonly byHand: boolean }) {
+    this.installing = env.installed ? "installed" : env.byHand ? "byHand" : "unavailable"
+  }
+
+  /** The browser offers its install prompt (`beforeinstallprompt`): again after a refusal, too. */
+  installOffered() {
+    if (this.installing !== "installed") this.installing = "offered"
+  }
+
+  /** The install entry's tap: the browser's prompt opens, and can be used only once. */
+  install(): Outcome {
+    if (this.installing !== "offered") return NONE
+    this.installing = "unavailable"
+    return { kind: "send", request: { t: "install" } }
+  }
+
+  /** The game was installed from this page (`appinstalled`). */
+  installed() {
+    this.installing = "installed"
+  }
+
+  get installEntry(): InstallEntry {
+    return INSTALL_ENTRY[this.installing]
+  }
+
+  /** A new version is downloaded and waits to take over. */
+  newVersionWaiting() {
+    if (this.newVersion === "none") this.newVersion = "waiting"
+  }
+
+  /** The menu is shown (back from a match) or hidden (a match starts). */
+  menuShown(on: boolean) {
+    this.onScreen = on
+  }
+
+  /** The update notice's tap: the new version takes over and the page reloads. Only from the menu, once. */
+  loadNewVersion(): Outcome {
+    if (this.updateNotice !== "shown") return NONE
+    this.newVersion = "loading"
+    return { kind: "send", request: { t: "update" } }
+  }
+
+  get updateNotice(): UpdateNotice {
+    return this.onScreen ? UPDATE_NOTICE[this.newVersion] : "hidden"
   }
 
   private needName(): Outcome {

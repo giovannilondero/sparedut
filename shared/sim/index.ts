@@ -2,15 +2,19 @@
  * A room's simulation, ready for the host: intents in, view and events out.
  */
 import { Random, type HostClock } from "@typeonce/ritmo"
-import { MODES, type ModeId } from "../folklore.ts"
+import { MODE_OBJECTIVE, MODES, type ModeId } from "../folklore.ts"
 import type { PlayerInput } from "../input.ts"
 import type { Team } from "../map.ts"
 import type { PhysicsWorld } from "../physics.ts"
 import type { PrimaryId } from "../weapons.ts"
 import type { GameEvent } from "./events.ts"
-import { freshDoors, freshTurrets } from "./rules.ts"
+import { freshDoors, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL } from "./rules.ts"
 import { simulate } from "./schedule.ts"
-import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, StartMatch, type PickupState } from "./schema.ts"
+import type { Device } from "../devices.ts"
+import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, GoToStation, StartMatch, StepUnavailable, Training, type PickupState, type PostValue } from "./schema.ts"
+import type { InterfaceAction } from "../training/interface.ts"
+import { isTraining, STATION_IDS, type StationId, type StepId } from "../training/index.ts"
+import { arrival, FIRST_START, type TrainingStart } from "../training/start.ts"
 import { ReadOutbox, ViewWorld, type WorldView } from "./view.ts"
 
 export interface SimOptions {
@@ -21,12 +25,17 @@ export interface SimOptions {
   readonly seed: number
   /** The map's physics world: the match map is its map. */
   readonly physics: PhysicsWorld
+  /** A training's start, from its request; a training without one starts at station 1. */
+  readonly training?: TrainingStart
 }
 
 export type Sim = ReturnType<typeof createSim>
 
 /** The room's Ritmo runtime; `debug` is used by the devtools (lint, sessions). */
 export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: HostClock.HostClock }) {
+  // The training has no warm-up and no clock: it is live from the start, at its first station.
+  const training = isTraining(options.mode)
+  const first = arrival(options.training ?? FIRST_START)
   const made = Game.Runtime.make({
     services: Game.Runtime.services(Game.Runtime.service(Physics, options.physics)),
     resources: {
@@ -37,18 +46,23 @@ export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: H
         timeLimitTicks: Math.round(options.minutes * 60 * 60),
         friendlyFire: options.friendlyFire ?? false
       },
+      Objective: MODE_OBJECTIVE[options.mode],
       Tick: 0,
       Score: { benandanti: 0, malandanti: 0 },
-      Flags: { benandanti: { _tag: "base" }, malandanti: { _tag: "base" } },
-      Hill: { owner: null, contested: false, ticks: 0 },
-      Cart: { d: 0, pushers: 0, contested: false, idle: 0 },
+      Flags: FRESH_FLAGS,
+      Hill: FRESH_HILL,
+      Cart: FRESH_CART,
+      StormCourse: null,
       Pickups: options.physics.map.pickups.map((): PickupState => ({ _tag: "up" })),
       Turrets: freshTurrets(options.physics.map),
       Doors: freshDoors(options.physics.map),
       History: [],
       Rng: Random.seed(options.seed)
     },
-    machines: Game.Runtime.machines(Game.Runtime.machine(Match, { _tag: "Warmup" })),
+    machines: Game.Runtime.machines(
+      Game.Runtime.machine(Match, training ? { _tag: "Live", ends: 0 } : { _tag: "Warmup" }),
+      Game.Runtime.machine(Training, training ? { _tag: "Arriving", station: first.station, unlocked: first.unlocked, completed: first.completed, place: "facingStart" } : { _tag: "Off" })
+    ),
     ...(debug ? { debug } : {})
   })
   if (!made.ok) throw new Error(`Invalid simulation: ${JSON.stringify(made.error)}`)
@@ -59,12 +73,22 @@ export function createSim(options: SimOptions) {
   const runtime = makeRuntime(options)
 
   return {
-    join: (session: string, name: string, team: Team, bot: boolean, primary: PrimaryId) => runtime.send(Join, { session, name, team, bot, primary }),
+    /** A player arrives; with a `post`, it always spawns there, with the post's health. */
+    join: (session: string, name: string, team: Team, bot: boolean, primary: PrimaryId, post: PostValue | null = null) =>
+      runtime.send(Join, { session, name, team, bot, primary, post }),
     leave: (session: string) => runtime.send(Leave, { session }),
     input: (session: string, input: PlayerInput) => runtime.send(InputArrived, { session, input }),
     team: (session: string, team: Team) => runtime.send(ChangeTeam, { session, team }),
     primary: (session: string, primary: PrimaryId) => runtime.send(ChangePrimary, { session, primary }),
     start: () => runtime.send(StartMatch, {}),
+    /** The client's report of an interface step: only a training's current step that declares this action takes it. */
+    report: (session: string, action: InterfaceAction) => runtime.send(ReportInterface, { session, action }),
+    /** The client's word that its active device has no control for a step: only a training takes it, for its current step, when the step table agrees. */
+    unavailable: (session: string, station: StationId, step: StepId, device: Device) => runtime.send(StepUnavailable, { session, station, step, device }),
+    /** The trainee goes to a station: only an unlocked one is reached (the current one restarts). */
+    goTo: (session: string, station: StationId) => runtime.send(GoToStation, { session, to: { _tag: "station", station: STATION_IDS.indexOf(station) } }),
+    /** The trainee starts the training over: station 1, the others locked again. */
+    startOver: (session: string) => runtime.send(GoToStation, { session, to: { _tag: "startOver" } }),
     /** Advances one tick and returns the game events it produced. */
     step(): GameEvent[] {
       const ticked = runtime.tick(simulate)
@@ -78,3 +102,4 @@ export function createSim(options: SimOptions) {
 export { simulate }
 export type { WorldView, PlayerView, PhaseView } from "./view.ts"
 export type { GameEvent } from "./events.ts"
+export type { PostValue } from "./schema.ts"

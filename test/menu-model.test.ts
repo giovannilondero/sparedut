@@ -24,6 +24,8 @@ const remembered = (over: Partial<Remembered> = {}): Remembered => ({
   lastBots: 4,
   lastLevel: "pari",
   lastFf: false,
+  training: { done: 0 },
+  trainingInvitation: "open",
   ...over
 })
 
@@ -346,4 +348,92 @@ test("a screen opens on its first control, and going back lands on the home scre
   // Drawn again on the same screen (a language change): focus stays where it is.
   expect(focusOnScreen("settings", "settings")).toBeNull()
   expect(focusOnScreen("home", "home")).toBeNull()
+})
+
+test("the training starts in one tap from the home screen, with nothing to choose", () => {
+  const { model } = menu()
+  expect(model.training()).toEqual({ kind: "send", request: { t: "training", start: { unlocked: 1, from: "look", completed: false } } })
+})
+
+test("the training, like any room, needs a name first", () => {
+  const { model } = menu({ name: "" })
+  expect(model.training()).toEqual({ kind: "refused", reason: "needName" })
+  expect(model.screen).toBe("home")
+})
+
+test("the create form does not offer the training's mode or map", () => {
+  const { model } = menu()
+  expect(model.options.modes).not.toContain("dutrine")
+  expect(model.options.maps).not.toContain("sagre")
+})
+
+// ---------------------------------------------------------------- installing and updating the game
+
+test("the install entry is a button while the browser offers to install, and one tap asks it to", () => {
+  const { model } = menu()
+  model.installSurroundings({ installed: false, byHand: false })
+  expect(model.installEntry).toBe("hidden")
+  model.installOffered()
+  expect(model.installEntry).toBe("button")
+  expect(model.install()).toEqual({ kind: "send", request: { t: "install" } })
+  // The browser's prompt is used once: the entry waits for the browser to offer it again.
+  expect(model.installEntry).toBe("hidden")
+  expect(model.install()).toEqual({ kind: "none" })
+  model.installOffered()
+  expect(model.installEntry).toBe("button")
+})
+
+test("installing needs no name", () => {
+  const { model } = menu({ name: "" })
+  model.installOffered()
+  expect(model.install()).toEqual({ kind: "send", request: { t: "install" } })
+})
+
+test("where the game is added to the home screen by hand, the install entry shows how", () => {
+  const { model } = menu()
+  model.installSurroundings({ installed: false, byHand: true })
+  expect(model.installEntry).toBe("instructions")
+  expect(model.install()).toEqual({ kind: "none" })
+})
+
+test("the install entry is hidden when the game runs installed, whatever the browser offers", () => {
+  for (const byHand of [false, true]) {
+    const { model } = menu()
+    model.installSurroundings({ installed: true, byHand })
+    model.installOffered()
+    expect(model.installEntry).toBe("hidden")
+  }
+})
+
+test("the install entry goes away once the game is installed from this page", () => {
+  const { model } = menu()
+  model.installOffered()
+  model.installed()
+  expect(model.installEntry).toBe("hidden")
+  model.installOffered()
+  expect(model.installEntry).toBe("hidden")
+})
+
+test("no update notice until a new version is waiting; then the menu shows it, and one tap loads it", () => {
+  const { model } = menu()
+  expect(model.updateNotice).toBe("hidden")
+  expect(model.loadNewVersion()).toEqual({ kind: "none" })
+  model.newVersionWaiting()
+  expect(model.updateNotice).toBe("shown")
+  expect(model.loadNewVersion()).toEqual({ kind: "send", request: { t: "update" } })
+  // Loading: said so, and a second tap asks nothing more.
+  expect(model.updateNotice).toBe("loading")
+  expect(model.loadNewVersion()).toEqual({ kind: "none" })
+})
+
+test("the update notice is never shown during a match, and appears on return to the menu", () => {
+  const { model } = menu()
+  model.menuShown(false)
+  model.newVersionWaiting()
+  expect(model.updateNotice).toBe("hidden")
+  expect(model.loadNewVersion()).toEqual({ kind: "none" })
+  model.menuShown(true)
+  expect(model.updateNotice).toBe("shown")
+  model.menuShown(false)
+  expect(model.updateNotice).toBe("hidden")
 })

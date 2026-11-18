@@ -1,10 +1,11 @@
 /**
  * La Tampieste: outside the safe circle the hail hurts. The circle is derived
- * from match time (`stormAt`), it isn't saved.
+ * from match time (`stormAt`), it isn't saved; a training's storm follows its
+ * own course instead (`StormCourse`).
  */
 import { MAPS } from "../../maps/index.ts"
-import { outsideStorm, STORM_DAMAGE, STORM_EVERY, stormAt } from "../rules.ts"
-import { Damage, Game, Life, Match, Motion, Player, Rules, Tick } from "../schema.ts"
+import { outsideStorm, STORM_DAMAGE, STORM_EVERY, stormNow } from "../rules.ts"
+import { Damage, Game, Life, Match, Motion, Objective, Player, Rules, StormCourse, Tick } from "../schema.ts"
 
 export const StormDamage = Game.System(
   "Sparedut/StormDamage",
@@ -12,7 +13,7 @@ export const StormDamage = Game.System(
     queries: {
       players: Game.Query({ selection: { player: Game.Query.read(Player), motion: Game.Query.read(Motion), life: Game.Query.read(Life) } })
     },
-    resources: { tick: Game.System.readResource(Tick), rules: Game.System.readResource(Rules) },
+    resources: { tick: Game.System.readResource(Tick), rules: Game.System.readResource(Rules), objective: Game.System.readResource(Objective), course: Game.System.readResource(StormCourse) },
     events: { damage: Game.System.writeEvent(Damage) },
     machines: { match: Game.System.machine(Match) }
   },
@@ -21,8 +22,8 @@ export const StormDamage = Game.System(
     const match = machines.match.get()
     const rules = resources.rules.get()
     const tick = resources.tick.get()
-    if (match._tag !== "Live" || rules.mode !== "tampieste" || tick % STORM_EVERY !== 0) return
-    const storm = stormAt(MAPS[rules.map], rules, match.ends - rules.timeLimitTicks, tick)
+    if (match._tag !== "Live" || resources.objective.get() !== "storm" || tick % STORM_EVERY !== 0) return
+    const storm = stormNow(MAPS[rules.map], rules, match.ends - rules.timeLimitTicks, resources.course.get(), tick)
     for (const m of queries.players.each()) {
       if (data.life.get(m)._tag !== "Alive" || !outsideStorm(storm, data.motion.get(m).body)) continue
       events.damage.emit({ victim: data.player.get(m).session, attacker: null, amount: STORM_DAMAGE, weapon: "tampieste", head: false, push: null })

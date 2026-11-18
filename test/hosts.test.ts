@@ -4,10 +4,10 @@
  */
 import { beforeAll, describe, expect, test } from "bun:test"
 import { createBrowserHost } from "../client/host.ts"
-import { Hub, type Clock, type Peer } from "../server/hub.ts"
-import { MODE_IDS } from "../shared/folklore.ts"
+import { Hub, type Clock } from "../server/hub.ts"
+import { ROOM_MODE_IDS } from "../shared/folklore.ts"
 import { initPhysics } from "../shared/physics.ts"
-import { PROTOCOL_VERSION, type ServerMessage } from "../shared/protocol.ts"
+import { harness } from "./harness.ts"
 
 beforeAll(() => initPhysics())
 
@@ -23,27 +23,6 @@ const HOSTS_CREATE = {
   offline: { t: "create", mode: "bataie", map: "glemone", minutes: 10, reach: "offline", bots: 2, level: "pari", ff: false, primary: "cramar" }
 }
 
-function harness(make: (clock: Clock) => Hub) {
-  let clock = 0
-  const hub = make(() => clock)
-  const connect = (network = "1.2.3.4") => {
-    const got: ServerMessage[] = []
-    const peer: Peer = { network: { key: network, lan: false }, send: (d) => got.push(JSON.parse(d)), id: null, name: "", room: null }
-    hub.open(peer)
-    const say = (msg: object) => hub.message(peer, JSON.stringify(msg))
-    say({ t: "hello", name: "Toni", version: PROTOCOL_VERSION })
-    return { peer, got, say, last: <T extends ServerMessage["t"]>(t: T) => got.findLast((m) => m.t === t) as Extract<ServerMessage, { t: T }> | undefined }
-  }
-  /** Lets `ticks` ticks of real time pass, in small steps as a timer would. */
-  const play = (ticks: number) => {
-    for (let i = 0; i < ticks; i++) {
-      clock += 1000 / 60 + 1e-6
-      hub.update()
-    }
-  }
-  return { hub, connect, play }
-}
-
 for (const host of HOSTS) {
   describe(host.name, () => {
     const create = { t: "create", mode: "bataie", map: "glemone", minutes: 10, reach: host.reach, ...host.access, bots: 2, level: "pari", ff: false, primary: "cramar" }
@@ -55,6 +34,22 @@ for (const host of HOSTS) {
       const { you } = me.last("joined")!
       // Two a side: the creator counts for their team.
       expect(me.last("room")!.room).toMatchObject({ reach: host.reach, mode: "bataie", map: "glemone", hostId: you, players: 1, bots: 3, level: "pari", ff: false })
+    })
+
+    test("a regular create request on the training's map is refused", () => {
+      const { hub, connect } = harness(host.make)
+      const me = connect()
+      me.say({ ...create, map: "sagre" })
+      expect(me.got.at(-1)).toEqual({ t: "error", code: "invalid" })
+      expect(hub.rooms.size).toBe(0)
+    })
+
+    test("a regular create request in the training's mode is refused", () => {
+      const { hub, connect } = harness(host.make)
+      const me = connect()
+      me.say({ ...create, mode: "dutrine" })
+      expect(me.got.at(-1)).toEqual({ t: "error", code: "invalid" })
+      expect(hub.rooms.size).toBe(0)
     })
 
     test("the host's clock brings snapshots of the creator's own player, thirty a second", () => {
@@ -196,7 +191,7 @@ describe("the in-browser host", () => {
     expect(other.peer.room).toBeNull()
   })
 
-  for (const mode of MODE_IDS) {
+  for (const mode of ROOM_MODE_IDS) {
     test(`an Offline room plays a whole ${mode} match against the bots`, () => {
       const { connect, play } = harness(browser)
       const me = connect()

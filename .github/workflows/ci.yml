@@ -35,6 +35,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm build
+      # Over the build output, so after the build: the service worker's precache list.
+      - run: pnpm test:build
       - name: Deploy to Cloudflare
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.DEPLOY_DOMAIN != ''
         run: pnpm cf:deploy --yes

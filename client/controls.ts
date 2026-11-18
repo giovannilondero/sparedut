@@ -104,7 +104,11 @@ export interface ControlsHandlers {
   onSlot: (slot: Slot) => void
   onLastWeapon: () => void
   onWheel: (dir: 1 | -1) => void
-  onKey: (code: string, down: boolean) => void
+  /**
+   * A key pressed or released (a pad's button under its key's name too). Says whether the game took
+   * the press as its own: the browser's meaning of that key then does not apply, for as long as it is held.
+   */
+  onKey: (code: string, down: boolean) => boolean
   /** Options on the pad: opens or closes the match menu. */
   onPause: () => void
   /** The touch controls changed (a finger landed, moved or lifted): redraw them from the view. */
@@ -128,6 +132,8 @@ export class Controls {
   /** With crouch as a toggle: whether the player stays crouched. */
   private crouched = false
   private keys = new Set<string>()
+  /** The keys held that the game took from the browser on their press: their repeats are the game's too. */
+  private taken = new Set<string>()
   enabled = true
   /** Playing with the pad: no mouse lock to request. */
   padActive = false
@@ -202,11 +208,18 @@ export class Controls {
       if (this.locked && this.enabled) handlers.onWheel(e.deltaY > 0 ? 1 : -1)
     })
     window.addEventListener("keydown", (e) => {
-      if (e.repeat) return
+      if (e.repeat) {
+        // A held key repeats: without this a held Tab would walk the focus through the page, a held Space press what it lands on.
+        if (this.taken.has(e.code)) e.preventDefault()
+        return
+      }
       this.lastUsed = "keyboard"
-      handlers.onKey(e.code, true)
-      if (!this.enabled || !this.locked) return
-      if (e.code === "Tab" || e.code === "Space") e.preventDefault()
+      const playing = this.enabled && this.locked
+      if (handlers.onKey(e.code, true) || (playing && e.code === "Space")) {
+        this.taken.add(e.code)
+        e.preventDefault()
+      }
+      if (!playing) return
       this.keys.add(e.code)
       const b = KEYS[e.code]
       if (b) this.press(b)
@@ -214,11 +227,16 @@ export class Controls {
     })
     window.addEventListener("keyup", (e) => {
       handlers.onKey(e.code, false)
+      this.taken.delete(e.code)
       this.keys.delete(e.code)
       const b = KEYS[e.code]
       if (b && !Object.entries(KEYS).some(([k, v]) => v === b && this.keys.has(k))) this.held.delete(b)
     })
-    window.addEventListener("blur", () => this.releaseAll())
+    window.addEventListener("blur", () => {
+      // A key released while the page was away is never heard: nothing stays taken.
+      this.taken.clear()
+      this.releaseAll()
+    })
   }
 
   /** Turns the view by a look change already in radians, before sensitivity and zoom. */

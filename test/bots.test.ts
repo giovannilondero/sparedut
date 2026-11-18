@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test"
 import { initPhysics } from "../shared/physics.ts"
 import { Room } from "../server/room.ts"
-import { MODE_IDS } from "../shared/folklore.ts"
+import { ROOM_MODE_IDS } from "../shared/folklore.ts"
 
-for (const mode of MODE_IDS) {
+for (const mode of ROOM_MODE_IDS) {
   test(`bots play a match: ${mode}`, async () => {
     await initPhysics()
     const room = new Room("TEST", "nessuno", "Test", "lan", { mode, map: "glemone", minutes: 10, reach: "online", access: { kind: "open" }, level: "pari", ff: false })

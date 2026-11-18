@@ -44,6 +44,12 @@ kbd { font-family: var(--sans); font-size: 0.78em; padding: 0.1em 0.45em; border
 /* The prompt's root holds no box of its own: its parts open in the top layer. */
 #menu > ui-dialog { position: absolute; }
 .brand { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+/* A new version is waiting: a line across the header, under the title, on every screen of the menu. */
+.update-notice { flex: 1 0 100%; min-block-size: 44px; text-align: start; font-weight: 600; color: #1a1208;
+  background: linear-gradient(180deg, #f6d27c, var(--gold)); border-color: var(--gold-deep); }
+.update-notice:hover { background: linear-gradient(180deg, #fbe0a0, #f0c35e); }
+.update-notice:disabled { cursor: progress; opacity: 0.8; }
+.update-notice[hidden] { display: none; }
 .brand-title { margin: 0; font-family: var(--serif); font-weight: 700; font-size: clamp(28px, 1.2rem + 2.6vw, 48px); line-height: 1; letter-spacing: 0.04em;
   background: linear-gradient(180deg, #fff3cf 0%, var(--gold) 55%, var(--gold-deep) 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.45)); }
@@ -217,6 +223,44 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 #announce .sub { display: block; font-size: 0.45em; color: var(--ink); font-style: italic; font-weight: 400; letter-spacing: 0; }
 #announce.pop { animation: pop 2.6s ease-out forwards; }
 @keyframes pop { 0% { opacity: 0; transform: translateX(-50%) scale(1.6); } 10% { opacity: 1; transform: translateX(-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
+#training { position: absolute; top: 14px; left: 14px; max-width: min(360px, 40vw); padding: 8px 12px; background: rgba(10, 8, 6, 0.72); border: 1px solid var(--stone-line); border-radius: 10px; font-size: 14px; display: grid; gap: 4px; }
+#training-station { font-family: var(--serif); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); }
+/* The station's line and its steps' marks share a row, the marks wrapping under it when the row is full. */
+.training-head { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; }
+.step-marks { display: inline-flex; gap: 4px; align-items: center; }
+.step-mark { inline-size: 8px; block-size: 8px; border-radius: 50%; border: 1px solid var(--gold); }
+.step-mark.is-done { background: var(--gold); opacity: 0.6; }
+.step-mark.is-current { background: var(--gold); box-shadow: 0 0 0 2px rgba(10, 8, 6, 0.72), 0 0 0 3px var(--gold); }
+#training-step .count { color: var(--gold); white-space: nowrap; }
+#training-done { color: var(--ben); font-weight: bold; }
+#training-done:empty { display: none; }
+#training-done.pop { animation: rise 0.3s ease-out; }
+/*
+ * A step to do arrives where the player is looking: large above the crosshair and edged in gold,
+ * then it glides to its corner (`Hud.training` sets `announce` when the step changes). While the
+ * game waits for the player to take the controls it waits there too, and arrives once they have.
+ * Under an open match menu it keeps to its corner, and arrives when the menu closes.
+ * On touch the panel is already first in the free area. With reduced motion it does not travel: it
+ * fades out in the middle and in at its place.
+ */
+#training { --mid: translate(calc(50vw - 14px - 50%), calc(30vh - 14px - 50%)) scale(1.6); --call-back: rgba(10, 8, 6, 0.9); --call-glow: 0 0 28px color-mix(in oklch, var(--gold) 35%, transparent); }
+#hud:not(.touch) #training.announce { animation: training-arrive 3.8s; }
+#hud:not(.touch):has(#clickplay:not(.hidden)) #training.announce { animation: none; transform: var(--mid); border-color: var(--gold); background-color: var(--call-back); box-shadow: var(--call-glow); }
+#hud:has(ui-dialog-content.overlay:not([hidden])) #training.announce { animation: none; }
+@keyframes training-arrive {
+  0% { opacity: 0; transform: var(--mid) scale(1.12); animation-timing-function: ease-out; }
+  6% { opacity: 1; transform: var(--mid) scale(1); border-color: var(--gold); background-color: var(--call-back); box-shadow: var(--call-glow); }
+  82% { opacity: 1; transform: var(--mid) scale(1); border-color: var(--gold); background-color: var(--call-back); box-shadow: var(--call-glow); animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1); }
+}
+@keyframes training-arrive-still {
+  0% { opacity: 0; transform: var(--mid); }
+  6%, 82% { opacity: 1; transform: var(--mid); border-color: var(--gold); background-color: var(--call-back); }
+  90% { opacity: 0; transform: var(--mid); }
+  90.01% { opacity: 0; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #hud:not(.touch) #training.announce { animation-name: training-arrive-still; }
+}
 #banner { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); font-size: 14px; background: rgba(10, 8, 6, 0.7); padding: 6px 14px; border-radius: 8px; border: 1px solid var(--stone-line); }
 #banner:empty { display: none; }
 #banner .storm { color: #9fd0ff; animation: storm-pulse 0.8s ease-in-out infinite alternate; }
@@ -337,6 +381,24 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 .overlay-main { display: contents; }
 .overlay > ui-dialog-title, .overlay .overlay-actions { flex: none; }
 .overlay-body { flex: 1 1 auto; min-block-size: 0; overflow-y: auto; overscroll-behavior: contain; }
+/*
+ * A body that scrolls fades out at the edge that still has content (the station list on a phone),
+ * so a row scrolled up reads as going under the edge, not as lying under the title. A row reached
+ * with the keyboard or a pad stops clear of both edges.
+ */
+@property --fade-start { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --fade-end { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@keyframes overlay-edges {
+  from { --fade-start: 0px; --fade-end: 1.5rem; }
+  5%, 95% { --fade-start: 1.5rem; --fade-end: 1.5rem; }
+  to { --fade-start: 1.5rem; --fade-end: 0px; }
+}
+.overlay-body {
+  scroll-padding-block: 1.5rem;
+  animation: overlay-edges linear;
+  animation-timeline: scroll(self block);
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent);
+}
 .overlay .overlay-actions > button { min-block-size: var(--tap); }
 /* A key hint (the back buttons' Esc) and the key legend mean nothing on touch, in the menu as in a match. */
 html[data-device="touch"] :is(#menu, #hud .overlay) kbd, html[data-device="touch"] .keys { display: none; }
@@ -344,6 +406,8 @@ html[data-device="touch"] :is(#menu, #hud .overlay) kbd, html[data-device="touch
 @media (pointer: coarse) {
   .overlay .overlay-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); }
   @container overlay (inline-size <= 40rem) { #pause .overlay-actions > #p-resume { grid-column: 1 / -1; } }
+  /* The training's completion screen: the one-tap match first, across both columns. */
+  @container overlay (inline-size <= 40rem) { #endscreen .training-done > #c-play { grid-column: 1 / -1; order: -1; } }
   /* A wide, short menu (a phone on its side): the roster and the host tools side by side, so the host's controls show without scrolling. */
   @container overlay (inline-size > 40rem) {
     #pause .overlay-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 0 16px; }
@@ -354,6 +418,25 @@ html[data-device="touch"] :is(#menu, #hud .overlay) kbd, html[data-device="touch
     #pause .host-bots button { padding-inline: 4px; font-size: 13px; }
   }
 }
+
+/* The training's match menu: the station list in place of the roster. Its title is ruled off from the
+   list, which scrolls under the rule on a phone, never under the title's words. */
+#pause:has(.station-list) > ui-dialog-title { border-block-end: 1px solid var(--stone-line); padding-block-end: 6px; margin-block-end: 2px; }
+/* The stations read down each column, then on to the next: as many columns as fit, of even length. */
+.station-list { list-style: none; margin: 4px 0 0; padding: 0; columns: 15rem; column-gap: 6px; }
+.station-list > li { break-inside: avoid; }
+.station-list > li + li { margin-block-start: 6px; }
+/* A lock is a taller glyph than a tick: the mark never sets its row's height, so the columns' rows line up. */
+.station-mark { line-height: 1; block-size: 1em; }
+.station-entry { inline-size: 100%; min-block-size: var(--tap); display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: start; font-size: 14px; padding: 6px 10px; }
+.station-entry.is-current { border-color: var(--gold); color: var(--gold); }
+.station-entry.is-done .station-mark { color: var(--gold); }
+.station-entry:disabled { opacity: 0.45; cursor: not-allowed; }
+/* On entering the training: the station that continues, its default choice, says so beside its name. */
+.station-entry.continues { background: color-mix(in srgb, var(--gold) 14%, transparent); }
+.station-continue { margin-inline-start: auto; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+.station-note { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+#p-over.confirm { border-color: #c0392b; color: #ff9d8f; }
 
 /* The match menu. */
 .pause-code { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
@@ -464,7 +547,7 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #hud-free, #hud-status { display: contents; }
 #hud.touch #hud-free { position: absolute; inset-inline-start: var(--free-l); inset-block-start: var(--free-t); inline-size: var(--free-w); block-size: var(--free-h);
   display: flex; flex-direction: column; align-items: center; gap: 4px; }
-#hud.touch :is(#turret-prompt, #turret-hud, #topbar, #killfeed, #banner, #chat) { position: static; inset: auto; transform: none; }
+#hud.touch :is(#turret-prompt, #turret-hud, #topbar, #killfeed, #banner, #chat, #training) { position: static; inset: auto; transform: none; }
 /* The score on one line: the two numbers in their team's colour around the clock. The objective, when the mode has one, on a line under it. */
 #hud.touch #topbar { order: 0; max-inline-size: 100%; flex-wrap: wrap; align-items: baseline; justify-content: center; column-gap: 10px; padding: 2px 12px;
   border-radius: 12px; border: 1px solid var(--stone-line); background: rgba(10, 8, 6, 0.72); }
@@ -499,6 +582,15 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #hud.touch #turret-prompt { order: 4; font-size: 13px; }
 #hud.touch #turret-hud { order: 5; inline-size: min(260px, 100%); padding: 3px 10px; display: flex; align-items: center; gap: 8px; font-size: 13px; }
 #hud.touch #turret-hud .bar { flex: 1; margin: 0; }
+/*
+ * The training's panel on touch: first in the free area, as wide as it allows, never down to the
+ * crosshair (the screen's middle). A training has no score: the empty score bar is not drawn.
+ */
+#hud.touch #training { order: -1; max-inline-size: 100%; max-block-size: calc(50dvh - var(--free-t) - 20px); overflow: hidden; padding: 6px 10px; font-size: 13px; line-height: 1.35; }
+#hud.touch #training-station { font-size: 11px; }
+#hud.touch:has(#training:not(.hidden)) #topbar { display: none; }
+#training-step kbd { white-space: nowrap; }
+#training-step .unavailable { color: var(--muted); font-style: italic; }
 
 /* Health and armour: a ring around each icon, the number beside it (--x/--y/--w/--h from the layout, --hp/--armor from the match). */
 #hud.touch #vitals { inset: auto; inset-inline-start: var(--x); inset-block-start: var(--y); inline-size: var(--w); block-size: var(--h); flex-direction: row; align-items: center; gap: 8px; }
@@ -557,12 +649,37 @@ html.in-match[data-device="touch"] #perf { top: var(--free-t); left: var(--free-
 .home-hero > span { font-size: clamp(21px, 1rem + 1.4vw, 28px); }
 .home-hero.primary small { opacity: 0.85; }
 .home-hero .last { color: #4a3008; opacity: 1; font-weight: 600; }
+/* The training's place among the tiles: its entry, which invites while `data-inviting` is set (Menu.renderTraining). */
+.home-training { display: contents; }
+.training-slot { position: relative; display: grid; min-inline-size: 0; }
+/* The completed mark sits at the tile's foot, whatever the height its row gives it. */
+.training-entry > small { padding-block-end: 8px; }
+.training-done { margin-block-start: auto; font-style: normal; font-size: 12px; font-weight: 700; color: var(--ben); }
+.training-done[hidden], .invite-ribbon[hidden], .invite-close[hidden] { display: none; }
+/* The invitation: the entry itself, gold-edged, a ribbon hung on its top edge and a close button on its corner. */
+[data-inviting] .training-entry { position: relative; border-color: var(--gold); box-shadow: 0 0 18px color-mix(in oklch, var(--gold) 30%, transparent); }
+.invite-ribbon { position: absolute; inset-block-start: -9px; inset-inline-start: 10px; max-inline-size: calc(100% - 44px); padding: 1px 9px; border-radius: 999px;
+  background: var(--gold); color: #1d1408; font-style: normal; font-size: 11px; font-weight: 700; white-space: nowrap; overflow: clip; text-overflow: ellipsis; }
+.invite-close { position: absolute; inset-block-start: -9px; inset-inline-end: -6px; display: grid; place-items: center; inline-size: 28px; block-size: 28px; padding: 0;
+  border-radius: 999px; border-color: var(--gold); background: #1d1813; color: var(--gold); font-size: 16px; line-height: 1; }
+/* A 44px target around a 28px circle. */
+.invite-close::after { content: ""; position: absolute; inset: min(0px, (100% - 44px) / 2); }
+@media (prefers-reduced-motion: no-preference) {
+  [data-inviting] .training-entry { animation: invite-glow 2.6s ease-in-out infinite alternate; }
+}
+@keyframes invite-glow { from { box-shadow: 0 0 6px color-mix(in oklch, var(--gold) 20%, transparent); } to { box-shadow: 0 0 22px color-mix(in oklch, var(--gold) 45%, transparent); } }
 .home-tiles { grid-area: tiles; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; }
 .home-tile { min-inline-size: 0; background-color: var(--stone); border: 1px solid var(--stone-line); border-radius: 12px; }
 .home-tile.big > span { font-size: 19px; }
 .home-tile.big { justify-content: flex-start; }
 .home-tools { grid-area: tools; display: flex; flex-wrap: wrap; gap: 8px; }
 .home-tools button { flex: 1 1 auto; min-block-size: 44px; font-size: 14px; padding: 8px 12px; background: var(--stone); }
+/* Installing the game: a tool among the others, or a line across the tools saying how to do it by hand. */
+.home-tools .install { color: var(--gold); border-color: var(--gold); }
+.install-by-hand { flex: 1 0 100%; margin: 0; padding: 8px 12px; font-size: 14px; line-height: 1.4; color: var(--ink); background: var(--stone);
+  border: 1px dashed var(--stone-line); border-radius: 10px; }
+.install-by-hand::before { content: "📲 "; }
+.home-tools .install[hidden], .install-by-hand[hidden] { display: none; }
 
 /* Join by code: label, letters, button; the letters show in capitals whatever is typed. */
 .code-join { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0; padding: 10px 12px; }

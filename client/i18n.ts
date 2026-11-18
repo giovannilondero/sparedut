@@ -9,8 +9,12 @@
 import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId, Team } from "../shared/map.ts"
 import type { Access, ErrorCode, Reach } from "../shared/protocol.ts"
+import type { StationId } from "../shared/training/index.ts"
 import type { WeaponId } from "../shared/weapons.ts"
 import type { Device } from "./device.ts"
+import type { Notice } from "./offline-cache/too-old.ts"
+import { CONTROL_TEXT, type ControlTexts } from "./training-text/controls.ts"
+import { stepsIn, type StepsIn } from "./training-text/index.ts"
 
 export type Lang = "fur" | "it"
 
@@ -23,10 +27,53 @@ type StaticKey =
   | "ff" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
   | "qHigh" | "autoRes" | "showInfo" | "invert" | "keys" | "vocabTitle" | "connecting" | "chatPh" | "deathTitle" | "deathHint"
   | "language" | "modeLabel" | "mapLabel" | "optionsLabel" | "crouchMode" | "crouchHold" | "crouchToggle"
-  | "accessLabel" | "accessOpen" | "accessPassword" | "passwordLabel" | "passwordTitle"
+  | "accessLabel" | "accessOpen" | "accessPassword" | "passwordLabel" | "passwordTitle" | "training" | "trainingSub"
 
 export interface Strings {
   readonly static: Record<StaticKey, string>
+  /** The training's HUD and announcements. Step instructions are in `client/training-text/`, one file per station. */
+  readonly training: {
+    /** Station `n` of `total`, with its name: the head of the training's panel. */
+    readonly station: Fn<[n: number, total: number, name: string]>
+    /** Which step of the station the player is on, beside the station's step marks. */
+    readonly step: Fn<[n: number, total: number]>
+    readonly stations: Record<StationId, string>
+    readonly steps: StepsIn
+    /** Each control a step names, as each device that has it shows it (markup): `client/training-text/controls.ts`. */
+    readonly controls: ControlTexts
+    /** In place of a step's instruction when the active device has no control for it. */
+    readonly unavailable: string
+    /** A repeated step's count so far. */
+    readonly count: Fn<[done: number, target: number]>
+    /** The brief confirmation of a step done. */
+    readonly stepDone: string
+    readonly stationDone: string
+    readonly complete: string
+    readonly completeSub: string
+    /** The match menu's line in place of the room's reach. */
+    readonly menuLine: string
+    /** The completion screen's way back home (the station list is `stationList`, the one-tap match the home screen's own). */
+    readonly done: { readonly home: string }
+    /** The match menu's station list and its actions (ticket #51). */
+    readonly stationList: string
+    readonly here: string
+    /** On entering the training, the station that continues where the player left off. */
+    readonly continueHere: string
+    /** On entering the training, above the station list: choose where to start. */
+    readonly chooseStation: string
+    readonly locked: string
+    readonly restart: string
+    readonly startOver: string
+    /** The second press that confirms starting over: the saved progress is lost. */
+    readonly startOverSure: string
+    /** The home screen's training entry (ticket #52): its completed mark and the invitation. */
+    readonly entry: {
+      readonly completed: string
+      /** The invitation: the ribbon on the entry itself, and its close button's label. */
+      readonly ribbon: string
+      readonly close: string
+    }
+  }
   readonly teams: Record<Team, { readonly name: string; readonly motto: string }>
   readonly modes: Record<ModeId, { readonly name: string; readonly sub: string; readonly rules: string }>
   readonly maps: Record<MapId, { readonly name: string; readonly sub: string }>
@@ -36,6 +83,16 @@ export interface Strings {
   readonly mine: string
   readonly quality: Record<"bassa" | "media" | "alta", string>
   readonly errors: Record<ErrorCode, string>
+  /** The game is too old for the server (`client/offline-cache/too-old.ts`): updating itself, or why it cannot. */
+  readonly tooOld: Record<Notice, string>
+  /** The installable game in the menu: the install entry and the update notice. */
+  readonly app: {
+    readonly install: string
+    /** How to add the game to the home screen where the browser has no install prompt (iPhone, iPad). */
+    readonly byHand: string
+    readonly update: string
+    readonly updating: string
+  }
   readonly menu: {
     readonly needName: string
     readonly roomsEmpty: string
@@ -77,6 +134,8 @@ export interface Strings {
     readonly lostRetry: string
     /** The host of an Offline room did not start in this browser. */
     readonly offlineFailed: string
+    /** Vêr was chosen, but with no network and never downloaded: Cumò is shown instead. */
+    readonly verOffline: string
   }
   readonly hud: {
     readonly over: string
@@ -286,6 +345,8 @@ const fur: Strings = {
     namePh: "Toni di Glemone",
     oneTap: "Zuie cuintri i bot",
     oneTapSub: "Offline cuintri il computer, ancje cence server",
+    training: "Impare a zuiâ",
+    trainingSub: "La Dutrine a la Sagre dal Frico, ancje cence server",
     create: "Cree une partide",
     createSub: "Offline, te rêt locâl o in linie",
     join: "Jentre cul codiç",
@@ -332,6 +393,47 @@ const fur: Strings = {
     mapLabel: "Mape",
     optionsLabel: "Opzions"
   },
+  training: {
+    station: (n, total, name) => `Stazion ${n} di ${total} · ${name}`,
+    step: (n, total) => `Pas ${n} di ${total}`,
+    stations: {
+      look: "Cjale e cjamine",
+      course: "Il percors",
+      always: "Simpri cun te",
+      switch: "Gambiâ arme",
+      stalls: "Lis bancjarelis",
+      armoury: "La armarie",
+      throw: "Bombis e minis",
+      pickups: "Robe di cjapâ sù",
+      turret: "La torete e il Lanciafrico",
+      medic: "Il miedi",
+      modes: "Lis modalitâts",
+      skirmish: "La scaramucie"
+    },
+    steps: stepsIn("fur"),
+    controls: CONTROL_TEXT.fur,
+    unavailable: "No si pues fâ cun chest dispositîf",
+    count: (done, target) => `${done} di ${target}`,
+    stepDone: "Fat!",
+    stationDone: "Stazion finide",
+    complete: "Dutrine finide!",
+    completeSub: "Cumò tu sâs dut: va a zuiâ",
+    menuLine: "Dutrine · Offline, dome tu",
+    done: { home: "Torne al inizi" },
+    stationList: "Lis stazions",
+    here: "Tu sês culì",
+    continueHere: "Va indenant",
+    chooseStation: "Sielç la stazion di dulà tacâ",
+    locked: "Ancjemò sierade",
+    restart: "Torne a tacâ la stazion",
+    startOver: "Torne a tacâ dal principi",
+    startOverSure: "Sigûr? Tu pierdis dut ce che tu âs fat",
+    entry: {
+      completed: "✓ Finide",
+      ribbon: "Gnûf? Tache di chi",
+      close: "No sta invidâmi plui"
+    }
+  },
   teams: {
     benandanti: { name: "Benandants", motto: "Pal racolt e pe glesie!" },
     malandanti: { name: "Malandants", motto: "La tampieste e je nestre!" }
@@ -361,6 +463,11 @@ const fur: Strings = {
       name: "La Tampieste",
       sub: "Ducj cuintri ducj",
       rules: "Nissune scuadre, une vite sole. La tampieste e strenç: fûr dal cercli la grampe e fâs mâl. L'ultin in pîts al vinç."
+    },
+    dutrine: {
+      name: "Dutrine",
+      sub: "La sagre che e insegne a zuiâ",
+      rules: "Une stazion daûr di chê altre: fâs ogni pas che al ti vegn domandât e la strade si vierç."
     }
   },
   maps: {
@@ -369,7 +476,8 @@ const fur: Strings = {
     trincee: { name: "Trinceis dal Pal Piçul", sub: "La Grande Vuere tes Alps Cjargnelis" },
     venzone: { name: "Vençon", sub: "Il borc dentri lis muris e il Dom di Sant Andree" },
     predil: { name: "Cave dal Predil", sub: "La miniere di Raibl, binaris e carei" },
-    maran: { name: "Lagune di Maran", sub: "Di gnot, sot de lune: la riserve, il bosc e il casot dai fenicotars" }
+    maran: { name: "Lagune di Maran", sub: "Di gnot, sot de lune: la riserve, il bosc e il casot dai fenicotars" },
+    sagre: { name: "Sagre dal Frico", sub: "La fieste dal paîs: lis bancjarelis in file e la place" }
   },
   levels: {
     zovin: { name: "Zovin", sub: "Facil: apene tornât di Udin" },
@@ -414,6 +522,18 @@ const fur: Strings = {
     wrongPassword: "Password sbaliade. Torne a provâ.",
     tooManyAttempts: "Masse password sbaliadis: spiete un pôc e torne a provâ."
   },
+  tooOld: {
+    updating: "Il server al à une version plui gnove dal zûc: le stoi cjamant jù, po la pagjine si torne a cjamâ di bessole.",
+    noWorker: "Version diferente dal server: torne a cjariâ la pagjine.",
+    noUpdate: "Il server al à une version plui gnove, ma no rivi a cjamâle jù. Lis partidis offline a van istès.",
+    stillRefused: "Il server nol acete ancjemò cheste version. Lis partidis offline a van istès: torne a provâ plui tart."
+  },
+  app: {
+    install: "Instale il zûc",
+    byHand: "Par vê il zûc su la schermade di inizi: tocje Condividi e po «Aggiungi alla schermata Home».",
+    update: "E je pronte une version gnove dal zûc: tocje par cjariâle.",
+    updating: "O cjarii la version gnove…"
+  },
   menu: {
     needName: "Prime il non!",
     roomsEmpty: "Nissune partide viarte. Creine une!",
@@ -452,7 +572,8 @@ const fur: Strings = {
     down: "Il server nol rispuint. Isal impiât? (pnpm dev)",
     lost: "Conession pierdude. Mandi!",
     lostRetry: "Conession pierdude: o torni a provâ…",
-    offlineFailed: "No rivi a inviâ la partide offline: torne a cjamâ la pagjine."
+    offlineFailed: "No rivi a inviâ la partide offline: torne a cjamâ la pagjine.",
+    verOffline: "Vêr nol è ancjemò stât discjamât e no tu âs rêt: intant tu viodis Cumò."
   },
   hud: {
     over: "FIN",
@@ -639,6 +760,8 @@ const it: Strings = {
     namePh: "Toni di Gemona",
     oneTap: "Gioca contro i bot",
     oneTapSub: "Offline contro il computer, anche senza server",
+    training: "Impara a giocare",
+    trainingSub: "La Dutrine alla Sagre dal Frico, anche senza server",
     create: "Crea una partita",
     createSub: "Offline, in rete locale o online",
     join: "Entra con codice",
@@ -685,6 +808,47 @@ const it: Strings = {
     mapLabel: "Mappa",
     optionsLabel: "Opzioni"
   },
+  training: {
+    station: (n, total, name) => `Stazione ${n} di ${total} · ${name}`,
+    step: (n, total) => `Passo ${n} di ${total}`,
+    stations: {
+      look: "Guarda e cammina",
+      course: "Il percorso",
+      always: "Sempre con te",
+      switch: "Cambiare arma",
+      stalls: "Le bancarelle",
+      armoury: "L'armeria",
+      throw: "Bombe e mine",
+      pickups: "Cose da raccogliere",
+      turret: "La torretta e il Lanciafrico",
+      medic: "Il medico",
+      modes: "Le modalità",
+      skirmish: "La scaramuccia"
+    },
+    steps: stepsIn("it"),
+    controls: CONTROL_TEXT.it,
+    unavailable: "Non si può fare con questo dispositivo",
+    count: (done, target) => `${done} di ${target}`,
+    stepDone: "Fatto!",
+    stationDone: "Stazione completata",
+    complete: "Dutrine completata!",
+    completeSub: "Ora sai tutto: vai a giocare",
+    menuLine: "Dutrine · Offline, solo tu",
+    done: { home: "Torna all'inizio" },
+    stationList: "Le stazioni",
+    here: "Sei qui",
+    continueHere: "Continua",
+    chooseStation: "Scegli la stazione da cui partire",
+    locked: "Ancora chiusa",
+    restart: "Ricomincia la stazione",
+    startOver: "Ricomincia da capo",
+    startOverSure: "Sicuro? Perdi tutti i progressi",
+    entry: {
+      completed: "✓ Completata",
+      ribbon: "Nuovo? Comincia da qui",
+      close: "Non invitarmi più"
+    }
+  },
   teams: {
     benandanti: { name: "Benandanti", motto: "Per il raccolto e per la chiesa!" },
     malandanti: { name: "Malandanti", motto: "La grandine è nostra!" }
@@ -714,6 +878,11 @@ const it: Strings = {
       name: "La Tampieste",
       sub: "Tutti contro tutti",
       rules: "Niente squadre, una vita sola. La tempesta si stringe: fuori dal cerchio la grandine fa male. L'ultimo in piedi vince."
+    },
+    dutrine: {
+      name: "Dutrine",
+      sub: "La sagra che insegna a giocare",
+      rules: "Una stazione dopo l'altra: fai ogni passo che ti viene chiesto e la strada si apre."
     }
   },
   maps: {
@@ -722,7 +891,8 @@ const it: Strings = {
     trincee: { name: "Trinceis dal Pal Piçul", sub: "La Grande Guerra sulle Alpi Carniche" },
     venzone: { name: "Vençon", sub: "Il borgo murato di Venzone e il Duomo di Sant'Andrea" },
     predil: { name: "Cave dal Predil", sub: "La miniera di Raibl: binari e carrelli" },
-    maran: { name: "Laguna di Marano", sub: "Di notte, sotto la luna: la riserva, il bosco e il capanno dei fenicotteri" }
+    maran: { name: "Laguna di Marano", sub: "Di notte, sotto la luna: la riserva, il bosco e il capanno dei fenicotteri" },
+    sagre: { name: "Sagre dal Frico", sub: "La festa del paese: le bancarelle in fila e la piazza" }
   },
   levels: {
     zovin: { name: "Zovin", sub: "Facile: appena tornato da Udine" },
@@ -767,6 +937,18 @@ const it: Strings = {
     wrongPassword: "Password sbagliata. Riprova.",
     tooManyAttempts: "Troppe password sbagliate: aspetta un attimo e riprova."
   },
+  tooOld: {
+    updating: "Il server ha una versione più nuova del gioco: la sto scaricando, poi la pagina si ricarica da sola.",
+    noWorker: "Versione diversa dal server: ricarica la pagina.",
+    noUpdate: "Il server ha una versione più nuova, ma non riesco a scaricarla. Le partite offline funzionano comunque.",
+    stillRefused: "Il server non accetta ancora questa versione. Le partite offline funzionano comunque: riprova più tardi."
+  },
+  app: {
+    install: "Installa il gioco",
+    byHand: "Per avere il gioco nella schermata Home: tocca Condividi e poi «Aggiungi alla schermata Home».",
+    update: "È pronta una nuova versione del gioco: tocca per caricarla.",
+    updating: "Carico la nuova versione…"
+  },
   menu: {
     needName: "Prima il nome!",
     roomsEmpty: "Nessuna partita aperta. Creane una!",
@@ -805,7 +987,8 @@ const it: Strings = {
     down: "Il server non risponde. È acceso? (pnpm dev)",
     lost: "Connessione persa. Mandi!",
     lostRetry: "Connessione persa: riprovo…",
-    offlineFailed: "Non riesco ad avviare la partita offline: ricarica la pagina."
+    offlineFailed: "Non riesco ad avviare la partita offline: ricarica la pagina.",
+    verOffline: "Vêr non è ancora stato scaricato e non c'è rete: intanto vedi Cumò."
   },
   hud: {
     over: "FINE",

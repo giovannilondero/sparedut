@@ -6,6 +6,13 @@
     <meta name="theme-color" content="#14110f" />
     <title>Sparedût</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Installable: the manifest, and for iOS its own icon and no browser bars once on the home screen. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-180.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Sparedût" />
     <link rel="stylesheet" href="./style.css" />
     <!-- Loading screen: inline styles, so it shows before the CSS and the bundle. -->
     <style>
@@ -43,6 +50,8 @@
         <!-- The look the world is drawn in: chosen here only, never shown over a match. Its buttons are built by Menu.bindLook (client/menu.ts). -->
         <div id="look-switch" class="look-switch" role="group" aria-labelledby="look-label"><span id="look-label"></span></div>
         <div class="lang" role="group" aria-labelledby="lang-label"><span id="lang-label" data-t="language"></span><button data-lang="fur">Furlan</button><button data-lang="it">Italiano</button></div>
+        <!-- A new version is waiting: one tap loads it. Never shown over a match (client/menu-model.ts). -->
+        <button id="update-notice" class="update-notice" hidden></button>
       </header>
 
       <!-- Home: everything at once, the room list beside the actions when there is room for it. -->
@@ -64,8 +73,18 @@
             <button id="j-go" data-t="joinGo"></button>
             <p id="j-msg" class="form-msg" role="alert"></p>
           </form>
-          <!-- The training's place: its entry goes here once the training exists. Nothing is shown or focusable until then. -->
-          <div class="home-training" hidden></div>
+          <!-- The training's place: its entry, with the mark of a training completed. Until it is dismissed
+               or the training started (client/menu-model.ts), the entry itself invites: a ribbon and a close button. -->
+          <div class="home-training" id="home-training">
+            <div class="training-slot">
+              <button class="big home-tile training-entry" data-go="training">
+                <span data-t="training"></span><small data-t="trainingSub"></small>
+                <i class="invite-ribbon" id="invite-ribbon" hidden></i>
+                <i class="training-done" id="training-completed" hidden></i>
+              </button>
+              <button class="invite-close" id="invite-close" hidden>×</button>
+            </div>
+          </div>
         </div>
         <section class="home-rooms" aria-labelledby="rooms-title">
           <h2 id="rooms-title" data-t="roomsTitle"></h2>
@@ -75,6 +94,9 @@
           <button data-go="armarie" data-t="armarie"></button>
           <button data-go="settings" data-t="settings"></button>
           <button data-go="vocabolari" data-t="vocab"></button>
+          <!-- Installing the game: the browser's prompt, or how to add it by hand on iPhone and iPad; nothing once installed. -->
+          <button id="install" class="install" hidden></button>
+          <p id="install-by-hand" class="install-by-hand" hidden></p>
         </nav>
       </div>
 
@@ -222,6 +244,8 @@
       <div id="killfeed"></div>
       <div id="announce"></div>
       <div id="banner"></div>
+      <!-- The training: the station, the step to do, the confirmation of a step done. -->
+      <div id="training" class="hidden" role="status"><div class="training-head"><div id="training-station"></div><span id="training-steps"></span></div><div id="training-step"></div><div id="training-done"></div></div>
 
       <div id="hud-status">
       <div id="vitals">

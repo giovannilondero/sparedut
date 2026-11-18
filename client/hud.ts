@@ -7,9 +7,12 @@ import { FLAG_BIT, type BoardRow, type RoomInfo, type SnapSelf, type Snapshot } 
 import type { KillCause } from "../shared/sim/events.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { WARMUP_TICKS } from "../shared/sim/rules.ts"
+import type { TrainingView } from "../shared/sim/view.ts"
+import { STATION_IDS } from "../shared/training/index.ts"
 import type { Device } from "./device.ts"
 import { t } from "./i18n.ts"
-import { menuControl, playPrompt, turretPrompt } from "./prompts.ts"
+import { menuControl, playPrompt, trainingPrompt, turretPrompt } from "./prompts.ts"
+import { announcesStep, NOT_SHOWN, stepMarksHtml, type PanelPlace } from "./training-panel.ts"
 import { buttonBit, TOUCH_BUTTONS, type Insets, type PickerEntry, type TouchLayout, type TouchView } from "./touch.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -21,6 +24,10 @@ export const fmtClock = (ticks: number) => {
   const s = Math.max(0, Math.ceil(ticks / 60))
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`
 }
+
+/** What the training panel shows, to write it again only when it changes. */
+type PanelShown = PanelPlace & { readonly strings: unknown; readonly count: number; readonly device: Device | null }
+const PANEL_BLANK: PanelShown = { ...NOT_SHOWN, strings: null, count: -1, device: null }
 
 export class Hud {
   private announceTimer = 0
@@ -71,6 +78,57 @@ export class Hud {
     if (this.written.get(`${id}:c:${cls}`) === on) return
     this.written.set(`${id}:c:${cls}`, on)
     $(id).classList.toggle(cls, on)
+  }
+
+  /** What the training panel last showed: it is written again only when one of these changes. */
+  private trainingShown: PanelShown = PANEL_BLANK
+  private trainingDoneTimer = 0
+
+  /**
+   * The training's panel: the station and its number out of the total, its steps as marks (done,
+   * current, to do), the current step's instruction naming its control, and its count when it has
+   * one. A step it was not showing arrives in the middle of the screen before it settles in its
+   * corner (`training-arrive` in style.css). Hidden outside a training, and the next one starts anew.
+   */
+  training(view: TrainingView | null, device: Device) {
+    this.toggle("training", "hidden", view === null)
+    if (view === null) {
+      this.trainingShown = PANEL_BLANK
+      return
+    }
+    const s = t()
+    const station = view.tag === "station" ? view.station : ""
+    const step = view.tag === "station" ? view.step : null
+    const count = view.tag === "station" ? view.count : -1
+    const shown = this.trainingShown
+    if (shown.strings === s && shown.station === station && shown.step === step && shown.count === count && shown.device === device) return
+    this.trainingShown = { strings: s, station, step, count, device }
+    if (view.tag === "complete") {
+      this.text("training-station", s.training.complete)
+      this.html("training-steps", "")
+      this.html("training-step", "")
+      return
+    }
+    this.text("training-station", s.training.station(STATION_IDS.indexOf(view.station) + 1, STATION_IDS.length, s.training.stations[view.station]))
+    this.html("training-steps", stepMarksHtml(view, s))
+    this.html("training-step", trainingPrompt(s, view, device))
+    if (announcesStep(shown, this.trainingShown)) this.restart($("training"), "announce")
+  }
+
+  /** Plays an element's animation from its start, also while it is still playing. */
+  private restart(el: HTMLElement, cls: string) {
+    el.classList.remove(cls)
+    void el.offsetWidth
+    el.classList.add(cls)
+  }
+
+  /** The brief confirmation that a step was done. */
+  trainingDone() {
+    const el = $("training-done")
+    el.textContent = `✓ ${t().training.stepDone}`
+    this.restart(el, "pop")
+    clearTimeout(this.trainingDoneTimer)
+    this.trainingDoneTimer = window.setTimeout(() => (el.textContent = ""), 1600)
   }
 
   show(on: boolean) {
@@ -177,6 +235,19 @@ export class Hud {
   /** `outside`: I'm alive and outside the Tampieste circle. `device`: the active one, whose controls the banner names. */
   top(snap: Snapshot, mode: ModeId, names: Map<string, string>, device: Device, outside = false) {
     const s = t()
+    if (snap.training) {
+      // A training has no score and no clock: its panel says where the trainee is.
+      this.text("name-ben", "")
+      this.text("name-mal", "")
+      this.text("score-ben", "")
+      this.text("score-mal", "")
+      this.text("clock", "")
+      this.text("mode-label", `${s.modes[mode].name} · ${s.modes[mode].sub}`)
+      this.html("objective", this.objectiveLine(snap, names))
+      // The storm's step (#49): outside the ring, the same warning as in La Tampieste.
+      this.html("banner", outside ? `<b class="storm">${s.hud.stormOutside}</b>` : "")
+      return
+    }
     const alone = mode === "tampieste"
     const alive = snap.players.filter((p) => p.f & FLAG_BIT.alive).length
     // In the Tampieste there are no teams: instead of the score, how many are still standing.
@@ -187,8 +258,18 @@ export class Hud {
     const phase = snap.phase
     this.text("clock", phase.tag === "Live" ? fmtClock(phase.ends - snap.tick) : phase.tag === "Warmup" ? fmtClock(WARMUP_TICKS - snap.tick) : s.hud.over)
     this.text("mode-label", alone ? `${s.modes[mode].name} · ${s.modes[mode].sub}` : s.hud.modeLabel(s.modes[mode].name, MODES[mode].scoreLimit))
+    this.html("objective", this.objectiveLine(snap, names))
+    this.html(
+      "banner",
+      phase.tag === "Warmup" ? s.hud.warmup(fmtClock(WARMUP_TICKS - snap.tick), menuControl(device)) : outside ? `<b class="storm">${s.hud.stormOutside}</b>` : ""
+    )
+  }
+
+  /** The state of the objective in force (`snap.objective`), and nothing for any other: in a regular room it is its mode's, in a training the current step's. */
+  private objectiveLine(snap: Snapshot, names: Map<string, string>) {
+    const s = t()
     let obj = ""
-    if (mode === "frico") {
+    if (snap.objective === "frico") {
       obj = (["benandanti", "malandanti"] as const)
         .map((team) => {
           const f = snap.flags[team]
@@ -196,23 +277,19 @@ export class Hud {
           return `<span class="${team === "benandanti" ? "ben" : "mal"}">🧀 ${state}</span>`
         })
         .join(" · ")
-    } else if (mode === "culine") {
+    } else if (snap.objective === "placute") {
       const h = snap.hill
       const color = h.owner ? TEAM_INFO[h.owner].color : "#888"
       const label = h.contested ? s.hud.contested : h.owner ? s.hud.hillOwned(s.teams[h.owner].name) : s.hud.hillFree
       obj = `${label}<div class="hillbar"><i style="width:${((h.ticks % 60) / 60) * 100}%;background:${color}"></i></div>`
-    } else if (mode === "cjar" && snap.cart) {
+    } else if (snap.objective === "cjar" && snap.cart) {
       const c = snap.cart
       const pct = Math.floor(c.progress * 100)
       const state = c.contested ? s.hud.cartStop : c.pushers > 0 ? s.hud.cartPush(c.pushers) : c.back ? s.hud.cartBack : s.hud.cartIdle
       const color = c.contested ? "#ffb347" : TEAM_INFO.benandanti.color
       obj = `${s.hud.cart(pct)} · ${state}<div class="hillbar"><i style="width:${pct}%;background:${color}"></i></div>`
     }
-    this.html("objective", obj)
-    this.html(
-      "banner",
-      phase.tag === "Warmup" ? s.hud.warmup(fmtClock(WARMUP_TICKS - snap.tick), menuControl(device)) : outside ? `<b class="storm">${s.hud.stormOutside}</b>` : ""
-    )
+    return obj
   }
 
   killfeed(k: string | null, v: string, w: KillCause, head: boolean, names: Map<string, string>, teams: Map<string, Team>, me: string, seed: number) {

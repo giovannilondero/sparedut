@@ -1,10 +1,12 @@
 /**
  * Projections of the world into plain data: the only read the host does.
  */
+import type { ObjectiveId } from "../folklore.ts"
 import { trackLength, trackPoint, type V3 } from "../map.ts"
 import { MAPS } from "../maps/index.ts"
+import { STATION_IDS, stepRule, stepsOf, type StationId, type StepId } from "../training/index.ts"
 import type { GameEvent, Winner } from "./events.ts"
-import { CART, stormAt, type StormValue } from "./rules.ts"
+import { CART, stormNow, type StormValue } from "./rules.ts"
 import {
   Arsenal,
   Cart,
@@ -15,6 +17,7 @@ import {
   Life,
   Match,
   Motion,
+  Objective,
   Out,
   Pickups,
   Player,
@@ -22,10 +25,12 @@ import {
   Rules,
   Score,
   Stats,
+  StormCourse,
   TeamOf,
   Tick,
   Turrets,
   Doors,
+  Training,
   type ArsenalValue,
   type FlagState,
   type HillValue,
@@ -74,16 +79,35 @@ export interface CartView {
   readonly back: boolean
 }
 
+/**
+ * The training's progress, as the trainee's HUD shows it: the station, the current step (null
+ * while arriving), how many times its action happened out of how many, and how many stations,
+ * from the first, are unlocked, and whether the training was completed once (every station completed).
+ */
+export type TrainingView =
+  | {
+      readonly tag: "station"
+      readonly station: StationId
+      readonly step: StepId | null
+      readonly count: number
+      readonly target: number
+      readonly unlocked: number
+      readonly completed: boolean
+    }
+  | { readonly tag: "complete" }
+
 export interface WorldView {
   readonly tick: number
   readonly phase: PhaseView
   readonly rules: RulesValue
+  /** The objective in force. */
+  readonly objective: ObjectiveId
   readonly score: Readonly<Record<Team, number>>
   readonly flags: Readonly<Record<Team, FlagState>>
   readonly hill: HillValue
-  /** Only in Spingi il Cjar. */
+  /** Only while the cjar is in force. */
   readonly cart: CartView | null
-  /** Only in a live Tampieste: the safe circle. */
+  /** Only while the storm is in force and the match is live: the safe circle. */
   readonly storm: StormValue | null
   readonly pickups: readonly boolean[]
   /** One per `map.turrets`. */
@@ -92,6 +116,8 @@ export interface WorldView {
   readonly doors: readonly number[]
   readonly projectiles: readonly ProjectileValue[]
   readonly players: readonly PlayerView[]
+  /** Only in a training. */
+  readonly training: TrainingView | null
 }
 
 export const ViewWorld = Game.Inspector(
@@ -114,25 +140,28 @@ export const ViewWorld = Game.Inspector(
     resources: {
       tick: Game.System.readResource(Tick),
       rules: Game.System.readResource(Rules),
+      objective: Game.System.readResource(Objective),
       score: Game.System.readResource(Score),
       flags: Game.System.readResource(Flags),
       hill: Game.System.readResource(Hill),
       cart: Game.System.readResource(Cart),
+      stormCourse: Game.System.readResource(StormCourse),
       pickups: Game.System.readResource(Pickups),
       turrets: Game.System.readResource(Turrets),
       doors: Game.System.readResource(Doors)
     },
-    machines: { match: Game.System.machine(Match) }
+    machines: { match: Game.System.machine(Match), training: Game.System.machine(Training) }
   },
   ({ queries, resources, machines }): WorldView => {
     const { data } = queries.players
     const rules = resources.rules.get()
     const map = MAPS[rules.map]
     const tick = resources.tick.get()
+    const objective = resources.objective.get()
     const cartState = resources.cart.get()
     const cartPoint = trackPoint(map.track, cartState.d)
     const cart: CartView | null =
-      rules.mode === "cjar"
+      objective === "cjar"
         ? {
             at: cartPoint.at,
             yaw: cartPoint.yaw,
@@ -147,11 +176,21 @@ export const ViewWorld = Game.Inspector(
       match._tag === "Live" ? { tag: "Live", ends: match.ends }
       : match._tag === "Over" ? { tag: "Over", winner: match.winner, restarts: match.restarts }
       : { tag: "Warmup" }
-    const storm = rules.mode === "tampieste" && match._tag === "Live" ? stormAt(map, rules, match.ends - rules.timeLimitTicks, tick) : null
+    const progress = machines.training.get()
+    let training: TrainingView | null = null
+    if (progress._tag === "Complete") training = { tag: "complete" }
+    else if (progress._tag === "Arriving") training = { tag: "station", station: STATION_IDS[progress.station], step: null, count: 0, target: 0, unlocked: progress.unlocked, completed: progress.completed }
+    else if (progress._tag === "Step") {
+      const station = STATION_IDS[progress.station]
+      const step = stepsOf(station)[progress.step]
+      training = { tag: "station", station, step, count: progress.count, target: stepRule(station, step).target, unlocked: progress.unlocked, completed: progress.completed }
+    }
+    const storm = objective === "storm" && match._tag === "Live" ? stormNow(map, rules, match.ends - rules.timeLimitTicks, resources.stormCourse.get(), tick) : null
     return {
       tick,
       phase,
       rules,
+      objective,
       score: resources.score.get(),
       flags: resources.flags.get(),
       hill: resources.hill.get(),
@@ -185,7 +224,8 @@ export const ViewWorld = Game.Inspector(
           seq: controls.input.seq,
           buttons: controls.input.buttons
         }
-      })
+      }),
+      training
     }
   }
 )

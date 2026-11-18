@@ -36,6 +36,8 @@ export interface WorldFrame {
   readonly turrets: readonly TurretVisual[]
   /** Health of each breakable door, from 0 (broken) to 1 (intact). */
   readonly doors: readonly number[]
+  /** One per `map.gates`: true while the gate closes the way (the training's way to the next station). */
+  readonly gates: readonly boolean[]
   readonly camera: THREE.PerspectiveCamera
 }
 export interface TurretVisual {

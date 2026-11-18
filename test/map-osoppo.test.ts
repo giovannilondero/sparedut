@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from "bun:test"
 import { playBots } from "./play.ts"
-import { MODE_IDS } from "../shared/folklore.ts"
+import { ROOM_MODE_IDS } from "../shared/folklore.ts"
 import { IDLE_INPUT } from "../shared/input.ts"
 import { FORT, O_RAMPART, OSOPPO } from "../shared/maps/osoppo.ts"
 import { stepBody, type Body } from "../shared/movement.ts"
@@ -62,7 +62,7 @@ describe("Fuart di Osôf", () => {
   })
 })
 
-for (const mode of MODE_IDS) {
+for (const mode of ROOM_MODE_IDS) {
   test(`bots play a match at Fuart di Osôf: ${mode}`, () => {
     const { kills, view: v } = playBots("osoppo", mode)
     console.log("osoppo", mode, { score: v.score, kills, hill: v.hill })
