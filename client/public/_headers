@@ -6,3 +6,7 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
   Cross-Origin-Opener-Policy: same-origin
+
+# The service worker: the browser always asks whether it changed, so a new build reaches every player.
+/sw.js
+  Cache-Control: no-cache
