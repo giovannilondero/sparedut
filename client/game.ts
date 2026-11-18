@@ -978,7 +978,7 @@ export class Game {
 
   /** Holds the screen awake during the match; the browser dropped the lock on hiding, so coming back takes it again. */
   private syncWake() {
-    this.wake.set({ inMatch: this.running, inMatchMenu: this.overlay !== "none", visible: !document.hidden })
+    this.wake.sync({ inMatch: this.running, inMatchMenu: this.overlay !== "none", visible: !document.hidden })
   }
 
   /** The match menu: drawn whole when it opens (or the host changes), else only what a room or phase update changes, so focus and the open skill list stay. */

@@ -37,11 +37,11 @@ export class ScreenWake {
 
   constructor(private readonly locker: WakeLocker | undefined) {}
 
-  set(situation: WakeSituation) {
+  sync(situation: WakeSituation) {
     this.wanted = holdsScreenAwake(situation)
     if (this.sentinel?.released) this.sentinel = null
     if (this.wanted) this.take()
-    else this.let()
+    else this.release()
   }
 
   private take() {
@@ -60,13 +60,13 @@ export class ScreenWake {
         this.requesting = false
         this.sentinel = sentinel
         // The situation changed while the browser answered.
-        if (!this.wanted) this.let()
+        if (!this.wanted) this.release()
       },
       (error: unknown) => this.refused(error)
     )
   }
 
-  private let() {
+  private release() {
     const sentinel = this.sentinel
     this.sentinel = null
     if (sentinel && !sentinel.released) void sentinel.release().catch(() => undefined)
