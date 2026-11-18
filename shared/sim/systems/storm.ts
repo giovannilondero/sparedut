@@ -4,7 +4,7 @@
  */
 import { MAPS } from "../../maps/index.ts"
 import { outsideStorm, STORM_DAMAGE, STORM_EVERY, stormAt } from "../rules.ts"
-import { Damage, Game, Life, Match, Motion, Player, Rules, Tick } from "../schema.ts"
+import { Damage, Game, Life, Match, Motion, Objective, Player, Rules, Tick } from "../schema.ts"
 
 export const StormDamage = Game.System(
   "Sparedut/StormDamage",
@@ -12,7 +12,7 @@ export const StormDamage = Game.System(
     queries: {
       players: Game.Query({ selection: { player: Game.Query.read(Player), motion: Game.Query.read(Motion), life: Game.Query.read(Life) } })
     },
-    resources: { tick: Game.System.readResource(Tick), rules: Game.System.readResource(Rules) },
+    resources: { tick: Game.System.readResource(Tick), rules: Game.System.readResource(Rules), objective: Game.System.readResource(Objective) },
     events: { damage: Game.System.writeEvent(Damage) },
     machines: { match: Game.System.machine(Match) }
   },
@@ -21,7 +21,7 @@ export const StormDamage = Game.System(
     const match = machines.match.get()
     const rules = resources.rules.get()
     const tick = resources.tick.get()
-    if (match._tag !== "Live" || rules.mode !== "tampieste" || tick % STORM_EVERY !== 0) return
+    if (match._tag !== "Live" || resources.objective.get() !== "storm" || tick % STORM_EVERY !== 0) return
     const storm = stormAt(MAPS[rules.map], rules, match.ends - rules.timeLimitTicks, tick)
     for (const m of queries.players.each()) {
       if (data.life.get(m)._tag !== "Alive" || !outsideStorm(storm, data.motion.get(m).body)) continue

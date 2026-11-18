@@ -2,7 +2,7 @@
  * A room's simulation, ready for the host: intents in, view and events out.
  */
 import { Random, type HostClock } from "@typeonce/ritmo"
-import { MODES, type ModeId } from "../folklore.ts"
+import { MODE_OBJECTIVE, MODES, type ModeId } from "../folklore.ts"
 import type { PlayerInput } from "../input.ts"
 import type { Team } from "../map.ts"
 import type { PhysicsWorld } from "../physics.ts"
@@ -37,6 +37,7 @@ export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: H
         timeLimitTicks: Math.round(options.minutes * 60 * 60),
         friendlyFire: options.friendlyFire ?? false
       },
+      Objective: MODE_OBJECTIVE[options.mode],
       Tick: 0,
       Score: { benandanti: 0, malandanti: 0 },
       Flags: { benandanti: { _tag: "base" }, malandanti: { _tag: "base" } },
