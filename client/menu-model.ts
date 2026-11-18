@@ -103,7 +103,7 @@ export function focusOnScreen(from: Screen, to: Screen): "first" | Screen | null
   return to === "home" ? from : "first"
 }
 
-/** The screens a player cannot reach without a name: they start or join a match. */
+/** The screens a player cannot reach without a name: they create or join a room. */
 const NEED_NAME: ReadonlySet<Screen> = new Set(["create", "password"])
 
 const NONE: Outcome = { kind: "none" }
@@ -257,7 +257,7 @@ export class MenuModel {
     return { kind: "send", request: { t: "create", room, oneTap: false } }
   }
 
-  /** The home screen's "play against the bots": an Offline match in one tap, with the remembered values. */
+  /** The home screen's "play against the bots": an Offline room in one tap, with the remembered values, its match started at once. */
   oneTap(): Outcome {
     if (!this.remembered.name) return this.needName()
     return { kind: "send", request: { t: "create", room: oneTapRoom(this.remembered), oneTap: true } }

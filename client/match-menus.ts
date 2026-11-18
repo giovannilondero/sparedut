@@ -24,5 +24,5 @@ export function focusOnOpen(which: MatchMenu, previous: MatchMenu): string | nul
   return "p-resume"
 }
 
-/** The end screen's first focus: another round for the host, who alone can start one; leaving for the rest. */
+/** The end screen's first focus: another match for the host, who alone can start one; leaving for the rest. */
 export const endFocus = (host: boolean): string => (host ? "e-again" : "e-leave")

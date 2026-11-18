@@ -1,5 +1,5 @@
 /**
- * The main menu: name, language, matches, armoury, settings, glossary. It draws the menu model
+ * The main menu: name, language, rooms, armoury, settings, glossary. It draws the menu model
  * and forwards the player's events to it; what a choice means is the model's to decide.
  */
 import type { BotLevel, ModeId } from "../shared/folklore.ts"
@@ -341,7 +341,7 @@ export class Menu {
     ;(same ?? box.querySelector<HTMLButtonElement>("button:not(:disabled)"))?.focus()
   }
 
-  // ---------------------------------------------------------------- create match
+  // ---------------------------------------------------------------- create a room
 
   /** Listeners only once: the cards are built here and only their texts change with the language. */
   private bindCreate() {

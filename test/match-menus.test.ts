@@ -23,7 +23,7 @@ test("the loadout and the settings start on their first control", () => {
   expect(focusOnOpen("settings", "pause")).toBeNull()
 })
 
-test("the end screen starts on another round for the host, on leaving for everyone else", () => {
+test("the end screen starts on another match for the host, on leaving for everyone else", () => {
   expect(endFocus(true)).toBe("e-again")
   expect(endFocus(false)).toBe("e-leave")
 })
