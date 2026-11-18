@@ -19,6 +19,7 @@ import { loadDetailed } from "./models/detailed.ts"
 import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
 import { BrowserHostConnection } from "./offline.ts"
+import { registerServiceWorker } from "./offline-cache/register.ts"
 import { Link } from "./connection.ts"
 import { PerfMonitor } from "./perf.ts"
 import { loadSettings, saveSettings } from "./settings.ts"
@@ -365,4 +366,13 @@ requestAnimationFrame(() =>
     loader.addEventListener("transitionend", () => loader.remove(), { once: true })
     setTimeout(() => loader.remove(), 1000)
   })
+)
+
+// After one visit online the game opens with no network (`client/offline-cache/`): production
+// build only, after the page has loaded so the worker's downloads don't compete with the boot.
+// `navigator.serviceWorker` is missing over plain http on a LAN address: the game plays as before.
+addEventListener(
+  "load",
+  () => void registerServiceWorker({ production: import.meta.env.PROD, container: navigator.serviceWorker as ServiceWorkerContainer | undefined }),
+  { once: true }
 )
