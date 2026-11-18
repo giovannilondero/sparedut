@@ -438,7 +438,7 @@ export class Game {
     this.lastPhase = tag
     if (tag === "Over") {
       if (document.pointerLockElement) document.exitPointerLock()
-      this.renderEnd()
+      this.renderEnd(true)
     } else {
       $<DialogElement>("end-dialog").open = false
       if (tag === "Live" && this.overlay === "none") this.controls.lock()
@@ -976,19 +976,35 @@ export class Game {
     return typeof winner === "object" ? winner.player === this.me : winner === this.teams.get(this.me)
   }
 
-  private renderEnd() {
+  /**
+   * The end screen: drawn whole and opened when the match ends (`full`), then only its results and
+   * countdown are redrawn (every second and on each scoreboard), so its buttons and focus stay.
+   */
+  private renderEnd(full = false) {
     const s = this.snap
     if (!s || s.phase.tag !== "Over") return
-    const el = $("endscreen")
     const host = this.room?.hostId === this.me
     const winner = s.phase.winner
     const en = t().end
-    const title = winner === "pari" ? en.draw : this.won(winner) ? en.win : en.lose
+    if (full) {
+      const title = winner === "pari" ? en.draw : this.won(winner) ? en.win : en.lose
+      const color = winner === "pari" ? "var(--gold)" : typeof winner === "object" ? (this.won(winner) ? "var(--gold)" : "#9fd0ff") : TEAM_INFO[winner].color
+      this.drawMenu("endscreen", title, `
+      <div class="overlay-body"><div id="e-results"></div><p class="muted end-restart" id="e-restart"></p></div>
+      <div class="row overlay-actions"><button id="e-leave">${en.leave}</button>${host ? `<button id="e-again" class="primary">${en.again}</button>` : ""}</div>`, "end-title", color)
+      $("e-leave").onclick = () => {
+        this.d.net.send({ t: "leave" })
+        this.d.onLeave()
+      }
+      const again = document.getElementById("e-again")
+      if (again) again.onclick = () => this.d.net.send({ t: "start" })
+    }
+    // Not drawn yet (a scoreboard before the snapshot that ended the match): nothing to update.
+    if (!document.getElementById("e-results")) return
     const sub =
       winner === "pari" ? en.drawSub
       : typeof winner === "object" ? `${en.lastStanding(esc(winner.name))} · ${en.lastStandingSub}`
       : en.winSub(t().teams[winner].name, t().teams[winner].motto)
-    const color = winner === "pari" ? "var(--gold)" : typeof winner === "object" ? (this.won(winner) ? "var(--gold)" : "#9fd0ff") : TEAM_INFO[winner].color
     const rows = [...this.board]
     const best = <K extends keyof BoardRow>(k: K) => rows.slice().sort((a, b) => (b[k] as number) - (a[k] as number))[0]
     const award = (title: string, row: BoardRow | undefined, value: string) =>
@@ -997,8 +1013,7 @@ export class Game {
     const killer = best("kills")
     const streak = best("best")
     const head = best("headshots")
-    this.drawMenu("endscreen", title, `
-      <div class="overlay-body">
+    $("e-results").innerHTML = `
       <p class="end-sub">${sub}${this.room?.mode === "tampieste" ? "" : ` · ${s.score.benandanti} – ${s.score.malandanti}`}</p>
       <div class="awards">
         ${award(en.mvp[mvp?.team ?? "benandanti"], mvp, en.points(mvp?.score ?? 0))}
@@ -1006,17 +1021,9 @@ export class Game {
         ${award(en.streak, streak, en.row(streak?.best ?? 0))}
         ${award(en.head, head, en.heads(head?.headshots ?? 0))}
       </div>
-      ${boardHtml(rows, this.me)}
-      <p class="muted end-restart">${en.restartIn(Math.max(0, Math.ceil((s.phase.restarts - s.tick) / 60)))}</p>
-      </div>
-      <div class="row overlay-actions"><button id="e-leave">${en.leave}</button>${host ? `<button id="e-again" class="primary">${en.again}</button>` : ""}</div>`, "end-title", color)
-    $("e-leave").onclick = () => {
-      this.d.net.send({ t: "leave" })
-      this.d.onLeave()
-    }
-    const again = document.getElementById("e-again")
-    if (again) again.onclick = () => this.d.net.send({ t: "start" })
-    this.openMenu("end-dialog", "endscreen", endFocus(host))
+      ${boardHtml(rows, this.me)}`
+    $("e-restart").textContent = en.restartIn(Math.max(0, Math.ceil((s.phase.restarts - s.tick) / 60)))
+    if (full) this.openMenu("end-dialog", "endscreen", endFocus(host))
   }
 
   // ---------------------------------------------------------------- fixed tick
