@@ -308,10 +308,10 @@ function aimAt(sim: Sim, id: string, target: string) {
 const carried = (sim: Sim) => sim.view().panels[0]
 /** The host ends the match (back to the Muster) and starts the next one. */
 function nextMatch(sim: Sim) {
-  sim.start()
+  sim.start(true)
   for (let i = 0; i < 10; i++) sim.step()
   expect(sim.view().phase.tag).toBe("Muster")
-  sim.start()
+  sim.start(true)
   for (let i = 0; i < SHIELD_TICKS + 5; i++) sim.step()
   expect(sim.view().phase.tag).toBe("Live")
 }
