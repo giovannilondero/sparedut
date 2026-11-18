@@ -6,7 +6,7 @@ import { z } from "zod"
 import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "./folklore.ts"
 import { PlayerInputSchema, type PlayerInput } from "./input.ts"
 import type { MapId, Team } from "./map.ts"
-import { MAP_IDS } from "./maps/index.ts"
+import { ROOM_MAP_IDS, type RoomMapId } from "./maps/index.ts"
 import type { Body } from "./movement.ts"
 import type { GameEvent } from "./sim/events.ts"
 import type { ArsenalValue, FlagState, HillValue, TurretState } from "./sim/schema.ts"
@@ -74,7 +74,7 @@ export const RoomCode = z.string().trim().toUpperCase().length(4)
 const createRoom = {
   t: z.literal("create"),
   mode: z.enum(MODE_IDS as [ModeId, ...ModeId[]]),
-  map: z.enum(MAP_IDS as [MapId, ...MapId[]]),
+  map: z.enum(ROOM_MAP_IDS as [RoomMapId, ...RoomMapId[]]),
   minutes: z.number().int().min(2).max(30),
   bots: z.number().int().min(0).max(MAX_BOTS),
   level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]),
