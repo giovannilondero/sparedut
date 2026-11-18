@@ -357,6 +357,8 @@ html.in-muster #hud { background: var(--night); }
 html.in-muster #hud-free, html.in-muster #death, html.in-muster #board { visibility: hidden; }
 #muster .muster-chat { max-block-size: 9rem; overflow-y: auto; font-size: 14px; padding: 4px 0; }
 #muster .muster-chat-input { inline-size: 100%; min-block-size: var(--tap); margin-block-start: 4px; }
+#muster .muster-match { font-family: var(--serif); font-size: 1.15rem; font-variant-numeric: tabular-nums; margin-block: 6px; }
+#muster .muster-note { color: var(--gold); margin-block: 4px; }
 
 .end-title { display: block; font-family: var(--serif); font-size: clamp(36px, 5vw, 64px); text-align: center; margin: 0; }
 .awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 10px; margin: 14px 0; }

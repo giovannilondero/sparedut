@@ -263,6 +263,10 @@ export interface Strings {
     readonly chatPlaceholder: string
     /** Under single weapon, above the locked picker: the primary everybody carries, chosen by the host. */
     readonly locked: Fn
+    /** Joining a match already on: the confirm that puts the player on the map. */
+    readonly enter: string
+    /** Joining a Tampieste already on: entering now plays from the next match. */
+    readonly nextMatch: string
   }
   readonly perf: { readonly snaps: string; readonly players: string; readonly corrections: string; readonly hide: string; readonly menu: string; readonly dynRes: string }
   readonly tips: readonly string[]
@@ -762,7 +766,9 @@ const fur: Strings = {
     primary: "Arme principâl",
     chat: "Cjacaris",
     chatPlaceholder: "Scrîf ai altris e frache Invio",
-    locked: (name) => `Arme uniche: ducj a zuin cun ${name}. Le à sielte l'host (👑).`
+    locked: (name) => `Arme uniche: ducj a zuin cun ${name}. Le à sielte l'host (👑).`,
+    enter: "Jentre te partide",
+    nextMatch: "La Tampieste e je za scomençade: tu zuiarâs de prossime partide."
   },
   perf: { snaps: "istantanis", players: "zuiadôrs", corrections: "corezions", hide: "F3 par platâ", menu: "menù", dynRes: "ris. dinamiche" },
   tips: [
@@ -1211,7 +1217,9 @@ const it: Strings = {
     primary: "Arma principale",
     chat: "Chiacchiere",
     chatPlaceholder: "Scrivi agli altri e premi Invio",
-    locked: (name) => `Arma unica: tutti giocano con ${name}. L'ha scelta l'host (👑).`
+    locked: (name) => `Arma unica: tutti giocano con ${name}. L'ha scelta l'host (👑).`,
+    enter: "Entra in partita",
+    nextMatch: "La Tampieste è già cominciata: giocherai dalla prossima partita."
   },
   perf: { snaps: "istantanee", players: "giocatori", corrections: "correzioni", hide: "F3 per nascondere", menu: "menu", dynRes: "ris. dinamica" },
   tips: [

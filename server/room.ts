@@ -37,8 +37,16 @@ const STEPS_PER_TICK = 3
 const MAX_CREDIT = 12
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
+/**
+ * Where a member is in the match. `waiting`: they joined while a match was on and have not entered
+ * it: no body, no hits, no seat on a team for scoring, until their enter intent (or the Muster).
+ * `inMatch`: one of the match's players, on the map whenever the match puts them there.
+ */
+export type Place = "waiting" | "inMatch"
+
 export interface Member {
   readonly id: string
+  place: Place
   name: string
   team: Team
   /** The primary the member chose, kept under single weapon: the roster shows `primaryOf` this. */
@@ -114,6 +122,45 @@ export class Room {
     return this.members.size >= MAX_PLAYERS
   }
 
+  /**
+   * Whether one more human can come in: a free seat, or a bot to give its seat up to them. A bot
+   * already promised to a member who has not entered yet is not promised again.
+   */
+  get admitsAnother() {
+    const bots = [...this.members.values()].filter((m) => m.bot).length
+    return this.members.size - MAX_PLAYERS < bots
+  }
+
+  /** Whether a match is on (live, or its results): a human who joins now waits until they enter. */
+  private get matchOn() {
+    return !this.training && this.world.phase.tag !== "Muster"
+  }
+
+  /** A member who joined a match already on and has not entered it. False for anybody else, and for a stranger. */
+  hasNotEntered(id: string): boolean {
+    return this.members.get(id)?.place === "waiting"
+  }
+
+  private get seated() {
+    return [...this.members.values()].filter((m) => m.place === "inMatch").length
+  }
+
+  /** A bot gives up its seat to a person entering `team`: one of that team's if it has one. */
+  private freeSeatFor(team: Team) {
+    if (this.seated < MAX_PLAYERS) return
+    const bots = [...this.members.values()].filter((m) => m.bot)
+    const bot = bots.findLast((m) => m.team === team) ?? bots.at(-1)
+    if (bot) this.removeMember(bot.id)
+  }
+
+  /** The member takes their seat in the match, with the team and primary they chose: the simulation takes them at the next step. */
+  private seat(m: Member) {
+    this.freeSeatFor(m.team)
+    m.place = "inMatch"
+    const { id, name, team, primary } = m
+    this.arriving.set(id, () => this.sim.join(id, name, team, false, primary))
+  }
+
   private teamCount(team: Team) {
     return [...this.members.values()].filter((m) => m.team === team).length
   }
@@ -122,16 +169,25 @@ export class Room {
     return this.teamCount("benandanti") <= this.teamCount("malandanti") ? "benandanti" : "malandanti"
   }
 
+  /**
+   * A human comes in. In the Muster (and in a training) they are one of the match's players at
+   * once, a bot giving up its seat if the room is full; while a match is on they wait, off the map,
+   * until they enter (`enter`), and the bot keeps its seat until then.
+   */
   addHuman(id: string, name: string, primary: PrimaryId, send: (msg: ServerMessage) => void) {
-    if (this.full) {
-      // A bot gives up its seat to a person.
-      const bot = [...this.members.values()].findLast((m) => m.bot)
-      if (!bot) return false
-      this.removeMember(bot.id)
-    }
+    if (!this.admitsAnother) return false
     const team = this.training ? "benandanti" : this.smallerTeam()
-    this.members.set(id, { id, name, team, primary, bot: false, send, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
-    this.arriving.set(id, () => this.sim.join(id, name, team, false, primary))
+    const m: Member = { id, place: "waiting", name, team, primary, bot: false, send, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT }
+    if (!this.matchOn) this.seat(m)
+    this.members.set(id, m)
+    return true
+  }
+
+  /** The enter intent: a member who has not entered takes their seat in the match on. Refused (false) from anybody else. */
+  enter(id: string): boolean {
+    const m = this.members.get(id)
+    if (!m || m.place !== "waiting" || !this.matchOn) return false
+    this.seat(m)
     return true
   }
 
@@ -151,7 +207,7 @@ export class Room {
     const used = new Set([...this.members.values()].map((m) => m.name))
     const name = BOT_NAMES[team].find((n) => !used.has(n)) ?? `${BOT_NAMES[team][0]} ${botCounter}`
     const primary = primaryFor(botCounter)
-    this.members.set(id, { id, name, team, primary, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
+    this.members.set(id, { id, place: "inMatch", name, team, primary, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
     this.arriving.set(id, () => this.sim.join(id, name, team, true, primary, post))
     return id
   }
@@ -172,7 +228,7 @@ export class Room {
     this.members.delete(id)
     this.bots.delete(id)
     this.stationBots.delete(id)
-    if (!this.arriving.delete(id)) this.sim.leave(id)
+    if (!this.arriving.delete(id) && m.place === "inMatch") this.sim.leave(id)
     if (this.hostId === id) {
       const next = this.humans[0]
       if (next) {
@@ -185,6 +241,11 @@ export class Room {
   setTeam(id: string, team: Team) {
     const m = this.members.get(id)
     if (!m || m.team === team) return
+    // Not on a team for scoring yet: the side they will enter on, with nobody to swap.
+    if (m.place === "waiting") {
+      m.team = team
+      return
+    }
     // Don't unbalance the teams: if the other one is larger, a bot swaps.
     if (this.teamCount(team) >= this.teamCount(m.team)) {
       const swap = [...this.members.values()].find((o) => o.bot && o.team === team)
@@ -206,7 +267,7 @@ export class Room {
     const m = this.members.get(id)
     if (!m || this.settings.single) return
     m.primary = primary
-    this.sim.primary(id, primary)
+    if (m.place === "inMatch") this.sim.primary(id, primary)
   }
 
   queueInput(id: string, input: PlayerInput) {
@@ -241,7 +302,7 @@ export class Room {
     // (the rest stays queued for the next tick). No repeated commands: the server
     // would take a step the client never took, and the camera would snap.
     for (const m of this.members.values()) {
-      if (m.bot) continue
+      if (m.bot || m.place === "waiting") continue
       // Step credit: one per tick on average, so nobody runs faster by sending more commands.
       m.credit = Math.min(MAX_CREDIT, m.credit + 1)
       for (let i = 0; i < STEPS_PER_TICK && m.queue.length && m.credit >= 1; i++) {
@@ -255,7 +316,7 @@ export class Room {
     for (const [id, brain] of this.stationBots) this.sim.input(id, brain.think(this.world))
     const events = this.sim.step()
     this.world = this.sim.view()
-    const swapped = this.training && this.keepStationBots()
+    const swapped = (this.training && this.keepStationBots()) || this.seatWaiting()
     for (const e of events) {
       this.events.push(e)
       // Bots are furlans: now and then they comment.
@@ -268,6 +329,17 @@ export class Room {
     // The roster names and colours the bodies the client draws from the snapshots: it must have the
     // new bots before the first snapshot that brings them, or they are drawn nameless in the wrong colours.
     if (swapped) this.broadcast({ t: "room", room: this.info() })
+  }
+
+  /**
+   * The room is in the Muster again: whoever had not entered the match that ended is in it like
+   * everybody else. True when somebody was seated, so that the members are told.
+   */
+  private seatWaiting(): boolean {
+    if (this.matchOn) return false
+    const waiting = [...this.members.values()].filter((m) => m.place === "waiting")
+    for (const m of waiting) this.seat(m)
+    return waiting.length > 0
   }
 
   get tick() {
@@ -416,7 +488,7 @@ export class Room {
       minutes: this.settings.minutes,
       level: this.level,
       ff: this.settings.ff,
-      roster: [...this.members.values()].map((m) => ({ id: m.id, name: m.name, team: m.team, primary: this.primaryOf(m), bot: m.bot, away: false }))
+      roster: [...this.members.values()].map((m) => ({ id: m.id, name: m.name, team: m.team, primary: this.primaryOf(m), bot: m.bot, away: false, onMap: m.place === "inMatch" }))
     }
   }
 
