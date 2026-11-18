@@ -6,7 +6,7 @@
 import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "../shared/folklore.ts"
 import type { MapId } from "../shared/map.ts"
 import { MAP_IDS } from "../shared/maps/index.ts"
-import { ACCESSES, Password, REACHES, type Access, type ErrorCode, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
+import { ACCESSES, MAX_BOTS, Password, REACHES, RoomCode, type Access, type ErrorCode, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 import type { Lang } from "./i18n.ts"
 import { oneTapRoom, type Settings } from "./settings.ts"
@@ -75,8 +75,8 @@ export const MENU_OPTIONS = {
   reaches: [...REACHES].sort((a, b) => REACH_PLACE[a] - REACH_PLACE[b]),
   accesses: ACCESSES,
   minutes: [5, 10, 15, 20],
-  /** Bots per team: as many as the server accepts. */
-  bots: [0, 1, 2, 3, 4, 5, 6, 7]
+  /** Bots per team: none up to as many as the server accepts. */
+  bots: Array.from({ length: MAX_BOTS + 1 }, (_, n) => n)
 } as const satisfies Record<string, readonly unknown[]>
 
 /** Creation's choices as they stand. */
@@ -269,8 +269,8 @@ export class MenuModel {
 
   joinByCode(): Outcome {
     if (!this.remembered.name) return this.needName()
-    const code = this.code.trim().toUpperCase()
-    return code.length === 4 ? { kind: "send", request: { t: "join", code } } : refused("codeBad")
+    const code = RoomCode.safeParse(this.code)
+    return code.success ? { kind: "send", request: { t: "join", code: code.data } } : refused("codeBad")
   }
 
   /** The latest room list, in the order the host sent it: LAN rooms first, then Online. */

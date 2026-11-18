@@ -62,13 +62,19 @@ export type RoomAccess = z.infer<typeof RoomAccess>
  */
 export type Reached<A> = { readonly reach: "offline" } | { readonly reach: ServerReach; readonly access: A }
 
+/** The most bots a room can be created with, per team. */
+export const MAX_BOTS = 7
+
+/** A room's code as a player types it to join: four characters, cleaned of spaces and case. */
+export const RoomCode = z.string().trim().toUpperCase().length(4)
+
 /** What every `create` carries, whatever its reach. */
 const createRoom = {
   t: z.literal("create"),
   mode: z.enum(MODE_IDS as [ModeId, ...ModeId[]]),
   map: z.enum(MAP_IDS as [MapId, ...MapId[]]),
   minutes: z.number().int().min(2).max(30),
-  bots: z.number().int().min(0).max(7),
+  bots: z.number().int().min(0).max(MAX_BOTS),
   level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]),
   ff: z.boolean(),
   primary: z.enum(PRIMARIES)
@@ -83,7 +89,7 @@ export const ClientMessage = z.discriminatedUnion("t", [
   ]),
   z.object({
     t: z.literal("join"),
-    code: z.string().trim().toUpperCase().length(4),
+    code: RoomCode,
     /** Only for a password room; an open room ignores it. */
     password: Password.optional(),
     primary: z.enum(PRIMARIES)
