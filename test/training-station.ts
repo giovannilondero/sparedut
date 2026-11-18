@@ -55,7 +55,18 @@ export function reach(station: StationId, seen?: (station: string, objective: st
     })
   /** Stands still for a while. */
   const wait = (ticks: number) => drive(ticks, () => ({}))
-  return { ...h, me, you, snap, drive, walkTo, wait }
+  /** Plays the automatic player (the one that brought the trainee here, so its inputs stay in sequence) for at most `ticks` ticks, until `done` holds for the events so far; returns every event. Its inputs run ahead of `drive`'s: drive no more after it. */
+  const autoplay = (ticks: number, done: (events: GameEvent[]) => boolean) => {
+    const events: GameEvent[] = []
+    for (let i = 0; i < ticks && !done(events); i++) {
+      for (const msg of auto.think(snap())) me.say(msg)
+      const before = me.got.length
+      h.play(1)
+      for (const m of me.got.slice(before)) if (m.t === "snap") events.push(...m.ev)
+    }
+    return events
+  }
+  return { ...h, me, you, snap, drive, walkTo, wait, autoplay }
 }
 
 /** The training steps completed among `events`, in order. */

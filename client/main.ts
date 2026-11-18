@@ -252,6 +252,8 @@ const inviteBase = () => `${publicUrl && isLocalHost(location.hostname) ? public
 
 /** The home screen's one-tap match against the bots starts right away, without warm-up. */
 let autostart = false
+/** What to do once the room is left (its `left` message): a match asked for while leaving waits for it. */
+let afterLeft: (() => void) | null = null
 const physicsReady = initPhysics().then(() => {
   game = new Game({
     renderer,
@@ -268,6 +270,11 @@ const physicsReady = initPhysics().then(() => {
     createAvatar,
     saveSettings: () => saveSettings(settings),
     onLeave: backToMenu,
+    leaveForOneTap: () => {
+      afterLeft = () => menu.oneTap()
+      link.send({ t: "leave" })
+      backToMenu()
+    },
     inviteBase,
     roomPassword: () => roomPassword
   })
@@ -327,6 +334,11 @@ link.on((msg: ServerMessage) => {
       roomPassword = null
       forgetRoomAddress()
       backToMenu()
+      if (afterLeft) {
+        const then = afterLeft
+        afterLeft = null
+        then()
+      }
       return
     case "error":
       // A password room: ask for it, saying why when the last one did not work.

@@ -27,7 +27,7 @@ import type { TrainingStart } from "../shared/training/start.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 import { BotBrain } from "./bot.ts"
 import { navGraph } from "./nav.ts"
-import { botsOf, postOf, RouteBrain, stationOf, type Brain } from "./station-bot.ts"
+import { botsOf, postOf, RouteBrain, stationGraph, stationOf, type Brain } from "./station-bot.ts"
 
 /** Pending commands per player: beyond this the client is running ahead and the old ones are dropped. */
 const MAX_QUEUE = 20
@@ -262,7 +262,7 @@ export class Room {
     const name = BOT_NAMES[bot.team].find((n) => !used.has(n)) ?? `${BOT_NAMES[bot.team][0]} ${botCounter}`
     const post = postOf(station, bot)
     this.members.set(id, { id, name, team: bot.team, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
-    this.stationBots.set(id, bot.fires ? new BotBrain(id, this.level, navGraph(this.physics), this.physics, botCounter) : new RouteBrain(id, bot.route, post.yaw))
+    this.stationBots.set(id, bot.fires ? new BotBrain(id, this.level, stationGraph(navGraph(this.physics), station), this.physics, botCounter) : new RouteBrain(id, bot.route, post.yaw))
     this.arriving.set(id, () => this.sim.join(id, name, bot.team, true, STATION_BOT_PRIMARY, post))
   }
 

@@ -210,6 +210,11 @@ export class Menu {
     this.apply(this.model.go(screen))
   }
 
+  /** The home screen's one-tap match, asked for from outside it: the training's completion screen. */
+  oneTap() {
+    this.apply(this.model.oneTap())
+  }
+
   /** Acts on the model's answer: sends the request, shows why it was refused, or draws the new screen. */
   private apply(o: Outcome) {
     if (o.kind === "send") {

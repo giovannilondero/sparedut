@@ -50,6 +50,8 @@ export interface Strings {
     readonly completeSub: string
     /** The match menu's line in place of the room's reach. */
     readonly menuLine: string
+    /** The completion screen's way back home (the station list is `stationList`, the one-tap match the home screen's own). */
+    readonly done: { readonly home: string }
     /** The match menu's station list and its actions (ticket #51). */
     readonly stationList: string
     readonly here: string
@@ -403,6 +405,7 @@ const fur: Strings = {
     complete: "Dutrine finide!",
     completeSub: "Cumò tu sâs dut: va a zuiâ",
     menuLine: "Dutrine · Offline, dome tu",
+    done: { home: "Torne al inizi" },
     stationList: "Lis stazions",
     here: "Tu sês culì",
     locked: "Ancjemò sierade",
@@ -809,6 +812,7 @@ const it: Strings = {
     complete: "Dutrine completata!",
     completeSub: "Ora sai tutto: vai a giocare",
     menuLine: "Dutrine · Offline, solo tu",
+    done: { home: "Torna all'inizio" },
     stationList: "Le stazioni",
     here: "Sei qui",
     locked: "Ancora chiusa",

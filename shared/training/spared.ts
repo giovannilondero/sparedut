@@ -14,3 +14,6 @@ export const SPARED_HP = 1
 
 /** Whether the trainee is spared at station `station` (an index in `STATION_IDS`). */
 export const spared = (station: number) => station < DEADLY_FROM
+
+/** Whether kills score at station `station`, as in a Bataie di Gnot: only in the skirmish. */
+export const killsScore = (station: number) => station === DEADLY_FROM

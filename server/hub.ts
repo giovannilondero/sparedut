@@ -190,6 +190,12 @@ export class Hub {
       room.sim.report(id, msg.a)
       return
     }
+    // A step the player's device cannot perform: only a training takes the word for it.
+    if (msg.t === "unavailable") {
+      if (!room?.training) return this.send(peer, { t: "error", code: "invalid" })
+      room.sim.unavailable(id, msg.station, msg.step, msg.device)
+      return
+    }
     // Going to a station, restarting one, starting over: only a training takes them.
     if (msg.t === "goTo" || msg.t === "startOver") {
       if (!room?.training) return this.send(peer, { t: "error", code: "invalid" })

@@ -10,6 +10,7 @@
 import { SAGRE, SAGRE_STATIONS } from "../../maps/sagre.ts"
 import { STATION_IDS, STATIONS, stepRule, stepsOf } from "../../training/index.ts"
 import type { Seen, StepRule } from "../../training/station.ts"
+import { hasControl } from "../../training/controls.ts"
 import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS } from "../../weapons.ts"
 import { freshArsenal, freshDoors, MAX_HP, stormOnCourse } from "../rules.ts"
 import {
@@ -29,6 +30,7 @@ import {
   Player,
   ReportInterface,
   Score,
+  StepUnavailable,
   StormCourse,
   Tick,
   Training,
@@ -73,13 +75,20 @@ export const PlayTraining = Game.System(
       stormCourse: Game.System.writeResource(StormCourse),
       turrets: Game.System.writeResource(Turrets)
     },
-    events: { happened: Game.System.readEvent(Out), out: Game.System.writeEvent(Out), reports: Game.System.readEvent(ReportInterface), goTo: Game.System.readEvent(GoToStation) },
+    events: {
+      happened: Game.System.readEvent(Out),
+      out: Game.System.writeEvent(Out),
+      reports: Game.System.readEvent(ReportInterface),
+      goTo: Game.System.readEvent(GoToStation),
+      unavailable: Game.System.readEvent(StepUnavailable)
+    },
     machines: { training: Game.System.updateMachine(Training) },
     nextMachines: { training: Game.System.nextState(Training) }
   },
   ({ queries, resources, events, machines, nextMachines }) => {
     // Reports are read every tick, so that one never waits for a later tick: outside a training's step they are ignored.
     const reports = events.reports.all()
+    const unavailable = events.unavailable.all()
     const goes = events.goTo.all()
     const state = machines.training.get()
     if (state._tag === "Off") return
@@ -237,7 +246,10 @@ export const PlayTraining = Game.System(
     }
 
     const now = rule.advance(seen(rule), { count: state.count, mark: state.mark })
-    const count = Math.min(rule.target, now.count)
+    // A step the client's active device has no control for completes itself (#50): only the
+    // trainee's word for this very step counts, and only if the step table agrees.
+    const skipped = unavailable.some((u) => u.session === session && u.station === id && u.step === steps[state.step] && !hasControl(rule.control, u.device))
+    const count = skipped ? rule.target : Math.min(rule.target, now.count)
     let next: Next
     if (count < rule.target) {
       standDoors(false)

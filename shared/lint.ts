@@ -1,6 +1,6 @@
 /** Entry point for `ritmo-devtools lint`: the room's runtime and its schedule. */
 import { HostClock } from "@typeonce/ritmo"
-import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Out, ReportInterface, StartMatch, GoToStation } from "./sim/schema.ts"
+import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Out, ReportInterface, StartMatch, GoToStation, StepUnavailable } from "./sim/schema.ts"
 import { makeRuntime, simulate } from "./sim/index.ts"
 
 /** The host reads `Out` events (with the `ReadOutbox` inspector) and forwards them to clients. */
@@ -18,6 +18,6 @@ export const lintTarget = async () => {
     runtime,
     schedules: { simulate },
     describe: { host: Game.Schedule(HostReadsOut) },
-    hostEvents: [Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, ReportInterface, GoToStation]
+    hostEvents: [Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, ReportInterface, GoToStation, StepUnavailable]
   }
 }

@@ -11,5 +11,5 @@
 import type { ControlId } from "./station.ts"
 
 /** The actions a client may report: a closed set, each the control its step teaches. */
-export const INTERFACE_ACTIONS = ["slot", "lastWeapon", "cycle"] as const satisfies readonly ControlId[]
+export const INTERFACE_ACTIONS = ["slot", "lastWeapon", "cycle", "board", "phrases"] as const satisfies readonly ControlId[]
 export type InterfaceAction = (typeof INTERFACE_ACTIONS)[number]
