@@ -2,10 +2,11 @@
  * Starting again in a training never duplicates its bots: going to a station from the list (another
  * one and back, the current one, several times before an arrival), restarting, starting over, dying
  * and respawning, leaving and entering again. Checked at both seams the player sees: the
- * simulation's players (the snapshot), and the roster the client is told, from which it knows whom
- * to name and whose body to take away (`Game.updateRoster` in `client/game.ts`).
+ * simulation's players (the snapshot), the roster the client is told (whom it names, and in which
+ * team's colours), and the bodies the client draws (`client/bodies.ts`).
  */
 import { beforeAll, describe, expect, test } from "bun:test"
+import { takeAwayDeparted } from "../client/bodies.ts"
 import { createBrowserHost } from "../client/host.ts"
 import { IDLE_INPUT } from "../shared/input.ts"
 import { initPhysics } from "../shared/physics.ts"
@@ -54,19 +55,20 @@ function roster(me: Client): readonly RosterEntry[] {
 }
 
 /**
- * The bodies the client draws, by the client's own rule: a body for every player a snapshot
- * brings, taken away only when a roster it is told no longer lists that player.
+ * The bodies the client draws, by its own rule (`client/bodies.ts`), with a frame drawn after
+ * every message as the page does: the frame draws a body for each player of the latest snapshot.
  */
 function drawn(me: Client): Set<string> {
-  const bodies = new Set<string>()
+  const bodies = new Map<string, string>()
+  let latest: ReadonlyMap<string, unknown> = new Map()
   for (const m of me.got) {
-    if (m.t === "snap") for (const p of m.players) if (p.id !== you(me)) bodies.add(p.id)
-    if (m.t === "room" || m.t === "joined") {
-      const listed = new Set(m.room.roster.map((r) => r.id))
-      for (const id of bodies) if (!listed.has(id)) bodies.delete(id)
+    if (m.t === "snap") {
+      latest = new Map(m.players.map((p) => [p.id, p]))
+      takeAwayDeparted(bodies, latest, () => {})
     }
+    for (const id of latest.keys()) if (id !== you(me) && !bodies.has(id)) bodies.set(id, id)
   }
-  return bodies
+  return new Set(bodies.keys())
 }
 
 /** Exactly the station's bots, each once: in the simulation, in the roster, on the scoreboard and drawn. */
