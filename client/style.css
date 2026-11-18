@@ -225,6 +225,12 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 @keyframes pop { 0% { opacity: 0; transform: translateX(-50%) scale(1.6); } 10% { opacity: 1; transform: translateX(-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
 #training { position: absolute; top: 14px; left: 14px; max-width: min(360px, 40vw); padding: 8px 12px; background: rgba(10, 8, 6, 0.72); border: 1px solid var(--stone-line); border-radius: 10px; font-size: 14px; display: grid; gap: 4px; }
 #training-station { font-family: var(--serif); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); }
+/* The station's line and its steps' marks share a row, the marks wrapping under it when the row is full. */
+.training-head { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; }
+.step-marks { display: inline-flex; gap: 4px; align-items: center; }
+.step-mark { inline-size: 8px; block-size: 8px; border-radius: 50%; border: 1px solid var(--gold); }
+.step-mark.is-done { background: var(--gold); opacity: 0.6; }
+.step-mark.is-current { background: var(--gold); box-shadow: 0 0 0 2px rgba(10, 8, 6, 0.72), 0 0 0 3px var(--gold); }
 #training-step .count { color: var(--gold); white-space: nowrap; }
 #training-done { color: var(--ben); font-weight: bold; }
 #training-done:empty { display: none; }
