@@ -172,3 +172,13 @@ test("the prompt follows the device used last: a key, then the controller, then 
   expect(c.device).toBe("keyboard")
   expect(prompt()).toContain("<kbd>WASD</kbd>")
 })
+
+/** The Muster's name in each language (the glossary's). */
+const MUSTER = { fur: "Adunade", it: "Adunata" } as const
+
+for (const [lang, s] of Object.entries(STRINGS)) {
+  test(`${lang}: the armoury station says that in a match the primary is chosen in the Muster`, () => {
+    const view: TrainingView = { tag: "station", station: "armoury", step: "choosePrimary", count: 0, target: 1, unlocked: 6, completed: false }
+    for (const d of DEVICES) expect(trainingPrompt(s, view, d)).toContain(MUSTER[lang as keyof typeof MUSTER])
+  })
+}
