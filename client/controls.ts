@@ -4,6 +4,7 @@
  * Short presses (a click between two ticks) are held until the next tick.
  */
 import { BUTTON, type ButtonName } from "../shared/input.ts"
+import type { Snapshot } from "../shared/protocol.ts"
 import type { WeaponId } from "../shared/weapons.ts"
 
 const KEYS: Record<string, ButtonName> = {
@@ -46,6 +47,21 @@ const TRIGGER_ON = 0.35
 /** Maximum stick look speed (rad/s), before sensitivity. */
 const LOOK_YAW = 3.4
 const LOOK_PITCH = 2.4
+
+/** What the controls follow of the player, from one snapshot. */
+export interface Tracked {
+  readonly alive: boolean
+  readonly mounted: boolean
+  /**
+   * A new life began since the last snapshot. A match start kills and respawns everyone within
+   * one tick, which no snapshot shows as a death; the spawn event is never missed.
+   */
+  readonly spawned: boolean
+}
+
+/** The player `me` in a snapshot, as the controls follow it. */
+export const trackedIn = (s: Snapshot, me: string, mounted: boolean): Tracked | null =>
+  s.you && { alive: s.you.alive, mounted, spawned: s.ev.some((e) => e.t === "spawn" && e.s === me) }
 
 export interface ControlsHandlers {
   onSlot: (slot: 1 | 2 | 3 | 4) => void
@@ -154,8 +170,8 @@ export class Controls {
    * A toggled crouch never outlives a life, a turret or a match: the player
    * respawns standing and dismounts standing.
    */
-  track(player: { alive: boolean; mounted: boolean } | null) {
-    if (!player || !player.alive || player.mounted) this.crouched = false
+  track(player: Tracked | null) {
+    if (!player || !player.alive || player.mounted || player.spawned) this.crouched = false
   }
 
   /**

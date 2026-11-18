@@ -16,7 +16,7 @@ import { outsideStorm, owned, RAISE_TICKS } from "../shared/sim/rules.ts"
 import { TURRET, WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
-import { Controls } from "./controls.ts"
+import { Controls, trackedIn } from "./controls.ts"
 import { boardHtml, esc, Hud, rosterHtml } from "./hud.ts"
 import { t } from "./i18n.ts"
 import type { Look } from "./looks.ts"
@@ -353,7 +353,7 @@ export class Game {
         else this.predictor.reconcile(you.body, you.seq, true)
       }
       this.wasAlive = you.alive
-      this.controls.track({ alive: you.alive, mounted: this.mounted() >= 0 })
+      this.controls.track(trackedIn(s, this.me, this.mounted() >= 0))
       // The server has already seen my last weapon switch and holds a different one: it
       // switched it itself (lanciafrico pickup, armoury, respawn) or rejected the switch. Follow it.
       const server = you.arsenal.current

@@ -1,5 +1,8 @@
 import { beforeAll, expect, test } from "bun:test"
+import { createBrowserHost } from "../client/host.ts"
 import { BUTTON } from "../shared/input.ts"
+import { initPhysics } from "../shared/physics.ts"
+import { PROTOCOL_VERSION, type ServerMessage } from "../shared/protocol.ts"
 
 type Listener = (e: Record<string, unknown>) => void
 
@@ -23,10 +26,11 @@ const pad = {
 const PAD = { cross: 0, circle: 1, l3: 10 } as const
 
 let Controls: typeof import("../client/controls.ts").Controls
+let trackedIn: typeof import("../client/controls.ts").trackedIn
 beforeAll(async () => {
   Object.assign(globalThis, { document: doc, window: target })
   Object.defineProperty(globalThis.navigator, "getGamepads", { value: () => [pad], configurable: true })
-  ;({ Controls } = await import("../client/controls.ts"))
+  ;({ Controls, trackedIn } = await import("../client/controls.ts"))
 })
 
 /** A player at the keyboard, with the mouse locked on the game. */
@@ -141,19 +145,19 @@ test("with toggle, the crouch is cleared on respawn, on mounting a turret and on
       c.buttons()
       expect(c.isHeld("crouch")).toBe(true)
     }
-    c.track({ alive: true, mounted: false })
+    c.track({ alive: true, mounted: false, spawned: false })
 
     crouchOn()
-    c.track({ alive: true, mounted: false })
+    c.track({ alive: true, mounted: false, spawned: false })
     expect(c.isHeld("crouch")).toBe(true) // nothing happened: still crouched
-    c.track({ alive: false, mounted: false })
-    c.track({ alive: true, mounted: false })
+    c.track({ alive: false, mounted: false, spawned: false })
+    c.track({ alive: true, mounted: false, spawned: false })
     expect(crouched(c.buttons())).toBe(false)
 
     crouchOn()
-    c.track({ alive: true, mounted: true })
+    c.track({ alive: true, mounted: true, spawned: false })
     expect(crouched(c.buttons())).toBe(false)
-    c.track({ alive: true, mounted: false })
+    c.track({ alive: true, mounted: false, spawned: false })
 
     crouchOn()
     c.track(null)
@@ -197,4 +201,41 @@ test("with toggle, holding ◯ down for a second press doesn't keep the player c
   p.down(PAD.circle)
   expect(crouched(p.c.buttons())).toBe(false)
   p.up(PAD.circle)
+})
+
+test("with toggle, the crouch is cleared when a match start respawns everyone, though no snapshot shows the player dead", async () => {
+  await initPhysics()
+  let clock = 0
+  const hub = createBrowserHost(() => clock)
+  const got: ServerMessage[] = []
+  const peer = { network: { key: "browser", lan: true }, send: (d: string) => got.push(JSON.parse(d) as ServerMessage), id: null, name: "", room: null }
+  hub.open(peer)
+  const say = (msg: object) => hub.message(peer, JSON.stringify(msg))
+  say({ t: "hello", name: "Toni", version: PROTOCOL_VERSION })
+  say({ t: "create", mode: "bataie", map: "glemone", minutes: 10, reach: "offline", bots: 0, level: "pari", ff: false, primary: "cramar" })
+
+  const joined = got.find((m) => m.t === "joined")?.you ?? ""
+  const { c, tap } = keyboard("toggle")
+  const deadSeen: boolean[] = []
+  /** The game's side: every snapshot that arrives reaches the controls. */
+  const play = (ticks: number) => {
+    for (let i = 0; i < ticks; i++) {
+      clock += 1000 / 60 + 1e-6
+      hub.update()
+      for (const m of got.splice(0)) {
+        if (m.t !== "snap") continue
+        deadSeen.push(m.you?.alive === false)
+        c.track(trackedIn(m, joined, false))
+      }
+    }
+  }
+  play(30)
+  tap("KeyC")
+  c.buttons()
+  expect(c.isHeld("crouch")).toBe(true)
+  deadSeen.length = 0
+  say({ t: "start" })
+  play(30)
+  expect(deadSeen.some(Boolean)).toBe(false) // the snapshots never show the respawn as a death
+  expect(crouched(c.buttons())).toBe(false)
 })
