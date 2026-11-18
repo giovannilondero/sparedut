@@ -156,6 +156,8 @@ const sendJoin = (code: string, password?: string) => {
 const menu = new Menu(settings, audio, {
   create: (o, oneTap = false) => {
     if (o.reach === "offline") {
+      // Still inside the tap that asks for the match: the only moment the browser grants fullscreen.
+      game?.requestFullscreen()
       // The room lives in this page: the game server need not be reachable.
       autostart = oneTap
       roomPassword = null
@@ -167,6 +169,7 @@ const menu = new Menu(settings, audio, {
       return
     }
     if (!ensureOnline()) return
+    game?.requestFullscreen()
     autostart = oneTap
     roomPassword = o.access.kind === "password" ? o.access.password : null
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
@@ -177,6 +180,7 @@ const menu = new Menu(settings, audio, {
   },
   join: (code, password) => {
     if (!ensureOnline()) return
+    game?.requestFullscreen()
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
     sendJoin(code, password)
   },

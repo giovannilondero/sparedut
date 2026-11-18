@@ -2,7 +2,7 @@
 <html lang="fur" class="booting">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#14110f" />
     <title>Sparedût</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -158,6 +158,8 @@
       <div id="crosshair"><i></i><i></i><i></i><i></i><b></b></div>
       <div id="hitmarker"></div>
       <div id="plumis"></div>
+      <!-- The HUD's panels. On a desktop the wrappers are invisible to layout; on touch they gather the panels in the area the controls leave free. -->
+      <div id="hud-free">
       <div id="turret-prompt" class="hidden"></div>
       <div id="turret-hud" class="hidden"><span id="turret-label"></span><div class="bar"><i id="turret-heat"></i></div></div>
 
@@ -175,6 +177,7 @@
       <div id="announce"></div>
       <div id="banner"></div>
 
+      <div id="hud-status">
       <div id="vitals">
         <div class="vital hp"><span class="ico">🧀</span><b id="hp">100</b><div class="bar"><i id="hp-bar"></i></div></div>
         <div class="vital armor"><span class="ico">🥮</span><b id="armor">0</b><div class="bar"><i id="armor-bar"></i></div></div>
@@ -187,8 +190,10 @@
         <div id="bombs"></div>
         <div id="slots"></div>
       </div>
+      </div>
 
       <div id="chat"><div id="chat-log"></div><input id="chat-input" class="hidden" maxlength="120" data-t-ph="chatPh" /></div>
+      </div>
       <div id="quickchat" class="hidden"></div>
 
       <div id="death" class="hidden">
@@ -204,7 +209,7 @@
       <div id="pause" class="hidden overlay"></div>
       <div id="settings-ingame" class="hidden overlay"></div>
       <div id="endscreen" class="hidden overlay"></div>
-      <div id="clickplay" class="hidden"><div class="for-mouse" data-t="clickplay"></div><div class="for-touch" data-t="tapplay"></div></div>
+      <div id="clickplay" class="hidden"></div>
 
       <!-- Touch controls (layout A): drawn where client/touch.ts places them; the canvas below takes the fingers. No text chat on touch. -->
       <div id="touch" class="hidden" aria-hidden="true">
@@ -226,6 +231,8 @@
     </div>
 
     <div id="toast" class="hidden"></div>
+    <!-- Resolves the safe-area insets (notch, home indicator) for the touch layout. -->
+    <div id="safe-area" aria-hidden="true"></div>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

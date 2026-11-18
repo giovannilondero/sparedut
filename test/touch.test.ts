@@ -5,7 +5,8 @@ import type { ArsenalValue } from "../shared/sim/schema.ts"
 import type { WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "../client/firstperson.ts"
 import type { Tracked } from "../client/controls.ts"
-import type { Circle, TouchView } from "../client/touch.ts"
+import type { Device } from "../client/device.ts"
+import type { Circle, Insets, Rect, TouchView } from "../client/touch.ts"
 
 type Listener = (e: Record<string, unknown>) => void
 
@@ -57,7 +58,7 @@ beforeAll(async () => {
 })
 
 /** A player in a match on a phone; each finger is a pointer of type "touch". */
-const phone = () => {
+const phone = (primary?: Device) => {
   for (const m of [docListeners, winListeners, elListeners]) m.clear()
   doc.pointerLockElement = null
   size.width = 844
@@ -71,7 +72,7 @@ const phone = () => {
     onKey: (code, down) => calls.push(`${code}:${down ? "down" : "up"}`),
     onPause: () => calls.push("pause"),
     onTouch: (v) => views.push(v)
-  })
+  }, primary)
   c.inMatch = true
   const finger = (pointerId: number, pointerType = "touch") => ({
     down: (x: number, y: number) => emit(elListeners, "pointerdown", { pointerId, pointerType, clientX: x, clientY: y }),
@@ -573,4 +574,75 @@ test("no touch control opens the text chat", () => {
   for (const b of TOUCH_BUTTONS) tap(layout().buttons[b])
   tap(centre(layout().weapon))
   expect(calls.filter((k) => k.startsWith("Enter") || k.startsWith("KeyT"))).toEqual([])
+})
+
+/** A phone's notch and home indicator: the insets the browser reports with `viewport-fit=cover`. */
+const NOTCH: Record<"portrait" | "landscape", Insets> = {
+  portrait: { top: 59, right: 0, bottom: 34, left: 0 },
+  landscape: { top: 0, right: 59, bottom: 21, left: 59 }
+}
+const box = (c: Circle): Rect => ({ left: c.x - c.r, top: c.y - c.r, width: 2 * c.r, height: 2 * c.r })
+const meets = (a: Rect, b: Rect) => a.left < b.left + b.width && b.left < a.left + a.width && a.top < b.top + b.height && b.top < a.top + a.height
+
+for (const [width, height] of [[390, 844], [844, 390], [360, 640], [640, 360], [820, 1180], [1180, 820]]) {
+  // Phones with a notch are tall ones: 640x360 has none.
+  for (const notch of Math.max(width, height) >= 800 ? [false, true] : [false]) {
+    const insets = notch ? NOTCH[height > width ? "portrait" : "landscape"] : { top: 0, right: 0, bottom: 0, left: 0 }
+    test(`at ${width}x${height}${notch ? " with a notch" : ""} the controls keep to the safe area and leave the HUD a free area`, () => {
+      const l = touchLayout({ width, height }, insets)
+      const safe: Rect = { left: insets.left, top: insets.top, width: width - insets.left - insets.right, height: height - insets.top - insets.bottom }
+      const inside = (r: Rect) => r.left >= safe.left && r.top >= safe.top && r.left + r.width <= safe.left + safe.width && r.top + r.height <= safe.top + safe.height
+      const controls: [string, Rect][] = [["stick", box(l.stick.rest)], ["fire", box(l.fire)], ...Object.entries(l.buttons).map(([n, c]): [string, Rect] => [n, box(c)]), ["weapon", l.weapon]]
+      for (const [name, r] of [...controls, ["free", l.free] as [string, Rect]]) expect({ name, inside: inside(r) }).toEqual({ name, inside: true })
+      // No HUD element under a control: the free area meets none of them.
+      for (const [name, r] of controls) expect({ name, clear: !meets(l.free, r) }).toEqual({ name, clear: true })
+      // Room for the HUD: the score bar and the vitals fit across it.
+      expect(l.free.width).toBeGreaterThanOrEqual(240)
+      expect(l.free.height).toBeGreaterThanOrEqual(safe.height * (l.portrait ? 0.5 : 0.85))
+      if (l.portrait) {
+        // The controls take the lower third, give or take a home indicator; the HUD sits above them.
+        const below = controls.filter(([n]) => n !== "menu" && n !== "board" && n !== "phrases")
+        for (const [name, r] of below) expect({ name, low: r.top >= safe.top + safe.height * 0.6 }).toEqual({ name, low: true })
+        for (const [, r] of below) expect(l.free.top + l.free.height).toBeLessThanOrEqual(r.top)
+      }
+    })
+  }
+}
+
+test("the layout follows the insets: a rotation that moves the notch re-lays it", () => {
+  const { c } = phone()
+  const plain = c.relayout({ width: 844, height: 390 })
+  const notched = c.relayout({ width: 844, height: 390 }, NOTCH.landscape)
+  expect(notched).not.toBe(plain)
+  expect(c.relayout({ width: 844, height: 390 }, { ...NOTCH.landscape })).toBe(notched)
+  expect(notched.buttons.menu.x).toBeGreaterThan(plain.buttons.menu.x)
+})
+
+test("the active device is the one used last, in the menu too, and starts from the main pointer", () => {
+  expect(phone().c.device).toBe("keyboard")
+  const { c, finger } = phone("touch")
+  expect(c.device).toBe("touch") // a phone: the first prompt already says "tap"
+  emit(winListeners, "keydown", { code: "KeyW", repeat: false })
+  expect(c.device).toBe("keyboard") // a key typed in the menu
+  emit(docListeners, "pointerdown", { pointerType: "touch" })
+  expect(c.device).toBe("touch") // a tap on a menu button
+  emit(docListeners, "pointerdown", { pointerType: "mouse" })
+  expect(c.device).toBe("keyboard")
+  finger(1).down(600, 150)
+  expect(c.device).toBe("touch") // the first touch in the match
+  pad.buttons[0] = { pressed: true, value: 1 }
+  c.poll(1 / 60)
+  pad.buttons[0] = { pressed: false, value: 0 }
+  c.poll(1 / 60)
+  expect(c.device).toBe("pad")
+  c.lock()
+  expect(c.device).toBe("keyboard") // a click locks the mouse
+})
+
+test("while touch drives the match, a stray key does not change what the prompts name", () => {
+  const { c, finger } = phone()
+  finger(1).down(600, 150)
+  emit(winListeners, "keydown", { code: "KeyE", repeat: false })
+  expect(c.touchActive).toBe(true)
+  expect(c.device).toBe("touch")
 })

@@ -52,7 +52,9 @@ export function lookFromUrl(): LookId {
 /** A small bar to switch look (reloads the page). Hidden while the mouse is captured. */
 export function mountLookSwitcher(current: LookId) {
   const bar = document.createElement("div")
-  bar.style.cssText = "position:fixed;right:10px;bottom:10px;z-index:50;display:flex;gap:4px;padding:4px;border-radius:8px;background:rgba(12,10,8,.7);font:12px ui-sans-serif,system-ui,sans-serif"
+  // Hidden during a match on every device (style.css): it belongs to the menu.
+  bar.id = "look-switcher"
+  bar.style.cssText = "position:fixed;right:max(10px, env(safe-area-inset-right, 0px));bottom:max(10px, env(safe-area-inset-bottom, 0px));z-index:50;display:flex;gap:4px;padding:4px;border-radius:8px;background:rgba(12,10,8,.7);font:12px ui-sans-serif,system-ui,sans-serif"
   for (const id of LOOK_IDS) {
     const b = document.createElement("button")
     b.textContent = LOOKS[id]
@@ -66,7 +68,6 @@ export function mountLookSwitcher(current: LookId) {
     bar.append(b)
   }
   document.body.append(bar)
-  document.addEventListener("pointerlockchange", () => (bar.hidden = !!document.pointerLockElement))
 }
 
 // --- restyling ----------------------------------------------------------------------------

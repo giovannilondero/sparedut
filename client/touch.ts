@@ -37,6 +37,15 @@ export type TouchButton = (typeof TOUCH_BUTTONS)[number]
 /** A button's bit in `TouchView.pressed`. */
 export const buttonBit = (b: TouchButton) => 1 << TOUCH_BUTTONS.indexOf(b)
 
+/** The safe-area insets of the screen (a notch, rounded corners, a home indicator), in CSS pixels. */
+export interface Insets {
+  readonly top: number
+  readonly right: number
+  readonly bottom: number
+  readonly left: number
+}
+export const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 }
+
 export interface TouchLayout {
   readonly portrait: boolean
   /** Where a thumb starts the stick (centred where it lands); `radius` is the drag for full tilt. */
@@ -48,21 +57,33 @@ export interface TouchLayout {
   readonly weapon: Rect
   /** The picker's entries, top to bottom: room for every weapon slot. */
   readonly picker: readonly Rect[]
+  /**
+   * Where the HUD goes: no control and no resting thumb inside it. In portrait it is everything
+   * above the controls and below the corner buttons; in landscape the column between the stick
+   * and the buttons around fire.
+   */
+  readonly free: Rect
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
 
-/** Layout A for a canvas of this size; in portrait the controls keep to the lower part of the screen. */
-export const touchLayout = ({ width, height }: { readonly width: number; readonly height: number }): TouchLayout => {
-  const portrait = height > width
+/**
+ * Layout A for a canvas of this size, inside the safe area the insets leave. In portrait the
+ * controls take the lower third of the screen and the HUD sits above them.
+ */
+export const touchLayout = (size: { readonly width: number; readonly height: number }, insets: Insets = NO_INSETS): TouchLayout => {
+  const portrait = size.height > size.width
+  // Everything is placed in the safe area: (x0, y0) is its top-left corner.
+  const x0 = insets.left
+  const y0 = insets.top
+  const width = size.width - insets.left - insets.right
+  const height = size.height - insets.top - insets.bottom
   const short = Math.min(width, height)
   const radius = clamp(short * 0.15, 48, 84)
   const fireR = clamp(short * 0.11, 36, 60)
-  // In portrait the HUD sits above the controls, which take the lower part of the screen.
-  const top = portrait ? height * 0.5 : height * 0.2
   const margin = clamp(short * 0.05, 16, 40)
-  const bottom = portrait ? height / 6 : fireR * 2.2
-  const fire: Circle = { x: width - margin - fireR * 1.6, y: height - bottom, r: fireR }
+  const bottom = fireR * 2.2
+  const fire: Circle = { x: x0 + width - margin - fireR * 1.6, y: y0 + height - bottom, r: fireR }
 
   // The other actions sit around fire on two arcs, opening up and to the left, within a thumb's reach.
   const btn = clamp(short * 0.065, 24, 34)
@@ -76,37 +97,53 @@ export const touchLayout = ({ width, height }: { readonly width: number; readonl
   const mine = around(ring2, 255)
   // The match menu, the scoreboard and the quick phrases: a row in the top-left corner, out of the thumbs' way.
   const small = Math.max(22, btn * 0.9)
-  const corner = (i: number): Circle => ({ x: margin + small + i * (2 * small + gap), y: margin + small, r: small })
+  const corner = (i: number): Circle => ({ x: x0 + margin + small + i * (2 * small + gap), y: y0 + margin + small, r: small })
 
+  const rest: Circle = { x: x0 + margin + radius * 1.4, y: y0 + height - bottom, r: radius }
   const weaponW = clamp(short * 0.32, 110, 160)
   const weaponH = btn * 1.6
-  const weapon: Rect = { left: width - margin - weaponW, top: mine.y - btn - gap - weaponH, width: weaponW, height: weaponH }
-  // The picker opens beside the name, downwards, over the buttons it covers while open.
+  // Above the buttons in landscape; in portrait above the stick, so that the controls keep to the lower third.
+  const weapon: Rect = portrait
+    ? { left: x0 + margin, top: rest.y - radius - gap - weaponH, width: weaponW, height: weaponH }
+    : { left: x0 + width - margin - weaponW, top: mine.y - btn - gap - weaponH, width: weaponW, height: weaponH }
+  // The picker opens beside the name, towards the middle and downwards, over the controls it covers while open.
   const step = weaponH + gap / 1.5
-  const picker = [0, 1, 2, 3].map((i): Rect => ({ left: weapon.left - gap - weaponW, top: weapon.top + i * step, width: weaponW, height: weaponH }))
+  const pickerLeft = portrait ? weapon.left + weaponW + gap : weapon.left - gap - weaponW
+  const picker = [0, 1, 2, 3].map((i): Rect => ({ left: pickerLeft, top: weapon.top + i * step, width: weaponW, height: weaponH }))
+  const buttons = {
+    crouch: around(ring, 155),
+    aim: around(ring, 200),
+    jump: around(ring, 245),
+    reload: around(ring, 290),
+    bomb: around(ring2, 220),
+    mine,
+    use: around(ring2, 290, btn * 1.1),
+    menu: corner(0),
+    board: corner(1),
+    phrases: corner(2)
+  }
+  // The controls under the thumbs: the stick at rest, fire, the name and the buttons around them.
+  const thumbs = [rest, fire, buttons.crouch, buttons.aim, buttons.jump, buttons.reload, buttons.bomb, buttons.mine, buttons.use]
+  const controlsTop = Math.min(weapon.top, ...thumbs.map((c) => c.y - c.r))
+  const corners = buttons.menu.y + small
+  const free: Rect = portrait
+    ? { left: x0 + margin, top: corners + gap, width: width - 2 * margin, height: controlsTop - gap - (corners + gap) }
+    : (() => {
+        const left = Math.max(rest.x + radius, buttons.phrases.x + small) + gap
+        const right = Math.min(weapon.left, ...thumbs.filter((c) => c !== rest).map((c) => c.x - c.r)) - gap
+        return { left, top: y0 + gap, width: right - left, height: height - 2 * gap }
+      })()
+  // In portrait a thumb starts the stick only among the controls, below the HUD.
+  const top = portrait ? controlsTop : y0 + height * 0.2
 
   return {
     portrait,
-    stick: {
-      region: { left: 0, top, width: width / 2, height: height - top },
-      radius,
-      rest: { x: margin + radius * 1.4, y: height - bottom, r: radius }
-    },
+    stick: { region: { left: x0, top, width: width / 2, height: y0 + height - top }, radius, rest },
     fire,
-    buttons: {
-      crouch: around(ring, 155),
-      aim: around(ring, 200),
-      jump: around(ring, 245),
-      reload: around(ring, 290),
-      bomb: around(ring2, 220),
-      mine,
-      use: around(ring2, 290, btn * 1.1),
-      menu: corner(0),
-      board: corner(1),
-      phrases: corner(2)
-    },
+    buttons,
     weapon,
-    picker
+    picker,
+    free
   }
 }
 
