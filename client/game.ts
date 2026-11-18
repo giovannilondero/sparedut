@@ -20,7 +20,7 @@ import { UnavailableSteps } from "./training-unavailable.ts"
 import type { StationId } from "../shared/training/index.ts"
 import { FRESH_TRAINING, trainingProgressed } from "./settings.ts"
 import { entryChoice, listOnEntry, stationButtonId, stationEntries, stationListHtml } from "./training-menu.ts"
-import { WEAPONS, type Slot, type WeaponId } from "../shared/weapons.ts"
+import { PRIMARIES, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
 import { Controls, trackedIn } from "./controls.ts"
@@ -40,7 +40,7 @@ import "@ui-sdk/web/dialog"
 import "@ui-sdk/web/select"
 import { takeAwayDeparted } from "./bodies.ts"
 import { alwaysChosen } from "./choice.ts"
-import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, menuPrimary, musterCountdown, musterFocus, musterScreen, musterTeams, primaryPicker, startsAtOnce, type MatchMenu, type MusterScreen } from "./match-menus.ts"
+import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, menuPrimary, musterCountdown, musterFocus, musterScreen, musterTeams, primaryPicker, singleOf, singleValue, SINGLE_OFF, startsAtOnce, type MatchMenu, type MusterScreen } from "./match-menus.ts"
 import { pickerEntries } from "./touch.ts"
 import { onViewportChange } from "./viewport.ts"
 
@@ -190,6 +190,8 @@ export class Game {
   private musterHost: boolean | null = null
   /** The Muster screen last drawn (the Muster, or joining a match already on), null before it is drawn. */
   private musterDrawn: string | null = null
+  /** The single weapon the Muster's primary picker was last drawn for (null: off), undefined before it is drawn. */
+  private musterSingle: PrimaryId | null | undefined = undefined
   /** The match's score and time last written on the joining screen. */
   private musterMatch = ""
   /** The countdown's seconds last drawn in the Muster (null: none running), undefined before it is drawn. */
@@ -1224,9 +1226,38 @@ export class Game {
       )
       .join("")
     $("m-team").textContent = s.pause.switchTeam(s.teams[this.otherTeam()].name)
+    // The host changed single weapon: the picker locks or unlocks for everybody.
+    if (room.single !== this.musterSingle) this.drawMusterPicker(room)
     // Joining a match already on has no ready mark: the confirm is the member's own.
     document.getElementById("m-ready")?.setAttribute("aria-pressed", String(this.readyMark()))
     if (host) this.syncLevel("m", room)
+    const single = document.getElementById("m-single") as SelectElement | null
+    if (single && single.value !== singleValue(room.single)) single.value = singleValue(room.single)
+  }
+
+  /**
+   * The Muster's primary picker: free on the player's own primary, or locked on the host's single
+   * weapon, with the note saying so. Redrawn only when the setting changes, so that focus stays.
+   */
+  private drawMusterPicker(room: RoomInfo) {
+    const s = t()
+    const picker = primaryPicker(room, this.d.settings.primary)
+    this.musterSingle = room.single
+    $("m-picker").innerHTML = `${picker._tag === "locked" ? `<p class="muted" id="m-locked">${esc(s.muster.locked(s.weapons[picker.chosen].name))}</p>` : ""}<div class="weapons" id="muster-armarie"></div>`
+    // The primary the player enters with; the browser remembers it for the next room. Under single
+    // weapon the picker is locked on the host's choice, and the remembered primary stays.
+    this.d.menu.buildArmarie($("muster-armarie"), (primary) => this.d.net.send({ t: "primary", p: primary }), picker)
+  }
+
+  /** The host's single weapon in the Muster, beside the bot tools: off, or one primary for everybody. */
+  private singleToolHtml(room: RoomInfo) {
+    const s = t()
+    const item = (value: string, name: string) => `<ui-select-item value="${value}">${name}<ui-select-item-indicator aria-hidden="true">✓</ui-select-item-indicator></ui-select-item>`
+    return `<ui-select id="m-single" class="host-level" presentation="auto" default-value="${singleValue(room.single)}">
+          <ui-select-label>${s.static.singleLabel}</ui-select-label>
+          <ui-select-trigger><button><ui-select-value></ui-select-value></button></ui-select-trigger>
+          <ui-select-content class="select-list level-list">${item(SINGLE_OFF, s.menu.singleOff)}${PRIMARIES.map((p) => item(p, s.weapons[p].name)).join("")}</ui-select-content>
+        </ui-select>`
   }
 
   /** My own ready mark, as the roster has it. */
@@ -1265,7 +1296,7 @@ export class Game {
     const p = s.pause
     const m = s.muster
     this.musterLeft = undefined
-    const picker = primaryPicker(room, this.d.settings.primary)
+    this.musterSingle = undefined
     this.drawMenu(MENU_PARTS.muster[1], m.title, `
       <div class="overlay-body">
         <div id="m-countdown" class="muster-countdown" role="timer"></div>
@@ -1273,10 +1304,9 @@ export class Game {
         ${this.roomCodeHtml("m", room)}
         ${joining ? `<div class="muster-match" id="m-match" aria-live="off"></div>${view.nextMatch ? `<p class="muster-note">${m.nextMatch}</p>` : ""}` : ""}
         <div class="roster" id="m-roster"></div>
-        ${host ? `<div class="host-tools"><span class="host-label">👑 ${p.host}</span>${this.botToolsHtml("m", room)}</div>` : `<div class="muted host-only">${p.hostOnly}</div>`}
+        ${host ? `<div class="host-tools"><span class="host-label">👑 ${p.host}</span>${this.botToolsHtml("m", room)}${joining ? "" : this.singleToolHtml(room)}</div>` : `<div class="muted host-only">${p.hostOnly}</div>`}
         <h3>${m.primary}</h3>
-        ${picker._tag === "locked" ? `<p class="muted" id="m-locked">${esc(m.locked(s.weapons[picker.chosen].name))}</p>` : ""}
-        <div class="weapons" id="muster-armarie"></div>
+        <div id="m-picker"></div>
         <h3>${m.chat}</h3>
         <div class="muster-chat" id="m-chat-log" role="log"></div>
         <input id="m-chat" class="muster-chat-input" maxlength="120" placeholder="${m.chatPlaceholder}" aria-label="${m.chat}" />
@@ -1289,9 +1319,7 @@ export class Game {
       </div>`)
     const el = $(MENU_PARTS.muster[1])
     this.bindCopy("m", room)
-    // The primary the player enters with; the browser remembers it for the next room. Under single
-    // weapon the picker is locked on the host's choice, and the remembered primary stays.
-    this.d.menu.buildArmarie($("muster-armarie"), (primary) => this.d.net.send({ t: "primary", p: primary }), picker)
+    this.drawMusterPicker(room)
     this.renderMusterChat()
     const chat = $<HTMLInputElement>("m-chat")
     chat.addEventListener("keydown", (e) => {
@@ -1326,6 +1354,10 @@ export class Game {
         if (this.room && startsAtOnce(this.room, this.me)) this.controls.lock()
       }
       $("m-cancel").onclick = () => this.d.net.send({ t: "cancel" })
+      // The room's update sets the value back from code ("imperative"): only the host's own choice is sent.
+      $<SelectElement>("m-single").addEventListener("valuechange", alwaysChosen((value, reason) => {
+        if (reason !== "imperative") this.d.net.send({ t: "single", p: singleOf(value) })
+      }))
     }
     if (!wasOpen) this.openMenu(...MENU_PARTS.muster, musterFocus({ host, reach: room.reach }))
   }

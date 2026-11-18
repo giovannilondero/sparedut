@@ -111,7 +111,7 @@ export interface ArsenalValue {
   readonly kit: Kit
   readonly current: WeaponId
   readonly primary: PrimaryId
-  /** The primary weapon chosen for the next respawn. */
+  /** The player's own primary, for the next respawn. Under single weapon the room's is carried instead, and this is kept for when it is off. */
   readonly nextPrimary: PrimaryId
   /** What is carried in slot 3: the Lanciafrico or the casot's panel, never both; null when nothing. */
   readonly power: PowerId | null
@@ -284,6 +284,8 @@ export const ChangePrimary = Descriptor.Event<{ readonly session: string; readon
 export const StartMatch = Descriptor.Event<{ readonly now: boolean }>()("Sparedut/StartMatch")
 /** The host cancels the Muster's countdown. */
 export const CancelCountdown = Descriptor.Event<{}>()("Sparedut/CancelCountdown")
+/** The host sets single weapon (null: off). Taken only in the Muster: the rules change there, never during a match. */
+export const SetSingle = Descriptor.Event<{ readonly single: PrimaryId | null }>()("Sparedut/SetSingle")
 /** From the host, only in a training: the client's report of an interface step (`shared/training/interface.ts`). */
 export const ReportInterface = Descriptor.Event<{ readonly session: string; readonly action: InterfaceAction }>()("Sparedut/ReportInterface")
 /** From the host, only in a training: the client says its active device has no control for this step (`shared/training/controls.ts`). */
@@ -322,7 +324,7 @@ export const Game = Schema.bind(
     components: { Player, TeamOf, Post, Motion, Controls, Life, Arsenal, Stats, Attackers, Projectile },
     requires: [Schema.requires(Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers)],
     resources: { Rules, Objective, Tick, Score, Flags, Hill, Cart, StormCourse, Pickups, Turrets, Doors, Panels, History, Rng },
-    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, CancelCountdown, ReportInterface, GoToStation, StepUnavailable, Damage, Heal, DoorHit, Out }
+    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, CancelCountdown, SetSingle, ReportInterface, GoToStation, StepUnavailable, Damage, Heal, DoorHit, Out }
   }),
   Root
 )

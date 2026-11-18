@@ -204,7 +204,7 @@ export class Hub {
     }
     if (!room) return
     // A training has no host tools, and its player stays a Benandante.
-    if (room.training && (msg.t === "team" || msg.t === "start" || msg.t === "ready" || msg.t === "cancel" || msg.t === "bot" || msg.t === "level")) return
+    if (room.training && (msg.t === "team" || msg.t === "start" || msg.t === "ready" || msg.t === "cancel" || msg.t === "single" || msg.t === "bot" || msg.t === "level")) return
     switch (msg.t) {
       case "input":
         room.queueInput(id, msg.i)
@@ -234,6 +234,9 @@ export class Hub {
         return
       case "cancel":
         if (room.hostId === id) room.cancelCountdown()
+        return
+      case "single":
+        if (room.setSingle(id, msg.p)) this.roomChanged(room)
         return
       case "enter":
         if (room.enter(id)) this.roomChanged(room)
