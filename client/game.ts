@@ -22,7 +22,7 @@ import { FRESH_TRAINING, trainingProgressed } from "./settings.ts"
 import { entryChoice, listOnEntry, stationButtonId, stationEntries, stationListHtml } from "./training-menu.ts"
 import { PANEL_HP, PRIMARIES, usesAmmo, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
-import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
+import type { Avatar, Fx, GameAudio, MotoseeEngine, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
 import { Controls, trackedIn } from "./controls.ts"
 import { boardHtml, esc, fmtClock, Hud, primaryHtml, rosterHtml } from "./hud.ts"
 import { t } from "./i18n.ts"
@@ -65,6 +65,8 @@ const OPENED_CONTENT = MATCH_MENUS.map((m) => `#${MENU_PARTS[m][1]}`).join(", ")
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 const INTERP_TICKS = 6
+/** The Motosee's rev, the ticks from trigger to bite. */
+const REV_TICKS = WEAPONS.motosee.spinTicks
 /** The keys of the quick phrases, in order: the number row, then the key after 0. */
 const PHRASE_KEYS = [..."1234567890".split("").map((d) => ({ code: `Digit${d}`, label: d })), { code: "Minus", label: "-" }]
 const SHOT_SOUND: Partial<Record<WeaponId, SoundName>> = {
@@ -162,7 +164,8 @@ export class Game {
   private turretCooldown = 0
   /** Last time (s) the heal sound played, so it doesn't turn into a barrage. */
   private healSoundAt = 0
-  private avatars = new Map<string, { avatar: Avatar; blob: THREE.Mesh; team: Team; stepAcc: number; last: { x: number; z: number } | null }>()
+  /** The others' avatars; `rev`: how far a Motosee in their hands has revved, in ticks, judged from its trigger as the server does. */
+  private avatars = new Map<string, { avatar: Avatar; blob: THREE.Mesh; team: Team; stepAcc: number; last: { x: number; z: number } | null; rev: number }>()
   /** Real player shadows only on high quality; otherwise a dark disc at their feet. */
   private dynamicShadows = false
   private snapArrivals: number[] = []
@@ -332,6 +335,7 @@ export class Game {
   stop() {
     this.running = false
     this.d.audio.disco(null, false)
+    this.d.audio.motosees([])
     this.openOverlay("none")
     for (const a of this.avatars.values()) {
       this.d.scene.remove(a.avatar.object, a.blob)
@@ -1649,10 +1653,8 @@ export class Game {
       audio.play("melee_swing")
       return
     }
-    if (def.mode === "held") {
-      audio.play("cut_motosee")
-      return
-    }
+    // the Motosee's sound is its engine, which runs for as long as it is in hand
+    if (def.mode === "held") return
     if (def.mode === "projectile") {
       audio.play(def.shell === "gjaline" ? "launch_gjaline" : "launch_frico")
       return
@@ -1762,7 +1764,8 @@ export class Game {
     const you = s?.you ?? null
     const myTeam = this.teams.get(this.me)
 
-    // The others' avatars.
+    // The others' avatars, and the Motosees in hand.
+    const engines: MotoseeEngine[] = []
     if (s) {
       for (const p of s.players) {
         if (p.id === this.me) continue
@@ -1774,7 +1777,7 @@ export class Game {
           const blob = new THREE.Mesh(this.blobGeo, this.blobMat)
           blob.renderOrder = 1
           this.d.scene.add(avatar.object, blob)
-          entry = { avatar, blob, team, stepAcc: 0, last: null }
+          entry = { avatar, blob, team, stepAcc: 0, last: null, rev: 0 }
           this.avatars.set(p.id, entry)
         }
         const q = this.interpolated(p.id) ?? p
@@ -1813,6 +1816,12 @@ export class Game {
           }
         }
         entry.last = { x: q.x, z: q.z }
+        // A Motosee in hand is heard by everybody: idling, revving while the trigger is held, then cutting.
+        const firing = (q.f & FLAG_BIT.firing) !== 0
+        if (q.f & FLAG_BIT.alive && q.w === "motosee") {
+          entry.rev = firing ? Math.min(REV_TICKS, entry.rev + dt * 60) : Math.max(0, entry.rev - dt * 120)
+          engines.push({ id: p.id, at: [q.x, q.y + 1.1, q.z], rev: entry.rev / REV_TICKS, cutting: firing && entry.rev >= REV_TICKS })
+        } else entry.rev = 0
       }
     }
 
@@ -1844,6 +1853,11 @@ export class Game {
       reserve: you?.arsenal.ammo[this.wanted].reserve ?? 0,
       reload: own && reloadProgress !== null ? { progress: reloadProgress, mag: own.mag, reserve: own.reserve } : null
     })
+    if (you?.alive && view.inHand === "motosee") {
+      const rev = this.localSpin / REV_TICKS
+      engines.push({ id: this.me, at: null, rev, cutting: rev >= 1 && this.prevFire })
+    }
+    audio.motosees(engines)
     if (this.ownReload && view.hensIn > this.ownReload.hensIn) {
       audio.play("cluck_gjaline")
       this.ownReload.hensIn = view.hensIn
