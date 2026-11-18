@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "Sparedût",
+  "short_name": "Sparedût",
+  "lang": "fur",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "theme_color": "#14110f",
+  "background_color": "#14110f",
+  "icons": [
+    { "src": "/icons/any-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/any-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

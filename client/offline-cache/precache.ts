@@ -23,6 +23,8 @@ export interface Precache {
   readonly urls: readonly string[]
   /** What the install downloads. */
   readonly bytes: number
+  /** Derived from the Vêr look's files alone, which are cached on first use: it names their cache. */
+  readonly ver: string
 }
 
 /** The service worker's own file: the browser fetches it, it never comes from a cache. */
@@ -34,6 +36,13 @@ const left = (url: string) => isVerFile(url) || url === "/_headers" || url === `
 /** The page is asked for as `/`: Cloudflare answers `/index.html` with a redirect, which a navigation can't take from a cache. */
 const urlOf = (path: string) => (path === "index.html" ? "/" : `/${path}`)
 
+/** A hash of the urls and contents of `files`, 12 hex digits. */
+const versionOf = (files: readonly { url: string; hash: string }[]) => {
+  const digest = createHash("sha256")
+  for (const file of [...files].sort((a, b) => (a.url < b.url ? -1 : a.url > b.url ? 1 : 0))) digest.update(`${file.url}\0${file.hash}\n`)
+  return digest.digest("hex").slice(0, 12)
+}
+
 export function precacheOf(files: readonly BuiltFile[]): Precache {
   const kept = files
     .map((file) => ({ ...file, url: urlOf(file.path) }))
@@ -44,6 +53,7 @@ export function precacheOf(files: readonly BuiltFile[]): Precache {
   return {
     version: digest.digest("hex").slice(0, 12),
     urls: kept.map((file) => file.url),
-    bytes: kept.reduce((sum, file) => sum + file.bytes, 0)
+    bytes: kept.reduce((sum, file) => sum + file.bytes, 0),
+    ver: versionOf(files.map((file) => ({ ...file, url: urlOf(file.path) })).filter((file) => isVerFile(file.url) && !/\.(md|map)$/.test(file.url)))
   }
 }

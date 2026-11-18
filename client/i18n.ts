@@ -11,6 +11,7 @@ import type { MapId, Team } from "../shared/map.ts"
 import type { Access, ErrorCode, Reach } from "../shared/protocol.ts"
 import type { WeaponId } from "../shared/weapons.ts"
 import type { Device } from "./device.ts"
+import type { Notice } from "./offline-cache/too-old.ts"
 
 export type Lang = "fur" | "it"
 
@@ -36,6 +37,16 @@ export interface Strings {
   readonly mine: string
   readonly quality: Record<"bassa" | "media" | "alta", string>
   readonly errors: Record<ErrorCode, string>
+  /** The game is too old for the server (`client/offline-cache/too-old.ts`): updating itself, or why it cannot. */
+  readonly tooOld: Record<Notice, string>
+  /** The installable game in the menu: the install entry and the update notice. */
+  readonly app: {
+    readonly install: string
+    /** How to add the game to the home screen where the browser has no install prompt (iPhone, iPad). */
+    readonly byHand: string
+    readonly update: string
+    readonly updating: string
+  }
   readonly menu: {
     readonly needName: string
     readonly roomsEmpty: string
@@ -77,6 +88,8 @@ export interface Strings {
     readonly lostRetry: string
     /** The host of an Offline room did not start in this browser. */
     readonly offlineFailed: string
+    /** Vêr was chosen, but with no network and never downloaded: Cumò is shown instead. */
+    readonly verOffline: string
   }
   readonly hud: {
     readonly over: string
@@ -415,6 +428,18 @@ const fur: Strings = {
     wrongPassword: "Password sbaliade. Torne a provâ.",
     tooManyAttempts: "Masse password sbaliadis: spiete un pôc e torne a provâ."
   },
+  tooOld: {
+    updating: "Il server al à une version plui gnove dal zûc: le stoi cjamant jù, po la pagjine si torne a cjamâ di bessole.",
+    noWorker: "Version diferente dal server: torne a cjariâ la pagjine.",
+    noUpdate: "Il server al à une version plui gnove, ma no rivi a cjamâle jù. Lis partidis offline a van istès.",
+    stillRefused: "Il server nol acete ancjemò cheste version. Lis partidis offline a van istès: torne a provâ plui tart."
+  },
+  app: {
+    install: "Instale il zûc",
+    byHand: "Par vê il zûc su la schermade di inizi: tocje Condividi e po «Aggiungi alla schermata Home».",
+    update: "E je pronte une version gnove dal zûc: tocje par cjariâle.",
+    updating: "O cjarii la version gnove…"
+  },
   menu: {
     needName: "Prime il non!",
     roomsEmpty: "Nissune partide viarte. Creine une!",
@@ -453,7 +478,8 @@ const fur: Strings = {
     down: "Il server nol rispuint. Isal impiât? (pnpm dev)",
     lost: "Conession pierdude. Mandi!",
     lostRetry: "Conession pierdude: o torni a provâ…",
-    offlineFailed: "No rivi a inviâ la partide offline: torne a cjamâ la pagjine."
+    offlineFailed: "No rivi a inviâ la partide offline: torne a cjamâ la pagjine.",
+    verOffline: "Vêr nol è ancjemò stât discjamât e no tu âs rêt: intant tu viodis Cumò."
   },
   hud: {
     over: "FIN",
@@ -769,6 +795,18 @@ const it: Strings = {
     wrongPassword: "Password sbagliata. Riprova.",
     tooManyAttempts: "Troppe password sbagliate: aspetta un attimo e riprova."
   },
+  tooOld: {
+    updating: "Il server ha una versione più nuova del gioco: la sto scaricando, poi la pagina si ricarica da sola.",
+    noWorker: "Versione diversa dal server: ricarica la pagina.",
+    noUpdate: "Il server ha una versione più nuova, ma non riesco a scaricarla. Le partite offline funzionano comunque.",
+    stillRefused: "Il server non accetta ancora questa versione. Le partite offline funzionano comunque: riprova più tardi."
+  },
+  app: {
+    install: "Installa il gioco",
+    byHand: "Per avere il gioco nella schermata Home: tocca Condividi e poi «Aggiungi alla schermata Home».",
+    update: "È pronta una nuova versione del gioco: tocca per caricarla.",
+    updating: "Carico la nuova versione…"
+  },
   menu: {
     needName: "Prima il nome!",
     roomsEmpty: "Nessuna partita aperta. Creane una!",
@@ -807,7 +845,8 @@ const it: Strings = {
     down: "Il server non risponde. È acceso? (pnpm dev)",
     lost: "Connessione persa. Mandi!",
     lostRetry: "Connessione persa: riprovo…",
-    offlineFailed: "Non riesco ad avviare la partita offline: ricarica la pagina."
+    offlineFailed: "Non riesco ad avviare la partita offline: ricarica la pagina.",
+    verOffline: "Vêr non è ancora stato scaricato e non c'è rete: intanto vedi Cumò."
   },
   hud: {
     over: "FINE",

@@ -6,6 +6,13 @@
     <meta name="theme-color" content="#14110f" />
     <title>Sparedût</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Installable: the manifest, and for iOS its own icon and no browser bars once on the home screen. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-180.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Sparedût" />
     <link rel="stylesheet" href="./style.css" />
     <!-- Loading screen: inline styles, so it shows before the CSS and the bundle. -->
     <style>
@@ -43,6 +50,8 @@
         <!-- The look the world is drawn in: chosen here only, never shown over a match. Its buttons are built by Menu.bindLook (client/menu.ts). -->
         <div id="look-switch" class="look-switch" role="group" aria-labelledby="look-label"><span id="look-label"></span></div>
         <div class="lang" role="group" aria-labelledby="lang-label"><span id="lang-label" data-t="language"></span><button data-lang="fur">Furlan</button><button data-lang="it">Italiano</button></div>
+        <!-- A new version is waiting: one tap loads it. Never shown over a match (client/menu-model.ts). -->
+        <button id="update-notice" class="update-notice" hidden></button>
       </header>
 
       <!-- Home: everything at once, the room list beside the actions when there is room for it. -->
@@ -75,6 +84,9 @@
           <button data-go="armarie" data-t="armarie"></button>
           <button data-go="settings" data-t="settings"></button>
           <button data-go="vocabolari" data-t="vocab"></button>
+          <!-- Installing the game: the browser's prompt, or how to add it by hand on iPhone and iPad; nothing once installed. -->
+          <button id="install" class="install" hidden></button>
+          <p id="install-by-hand" class="install-by-hand" hidden></p>
         </nav>
       </div>
 
