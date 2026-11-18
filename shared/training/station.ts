@@ -77,14 +77,23 @@ export interface StepRule {
   readonly advance: (seen: Seen, now: StepProgress) => StepProgress
 }
 
-/** A bot at a station: kept present by the host while the station is current. */
+/**
+ * A bot at a station: kept present by the host while the station is current, gone when it is not
+ * (`server/station-bot.ts`). It spawns, and comes back after the usual respawn delay when killed,
+ * at the first point of its route, with `hp` health.
+ */
 export interface StationBot {
   readonly team: Team
   /** The points it walks, back and forth; a single point is a bot standing still. */
   readonly route: readonly V3[]
+  /** False: it walks its route and never fires. True: an ordinary bot at the room's skill, which leaves its route to fight. */
   readonly fires: boolean
+  /** Its health on every spawn (`MAX_HP` is full). */
   readonly hp: number
 }
+
+/** The most bots a station keeps present, so never more alive at once: the host keeps the first ones its setup lists. */
+export const MAX_STATION_BOTS = 4
 
 /** What arriving at a station gives the trainee and puts in force. Every weapon's ammunition is refilled. */
 export interface StationSetup {

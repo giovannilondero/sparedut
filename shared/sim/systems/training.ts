@@ -7,11 +7,11 @@
  * It is not gated on the `Training` machine: it reads `Out`, and a reader that never ran would
  * keep a regular room's events waiting for it.
  */
-import { SAGRE_STATIONS } from "../../maps/sagre.ts"
+import { SAGRE, SAGRE_STATIONS } from "../../maps/sagre.ts"
 import { STATION_IDS, STATIONS, stepRule, stepsOf } from "../../training/index.ts"
 import type { Seen } from "../../training/station.ts"
-import { freshArsenal, MAX_HP } from "../rules.ts"
-import { Arsenal, Controls, Game, Life, Motion, Objective, Out, Player, Tick, Training } from "../schema.ts"
+import { freshArsenal, freshDoors, MAX_HP } from "../rules.ts"
+import { Arsenal, Controls, Doors, Game, Life, Motion, Objective, Out, Player, Tick, Training } from "../schema.ts"
 
 /** Where the trainee is after a station completes: at the next station's first step, or done. */
 type Next = { readonly _tag: "Step"; readonly station: number; readonly step: number; readonly count: number; readonly mark: number; readonly unlocked: number } | { readonly _tag: "Complete" }
@@ -30,7 +30,7 @@ export const PlayTraining = Game.System(
         }
       })
     },
-    resources: { tick: Game.System.readResource(Tick), objective: Game.System.writeResource(Objective) },
+    resources: { tick: Game.System.readResource(Tick), objective: Game.System.writeResource(Objective), doors: Game.System.writeResource(Doors) },
     events: { happened: Game.System.readEvent(Out), out: Game.System.writeEvent(Out) },
     machines: { training: Game.System.updateMachine(Training) },
     nextMachines: { training: Game.System.nextState(Training) }
@@ -93,7 +93,16 @@ export const PlayTraining = Game.System(
       return { _tag: "Step", station: index, step: 0, count: begun.count, mark: begun.mark, unlocked: Math.min(STATION_IDS.length, open) }
     }
 
+    // The doors (station 3's shed): whole whenever the trainee arrives at a station, and standing
+    // again at once when broken by anything that does not complete the current step, so a step
+    // that asks for one broken never lacks it.
+    const standDoors = (all: boolean) => {
+      const hp = resources.doors.get()
+      if (hp.some((left) => all || left <= 0)) resources.doors.set(freshDoors(SAGRE).map((full, i) => (all || (hp[i] ?? 0) <= 0 ? full : hp[i])))
+    }
+
     if (state._tag === "Arriving") {
+      standDoors(true)
       const next = arrive(state.station, state.unlocked, state.place)
       if (next._tag === "Complete") nextMachines.training.transition({ from: "Arriving", to: "Complete" })
       else nextMachines.training.transition({ from: "Arriving", to: "Step", data: { station: next.station, step: next.step, count: next.count, mark: next.mark, unlocked: next.unlocked } })
@@ -106,8 +115,10 @@ export const PlayTraining = Game.System(
     const now = rule.advance(seen(), { count: state.count, mark: state.mark })
     const count = Math.min(rule.target, now.count)
     let next: Next
-    if (count < rule.target) next = { _tag: "Step", station: state.station, step: state.step, count, mark: now.mark, unlocked: state.unlocked }
-    else {
+    if (count < rule.target) {
+      standDoors(false)
+      next = { _tag: "Step", station: state.station, step: state.step, count, mark: now.mark, unlocked: state.unlocked }
+    } else {
       events.out.emit({ t: "training", a: "step", station: id, step: steps[state.step] })
       if (state.step + 1 < steps.length) {
         const begun = stepRule(id, steps[state.step + 1]).begin(seen())

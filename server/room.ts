@@ -21,10 +21,12 @@ import {
   type Snapshot
 } from "../shared/protocol.ts"
 import { createSim, type GameEvent, type Sim, type WorldView } from "../shared/sim/index.ts"
-import { TRAINING } from "../shared/training/index.ts"
+import { TRAINING, type StationId } from "../shared/training/index.ts"
+import type { StationBot } from "../shared/training/station.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 import { BotBrain } from "./bot.ts"
 import { navGraph } from "./nav.ts"
+import { botsOf, postOf, RouteBrain, stationOf, type Brain } from "./station-bot.ts"
 
 /** Pending commands per player: beyond this the client is running ahead and the old ones are dropped. */
 const MAX_QUEUE = 20
@@ -32,6 +34,8 @@ const MAX_QUEUE = 20
 const STEPS_PER_TICK = 3
 /** Steps that can accumulate during lag, to be caught up afterwards. */
 const MAX_CREDIT = 12
+/** What a station's bot carries: a bot that fires uses it. */
+const STATION_BOT_PRIMARY: PrimaryId = "cramar"
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
 export interface Member {
@@ -65,6 +69,10 @@ export class Room {
   readonly sim: Sim
   readonly members = new Map<string, Member>()
   private bots = new Map<string, BotBrain>()
+  /** A training's bots: the current station's, kept present by `keepStationBots`. */
+  private stationBots = new Map<string, Brain>()
+  /** The station whose bots are present. */
+  private botsFor: StationId | null = null
   private events: GameEvent[] = []
   /**
    * Joins the simulation has not taken yet: it takes them at the next step. A member who leaves
@@ -149,6 +157,7 @@ export class Room {
     if (!m) return
     this.members.delete(id)
     this.bots.delete(id)
+    this.stationBots.delete(id)
     if (!this.arriving.delete(id)) this.sim.leave(id)
     if (this.hostId === id) {
       const next = this.humans[0]
@@ -216,8 +225,10 @@ export class Room {
       }
     }
     for (const [id, brain] of this.bots) this.sim.input(id, brain.think(this.world))
+    for (const [id, brain] of this.stationBots) this.sim.input(id, brain.think(this.world))
     const events = this.sim.step()
     this.world = this.sim.view()
+    if (this.training) this.keepStationBots()
     for (const e of events) {
       this.events.push(e)
       // Bots are furlans: now and then they comment.
@@ -231,6 +242,25 @@ export class Room {
 
   get tick() {
     return this.world.tick
+  }
+
+  /** A training: the current station's bots are present, and no other's. They join at the next step. */
+  private keepStationBots() {
+    const station = stationOf(this.world)
+    if (station === this.botsFor) return
+    for (const id of [...this.stationBots.keys()]) this.removeMember(id)
+    this.botsFor = station
+    if (station) for (const bot of botsOf(station)) this.addStationBot(station, bot)
+  }
+
+  private addStationBot(station: StationId, bot: StationBot) {
+    const id = `bot-${++botCounter}`
+    const used = new Set([...this.members.values()].map((m) => m.name))
+    const name = BOT_NAMES[bot.team].find((n) => !used.has(n)) ?? `${BOT_NAMES[bot.team][0]} ${botCounter}`
+    const post = postOf(station, bot)
+    this.members.set(id, { id, name, team: bot.team, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
+    this.stationBots.set(id, bot.fires ? new BotBrain(id, this.level, navGraph(this.physics), this.physics, botCounter) : new RouteBrain(id, bot.route, post.yaw))
+    this.arriving.set(id, () => this.sim.join(id, name, bot.team, true, STATION_BOT_PRIMARY, post))
   }
 
   private sendSnapshots() {
@@ -335,7 +365,7 @@ export class Room {
       map: this.settings.map,
       ...shownReach(this.settings),
       players: this.humans.length,
-      bots: this.bots.size,
+      bots: this.bots.size + this.stationBots.size,
       max: MAX_PLAYERS,
       phase: this.world.phase.tag
     }

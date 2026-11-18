@@ -8,7 +8,7 @@
 import { Descriptor, Random, Schema } from "@typeonce/ritmo"
 import { z } from "zod"
 import type { PlayerInput } from "../input.ts"
-import type { MapId, Team } from "../map.ts"
+import type { MapId, Team, V3 } from "../map.ts"
 import type { Body } from "../movement.ts"
 import type { PhysicsWorld } from "../physics.ts"
 import type { ModeId, ObjectiveId } from "../folklore.ts"
@@ -26,6 +26,17 @@ export interface PlayerInfo {
 }
 export const Player = Descriptor.Component<PlayerInfo>()("Sparedut/Player")
 export const TeamOf = Descriptor.Component<Team>()("Sparedut/Team")
+
+/**
+ * A member that always (re)spawns at one place, with a given health: a bot the training keeps at a
+ * station. Members without one spawn at their team's spawn points with full health.
+ */
+export interface PostValue {
+  readonly at: V3
+  readonly yaw: number
+  readonly hp: number
+}
+export const Post = Descriptor.Component<PostValue>()("Sparedut/Post")
 
 export interface MotionValue {
   readonly body: Body
@@ -211,8 +222,15 @@ export const Rng = Descriptor.ConstructedResource(Random.codec)("Sparedut/Rng")
 
 // --- Events -----------------------------------------------------------------
 
-/** From the host: a player arrives (human or bot). */
-export const Join = Descriptor.Event<{ readonly session: string; readonly name: string; readonly team: Team; readonly bot: boolean; readonly primary: PrimaryId }>()("Sparedut/Join")
+/** From the host: a player arrives (human or bot), with a post when it always spawns at one place. */
+export const Join = Descriptor.Event<{
+  readonly session: string
+  readonly name: string
+  readonly team: Team
+  readonly bot: boolean
+  readonly primary: PrimaryId
+  readonly post: PostValue | null
+}>()("Sparedut/Join")
 export const Leave = Descriptor.Event<{ readonly session: string }>()("Sparedut/Leave")
 export const InputArrived = Descriptor.Event<{ readonly session: string; readonly input: PlayerInput }>()("Sparedut/InputArrived")
 export const ChangeTeam = Descriptor.Event<{ readonly session: string; readonly team: Team }>()("Sparedut/ChangeTeam")
@@ -248,7 +266,7 @@ export const Physics = Descriptor.Service<PhysicsWorld>()("Sparedut/Physics")
 
 export const Game = Schema.bind(
   Schema.fragment({
-    components: { Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers, Projectile },
+    components: { Player, TeamOf, Post, Motion, Controls, Life, Arsenal, Stats, Attackers, Projectile },
     requires: [Schema.requires(Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers)],
     resources: { Rules, Objective, Tick, Score, Flags, Hill, Cart, Pickups, Turrets, Doors, History, Rng },
     events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, Damage, Heal, DoorHit, Out }
