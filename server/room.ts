@@ -250,8 +250,8 @@ export class Room {
     }
     if (this.world.tick % SNAPSHOT_EVERY === 0) this.sendSnapshots()
     if (this.world.tick % 60 === 0) this.broadcast({ t: "board", rows: this.board() })
-    // After this tick's snapshot, which still has the bots that left: the client draws a body for
-    // every player a snapshot brings and takes away only those a later roster no longer lists.
+    // The roster names and colours the bodies the client draws from the snapshots: it must have the
+    // new bots before the first snapshot that brings them, or they are drawn nameless in the wrong colours.
     if (swapped) this.broadcast({ t: "room", room: this.info() })
   }
 
