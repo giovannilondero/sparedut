@@ -521,10 +521,12 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); background: var(--stone); border: 1px solid var(--gold); padding: 10px 18px; border-radius: 10px; z-index: 10; animation: rise 0.2s; }
 
 /* ---------------- PERFORMANCE PANEL (F3) ---------------- */
-#perf { position: fixed; top: 10px; left: 10px; z-index: 20; pointer-events: none; display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 8px;
+#perf { position: fixed; top: max(10px, env(safe-area-inset-top, 0px)); left: max(10px, env(safe-area-inset-left, 0px)); z-index: 20; pointer-events: none; display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 8px;
   background: rgba(10, 8, 6, 0.78); border: 1px solid var(--stone-line); font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); min-width: 220px; }
 #perf b { font-size: 16px; }
 #perf small { color: var(--muted); margin-top: 2px; }
+/* A match on touch: in the HUD's free area, clear of the corner buttons and the notch. */
+html.in-match[data-device="touch"] #perf { top: var(--free-t); left: var(--free-l); min-width: 0; max-inline-size: var(--free-w); }
 
 /* ---------------- MENU: HOME ----------------
    Everything at once. One column on a narrow screen, the list after the actions; where there is

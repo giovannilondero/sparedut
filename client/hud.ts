@@ -48,6 +48,13 @@ export class Hud {
     $(id).style.setProperty(prop, value)
   }
 
+  /** A custom property on the page's root, for elements outside the HUD too. */
+  private pageStyle(prop: string, value: string) {
+    if (this.written.get(`page:s:${prop}`) === value) return
+    this.written.set(`page:s:${prop}`, value)
+    document.documentElement.style.setProperty(prop, value)
+  }
+
   private toggleOn(el: Element, key: string, cls: string, on: boolean) {
     if (this.written.get(`${key}:c:${cls}`) === on) return
     this.written.set(`${key}:c:${cls}`, on)
@@ -300,12 +307,12 @@ export class Hud {
       this.style(`touch-${b}`, "--y", `${c.y}px`)
       this.style(`touch-${b}`, "--r", `${c.r}px`)
     }
-    // The HUD's area clear of the controls, and the orientation, for the touch HUD's CSS.
+    // The HUD's area clear of the controls, for the touch HUD's CSS and the performance panel outside it; the orientation.
     const f = layout.free
-    this.style("hud", "--free-l", `${f.left}px`)
-    this.style("hud", "--free-t", `${f.top}px`)
-    this.style("hud", "--free-w", `${f.width}px`)
-    this.style("hud", "--free-h", `${f.height}px`)
+    this.pageStyle("--free-l", `${f.left}px`)
+    this.pageStyle("--free-t", `${f.top}px`)
+    this.pageStyle("--free-w", `${f.width}px`)
+    this.pageStyle("--free-h", `${f.height}px`)
     this.toggle("hud", "portrait", layout.portrait)
     const w = layout.weapon
     this.style("touch", "--wx", `${w.left}px`)
