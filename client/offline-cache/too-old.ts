@@ -48,6 +48,8 @@ export type TooOldEvent =
   | { readonly t: "atMenu" }
   /** The check or the take-over took too long. */
   | { readonly t: "gaveUp" }
+  /** The server answered a hello of this page with no version error. */
+  | { readonly t: "accepted" }
 
 export type Effect =
   | { readonly do: "check" }
@@ -55,6 +57,8 @@ export type Effect =
   /** Remember the reload for this page session, then reload. */
   | { readonly do: "reload" }
   | { readonly do: "tell"; readonly say: Notice }
+  /** Forget the reload of this page session: a refusal from now on is a new one, with its own update. */
+  | { readonly do: "forget" }
 
 export interface TooOldContext {
   /** This page session has already reloaded automatically (kept across the reload). */
@@ -72,6 +76,8 @@ const NONE: readonly Effect[] = []
 const stay = (state: TooOld): TooOldStep => ({ state, effects: NONE })
 const stuck = (reason: StuckReason): TooOldStep => ({ state: { _tag: "Stuck", reason }, effects: [{ do: "tell", say: reason }] })
 const updating: readonly Effect[] = [{ do: "tell", say: "updating" }]
+/** The server takes this page: any earlier refusal is over, and the reload that answered it is forgotten. */
+const accepted = (context: TooOldContext): TooOldStep => ({ state: FINE, effects: context.reloaded ? [{ do: "forget" }] : NONE })
 const reloadUnlessPlaying = (context: TooOldContext): TooOldStep =>
   context.playing ? stay({ _tag: "TookOver" }) : { state: { _tag: "Reloading" }, effects: [{ do: "reload" }] }
 
@@ -79,6 +85,7 @@ type Handlers = { readonly [K in TooOld["_tag"]]: (state: Extract<TooOld, { _tag
 
 const handlers = {
   Fine: (state, event, context) => {
+    if (event.t === "accepted") return accepted(context)
     if (event.t !== "refused") return stay(state)
     if (context.reloaded) return stuck("stillRefused")
     return { state: { _tag: "Checking" }, effects: [{ do: "check" }, ...updating] }
@@ -96,6 +103,7 @@ const handlers = {
       case "gaveUp":
         return stuck("noUpdate")
       case "atMenu":
+      case "accepted":
         return stay(state)
     }
   },
@@ -109,6 +117,7 @@ const handlers = {
         return reloadUnlessPlaying(context)
       case "checked":
       case "gaveUp":
+      case "accepted":
         return stay(state)
     }
   },
@@ -122,6 +131,7 @@ const handlers = {
         return stuck("noUpdate")
       case "checked":
       case "atMenu":
+      case "accepted":
         return stay(state)
     }
   },
@@ -131,7 +141,10 @@ const handlers = {
     return stay(state)
   },
   Reloading: (state) => stay(state),
-  Stuck: (state, event) => (event.t === "refused" ? { state, effects: [{ do: "tell", say: state.reason }] } : stay(state))
+  Stuck: (state, event, context) => {
+    if (event.t === "accepted") return accepted(context)
+    return event.t === "refused" ? { state, effects: [{ do: "tell", say: state.reason }] } : stay(state)
+  }
 } satisfies Handlers
 
 /** The next state of a page refused by the server, and what the client must do. */

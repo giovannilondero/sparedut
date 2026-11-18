@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
-import { FINE, tooOld, type Effect, type TooOld, type TooOldEvent } from "../client/offline-cache/too-old.ts"
+import { FINE, tooOld, type Effect, type Notice, type TooOld, type TooOldEvent } from "../client/offline-cache/too-old.ts"
+import { RELOADED_KEY, SelfUpdate } from "../client/offline-cache/self-update.ts"
 import { checkForUpdate, takeOver, TAKE_OVER } from "../client/offline-cache/update.ts"
 
 /** Plays the events in order on one page and collects what the client is told to do. */
@@ -189,4 +190,61 @@ test("taking over asks the waiting version, and only it", () => {
   expect(waiting.posted).toEqual([TAKE_OVER])
   expect(takeOver(registration())).toBe(false)
   expect(takeOver(null)).toBe(false)
+})
+
+// A later refusal in the same tab (`client/offline-cache/self-update.ts`): once the server has
+// accepted this page, the reload is forgotten, and a new refusal is a new episode.
+
+test("a page the server accepts forgets the automatic reload, and a stuck page is fine again", () => {
+  expect(run([{ t: "accepted" }], { reloaded: true }).effects).toEqual([{ do: "forget" }])
+  expect(run([{ t: "accepted" }]).effects).toEqual([])
+  const { state, effects } = run([{ t: "refused" }, { t: "checked", outcome: "none" }, { t: "accepted" }, { t: "refused" }])
+  expect(state).toEqual({ _tag: "Checking" })
+  expect(effects.filter((e) => e.do === "check")).toHaveLength(2)
+})
+
+/** The page's side: a tab's session storage, the service worker container and what the player is told. */
+const page = (reloaded: boolean, waiting: FakeWorker | null) => {
+  const stored = new Map<string, string>(reloaded ? [[RELOADED_KEY, "1"]] : [])
+  const session = { getItem: (k: string) => stored.get(k) ?? null, setItem: (k: string, v: string) => void stored.set(k, v), removeItem: (k: string) => void stored.delete(k) }
+  let changed = () => {}
+  const told: Notice[] = []
+  let reloads = 0
+  const update = new SelfUpdate({
+    registration: Promise.resolve(registration({ waiting: waiting ?? undefined })),
+    container: { addEventListener: (_type, listener) => void (changed = listener) },
+    session,
+    reload: () => void reloads++,
+    tell: (notice) => void told.push(notice),
+    playing: () => false
+  })
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+  return { update, stored, told, reloads: () => reloads, tookOver: () => changed(), settle }
+}
+
+test("refused right after the automatic reload: the flag is still there, and the page never reloads again", async () => {
+  const p = page(true, new FakeWorker("installed"))
+  p.update.refused()
+  p.update.welcomed()
+  await p.settle()
+  expect(p.told).toEqual(["stillRefused"])
+  expect(p.stored.has(RELOADED_KEY)).toBe(true)
+  expect(p.reloads()).toBe(0)
+})
+
+test("refused again later in a tab that updated itself once: a new update attempt", async () => {
+  const waiting = new FakeWorker("installed")
+  const p = page(true, waiting)
+  // The reloaded page says hello and the server accepts it.
+  p.update.welcomed()
+  expect(p.stored.has(RELOADED_KEY)).toBe(false)
+  // A later server update refuses this page.
+  p.update.refused()
+  p.update.welcomed()
+  await p.settle()
+  expect(p.told).toEqual(["updating"])
+  expect(waiting.posted).toEqual([TAKE_OVER])
+  p.tookOver()
+  expect(p.reloads()).toBe(1)
+  expect(p.stored.has(RELOADED_KEY)).toBe(true)
 })
