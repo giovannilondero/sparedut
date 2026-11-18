@@ -17,7 +17,7 @@ export type Lang = "fur" | "it"
 type Fn<A extends unknown[] = [string]> = (...args: A) => string
 
 /** Static HTML texts: `data-t="key"` (innerHTML) and `data-t-ph="key"` (placeholder). */
-export type StaticKey =
+type StaticKey =
   | "title" | "nameLabel" | "namePh" | "oneTap" | "oneTapSub" | "create" | "createSub" | "join"
   | "roomsTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "reachLabel"
   | "ff" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
