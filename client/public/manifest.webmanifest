@@ -7,11 +7,19 @@
   "scope": "/",
   "display": "fullscreen",
   "orientation": "any",
+  "launch_handler": { "client_mode": "focus-existing" },
   "theme_color": "#14110f",
   "background_color": "#14110f",
   "icons": [
     { "src": "/icons/any-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/any-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Zuie cuintri i bot",
+      "url": "/?shortcut=bots",
+      "icons": [{ "src": "/icons/any-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
   ]
 }

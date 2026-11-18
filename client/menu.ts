@@ -217,6 +217,11 @@ export class Menu {
     this.apply(this.model.oneTap())
   }
 
+  /** The installed game's shortcut, "Zuie cuintri i bot": exactly the home screen's button. */
+  shortcut() {
+    this.apply(this.model.shortcut())
+  }
+
   /** Acts on the model's answer: sends the request, shows why it was refused, or draws the new screen. */
   private apply(o: Outcome) {
     if (o.kind === "send") {

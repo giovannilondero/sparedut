@@ -9,6 +9,8 @@
 import { expect, test } from "bun:test"
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
+import { STRINGS } from "../client/i18n.ts"
+import { readOpening } from "../client/opening.ts"
 import { readPrecache } from "../scripts/service-worker.ts"
 
 const DIST = join(import.meta.dir, "../dist")
@@ -72,4 +74,18 @@ test("the size cached at install", () => {
   const bytes = precache.urls.reduce((sum, url) => sum + statSync(fileOf(url)).size, 0)
   expect(bytes).toBe(precache.bytes)
   console.log(`precached at install: ${precache.urls.length} files, ${(bytes / 1e6).toFixed(2)} MB (build ${precache.version})`)
+})
+
+test("the built manifest offers the home screen's button as the icon's shortcut, opening the game on it, and focuses an open game", () => {
+  const html = readFileSync(join(DIST, "index.html"), "utf8")
+  const url = html.match(/<link rel="manifest" href="([^"]+)"/)?.[1]
+  const manifest = JSON.parse(readFileSync(fileOf(url!), "utf8")) as {
+    shortcuts?: { name: string; url: string; icons?: { src: string }[] }[]
+    launch_handler?: unknown
+  }
+  expect(manifest.shortcuts?.map((shortcut) => shortcut.name)).toEqual([STRINGS.fur.static.oneTap])
+  const target = new URL(manifest.shortcuts![0]!.url, "https://sparedut.example")
+  expect(readOpening(target.search, target.hash)).toEqual({ kind: "shortcut" })
+  for (const icon of manifest.shortcuts![0]!.icons ?? []) expect(existsSync(fileOf(icon.src))).toBe(true)
+  expect(manifest.launch_handler).toEqual({ client_mode: "focus-existing" })
 })

@@ -304,6 +304,11 @@ export class MenuModel {
     return { kind: "send", request: { t: "create", room: oneTapRoom(this.remembered), oneTap: true } }
   }
 
+  /** The installed game's shortcut, "Zuie cuintri i bot" (`client/opening.ts`): exactly the home screen's button. */
+  shortcut(): Outcome {
+    return this.oneTap()
+  }
+
   /**
    * The home screen's training (its entry, or the invitation's own button): one tap, nothing to
    * choose; like any room it needs a name. It resumes at the first station not completed. Started
