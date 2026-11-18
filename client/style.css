@@ -291,7 +291,7 @@ html.in-match input { user-select: text; -webkit-user-select: text; }
 #touch-stick.held { opacity: 1; }
 #touch-knob { position: absolute; left: 50%; top: 50%; width: 46%; height: 46%; margin: -23% 0 0 -23%; border-radius: 50%; background: rgba(243, 233, 210, 0.55); box-shadow: 0 0 6px rgba(0, 0, 0, 0.5); }
 #touch-fire { left: var(--fire-x); top: var(--fire-y); width: calc(var(--fire-r) * 2); height: calc(var(--fire-r) * 2); }
-/* Layout B's second fire, under the left thumb. */
+/* The second fire, above the stick under the left thumb. */
 #touch-fire-left { left: var(--lfire-x); top: var(--lfire-y); width: calc(var(--lfire-r) * 2); height: calc(var(--lfire-r) * 2); }
 :is(#touch-fire, #touch-fire-left) { position: absolute; transform: translate(-50%, -50%);
   border-radius: 50%; border: 2px solid rgba(232, 182, 76, 0.75); background: radial-gradient(circle, rgba(232, 182, 76, 0.55) 0 22%, rgba(10, 8, 6, 0.3) 24%); }

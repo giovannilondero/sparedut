@@ -8,10 +8,9 @@ import { BUTTON, type ButtonName } from "../shared/input.ts"
 import { turretRestSeat, type TurretSpot } from "../shared/map.ts"
 import type { Snapshot } from "../shared/protocol.ts"
 import type { ArsenalValue, TurretState } from "../shared/sim/schema.ts"
-import { TURRET, WEAPONS, type WeaponId } from "../shared/weapons.ts"
-import { autoFired } from "./autofire.ts"
+import { TURRET, type WeaponId } from "../shared/weapons.ts"
 import { pointerDevice, type Device } from "./device.ts"
-import { buttonBit, inCircle, inRect, NO_INSETS, pickerEntries, TOUCH_BUTTONS, touchLayout, type Insets, type TouchButton, type TouchLayout, type TouchLayoutId, type TouchView } from "./touch.ts"
+import { buttonBit, inCircle, inRect, NO_INSETS, pickerEntries, TOUCH_BUTTONS, touchLayout, type Insets, type TouchButton, type TouchLayout, type TouchView } from "./touch.ts"
 
 const KEYS: Record<string, ButtonName> = {
   Space: "jump",
@@ -156,7 +155,7 @@ export class Controls {
   /** Look, movement and fire go through (no menu open); the frame loop says so in `poll`. */
   private playing = true
   /** The touch controls as the HUD draws them, updated in place. */
-  readonly touchView: TouchView = { stick: { held: false, ox: 0, oy: 0, kx: 0, ky: 0 }, fire: false, fireShown: true, pressed: 0, aim: false, crouch: false, board: false, use: null, picker: null }
+  readonly touchView: TouchView = { stick: { held: false, kx: 0, ky: 0 }, fire: false, pressed: 0, aim: false, crouch: false, board: false, use: null, picker: null }
   /** The layout for the canvas's current size: computed once per size, read by the input and the HUD. */
   private layout: TouchLayout | null = null
   /** Where the canvas sat when the last finger landed: moves are measured from there. */
@@ -168,16 +167,9 @@ export class Controls {
   private tracked: Tracked | null = null
   /** The device used last, anywhere on the page (the menu too). */
   private lastUsed: Device
-  /** Layout C: the crosshair rests on an enemy within range, as the frame loop last found it (`sight`). */
-  private sighted = false
-  /** Layout C with a single-shot weapon: fire is let go every other tick, so each press is a new shot. */
-  private pulse = false
 
-  /**
-   * `primary`: the device to assume before any input, from the main pointer (a finger on a phone).
-   * `touchLayoutId`: the touch layout under trial (`?touch=`).
-   */
-  constructor(private readonly element: HTMLElement, private readonly handlers: ControlsHandlers, primary: Device = "keyboard", private readonly touchLayoutId: TouchLayoutId = "a") {
+  /** `primary`: the device to assume before any input, from the main pointer (a finger on a phone). */
+  constructor(private readonly element: HTMLElement, private readonly handlers: ControlsHandlers, primary: Device = "keyboard") {
     this.lastUsed = primary
     // Before a match there is nothing to drive, but a tap or a key on the menu says what the player holds.
     document.addEventListener("pointerdown", (e) => (this.lastUsed = pointerDevice(e.pointerType) ?? this.lastUsed), { capture: true })
@@ -259,7 +251,7 @@ export class Controls {
     this.layoutW = size.width
     this.layoutH = size.height
     this.insets = insets
-    return (this.layout = touchLayout(size, insets, this.touchLayoutId))
+    return (this.layout = touchLayout(size, insets))
   }
   private layoutW = 0
   private layoutH = 0
@@ -281,25 +273,6 @@ export class Controls {
     const p = this.tracked
     if (!p?.alive) return null
     return p.mounted ? "dismount" : p.nearTurret ? "use" : null
-  }
-
-  /** The weapon in hand fires by itself in a layout that does that: alive, on foot, with a gun. */
-  private get gunInHand() {
-    const p = this.tracked
-    return !!p?.alive && !p.mounted && !!p.arsenal && autoFired(p.arsenal.current)
-  }
-
-  /**
-   * Layout C: touch drives the match and the weapon in hand fires by itself. While this holds,
-   * the frame loop tells `sight` each tick whether an enemy is under the crosshair.
-   */
-  get autoFiring() {
-    return this.touchActive && !!this.layout?.autoFire && this.gunInHand
-  }
-
-  /** Layout C: whether the crosshair rests on an enemy within the weapon's range, for the next tick's buttons. Never moves the aim. */
-  sight(onEnemy: boolean) {
-    this.sighted = onEnemy
   }
 
   /**
@@ -331,13 +304,9 @@ export class Controls {
       this.latched |= BUTTON.fire
       v.fire = true
     } else if (role === "stick") {
-      // A floating stick centres under the thumb; a fixed one stays put and tilts towards it at once.
-      const st = v.stick
-      const fixed = layout.stick.fixed
-      st.held = true
-      st.ox = st.kx = fixed ? layout.stick.rest.x : x
-      st.oy = st.ky = fixed ? layout.stick.rest.y : y
-      if (fixed) this.tilt(x, y, layout.stick.radius)
+      // The stick stays put and tilts towards the thumb at once.
+      v.stick.held = true
+      this.tilt(x, y, layout.stick)
     } else if (role === "weapon") this.weaponFinger = { finger, held: 0, opened: false }
     else if (isButton(role)) this.buttonDown(role)
     this.redraw()
@@ -355,7 +324,7 @@ export class Controls {
       }
       if (inRect(layout.weapon, x, y)) return "spent"
     }
-    if ((inCircle(layout.fire, x, y) && this.touchView.fireShown) || (layout.leftFire && inCircle(layout.leftFire, x, y))) return "fire"
+    if (inCircle(layout.fire, x, y) || inCircle(layout.leftFire, x, y)) return "fire"
     for (const b of TOUCH_BUTTONS) if (inCircle(layout.buttons[b], x, y) && (b !== "use" || this.turretControl)) return b
     if (inRect(layout.weapon, x, y)) return "weapon"
     const region = layout.stick.region
@@ -392,7 +361,6 @@ export class Controls {
     v.aim = this.touchHeld.has("aim")
     v.crouch = this.crouched
     v.use = this.turretControl
-    v.fireShown = this.fireShown
     this.handlers.onTouch?.(v)
   }
 
@@ -401,17 +369,17 @@ export class Controls {
     if (!f) return
     const x = e.clientX - this.originX
     const y = e.clientY - this.originY
-    if (f.role === "stick" && this.layout) this.tilt(x, y, this.layout.stick.radius)
+    if (f.role === "stick" && this.layout) this.tilt(x, y, this.layout.stick)
     else if (f.role === "look" || f.role === "fire") this.turn((x - f.x) * TOUCH_LOOK, (y - f.y) * TOUCH_LOOK)
     f.x = x
     f.y = y
   }
 
   /** The stick under the thumb at (x, y): analog movement, and sprint when pushed to its edge while forward. */
-  private tilt(x: number, y: number, radius: number) {
+  private tilt(x: number, y: number, { rest, radius }: TouchLayout["stick"]) {
     const v = this.touchView.stick
-    const dx = x - v.ox
-    const dy = y - v.oy
+    const dx = x - rest.x
+    const dy = y - rest.y
     const len = Math.hypot(dx, dy)
     const k = len <= TOUCH_DEAD * radius ? 0 : Math.min(1, (len / radius - TOUCH_DEAD) / (1 - TOUCH_DEAD)) / len
     // Zero, not minus zero, at rest.
@@ -423,8 +391,8 @@ export class Controls {
     if (sprint) this.touchHeld.add("sprint")
     else this.touchHeld.delete("sprint")
     const rim = len > radius ? radius / len : 1
-    v.kx = v.ox + dx * rim
-    v.ky = v.oy + dy * rim
+    v.kx = dx * rim
+    v.ky = dy * rim
     this.redraw()
   }
 
@@ -478,11 +446,6 @@ export class Controls {
     if (this.locked) document.exitPointerLock()
   }
 
-  /** Fire is on screen: always, except in layout C while the weapon in hand fires by itself. */
-  private get fireShown() {
-    return !this.layout?.autoFire || !this.gunInHand
-  }
-
   /** A narrow FOV (scope) slows down aiming. */
   zoomScale = 1
 
@@ -510,7 +473,7 @@ export class Controls {
     // The touch aim toggle does not outlive a life either.
     if (!player || !player.alive || player.spawned) this.touchHeld.delete("aim")
     // The HUD learns what a snapshot changed only when something did.
-    if (this.crouched !== before || this.touchHeld.has("aim") !== aimed || this.turretControl !== v.use || this.fireShown !== v.fireShown) this.redraw()
+    if (this.crouched !== before || this.touchHeld.has("aim") !== aimed || this.turretControl !== v.use) this.redraw()
   }
 
   /**
@@ -699,17 +662,8 @@ export class Controls {
   /** The tick's buttons: held ones plus those pressed and already released. */
   buttons() {
     if (!this.enabled) return 0
-    let b = this.latched | this.heldButtons()
+    const b = this.latched | this.heldButtons()
     this.latched = 0
-    // Layout C presses fire for the player: held for an automatic weapon, pressed anew each other tick for a single-shot one.
-    if (this.sighted && this.autoFiring) {
-      const semi = WEAPONS[this.tracked!.arsenal!.current].mode === "semi"
-      if (!semi || !this.pulse) b |= BUTTON.fire
-      this.pulse = semi && !this.pulse
-    } else {
-      this.sighted = false
-      this.pulse = false
-    }
     return b
   }
 

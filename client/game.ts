@@ -10,16 +10,13 @@ import { turretAim, turretSeat, type MapId, type PickupKind, type Team } from ".
 import { DISCO } from "../shared/maps/maran.ts"
 import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, seatedBody, sprinting } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
-import type { Vec3 } from "../shared/vec.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
 import { outsideStorm, owned, RAISE_TICKS } from "../shared/sim/rules.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
-import { aimDir, enemyUnderCrosshair, type Sighted } from "./autofire.ts"
 import { Controls, freeTurretInReach, trackedIn } from "./controls.ts"
-import type { TouchLayoutId } from "./touch.ts"
 import { boardHtml, esc, Hud, rosterHtml } from "./hud.ts"
 import { t } from "./i18n.ts"
 import type { Look } from "./looks.ts"
@@ -72,8 +69,6 @@ export interface GameDeps {
   readonly inviteBase: () => string
   /** The room's password, if this client knows it: it goes into the invite link's fragment. */
   readonly roomPassword: () => string | null
-  /** The touch layout under trial (`?touch=`). */
-  readonly touchLayout: TouchLayoutId
 }
 
 interface Frame {
@@ -124,13 +119,7 @@ export class Game {
   private turretCooldown = 0
   /** Last time (s) the heal sound played, so it doesn't turn into a barrage. */
   private healSoundAt = 0
-  private avatars = new Map<string, { avatar: Avatar; blob: THREE.Mesh; team: Team; stepAcc: number; last: { x: number; z: number } | null; sighted: Sighted }>()
-  /** The others as touch layout C's auto-fire sees them: one object per avatar, updated in place each frame. */
-  private sighted: Sighted[] = []
-  /** Scratch for the auto-fire's ray, and the wall it may meet: nothing allocated per tick. */
-  private readonly sightEye = { x: 0, y: 0, z: 0 }
-  private readonly sightDir = { x: 0, y: 0, z: 0 }
-  private readonly wallDist = (o: Vec3, d: Vec3, max: number) => this.physics.raycast(o, d, max)?.dist ?? null
+  private avatars = new Map<string, { avatar: Avatar; blob: THREE.Mesh; team: Team; stepAcc: number; last: { x: number; z: number } | null }>()
   /** Real player shadows only on high quality; otherwise a dark disc at their feet. */
   private dynamicShadows = false
   private snapArrivals: number[] = []
@@ -179,7 +168,7 @@ export class Game {
       onKey: (code, down) => this.key(code, down),
       onPause: () => this.padPause(),
       onTouch: (view) => this.hud.drawTouch(view)
-    }, matchMedia("(pointer: coarse)").matches ? "touch" : "keyboard", d.touchLayout)
+    }, matchMedia("(pointer: coarse)").matches ? "touch" : "keyboard")
     // Rotating the device re-lays the touch controls; fingers already down keep their control.
     addEventListener("resize", () => this.running && this.placeTouch())
     // No context menu from a long press anywhere during a match (the canvas already refuses it).
@@ -257,7 +246,6 @@ export class Game {
       a.avatar.dispose()
     }
     this.avatars.clear()
-    this.sighted.length = 0
     this.hud.show(false)
     this.openOverlay("none")
     this.d.viewmodel.setVisible(false)
@@ -360,7 +348,6 @@ export class Game {
         this.d.scene.remove(a.avatar.object, a.blob)
         a.avatar.dispose()
         this.avatars.delete(id)
-        this.sighted.splice(this.sighted.indexOf(a.sighted), 1)
       }
     }
     if (this.overlay === "pause") this.renderPause()
@@ -933,10 +920,8 @@ export class Game {
   private fixedStep() {
     const c = this.controls
     const { mx, mz } = c.move()
-    const you = this.you()
-    // Touch layout C: fire is pressed for the player while an enemy is under the crosshair.
-    if (c.autoFiring) c.sight(!!you && this.enemyInSight(c.yaw, c.pitch, WEAPONS[you.arsenal.current].range))
     let buttons = c.buttons()
+    const you = this.you()
     const over = this.snap?.phase.tag === "Over"
     if (over || this.overlay !== "none") buttons = 0
     // At the turret the view stays within the arc the gun can turn through.
@@ -1029,17 +1014,6 @@ export class Game {
     const mine = (buttons & BUTTON.mine) !== 0
     if (mine && !this.prevMine && you.arsenal.mines > 0) this.d.viewmodel.throwBomb()
     this.prevMine = mine
-  }
-
-  /** Touch layout C: whether a shot along this look, from my predicted eye, would meet an enemy first within `range`. */
-  private enemyInSight(yaw: number, pitch: number, range: number) {
-    const b = this.predictor.body
-    if (!b) return false
-    const eye = this.sightEye
-    eye.x = b.x
-    eye.y = b.y + this.eye
-    eye.z = b.z
-    return enemyUnderCrosshair(eye, aimDir(this.sightDir, yaw, pitch), range, this.sighted, this.wallDist)
   }
 
   private localShot(id: WeaponId, input: PlayerInput) {
@@ -1175,18 +1149,10 @@ export class Game {
           const blob = new THREE.Mesh(this.blobGeo, this.blobMat)
           blob.renderOrder = 1
           this.d.scene.add(avatar.object, blob)
-          entry = { avatar, blob, team, stepAcc: 0, last: null, sighted: { x: 0, y: 0, z: 0, crouch: false, alive: false, enemy: false } }
+          entry = { avatar, blob, team, stepAcc: 0, last: null }
           this.avatars.set(p.id, entry)
-          this.sighted.push(entry.sighted)
         }
         const q = this.interpolated(p.id) ?? p
-        const seen = entry.sighted
-        seen.x = q.x
-        seen.y = q.y
-        seen.z = q.z
-        seen.crouch = (q.f & FLAG_BIT.crouch) !== 0
-        seen.alive = (q.f & FLAG_BIT.alive) !== 0
-        seen.enemy = entry.team !== myTeam || this.room?.mode === "tampieste"
         entry.avatar.setLabelVisible(entry.team === myTeam)
         entry.avatar.update(dt, {
           x: q.x,

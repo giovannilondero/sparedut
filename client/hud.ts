@@ -285,12 +285,9 @@ export class Hud {
     this.style("touch", "--fire-y", `${layout.fire.y}px`)
     this.style("touch", "--fire-r", `${layout.fire.r}px`)
     const left = layout.leftFire
-    this.toggle("touch-fire-left", "hidden", !left)
-    if (left) {
-      this.style("touch", "--lfire-x", `${left.x}px`)
-      this.style("touch", "--lfire-y", `${left.y}px`)
-      this.style("touch", "--lfire-r", `${left.r}px`)
-    }
+    this.style("touch", "--lfire-x", `${left.x}px`)
+    this.style("touch", "--lfire-y", `${left.y}px`)
+    this.style("touch", "--lfire-r", `${left.r}px`)
     for (const b of TOUCH_BUTTONS) {
       const c = layout.buttons[b]
       this.style(`touch-${b}`, "--x", `${c.x}px`)
@@ -318,11 +315,10 @@ export class Hud {
   private drawnPressed = -1
   private drawnToggles = -1
   private drawnUse: TouchView["use"] | undefined = undefined
-  private drawnFireShown: boolean | undefined = undefined
   private drawnPicker: readonly PickerEntry[] | null | undefined = undefined
 
   /**
-   * Draws the stick where the thumb landed and the knob under it, and fire as held.
+   * Draws the stick as held and the knob under the thumb, and fire as held.
    * Called on touch events only; it writes transforms and classes, never layout.
    */
   drawTouch(view: TouchView) {
@@ -330,14 +326,9 @@ export class Hud {
     const knob = $("touch-knob")
     const v = view.stick
     stick.classList.toggle("held", v.held)
-    stick.style.transform = v.held ? `translate(${v.ox}px, ${v.oy}px)` : ""
-    knob.style.transform = v.held ? `translate(${v.kx - v.ox}px, ${v.ky - v.oy}px)` : ""
+    knob.style.transform = v.held ? `translate(${v.kx}px, ${v.ky}px)` : ""
     $("touch-fire").classList.toggle("held", view.fire)
     $("touch-fire-left").classList.toggle("held", view.fire)
-    if (view.fireShown !== this.drawnFireShown) {
-      this.drawnFireShown = view.fireShown
-      $("touch-fire").classList.toggle("hidden", !view.fireShown)
-    }
     if (view.pressed !== this.drawnPressed) {
       this.drawnPressed = view.pressed
       for (const b of TOUCH_BUTTONS) $(`touch-${b}`).classList.toggle("held", (view.pressed & buttonBit(b)) !== 0)
