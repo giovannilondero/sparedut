@@ -3,14 +3,13 @@
  * a Benandante who stands still and never fires, to full health.
  */
 import { SAGRE_STATIONS } from "../../maps/sagre.ts"
-import { MAX_HP } from "../../sim/rules.ts"
-import { counted, station, type Seen } from "../station.ts"
+import { counted, station, STATION_BOT_HP, type Seen } from "../station.ts"
 
 /** The wounded teammate's health on every spawn: the step asks for the rest, up to full. */
 export const WOUNDED_HP = 30
 
 /** How much health the trainee must restore to the teammate: from `WOUNDED_HP` to full. */
-export const TO_RESTORE = MAX_HP - WOUNDED_HP
+export const TO_RESTORE = STATION_BOT_HP - WOUNDED_HP
 
 const PLACE = SAGRE_STATIONS.medic
 
