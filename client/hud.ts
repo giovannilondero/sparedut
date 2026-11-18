@@ -8,11 +8,10 @@ import type { KillCause } from "../shared/sim/events.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { WARMUP_TICKS } from "../shared/sim/rules.ts"
 import type { TrainingView } from "../shared/sim/view.ts"
-import { STATION_IDS, stepRule } from "../shared/training/index.ts"
-import type { StepText } from "./training-text/index.ts"
+import { STATION_IDS } from "../shared/training/index.ts"
 import type { Device } from "./device.ts"
 import { t } from "./i18n.ts"
-import { menuControl, playPrompt, trainingControl, turretPrompt } from "./prompts.ts"
+import { menuControl, playPrompt, trainingPrompt, turretPrompt } from "./prompts.ts"
 import { buttonBit, TOUCH_BUTTONS, type Insets, type PickerEntry, type TouchLayout, type TouchView } from "./touch.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -100,10 +99,7 @@ export class Hud {
       return
     }
     this.text("training-station", s.training.station(STATION_IDS.indexOf(view.station) + 1, STATION_IDS.length, s.training.stations[view.station]))
-    if (view.step === null) return this.html("training-step", "")
-    const instruction = (s.training.steps[view.station] as Readonly<Record<string, StepText>>)[view.step]
-    const control = trainingControl(s, stepRule(view.station, view.step).control, device)
-    this.html("training-step", `${instruction(control)}${view.target > 1 ? ` <b class="count">${s.training.count(view.count, view.target)}</b>` : ""}`)
+    this.html("training-step", trainingPrompt(s, view, device))
   }
 
   /** The brief confirmation that a step was done. */
