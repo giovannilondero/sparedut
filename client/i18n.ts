@@ -252,6 +252,10 @@ export interface Strings {
     readonly primary: string
     readonly chat: string
     readonly chatPlaceholder: string
+    /** Joining a match already on: the confirm that puts the player on the map. */
+    readonly enter: string
+    /** Joining a Tampieste already on: entering now plays from the next match. */
+    readonly nextMatch: string
   }
   readonly perf: { readonly snaps: string; readonly players: string; readonly corrections: string; readonly hide: string; readonly menu: string; readonly dynRes: string }
   readonly tips: readonly string[]
@@ -733,7 +737,9 @@ const fur: Strings = {
     title: "Adunade",
     primary: "Arme principâl",
     chat: "Cjacaris",
-    chatPlaceholder: "Scrîf ai altris e frache Invio"
+    chatPlaceholder: "Scrîf ai altris e frache Invio",
+    enter: "Jentre te partide",
+    nextMatch: "La Tampieste e je za scomençade: tu zuiarâs de prossime partide."
   },
   perf: { snaps: "istantanis", players: "zuiadôrs", corrections: "corezions", hide: "F3 par platâ", menu: "menù", dynRes: "ris. dinamiche" },
   tips: [
@@ -1165,7 +1171,9 @@ const it: Strings = {
     title: "Adunata",
     primary: "Arma principale",
     chat: "Chiacchiere",
-    chatPlaceholder: "Scrivi agli altri e premi Invio"
+    chatPlaceholder: "Scrivi agli altri e premi Invio",
+    enter: "Entra in partita",
+    nextMatch: "La Tampieste è già cominciata: giocherai dalla prossima partita."
   },
   perf: { snaps: "istantanee", players: "giocatori", corrections: "correzioni", hide: "F3 per nascondere", menu: "menu", dynRes: "ris. dinamica" },
   tips: [

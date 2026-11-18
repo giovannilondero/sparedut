@@ -120,6 +120,8 @@ export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("primary"), p: z.enum(PRIMARIES) }),
   z.object({ t: z.literal("chat"), text: visible(120) }),
   z.object({ t: z.literal("start") }),
+  /** A member who joined a match already on takes their seat in it, with the team and primary they chose. */
+  z.object({ t: z.literal("enter") }),
   z.object({ t: z.literal("bot"), team, delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ t: z.literal("level"), level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]) }),
   z.object({ t: z.literal("ping"), c: z.number(), rtt: z.number().min(0).max(RTT_MAX).optional() }),
@@ -146,6 +148,11 @@ export interface RosterEntry {
   readonly primary: PrimaryId
   readonly bot: boolean
   readonly away: boolean
+  /**
+   * False for a member who joined a match already on and has not entered it: off the map and out
+   * of the match until they do. True for everybody else, in the Muster too, where they enter at the start.
+   */
+  readonly onMap: boolean
 }
 
 /** A room in the room list. Its access says whether it asks for a password, never the password itself. */
