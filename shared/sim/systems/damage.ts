@@ -5,7 +5,7 @@
 import { STREAK_AT } from "../../folklore.ts"
 import { killsScore, spared, SPARED_HP } from "../../training/spared.ts"
 import type { KillCause } from "../events.ts"
-import { absorb, ASSIST_WINDOW_TICKS, hostile, MAX_HP, RESPAWN_TICKS } from "../rules.ts"
+import { absorb, ASSIST_WINDOW_TICKS, currentStation, hostile, MAX_HP, RESPAWN_TICKS } from "../rules.ts"
 import { Attackers, Damage, Game, Heal, Life, Match, Motion, Out, Player, Rules, Score, Stats, TeamOf, Tick, Training } from "../schema.ts"
 
 /** Causes that can also hit whoever launched them (the others, on oneself, count as a fall). */
@@ -51,7 +51,8 @@ export const ApplyDamage = Game.System(
     const bySession = new Map(queries.players.each().map((m) => [data.player.get(m).session, m]))
     // The training spares the trainee (the one player who is not a bot) before the skirmish.
     const training = machines.training.get()
-    const sparing = (training._tag === "Arriving" || training._tag === "Step") && spared(training.station)
+    const station = currentStation(training)
+    const sparing = station !== null && spared(station)
     // Kills score in a Bataie di Gnot, and in the training's skirmish, which is one.
     const scoring = rules.mode === "bataie" || (training._tag === "Step" && killsScore(training.station))
 

@@ -21,7 +21,7 @@ import {
   type Snapshot
 } from "../shared/protocol.ts"
 import { createSim, type GameEvent, type Sim, type WorldView } from "../shared/sim/index.ts"
-import { TRAINING, type StationId } from "../shared/training/index.ts"
+import { isTraining, TRAINING, type StationId } from "../shared/training/index.ts"
 import type { StationBot } from "../shared/training/station.ts"
 import type { TrainingStart } from "../shared/training/start.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
@@ -101,7 +101,7 @@ export class Room {
 
   /** A training: one player, a Benandante, and no host tools. */
   get training() {
-    return this.settings.mode === TRAINING.mode
+    return isTraining(this.settings.mode)
   }
 
   get humans() {

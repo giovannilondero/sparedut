@@ -130,6 +130,10 @@ export const FRESH_FLAGS: Readonly<Record<Team, FlagState>> = { benandanti: { _t
 export const FRESH_HILL: HillValue = { owner: null, contested: false, ticks: 0 }
 export const FRESH_CART: CartValue = { d: 0, pushers: 0, contested: false, idle: 0 }
 
+/** The station the trainee is at, arriving or on one of its steps (an index in `STATION_IDS`); null outside a training or once it is complete. */
+export const currentStation = (training: { readonly _tag: "Off" | "Complete" } | { readonly _tag: "Arriving" | "Step"; readonly station: number }): number | null =>
+  training._tag === "Arriving" || training._tag === "Step" ? training.station : null
+
 /** Cool, free turrets and intact doors: how they are at match start. */
 export const freshTurrets = (map: MapDef): TurretState[] => map.turrets.map(() => ({ gunner: null, heat: 0, jammed: false, cooldown: 0 }))
 export const freshDoors = (map: MapDef): number[] => map.doors.map((d) => d.hp)

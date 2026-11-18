@@ -13,7 +13,7 @@ import { simulate } from "./schedule.ts"
 import type { Device } from "../devices.ts"
 import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, GoToStation, StartMatch, StepUnavailable, Training, type PickupState, type PostValue } from "./schema.ts"
 import type { InterfaceAction } from "../training/interface.ts"
-import { STATION_IDS, TRAINING, type StationId, type StepId } from "../training/index.ts"
+import { isTraining, STATION_IDS, type StationId, type StepId } from "../training/index.ts"
 import { arrival, FIRST_START, type TrainingStart } from "../training/start.ts"
 import { ReadOutbox, ViewWorld, type WorldView } from "./view.ts"
 
@@ -34,7 +34,7 @@ export type Sim = ReturnType<typeof createSim>
 /** The room's Ritmo runtime; `debug` is used by the devtools (lint, sessions). */
 export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: HostClock.HostClock }) {
   // The training has no warm-up and no clock: it is live from the start, at its first station.
-  const training = options.mode === TRAINING.mode
+  const training = isTraining(options.mode)
   const first = arrival(options.training ?? FIRST_START)
   const made = Game.Runtime.make({
     services: Game.Runtime.services(Game.Runtime.service(Physics, options.physics)),

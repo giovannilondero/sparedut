@@ -26,6 +26,9 @@ import { TURRET_STATION } from "./stations/turret.ts"
 /** The training's mode and map: fixed by the training request, never chosen by a regular room. */
 export const TRAINING = { mode: "dutrine", map: "sagre" } as const satisfies { readonly mode: ModeId; readonly map: MapId }
 
+/** Whether a room's mode is the training's: its rules, its requests and its menu. */
+export const isTraining = (mode: ModeId): boolean => mode === TRAINING.mode
+
 /** The stations, in the order a first run goes through them. Index `i` is station `i + 1`; its place on the map is `SAGRE_STATIONS[id]`. */
 export const STATION_IDS = ["look", "course", "always", "switch", "stalls", "armoury", "throw", "pickups", "turret", "medic", "modes", "skirmish"] as const
 export type StationId = (typeof STATION_IDS)[number]
