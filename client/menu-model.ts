@@ -7,7 +7,9 @@ import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "../shared/f
 import type { MapId } from "../shared/map.ts"
 import { MAP_IDS } from "../shared/maps/index.ts"
 import { ACCESSES, Password, REACHES, type Access, type ErrorCode, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
-import { oneTapRoom } from "./settings.ts"
+import type { PrimaryId } from "../shared/weapons.ts"
+import type { Lang } from "./i18n.ts"
+import { oneTapRoom, type Settings } from "./settings.ts"
 
 export type CreateOptions = Reached<RoomAccess> & {
   readonly mode: ModeId
@@ -18,16 +20,11 @@ export type CreateOptions = Reached<RoomAccess> & {
   readonly ff: boolean
 }
 
-/** What the menu keeps between visits. The caller decides where it is stored. */
-export interface Remembered {
-  name: string
-  lastMode: ModeId
-  lastMap: MapId
-  lastMinutes: number
-  lastBots: number
-  lastLevel: BotLevel
-  lastFf: boolean
-}
+/** What the menu keeps between visits: the player's settings. The caller decides where they are stored. */
+export type Remembered = Settings
+
+/** The settings form's values: the same form in the menu and in a match. */
+export type FormSetting = "sensitivity" | "fov" | "master" | "music" | "quality" | "crouch" | "autoRes" | "showInfo" | "invertY"
 
 export const SCREENS = ["home", "create", "password", "armarie", "settings", "vocabolari"] as const
 export type Screen = (typeof SCREENS)[number]
@@ -175,6 +172,27 @@ export class MenuModel {
 
   typeName(text: string) {
     this.remembered.name = text.trim()
+    this.save()
+  }
+
+  chooseLanguage(lang: Lang) {
+    this.change("lang", lang)
+  }
+
+  /** The primary weapon, chosen in the armoury: the menu's or a match's. */
+  choosePrimary(primary: PrimaryId) {
+    this.change("primary", primary)
+  }
+
+  /** A value of the settings form: remembered, and applied by whoever `save` calls. */
+  changeSetting<K extends FormSetting>(key: K, value: Settings[K]) {
+    this.change(key, value)
+  }
+
+  /** Remembers a changed value; the value it already has saves nothing. */
+  private change<K extends keyof Settings>(key: K, value: Settings[K]) {
+    if (this.remembered[key] === value) return
+    this.remembered[key] = value
     this.save()
   }
 

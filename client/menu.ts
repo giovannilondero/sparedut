@@ -114,9 +114,8 @@ export class Menu {
     for (const el of document.querySelectorAll<HTMLButtonElement>("[data-lang]")) {
       el.addEventListener("click", () => {
         audio.play("ui_click")
-        settings.lang = el.dataset.lang as Lang
+        this.model.chooseLanguage(el.dataset.lang as Lang)
         setLang(settings.lang)
-        handlers.settingsChanged()
       })
     }
     this.bindLook()
@@ -474,8 +473,7 @@ export class Menu {
     group.addEventListener("valuechange", (e) => {
       // A primary is always chosen: a change to none is refused.
       if (e.detail.value === null) return e.preventDefault()
-      this.settings.primary = e.detail.value as PrimaryId
-      this.handlers.settingsChanged()
+      this.model.choosePrimary(e.detail.value as PrimaryId)
       this.audio.play("switch")
       onPick?.(this.settings.primary)
     })
@@ -494,11 +492,7 @@ export class Menu {
       const el = $<HTMLElementTagNameMap["ui-slider"]>(id)
       el.format = format
       el.value = s[key]
-      const set = (v: number) => {
-        if (v === s[key]) return
-        s[key] = v
-        this.handlers.settingsChanged()
-      }
+      const set = (v: number) => this.model.changeSetting(key, v)
       // Applied while dragging (the volume is heard, the field of view seen), saved with every step like the rest.
       el.addEventListener("valuechange", (e) => {
         if (typeof e.detail.value === "number") set(e.detail.value)
@@ -522,24 +516,14 @@ export class Menu {
     slider("s-music", "music", (v) => `${Math.round(v * 100)}%`)
     const q = $<HTMLSelectElement>("s-quality")
     q.value = s.quality
-    q.addEventListener("change", () => {
-      s.quality = q.value as Settings["quality"]
-      this.handlers.settingsChanged()
-    })
+    q.addEventListener("change", () => this.model.changeSetting("quality", q.value as Settings["quality"]))
     const crouch = $<HTMLSelectElement>("s-crouch")
     crouch.value = s.crouch
-    crouch.addEventListener("change", () => {
-      s.crouch = crouch.value as Settings["crouch"]
-      this.handlers.settingsChanged()
-    })
+    crouch.addEventListener("change", () => this.model.changeSetting("crouch", crouch.value as Settings["crouch"]))
     for (const [id, key] of [["s-autores", "autoRes"], ["s-info", "showInfo"], ["s-invert", "invertY"]] as const) {
       const box = $<HTMLElementTagNameMap["ui-switch"]>(id)
       box.checked = s[key]
-      box.addEventListener("checkedchange", (e) => {
-        if (e.detail.value === s[key]) return
-        s[key] = e.detail.value
-        this.handlers.settingsChanged()
-      })
+      box.addEventListener("checkedchange", (e) => this.model.changeSetting(key, e.detail.value))
     }
   }
 

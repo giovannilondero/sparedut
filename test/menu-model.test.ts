@@ -7,6 +7,17 @@ import { focusOnScreen, MenuModel, type Remembered } from "../client/menu-model.
 
 const remembered = (over: Partial<Remembered> = {}): Remembered => ({
   name: "Toni",
+  lang: "fur",
+  primary: "cramar",
+  sensitivity: 1,
+  fov: 80,
+  master: 0.8,
+  music: 0.5,
+  invertY: false,
+  crouch: "hold",
+  quality: "media",
+  showInfo: false,
+  autoRes: true,
   lastMode: "bataie",
   lastMap: "glemone",
   lastMinutes: 10,
@@ -153,6 +164,34 @@ test("back goes home from any other screen, and does nothing at home", () => {
   expect(model.back()).toBe(true)
   expect(model.screen).toBe("home")
   expect(model.back()).toBe(false)
+})
+
+test("the language chosen is remembered at once", () => {
+  const { model, values, counter } = menu()
+  model.chooseLanguage("it")
+  expect([values.lang, counter.saves]).toEqual(["it", 1])
+  model.chooseLanguage("it")
+  expect(counter.saves).toBe(1) // the same language again changes nothing
+})
+
+test("the primary weapon chosen in the armoury is remembered at once", () => {
+  const { model, values, counter } = menu()
+  model.choosePrimary("cjampanili")
+  expect([values.primary, counter.saves]).toEqual(["cjampanili", 1])
+  model.choosePrimary("cjampanili")
+  expect(counter.saves).toBe(1)
+})
+
+test("a setting changed in the form is remembered at once; the value it already has saves nothing", () => {
+  const { model, values, counter } = menu()
+  model.changeSetting("sensitivity", 1.5)
+  model.changeSetting("quality", "alta")
+  model.changeSetting("crouch", "toggle")
+  model.changeSetting("invertY", true)
+  expect(values).toMatchObject({ sensitivity: 1.5, quality: "alta", crouch: "toggle", invertY: true })
+  expect(counter.saves).toBe(4)
+  model.changeSetting("sensitivity", 1.5)
+  expect(counter.saves).toBe(4)
 })
 
 const room = (code: string, over: object = {}) =>
