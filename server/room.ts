@@ -20,7 +20,7 @@ import {
   type RoomAccess,
   type Snapshot
 } from "../shared/protocol.ts"
-import { createSim, type GameEvent, type Sim, type WorldView } from "../shared/sim/index.ts"
+import { createSim, type GameEvent, type PostValue, type Sim, type WorldView } from "../shared/sim/index.ts"
 import { isTraining, TRAINING, type StationId } from "../shared/training/index.ts"
 import type { StationBot } from "../shared/training/station.ts"
 import type { TrainingStart } from "../shared/training/start.ts"
@@ -135,14 +135,23 @@ export class Room {
 
   addBot(team: Team) {
     if (this.full) return
-    const used = new Set([...this.members.values()].map((m) => m.name))
-    const name = BOT_NAMES[team].find((n) => !used.has(n)) ?? `${BOT_NAMES[team][0]} ${++botCounter}`
-    const id = `bot-${++botCounter}`
     const primaries: PrimaryId[] = ["cramar", "cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis", "cramar"]
-    const primary = primaries[botCounter % primaries.length]
-    this.members.set(id, { id, name, team, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
+    const id = this.seatBot(team, (n) => primaries[n % primaries.length], null)
     this.bots.set(id, new BotBrain(id, this.level, navGraph(this.physics), this.physics, botCounter))
-    this.arriving.set(id, () => this.sim.join(id, name, team, true, primary))
+  }
+
+  /**
+   * A bot's seat in the room: a new id, a name of its team no member has, its member record, and
+   * its join at the next step with the primary `primaryFor` its number picks and its post, if any.
+   */
+  private seatBot(team: Team, primaryFor: (n: number) => PrimaryId, post: PostValue | null): string {
+    const id = `bot-${++botCounter}`
+    const used = new Set([...this.members.values()].map((m) => m.name))
+    const name = BOT_NAMES[team].find((n) => !used.has(n)) ?? `${BOT_NAMES[team][0]} ${botCounter}`
+    const primary = primaryFor(botCounter)
+    this.members.set(id, { id, name, team, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
+    this.arriving.set(id, () => this.sim.join(id, name, team, true, primary, post))
+    return id
   }
 
   removeBot(team: Team) {
@@ -257,14 +266,11 @@ export class Room {
   }
 
   private addStationBot(station: StationId, bot: StationBot) {
-    const id = `bot-${++botCounter}`
-    const used = new Set([...this.members.values()].map((m) => m.name))
-    const name = BOT_NAMES[bot.team].find((n) => !used.has(n)) ?? `${BOT_NAMES[bot.team][0]} ${botCounter}`
     const post = postOf(station, bot)
-    this.members.set(id, { id, name, team: bot.team, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
+    const id = this.seatBot(bot.team, () => STATION_BOT_PRIMARY, post)
     this.stationBots.set(id, bot.fires ? new BotBrain(id, this.level, stationGraph(navGraph(this.physics), station), this.physics, botCounter) : new RouteBrain(id, bot.route, post.yaw))
-    this.arriving.set(id, () => this.sim.join(id, name, bot.team, true, STATION_BOT_PRIMARY, post))
   }
+
 
   private sendSnapshots() {
     const w = this.world
