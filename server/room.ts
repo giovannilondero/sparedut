@@ -197,7 +197,7 @@ export class Room {
 
   addBot(team: Team) {
     if (this.full) return
-    const primaries: PrimaryId[] = ["cramar", "cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis", "cramar"]
+    const primaries: PrimaryId[] = ["cramar", "cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis", "cramar", "motosee"]
     const id = this.seatBot(team, (n) => primaries[n % primaries.length], null)
     this.bots.set(id, new BotBrain(id, this.level, navGraph(this.physics), this.physics, botCounter))
   }

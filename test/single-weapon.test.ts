@@ -17,6 +17,7 @@ import { createSim, type Sim } from "../shared/sim/index.ts"
 import { freshArsenal, owned, restock, SHIELD_TICKS } from "../shared/sim/rules.ts"
 import { CLASSES, PRIMARIES, RAIBL_MINE, SGNAPE_BOMB, WEAPONS, type PrimaryId } from "../shared/weapons.ts"
 import { harness } from "./harness.ts"
+import { onlooker } from "./play.ts"
 
 let glemone: PhysicsWorld
 let maran: PhysicsWorld
@@ -277,6 +278,7 @@ describe("single weapon between bots", () => {
       const room = new Room("TEST", "nessuno", "Test", "lan", { mode: "bataie", map: "glemone", minutes: 2, reach: "online", access: { kind: "open" }, level: "pari", ff: false, single: primary })
       room.fillBots(4)
       room.start()
+      const feed = onlooker(room)
       const started = performance.now()
       let ticks = 0
       for (; ticks < 60 * 60 * 3 && room.sim.view().phase.tag !== "Over"; ticks++) room.step()
@@ -288,6 +290,8 @@ describe("single weapon between bots", () => {
       expect(v.players.every((p) => p.arsenal.primary === primary)).toBe(true)
       expect(room.info().roster.every((r) => r.primary === primary)).toBe(true)
       expect(kills).toBeGreaterThan(0)
+      // Bots with the Motosee close in and cut with it, rather than falling back to the Mescul.
+      if (primary === "motosee") expect(feed.filter((e) => e.t === "kill" && e.w === "motosee").length).toBeGreaterThan(0)
       expect(ms).toBeLessThan(8)
     }, 120000)
   }
