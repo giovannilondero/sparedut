@@ -89,6 +89,8 @@ export interface Tracked {
   readonly spawned: boolean
   /** On foot within reach of a free turret: "use" would mount it. */
   readonly nearTurret: boolean
+  /** Facing a panel that can be torn off (`facesPanel`), with slot 3 free: holding "use" would tear it. */
+  readonly nearPanel: boolean
   /** What the player carries, for the weapon picker. */
   readonly arsenal: ArsenalValue | null
 }
@@ -97,8 +99,15 @@ export interface Tracked {
  * The player `me` in a snapshot, as the controls follow it. `at.mounted`: on a turret's seat;
  * `at.freeTurret`: a free turret within reach (`freeTurretInReach`), which counts only on foot.
  */
-export const trackedIn = (s: Snapshot, me: string, at: { readonly mounted: boolean; readonly freeTurret: boolean }): Tracked | null =>
-  s.you && { alive: s.you.alive, mounted: at.mounted, spawned: s.ev.some((e) => e.t === "spawn" && e.s === me), nearTurret: at.freeTurret && !at.mounted, arsenal: s.you.arsenal }
+export const trackedIn = (s: Snapshot, me: string, at: { readonly mounted: boolean; readonly freeTurret: boolean; readonly panel: boolean }): Tracked | null =>
+  s.you && {
+    alive: s.you.alive,
+    mounted: at.mounted,
+    spawned: s.ev.some((e) => e.t === "spawn" && e.s === me),
+    nearTurret: at.freeTurret && !at.mounted,
+    nearPanel: at.panel && !at.mounted,
+    arsenal: s.you.arsenal
+  }
 
 export interface ControlsHandlers {
   onSlot: (slot: Slot) => void
@@ -278,11 +287,11 @@ export class Controls {
     return this.lastUsed
   }
 
-  /** What "use" does now: mount a free turret within reach, dismount, or nothing (the control is hidden). */
-  get turretControl(): "use" | "dismount" | null {
+  /** What "use" does now: mount a free turret within reach, dismount, tear off the casot's panel, or nothing (the control is hidden). */
+  get turretControl(): "use" | "dismount" | "tear" | null {
     const p = this.tracked
     if (!p?.alive) return null
-    return p.mounted ? "dismount" : p.nearTurret ? "use" : null
+    return p.mounted ? "dismount" : p.nearTurret ? "use" : p.nearPanel ? "tear" : null
   }
 
   /**

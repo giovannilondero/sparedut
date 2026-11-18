@@ -22,7 +22,7 @@ import type { GameAudio } from "./contracts.ts"
 import { esc } from "./hud.ts"
 import { onLangChange, setLang, t, type Lang } from "./i18n.ts"
 import { chooseLook, LOOK_IDS, LOOKS, type LookId } from "./looks.ts"
-import { focusOnScreen, MenuModel, SCREENS, type CreateOptions, type Outcome, type PasswordRefusal, type PromptProblem, type Refusal, type Screen } from "./menu-model.ts"
+import { classFigures, focusOnScreen, MenuModel, SCREENS, type CreateOptions, type Outcome, type PasswordRefusal, type PromptProblem, type Refusal, type Screen } from "./menu-model.ts"
 import type { PrimaryPicker } from "./match-menus.ts"
 import { oneTapRoom, type Settings } from "./settings.ts"
 
@@ -583,9 +583,11 @@ export class Menu {
       const w = WEAPONS[id]
       const text = s.weapons[id]
       const rate = 60 / w.cooldownTicks
-      const tag = isPrimary(id) ? s.menu.tag.primary : id === "lanciafrico" ? s.menu.tag.power : id === "mescul" ? s.menu.tag.melee : s.menu.tag.pistol
+      const tag = isPrimary(id) ? s.menu.tag.primary : w.slot === 3 ? s.menu.tag.power : id === "mescul" ? s.menu.tag.melee : s.menu.tag.pistol
+      // A primary is a class: its health and speed come first.
+      const figures = isPrimary(id) ? classFigures(s, id as PrimaryId).map(([label, value]) => `<span class="stat figure">${label}<b>${value}</b></span>`).join("") : ""
       return `<span class="tag">${w.slot} · ${tag}</span><b id="${target.id}-${id}">${text.name}</b><span class="blurb" id="${target.id}-${id}-blurb">${text.blurb}</span>
-        <span class="stats">${bar(s.menu.stat.damage, (w.damage * w.pellets) / max.damage)}${bar(s.menu.stat.rate, rate / max.rate)}${bar(s.menu.stat.range, (w.range || 120) / max.range)}${bar(s.menu.stat.mag, Math.max(w.magazine, 1) / max.mag)}</span>`
+        <span class="stats">${figures}${bar(s.menu.stat.damage, (w.damage * w.pellets) / max.damage)}${bar(s.menu.stat.rate, rate / max.rate)}${bar(s.menu.stat.range, (w.range || 120) / max.range)}${bar(s.menu.stat.mag, Math.max(w.magazine, 1) / max.mag)}</span>`
     }
     // The mitraie can't be carried: it stays on the turrets.
     const carried = WEAPON_IDS.filter((id) => id !== "mitraie" && !isPrimary(id))

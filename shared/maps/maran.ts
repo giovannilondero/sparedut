@@ -428,12 +428,17 @@ export const DISCO: V3 = [44, 2.7, 27]
 /** The birdwatching slit: narrow, you can shoot through it but not pass. */
 const SLIT = { y0: 1.85, y1: 2.25 } as const
 const DOOR = { z0: 26.2, z1: 27.8, top: CASOT.floor + 2.1 } as const
+/**
+ * The panel in the casot's north wall, by the door's corner: a board to tear off from inside.
+ * Sill and lintel stay, and the gap is lower than a crouching body: shots pass, players don't.
+ */
+export const PANEL = { x0: 40.7, x1: 41.7, y0: CASOT.floor + 0.8, y1: CASOT.floor + 1.8 } as const
 {
   const { minX, maxX, minZ, maxZ, floor, top, t } = CASOT
   const slit = (a0: number, a1: number): Hole => ({ a0, a1, ...SLIT })
   wall([minX, floor, minZ], [minX + t, top, maxZ], "legno", [{ a0: DOOR.z0, a1: DOOR.z1, y0: floor, y1: DOOR.top }])
   wall([maxX - t, floor, minZ], [maxX, top, maxZ], "legno", [slit(23, 25), slit(26, 28), slit(29, 31)])
-  wall([minX + t, floor, minZ], [maxX - t, top, minZ + t], "legno", [slit(43, 46), slit(47, 50.5)])
+  wall([minX + t, floor, minZ], [maxX - t, top, minZ + t], "legno", [{ a0: PANEL.x0, a1: PANEL.x1, y0: PANEL.y0, y1: PANEL.y1 }, slit(43, 46), slit(47, 50.5)])
   wall([minX + t, floor, maxZ - t], [maxX - t, top, maxZ], "legno", [slit(43, 46), slit(47, 50.5)])
   box([minX - 0.4, top, minZ - 0.4], [maxX + 0.4, top + 0.3, maxZ + 0.4], "legno")
   box([SCJALIN.minX, floor, SCJALIN.minZ], [SCJALIN.maxX, SCJALIN.top, SCJALIN.maxZ], "legno")
@@ -655,5 +660,6 @@ export const MARAN = defineMap({
     { at: [0, FORESTERIE.roof, -65.2], yaw: Math.PI },
     { at: [-18, LAND, 63.6], yaw: 0 }
   ],
-  doors: [{ name: "Puarte dal casot", min: [CASOT.minX + 0.05, CASOT.floor, DOOR.z0], max: [CASOT.minX + 0.25, DOOR.top, DOOR.z1], hp: 150 }]
+  doors: [{ name: "Puarte dal casot", min: [CASOT.minX + 0.05, CASOT.floor, DOOR.z0], max: [CASOT.minX + 0.25, DOOR.top, DOOR.z1], hp: 150 }],
+  panels: [{ name: "Panel dal casot", min: [PANEL.x0, PANEL.y0, CASOT.minZ], max: [PANEL.x1, PANEL.y1, CASOT.minZ + CASOT.t], inward: [0, 0, 1] }]
 })

@@ -3,10 +3,9 @@
  * the storm.
  */
 import type { MapDef, Spawn, Team } from "../map.ts"
-import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../weapons.ts"
-import type { Ammo, ArsenalValue, CartValue, FlagState, HillValue, Kit, PickupState, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
+import { CLASSES, RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../weapons.ts"
+import type { Ammo, ArsenalValue, CartValue, FlagState, HillValue, Kit, PanelState, PickupState, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
 
-export const MAX_HP = 100
 export const MAX_ARMOR = 100
 export const RESPAWN_TICKS = 180
 /** After sprinting the weapon comes back up in this many ticks (server and client prediction). */
@@ -14,6 +13,14 @@ export const RAISE_TICKS = 12
 export const SHIELD_TICKS = 90
 export const SGNAPE_TICKS = 600
 export const SGNAPE_SPEED = 1.3
+/** Carrying the frico slows you down. */
+export const CARRIER_SPEED = 0.9
+
+/** A class's maximum health: what its player spawns with, and where every heal stops. */
+export const maxHp = (primary: PrimaryId) => CLASSES[primary].hp
+
+/** Health that a change of primary leaves: no more than the new class's maximum. */
+export const hpFor = (primary: PrimaryId, hp: number) => Math.min(hp, maxHp(primary))
 export const ASSIST_WINDOW_TICKS = 600
 export const OVER_TICKS = 15 * 60
 export const FLAG_RETURN_TICKS = 30 * 60
@@ -110,7 +117,7 @@ export function freshArsenal(primary: PrimaryId, kit: Kit = "full"): ArsenalValu
     current: primary,
     primary,
     nextPrimary: primary,
-    launcher: false,
+    power: null,
     ammo: freshAmmo(),
     action: { _tag: "switch", ticks: 20 },
     bombs: full ? SGNAPE_BOMB.perLife : 0,
@@ -124,9 +131,12 @@ export function freshArsenal(primary: PrimaryId, kit: Kit = "full"): ArsenalValu
 
 export const NO_STATS: StatsValue = { kills: 0, deaths: 0, assists: 0, caps: 0, score: 0, damage: 0, headshots: 0, streak: 0, best: 0 }
 
-/** The weapons the player can hold right now (the mitraie isn't held: you use the turret). */
-export const owned = (a: ArsenalValue, id: WeaponId) =>
-  id === "mescul" || id === a.primary || (a.kit === "full" && (id === "mandi" || (id === "lanciafrico" && a.launcher)))
+/**
+ * The weapons the player can hold right now (the mitraie isn't held: you use the turret). Under
+ * single weapon (`kit` "single") no pistol; what is in slot 3 (the panel) stays.
+ */
+export const owned = (a: Pick<ArsenalValue, "kit" | "primary" | "power">, id: WeaponId) =>
+  id === "mescul" || id === a.primary || id === a.power || (id === "mandi" && a.kit === "full")
 
 /**
  * An ammunition pickup taken: every weapon owned back to its full reserve, and with a full kit the
@@ -145,6 +155,14 @@ export function restock(a: ArsenalValue): ArsenalValue | null {
 export const freshPickups = (map: MapDef, rules: Pick<RulesValue, "single">): PickupState[] =>
   map.pickups.map((p): PickupState => (rules.single && p.kind === "lanciafrico" ? { _tag: "absent" } : { _tag: "up" }))
 
+/**
+ * How fast a player moves, as a multiple of the walk: the class's base speed, times the multiplier
+ * of the weapon in hand (`requested`, if they own it; else the one they hold), times the sgnape and
+ * carrying the frico. The simulation and the client's prediction both move with it.
+ */
+export const speedScale = (a: Pick<ArsenalValue, "kit" | "primary" | "current" | "power" | "sgnape">, requested: WeaponId, carrier: boolean) =>
+  CLASSES[a.primary].speed * WEAPONS[owned(a, requested) ? requested : a.current].moveScale * (a.sgnape > 0 ? SGNAPE_SPEED : 1) * (carrier ? CARRIER_SPEED : 1)
+
 /** The weapon a number key selects: the one in that slot the player owns (in slot 1, the primary), or null. */
 export const weaponInSlot = (a: ArsenalValue, slot: Slot): WeaponId | null => WEAPON_IDS.find((id) => WEAPONS[id].slot === slot && owned(a, id)) ?? null
 
@@ -160,6 +178,8 @@ export const currentStation = (training: { readonly _tag: "Off" | "Complete" } |
 /** Cool, free turrets and intact doors: how they are at match start. */
 export const freshTurrets = (map: MapDef): TurretState[] => map.turrets.map(() => ({ gunner: null, heat: 0, jammed: false, cooldown: 0 }))
 export const freshDoors = (map: MapDef): number[] => map.doors.map((d) => d.hp)
+/** Every panel on its wall: how they are at match start. */
+export const freshPanels = (map: MapDef): PanelState[] => (map.panels ?? []).map(() => ({ _tag: "wall" }))
 
 /** Breakable doors take more from kicks (the mescul) than from pellets. */
 export const DOOR_MELEE_SCALE = 1.6

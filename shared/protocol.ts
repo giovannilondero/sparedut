@@ -11,7 +11,7 @@ import type { Body } from "./movement.ts"
 import type { GameEvent } from "./sim/events.ts"
 import type { ArsenalValue, FlagState, HillValue, TurretState } from "./sim/schema.ts"
 import type { StormValue } from "./sim/rules.ts"
-import type { CartView, PhaseView, TrainingView } from "./sim/view.ts"
+import type { CartView, PanelView, PhaseView, TrainingView } from "./sim/view.ts"
 import { PRIMARIES, type PrimaryId, type ProjectileKind, type WeaponId } from "./weapons.ts"
 import { INTERFACE_ACTIONS } from "./training/interface.ts"
 import { isStepId, isStepOf, STATION_IDS, type StepId } from "./training/index.ts"
@@ -224,6 +224,8 @@ export interface Snapshot {
   readonly turrets: ReadonlyArray<TurretState>
   /** Health of the breakable doors, in `map.doors` order (0 = broken down). */
   readonly doors: readonly number[]
+  /** The map's panels, in `map.panels` order: on the wall, being torn off, or off. */
+  readonly panels: readonly PanelView[]
   readonly players: readonly SnapOther[]
   readonly you: SnapSelf | null
   /** Only in a training: where the trainee is in it. */
@@ -236,6 +238,8 @@ export interface BoardRow {
   readonly name: string
   readonly team: Team
   readonly bot: boolean
+  /** Their primary, and so their class. */
+  readonly primary: PrimaryId
   readonly kills: number
   readonly deaths: number
   readonly assists: number

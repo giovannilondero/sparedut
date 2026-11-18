@@ -15,7 +15,7 @@ import { FLAG_BIT } from "../shared/protocol.ts"
 import type { GameEvent } from "../shared/sim/events.ts"
 import { createSim, type Sim } from "../shared/sim/index.ts"
 import { freshArsenal, owned, restock, SHIELD_TICKS } from "../shared/sim/rules.ts"
-import { PRIMARIES, RAIBL_MINE, SGNAPE_BOMB, WEAPONS, type PrimaryId } from "../shared/weapons.ts"
+import { CLASSES, PRIMARIES, RAIBL_MINE, SGNAPE_BOMB, WEAPONS, type PrimaryId } from "../shared/weapons.ts"
 import { harness } from "./harness.ts"
 
 let glemone: PhysicsWorld
@@ -159,6 +159,11 @@ describe("single weapon in the simulation", () => {
     sim.primary("a", "mulin")
     steps(sim, 5)
     expect(me(sim).arsenal.primary).toBe("cjampanili")
+  })
+
+  test("a player's class is the single weapon's: they spawn with its health, whatever they prefer", () => {
+    const sim = match(glemone, "cramar", "mulin")
+    expect(me(sim).hp).toBe(CLASSES.mulin.hp)
   })
 
   test("a player owns only the primary and the Mescul: selecting the pistol does nothing", () => {

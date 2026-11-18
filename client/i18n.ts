@@ -122,7 +122,7 @@ export interface Strings {
     readonly single: Fn
     readonly minutes: Fn<[number]>
     readonly tag: { readonly primary: string; readonly power: string; readonly melee: string; readonly pistol: string }
-    readonly stat: { readonly damage: string; readonly rate: string; readonly range: string; readonly mag: string }
+    readonly stat: { readonly damage: string; readonly rate: string; readonly range: string; readonly mag: string; readonly health: string; readonly speed: string }
     readonly vocab: readonly (readonly [string, string])[]
     /** One line on who can see and join a room of that reach. */
     readonly reachSub: Record<Reach, string>
@@ -187,6 +187,9 @@ export interface Strings {
     /** The touch button that mounts a free turret, and the one that dismounts in its place. */
     readonly touchUse: string
     readonly touchLeave: string
+    /** The casot's panel: the active device's control to tear it off (held), and the touch button that does it. */
+    readonly panelTear: Readonly<Record<Device, string>>
+    readonly touchTear: string
     readonly turretHeat: string
     readonly turretHot: string
   }
@@ -207,6 +210,8 @@ export interface Strings {
     /** A map's door broken down: who broke it. */
     readonly doorBroken: Fn<[string]>
     readonly doorSub: string
+    readonly panelTorn: Fn<[string]>
+    readonly panelSub: string
     /** The gjaline's feathers in the eyes. */
     readonly plumis: string
   }
@@ -345,12 +350,13 @@ const WEAPON_NAMES = {
   miedi: { name: "Cassele dal Miedi", short: "Miedi" },
   gjalinis: { name: "Cjanon des Gjalinis", short: "Gjalinis" },
   lanciafrico: { name: "Lanciafrico", short: "Lanciafrico" },
+  panel: { name: "Panel dal Casot", short: "Panel" },
   mitraie: { name: "Mitraie de Postazion", short: "Mitraie" }
 } as const
 
 /** The labels on the touch "use" button, mounting and dismounting: the turret prompts on touch name them. */
-const FUR_TOUCH = { use: "Mitraie", leave: "Lasse" } as const
-const IT_TOUCH = { use: "Mitragliatrice", leave: "Lascia" } as const
+const FUR_TOUCH = { use: "Mitraie", leave: "Lasse", tear: "Panel" } as const
+const IT_TOUCH = { use: "Mitragliatrice", leave: "Lascia", tear: "Pannello" } as const
 
 const fur: Strings = {
   static: {
@@ -518,6 +524,10 @@ const fur: Strings = {
       ...WEAPON_NAMES.lanciafrico,
       blurb: "Al tire formis di frico bulintis che a sbalcin e a sclopin. Arme potente: si cjape sù in Vie Bini."
     },
+    panel: {
+      ...WEAPON_NAMES.panel,
+      blurb: "Une bree dal mûr dal casot, gjavade vie cu lis mans. E pese e ti fâs lâ plui planc, ma cuant che e rive e fâs mâl. E je dome a Maran, e une sole par partide."
+    },
     mitraie: {
       ...WEAPON_NAMES.mitraie,
       blurb: "No si puarte: e je su lis toretis. Colps infinits e svelts, ma se no tu molis il grilet si scjalde e si ferme."
@@ -571,7 +581,7 @@ const fur: Strings = {
       melee: "Cuarp a cuarp · simpri cun te",
       pistol: "Pistole · simpri cun te"
     },
-    stat: { damage: "Dam", rate: "Cjadence", range: "Puartade", mag: "Cjamadôr" },
+    stat: { damage: "Dam", rate: "Cjadence", range: "Puartade", mag: "Cjamadôr", health: "Salût", speed: "Velocitât" },
     vocab: VOCAB,
     reachSub: {
       offline: "Dome tu cuintri i bot, in chest navigadôr",
@@ -607,7 +617,7 @@ const fur: Strings = {
     deathSelf: "Tu ti sês fat mâl di bessôl",
     respawnIn: (s) => `Si torne in pîts tra ${s}…`,
     shield: "✨ Protezût",
-    board: ["Non", "Ponts", "Copâts", "Muarts", "Ajûts", "Frics", "Serie", "Ping"],
+    board: ["Non", "Arme", "Ponts", "Copâts", "Muarts", "Ajûts", "Frics", "Serie", "Ping"],
     kill: {
       mescul: ["al à messedât come la polente", "al à mesculât", "al à dât une mesculade a"],
       mandi: ["al à saludât par simpri", "al à dit Mandi a", "al à fat la riverence a"],
@@ -615,6 +625,7 @@ const fur: Strings = {
       doplete: ["al à benedît", "al à mandât a messe", "al à spedît in canoniche"],
       cjampanili: ["al à sunât lis cjampanis a", "al à cjalât di lontan", "al à dit l'Ave Marie a"],
       lanciafrico: ["al à fat frico di", "al à frizût", "al à servît cul pan"],
+      panel: ["al à inclaudât", "al à sbatût la bree in muse a", "al à fat cjatâ il mûr a"],
       mulin: ["al à masanât", "al à fat farine di", "al à metût sot la muele"],
       miedi: ["al à dât la medisine sbaliade a", "al à curât par simpri", "al à prescrit il ripôs eterni a"],
       sgnape: ["al à fat bevi masse sgnape a", "al à cjocât", "al à fat il brindis cun"],
@@ -670,6 +681,12 @@ const fur: Strings = {
     },
     touchUse: FUR_TOUCH.use,
     touchLeave: FUR_TOUCH.leave,
+    panelTear: {
+      keyboard: "Ten <kbd>E</kbd> par gjavâ vie il panel",
+      pad: "Ten <kbd>⬇</kbd> par gjavâ vie il panel",
+      touch: `Ten <kbd>${FUR_TOUCH.tear}</kbd> par gjavâ vie il panel`
+    },
+    touchTear: FUR_TOUCH.tear,
     turretHeat: "Calôr",
     turretHot: "SCJALDADE!"
   },
@@ -695,6 +712,8 @@ const fur: Strings = {
     quickGloss: null,
     doorBroken: (who) => `${who} al à sfondât la puarte dal casot!`,
     doorSub: "Dentri e je fieste: i fenicotars a balin",
+    panelTorn: (who) => `${who} al à gjavât vie il panel dal casot!`,
+    panelSub: "Tal mûr e reste une buse: si pues tirâ traviers",
     plumis: "Plumis tai vôi!"
   },
   loadout: {
@@ -943,6 +962,10 @@ const it: Strings = {
       ...WEAPON_NAMES.lanciafrico,
       blurb: "Spara forme di frico bollenti che rimbalzano e scoppiano. Arma potente: si raccoglie in Via Bini."
     },
+    panel: {
+      ...WEAPON_NAMES.panel,
+      blurb: "Un'asse del muro del capanno, strappata via a mani nude. Pesa e ti fa andare più piano, ma quando arriva fa male. C'è solo a Marano, e una sola per partita."
+    },
     mitraie: {
       ...WEAPON_NAMES.mitraie,
       blurb: "Non si porta: sta sulle torrette. Colpi infiniti e veloci, ma se non molli il grilletto si scalda e si ferma."
@@ -996,7 +1019,7 @@ const it: Strings = {
       melee: "Corpo a corpo · sempre con te",
       pistol: "Pistola · sempre con te"
     },
-    stat: { damage: "Danno", rate: "Cadenza", range: "Portata", mag: "Caricatore" },
+    stat: { damage: "Danno", rate: "Cadenza", range: "Portata", mag: "Caricatore", health: "Salute", speed: "Velocità" },
     vocab: VOCAB,
     reachSub: {
       offline: "Solo tu contro i bot, in questo browser",
@@ -1032,7 +1055,7 @@ const it: Strings = {
     deathSelf: "Ti sei fatto male da solo",
     respawnIn: (s) => `Si torna in piedi tra ${s}…`,
     shield: "✨ Protetto",
-    board: ["Nome", "Punti", "Uccisioni", "Morti", "Assist", "Catture", "Serie", "Ping"],
+    board: ["Nome", "Arma", "Punti", "Uccisioni", "Morti", "Assist", "Catture", "Serie", "Ping"],
     kill: {
       mescul: ["ha girato come la polenta", "ha rimestato", "ha dato una mestolata a"],
       mandi: ["ha salutato per sempre", "ha detto Mandi a", "ha fatto la riverenza a"],
@@ -1040,6 +1063,7 @@ const it: Strings = {
       doplete: ["ha benedetto", "ha mandato a messa", "ha spedito in canonica"],
       cjampanili: ["ha suonato le campane a", "ha guardato da lontano", "ha recitato l'Ave Maria a"],
       lanciafrico: ["ha fatto frico di", "ha fritto", "ha servito col pane"],
+      panel: ["ha inchiodato", "ha sbattuto l'asse in faccia a", "ha fatto conoscere il muro a"],
       mulin: ["ha macinato", "ha fatto farina di", "ha messo sotto la macina"],
       miedi: ["ha dato la medicina sbagliata a", "ha curato per sempre", "ha prescritto il riposo eterno a"],
       sgnape: ["ha fatto bere troppa grappa a", "ha ubriacato", "ha brindato con"],
@@ -1095,6 +1119,12 @@ const it: Strings = {
     },
     touchUse: IT_TOUCH.use,
     touchLeave: IT_TOUCH.leave,
+    panelTear: {
+      keyboard: "Tieni premuto <kbd>E</kbd> per strappare il pannello",
+      pad: "Tieni premuto <kbd>⬇</kbd> per strappare il pannello",
+      touch: `Tieni premuto <kbd>${IT_TOUCH.tear}</kbd> per strappare il pannello`
+    },
+    touchTear: IT_TOUCH.tear,
     turretHeat: "Calore",
     turretHot: "SURRISCALDATA!"
   },
@@ -1131,6 +1161,8 @@ const it: Strings = {
     ],
     doorBroken: (who) => `${who} ha sfondato la porta del capanno!`,
     doorSub: "Dentro c'è festa: i fenicotteri ballano",
+    panelTorn: (who) => `${who} ha strappato il pannello del capanno!`,
+    panelSub: "Nel muro resta un buco: ci si spara attraverso",
     plumis: "Piume negli occhi!"
   },
   loadout: {

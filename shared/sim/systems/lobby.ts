@@ -3,7 +3,7 @@
  */
 import { IDLE_INPUT } from "../../input.ts"
 import { MAPS } from "../../maps/index.ts"
-import { freshArsenal, kitOf, NO_STATS, primaryOf } from "../rules.ts"
+import { freshArsenal, hpFor, kitOf, NO_STATS, primaryOf } from "../rules.ts"
 import {
   Arsenal,
   Attackers,
@@ -105,8 +105,11 @@ export const HandleTeamChanges = Game.System(
       const primary = primaries.get(session)
       // The new primary arrives immediately; if you were holding the old one, you switch to the new one.
       // Each weapon keeps its own ammo: switching back and forth reloads nothing.
-      if (primary)
-        data.arsenal.update(m, (a) =>
+      if (!primary) continue
+      // A new class: health above its maximum comes down to it.
+      const life = data.life.get(m)
+      if (life._tag === "Alive") data.life.update(m, { state: "Alive", data: (l) => ({ hp: hpFor(primary, l.hp), armor: l.armor, shield: l.shield }) })
+      data.arsenal.update(m, (a) =>
           a.primary === primary
             ? { ...a, nextPrimary: primary }
             : {

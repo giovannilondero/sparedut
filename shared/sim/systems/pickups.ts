@@ -1,10 +1,11 @@
 /**
- * Pickups: frico (health), gubane (armor), sgnape (speed), munizions, lanciafrico.
+ * Pickups: frico (health), gubane (armor), sgnape (speed), munizions, lanciafrico (not for
+ * whoever carries the casot's panel: they share slot 3).
  */
 import type { PickupKind } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
 import { WEAPONS } from "../../weapons.ts"
-import { MAX_ARMOR, MAX_HP, restock, SGNAPE_TICKS } from "../rules.ts"
+import { MAX_ARMOR, maxHp, restock, SGNAPE_TICKS } from "../rules.ts"
 import { Arsenal, Game, Life, Match, Motion, Out, Pickups, Player, Rules } from "../schema.ts"
 
 export const RESPAWN_OF = {
@@ -46,8 +47,8 @@ export const CollectPickups = Game.System(
         let used = true
         switch (spot.kind) {
           case "frico":
-            if (life.hp >= MAX_HP) used = false
-            else data.life.update(m, { state: "Alive", data: (l) => ({ hp: Math.min(MAX_HP, l.hp + 40), armor: l.armor, shield: l.shield }) })
+            if (life.hp >= maxHp(a.primary)) used = false
+            else data.life.update(m, { state: "Alive", data: (l) => ({ hp: Math.min(maxHp(a.primary), l.hp + 40), armor: l.armor, shield: l.shield }) })
             break
           case "gubane":
             if (life.armor >= MAX_ARMOR) used = false
@@ -63,9 +64,14 @@ export const CollectPickups = Game.System(
             break
           }
           case "lanciafrico":
+            // Slot 3 holds one thing: whoever carries the panel leaves the Lanciafrico where it is.
+            if (a.power === "panel") {
+              used = false
+              break
+            }
             data.arsenal.set(m, {
               ...a,
-              launcher: true,
+              power: "lanciafrico",
               current: "lanciafrico",
               action: { _tag: "switch", ticks: 20 },
               ammo: { ...a.ammo, lanciafrico: { mag: WEAPONS.lanciafrico.magazine, reserve: WEAPONS.lanciafrico.reserve } }

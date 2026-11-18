@@ -411,7 +411,7 @@ const loop = (now: number) => {
     game?.menuFrame()
     world.menuCamera(time, camera)
     camera.updateMatrixWorld()
-    world.update(dt, time, { pickups: [], flags: null, hill: null, cart: null, storm: null, turrets: [], doors: [], gates: [], camera })
+    world.update(dt, time, { pickups: [], flags: null, hill: null, cart: null, storm: null, turrets: [], doors: [], panels: [], gates: [], camera })
     fx.update(dt, camera)
     renderer.info.reset()
     look.render(scene, camera)

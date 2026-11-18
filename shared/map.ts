@@ -6,7 +6,7 @@
  * Axes: x east, y up, z south. Metres.
  */
 import { Ops } from "@typeonce/ritmo"
-import { TURRET } from "./weapons.ts"
+import { PANEL_REACH, TURRET } from "./weapons.ts"
 
 export type V3 = readonly [number, number, number]
 
@@ -102,6 +102,19 @@ export interface DoorDef {
 }
 
 /**
+ * A section of wall that can be torn off and carried (the casot's panel): solid while on the wall,
+ * then gone until the next match. Not in `blocks`, like a door: the physics removes it once torn
+ * off. The wall around it keeps a sill and a lintel, so its gap can be shot through but not walked
+ * through. `inward` is the unit normal (horizontal) pointing into the room it is torn off from.
+ */
+export interface PanelDef {
+  readonly name: string
+  readonly min: V3
+  readonly max: V3
+  readonly inward: V3
+}
+
+/**
  * A way that a host can close: the training's gate to the next station. Not in `blocks`, so it
  * collides only once something closes it; the physics of a plain map leaves every way open.
  */
@@ -153,6 +166,8 @@ export interface MapDef {
   readonly turrets: readonly TurretSpot[]
   /** The doors to break down (not in `blocks`: the physics removes them when they give way). */
   readonly doors: readonly DoorDef[]
+  /** Sections of wall to tear off and carry (only Lagune di Maran's casot has one). */
+  readonly panels?: readonly PanelDef[]
   /** Ways closed until a host opens them (the training's fair has one between each two stations). */
   readonly gates?: readonly GateDef[]
 }
@@ -267,6 +282,27 @@ export function freeTurretInReach(
 /** The turret user's aim, clamped to the arc the gun turns through. */
 export function turretAim(t: TurretSpot, yaw: number, pitch: number): { readonly yaw: number; readonly pitch: number } {
   return { yaw: turretYaw(t, yaw), pitch: Math.max(-TURRET.pitchDown, Math.min(TURRET.pitchUp, pitch)) }
+}
+
+/** How far from straight at a panel a look still faces it (cosine of the angle, seen from above). */
+const PANEL_FACING = 0.6
+
+/**
+ * Whether a body with feet at `at`, looking along `yaw`, can tear the panel off: on its inward side,
+ * within `PANEL_REACH` of it, in front of it and facing it. The one rule for the simulation and the
+ * tear prompt.
+ */
+export function facesPanel(p: PanelDef, at: { readonly x: number; readonly y: number; readonly z: number }, yaw: number): boolean {
+  const cx = (p.min[0] + p.max[0]) / 2
+  const cz = (p.min[2] + p.max[2]) / 2
+  const [nx, , nz] = p.inward
+  const half = Math.abs(p.max[0] - p.min[0]) * Math.abs(nz) + Math.abs(p.max[2] - p.min[2]) * Math.abs(nx)
+  const depth = (at.x - cx) * nx + (at.z - cz) * nz
+  const side = Math.abs((at.x - cx) * -nz + (at.z - cz) * nx)
+  if (depth <= 0 || depth > PANEL_REACH || side > half / 2 + 0.4) return false
+  if (at.y < p.min[1] - 1.6 || at.y > p.min[1]) return false
+  // The look, seen from above (yaw 0 faces north, -z), against the way back out through the panel.
+  return -Ops.sin(yaw) * -nx + -Ops.cos(yaw) * -nz >= PANEL_FACING
 }
 
 const dist3 = (a: V3, b: V3) => Math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2 + (b[2] - a[2]) ** 2)

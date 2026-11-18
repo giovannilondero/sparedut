@@ -6,11 +6,12 @@ import type { Team } from "../shared/map.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type SnapSelf, type Snapshot } from "../shared/protocol.ts"
 import type { KillCause } from "../shared/sim/events.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
+import { maxHp } from "../shared/sim/rules.ts"
 import type { TrainingView } from "../shared/sim/view.ts"
 import { STATION_IDS } from "../shared/training/index.ts"
 import type { Device } from "./device.ts"
 import { t } from "./i18n.ts"
-import { playPrompt, trainingPrompt, turretPrompt } from "./prompts.ts"
+import { panelPrompt, playPrompt, trainingPrompt, turretPrompt } from "./prompts.ts"
 import { announcesStep, NOT_SHOWN, stepMarksHtml, type PanelPlace } from "./training-panel.ts"
 import { buttonBit, TOUCH_BUTTONS, type Insets, type PickerEntry, type TouchLayout, type TouchView } from "./touch.ts"
 
@@ -138,13 +139,15 @@ export class Hud {
   vitals(you: SnapSelf | null, slot: { owned: (id: WeaponId) => boolean }, localMag: number | null, turret = false) {
     if (!you) return
     const hp = Math.max(0, you.hp)
+    // The bar and the ring are full at the class's health, whatever it is.
+    const share = Math.min(100, Math.round((hp / maxHp(you.arsenal.primary)) * 100))
     this.text("hp", String(hp))
-    this.style("hp-bar", "width", `${hp}%`)
-    this.toggleOn($("hp").parentElement!, "hp-low", "low", hp < 30 && you.alive)
+    this.style("hp-bar", "width", `${share}%`)
+    this.toggleOn($("hp").parentElement!, "hp-low", "low", share < 30 && you.alive)
     this.text("armor", String(you.armor))
     this.style("armor-bar", "width", `${you.armor}%`)
     // The touch HUD draws the two as rings around their icons.
-    this.style("vitals", "--hp", String(hp))
+    this.style("vitals", "--hp", String(share))
     this.style("vitals", "--armor", String(you.armor))
     const a = you.arsenal
     const def = WEAPONS[a.current]
@@ -163,7 +166,7 @@ export class Hud {
     this.text("touch-reserve", endless ? "" : `/ ${ammo.reserve}`)
     this.data("touch-bomb", "n", String(a.bombs))
     this.data("touch-mine", "n", String(a.mines))
-    const slots: [string, WeaponId][] = [["1", a.primary], ["2", "mandi"], ["3", "lanciafrico"], ["4", "mescul"]]
+    const slots: [string, WeaponId][] = [["1", a.primary], ["2", "mandi"], ["3", a.power ?? "lanciafrico"], ["4", "mescul"]]
     this.html("slots", slots
       .map(([k, id]) => `<span class="${id === a.current ? "on" : slot.owned(id) ? "" : "off"}">${k} ${t().weapons[id].short}</span>`)
       .join(""))
@@ -184,6 +187,17 @@ export class Hud {
     this.toggle("turret-hud", "jammed", gun.jammed)
     this.toggle("turret-hud", "warm", gun.heat > 0.7)
     this.text("turret-label", gun.jammed ? t().hud.turretHot : t().hud.turretHeat)
+  }
+
+  /**
+   * The casot's panel: facing it with slot 3 free, the control to hold to tear it off; while holding,
+   * how far the tear has got (0 to 1).
+   */
+  panel(prompt: boolean, progress: number, device: Device) {
+    this.toggle("panel-prompt", "hidden", !prompt)
+    if (!prompt) return
+    this.html("panel-label", panelPrompt(t(), device))
+    this.style("panel-tear", "width", `${Math.round(progress * 100)}%`)
   }
 
   /** Feathers in the eyes (the gjaline): vision is covered for `seconds` and then slowly clears. */
@@ -460,7 +474,7 @@ export class Hud {
       this.drawnUse = view.use
       const use = $("touch-use")
       use.classList.toggle("hidden", !view.use)
-      use.textContent = view.use === "dismount" ? t().hud.touchLeave : t().hud.touchUse
+      use.textContent = view.use === "dismount" ? t().hud.touchLeave : view.use === "tear" ? t().hud.touchTear : t().hud.touchUse
     }
     if (view.picker !== this.drawnPicker) {
       this.drawnPicker = view.picker
@@ -484,11 +498,11 @@ export function boardHtml(rows: readonly BoardRow[], me: string) {
       const list = rows.filter((r) => r.team === team).sort((a, b) => b.score - a.score)
       const info = t().teams[team]
       return `<h3 style="color:${TEAM_INFO[team].color}">${info.name} <small style="color:var(--muted);font-size:13px">· ${info.motto}</small></h3>
-      <table><tr>${t().hud.board.map((h) => `<th>${h}</th>`).join("")}</tr>
+      <table><tr>${t().hud.board.map((h, i) => (i === 1 ? `<th class="primary">${h}</th>` : `<th>${h}</th>`)).join("")}</tr>
       ${list
         .map(
           (r) =>
-            `<tr class="${r.id === me ? "me" : ""}"><td>${esc(r.name)}${r.bot ? " 🤖" : ""}</td><td>${r.score}</td><td>${r.kills}</td><td>${r.deaths}</td><td>${r.assists}</td><td>${r.caps}</td><td>${r.best}</td><td>${r.bot ? "—" : r.ping}</td></tr>`
+            `<tr class="${r.id === me ? "me" : ""}"><td>${esc(r.name)}${r.bot ? " 🤖" : ""}</td><td class="primary">${t().weapons[r.primary].name}</td><td>${r.score}</td><td>${r.kills}</td><td>${r.deaths}</td><td>${r.assists}</td><td>${r.caps}</td><td>${r.best}</td><td>${r.bot ? "—" : r.ping}</td></tr>`
         )
         .join("")}</table>`
     })
