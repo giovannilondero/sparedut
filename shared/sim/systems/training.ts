@@ -171,7 +171,7 @@ export const PlayTraining = Game.System(
       if (a.bombs === 0 || a.mines === 0) data.arsenal.set(trainee, { ...a, bombs: a.bombs || SGNAPE_BOMB.perLife, mines: a.mines || RAIBL_MINE.perLife })
     }
 
-    const now =rule.advance(seen(rule), { count: state.count, mark: state.mark })
+    const now = rule.advance(seen(rule), { count: state.count, mark: state.mark })
     const count = Math.min(rule.target, now.count)
     let next: Next
     if (count < rule.target) {
