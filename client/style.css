@@ -437,7 +437,16 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #touch-use { font-size: 11px; letter-spacing: 0.02em; border-color: var(--gold); opacity: 1; text-align: center; hyphens: auto; overflow-wrap: anywhere; padding: 4px; }
 #touch-weapon, #touch-picker > div { position: absolute; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--stone-line); background: var(--stone);
   font-family: var(--serif); font-size: 15px; color: var(--ink); overflow: hidden; white-space: nowrap; }
-#touch-weapon { left: var(--wx); top: var(--wy); width: var(--ww); height: var(--wh); }
+/* The weapon in hand: the rounds large, the name small under them. */
+#touch-weapon { left: var(--wx); top: var(--wy); width: var(--ww); height: var(--wh); align-content: center; gap: 2px; padding-inline: 6px; line-height: 1; font-variant-numeric: tabular-nums; }
+#touch-weapon b { font-size: calc(var(--wh) * 0.5); }
+#touch-weapon i { font-style: normal; font-size: calc(var(--wh) * 0.32); opacity: 0.75; margin-inline-start: 4px; }
+#touch-weapon small { max-inline-size: 100%; overflow: hidden; text-overflow: ellipsis; font: 600 calc(var(--wh) * 0.24) / 1 var(--sans); letter-spacing: 0.04em; color: var(--muted); }
+/* How many bombs and mines are left, on their buttons; none left dims the button. */
+:is(#touch-bomb, #touch-mine)::after { content: attr(data-n); position: absolute; inset-block-start: -4px; inset-inline-end: -4px; box-sizing: border-box; min-inline-size: 16px; block-size: 16px; padding-inline: 3px;
+  border-radius: 8px; background: var(--gold); color: #1d1408; font: 700 10px / 16px var(--sans); text-align: center; text-shadow: none; }
+:is(#touch-bomb, #touch-mine)[data-n="0"] { opacity: 0.3; }
+:is(#touch-bomb, #touch-mine)[data-n="0"]::after { display: none; }
 #touch-picker > div.on { border-color: var(--gold); color: var(--gold); }
 #quickchat.tap { pointer-events: auto; z-index: 1; top: 76px; bottom: auto; left: 12px; max-width: calc(100% - 24px); max-height: calc(100% - 90px); overflow-y: auto; touch-action: pan-y; font-size: 15px; gap: 0; }
 #quickchat.tap div { padding: 7px 4px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
@@ -445,63 +454,57 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #quickchat.tap kbd { display: none; }
 
 /*
- * The HUD on touch (#hud.touch, while touch is the active device). The panels gather in the area
- * client/touch.ts leaves free of the controls (--free-*, set once per size): a column with the
- * scores, the storm warning and the kill feed at the top and the vitals at the bottom, the
- * crosshair's middle left clear. Sizes follow the column's width. On a desktop the two wrappers
- * are `display: contents` and nothing here applies.
+ * The HUD on touch (#hud.touch, while touch is the active device). A phone's screen is the view:
+ * the panels are small and few. The score, the storm warning and the kill feed sit at the top of
+ * the area client/touch.ts leaves free of the controls (--free-*, set once per size), the chat and
+ * the turret at its foot, the crosshair's middle clear. The vitals are two rings where the layout
+ * puts them; the rounds are on the weapon's control, the bombs and mines on their buttons. On a
+ * desktop the two wrappers are `display: contents` and nothing here applies.
  */
 #hud-free, #hud-status { display: contents; }
 #hud.touch #hud-free { position: absolute; inset-inline-start: var(--free-l); inset-block-start: var(--free-t); inline-size: var(--free-w); block-size: var(--free-h);
-  display: flex; flex-direction: column; align-items: center; gap: 6px; container: hud / inline-size; }
-#hud.touch :is(#turret-prompt, #turret-hud, #topbar, #killfeed, #banner, #vitals, #ammo, #chat) { position: static; inset: auto; transform: none; }
-#hud.touch #topbar { order: 0; max-inline-size: 100%; }
-#hud.touch #banner { order: 1; max-inline-size: 100%; text-align: center; font-size: clamp(12px, 3.6cqi, 14px); padding: 4px 10px; }
-#hud.touch #killfeed { order: 2; inline-size: 100%; align-items: center; font-size: clamp(11px, 3.2cqi, 13px); }
-#hud.touch #killfeed .kf { max-inline-size: 100%; text-align: center; padding: 3px 8px; }
-/* The three newest kills: more would reach the crosshair. */
-#hud.touch #killfeed .kf:nth-last-child(n + 4) { display: none; }
-/* The bottom group: the chat, the turret, the vitals and the ammunition, pushed to the bottom of the column. */
-#hud.touch #chat { order: 3; margin-block-start: auto; align-self: stretch; inline-size: auto; font-size: clamp(11px, 3.2cqi, 13px); }
-#hud.touch #chat-log div:nth-last-child(n + 4) { display: none; }
-#hud.touch #turret-prompt { order: 4; font-size: clamp(13px, 3.8cqi, 15px); }
-#hud.touch #turret-hud { order: 5; inline-size: min(260px, 100%); padding: 3px 10px; display: flex; align-items: center; gap: 8px; font-size: 14px; }
+  display: flex; flex-direction: column; align-items: center; gap: 4px; }
+#hud.touch :is(#turret-prompt, #turret-hud, #topbar, #killfeed, #banner, #chat) { position: static; inset: auto; transform: none; }
+/* The score on one line: the two numbers in their team's colour around the clock. The objective, when the mode has one, on a line under it. */
+#hud.touch #topbar { order: 0; max-inline-size: 100%; flex-wrap: wrap; align-items: baseline; justify-content: center; column-gap: 10px; padding: 2px 12px;
+  border-radius: 12px; border: 1px solid var(--stone-line); background: rgba(10, 8, 6, 0.72); }
+#hud.touch #topbar .score { padding: 0; gap: 6px; border: 0; background: none; align-items: baseline; }
+#hud.touch #topbar .score b { font-size: 18px; min-inline-size: 0; }
+#hud.touch #topbar .team-name { display: none; }
+/* The Tampieste has no score: its "still standing" count is written where the team's name goes. */
+#hud.touch #topbar:has(#score-ben:empty) .team-name { display: inline; font-size: 11px; letter-spacing: 0.08em; }
+#hud.touch .center-info { display: contents; }
+#hud.touch #clock { font-size: 15px; }
+#hud.touch #mode-label { display: none; }
+#hud.touch #objective { flex-basis: 100%; margin: 0 0 2px; font-size: 11px; text-align: center; }
+#hud.touch #objective:empty { display: none; }
+#hud.touch #banner { order: 1; max-inline-size: 100%; text-align: center; font-size: 12px; padding: 3px 10px; }
+/* The two newest kills, one line each, without the weapon. */
+#hud.touch #killfeed { order: 2; inline-size: 100%; align-items: center; gap: 2px; font-size: 11px; }
+#hud.touch #killfeed .kf { max-inline-size: 100%; padding: 2px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#hud.touch #killfeed .w, #hud.touch #killfeed .kf:nth-last-child(n + 3) { display: none; }
+/* The foot of the column: the two newest chat lines, as wide as their text, and the turret. */
+#hud.touch #chat { order: 3; margin-block-start: auto; align-self: flex-start; inline-size: auto; max-inline-size: 100%; font-size: 11px; }
+#hud.touch #chat-log { align-items: flex-start; }
+#hud.touch #chat-log div { max-inline-size: 100%; padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#hud.touch #chat-log div:nth-last-child(n + 3) { display: none; }
+#hud.touch #turret-prompt { order: 4; font-size: 13px; }
+#hud.touch #turret-hud { order: 5; inline-size: min(260px, 100%); padding: 3px 10px; display: flex; align-items: center; gap: 8px; font-size: 13px; }
 #hud.touch #turret-hud .bar { flex: 1; margin: 0; }
-/* The vitals and the ammunition share the row in two equal halves. */
-#hud.touch #hud-status { order: 6; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 8px; align-self: stretch; }
 
-#hud.touch #topbar .score { padding: 4px 8px; gap: 6px; }
-#hud.touch #topbar .score b { font-size: clamp(20px, 6cqi, 30px); min-inline-size: 1.2em; }
-#hud.touch #topbar .team-name { font-size: clamp(9px, 2.6cqi, 13px); letter-spacing: 0.08em; }
-#hud.touch .center-info { min-inline-size: 0; padding: 3px 10px; }
-#hud.touch #clock { font-size: clamp(18px, 5cqi, 24px); }
-#hud.touch #mode-label { font-size: 9px; letter-spacing: 0.12em; }
-/* A narrow column: the clock, the mode and the objective take a row of their own above the two scores. */
-@container hud (width < 26rem) {
-  #hud.touch #topbar { flex-wrap: wrap; justify-content: center; }
-  #hud.touch #topbar .center-info { order: -1; flex-basis: 100%; border: 1px solid var(--stone-line); border-radius: 10px 10px 0 0; }
-  #hud.touch #topbar .score { flex: 1; border-block-start: 0; }
-  #hud.touch #topbar .score.ben { border-radius: 0 0 0 10px; }
-  #hud.touch #topbar .score.mal { border-radius: 0 0 10px 0; justify-content: flex-end; }
-}
-
-#hud.touch #vitals { gap: 4px; }
-#hud.touch .vital { grid-template-columns: auto auto minmax(24px, 1fr); gap: 6px; padding: 3px 8px; }
-#hud.touch .vital b { font-size: clamp(18px, 5.6cqi, 26px); min-inline-size: 1.9em; }
-#hud.touch .vital .ico { font-size: 16px; }
-#hud.touch #buffs { font-size: 12px; }
-#hud.touch #ammo { min-inline-size: 0; padding: 4px 10px; }
-#hud.touch .ammo-row b { font-size: clamp(26px, 8cqi, 40px); }
-#hud.touch #bombs { font-size: clamp(11px, 3.2cqi, 13px); }
-/* The touch controls show the weapon's name and pick weapons: the name here and the number-key hints are noise. */
-#hud.touch :is(#weapon-name, #slots) { display: none; }
-
-/* Landscape: height is what runs out. Two kills, two chat lines and slimmer panels keep the crosshair's band clear. */
-#hud.touch:not(.portrait) :is(#killfeed .kf, #chat-log div):nth-last-child(n + 3) { display: none; }
-#hud.touch:not(.portrait) .vital { padding-block: 1px; }
-#hud.touch:not(.portrait) .vital b { font-size: clamp(18px, 4.6cqi, 26px); }
-#hud.touch:not(.portrait) .ammo-row b { font-size: clamp(24px, 6.4cqi, 40px); }
-#hud.touch:not(.portrait) #ammo { padding-block: 2px; }
+/* Health and armour: a ring around each icon, the number beside it (--x/--y/--w/--h from the layout, --hp/--armor from the match). */
+#hud.touch #vitals { inset: auto; inset-inline-start: var(--x); inset-block-start: var(--y); inline-size: var(--w); block-size: var(--h); flex-direction: row; align-items: center; gap: 8px; }
+#hud.touch .vital { display: flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; }
+#hud.touch .vital.hp { --v: var(--hp); --ring: var(--gold); }
+#hud.touch .vital.hp.low { --ring: #ff6b5a; }
+#hud.touch .vital.armor { --v: var(--armor); --ring: #d79b5b; }
+#hud.touch .vital .ico { inline-size: var(--h); block-size: var(--h); display: grid; place-items: center; border-radius: 50%; font-size: calc(var(--h) * 0.42);
+  background: radial-gradient(closest-side, rgba(10, 8, 6, 0.78) calc(100% - 4px), transparent calc(100% - 3.5px)), conic-gradient(var(--ring) calc(var(--v) * 1%), rgba(243, 233, 210, 0.22) 0); }
+#hud.touch .vital b { font-size: calc(var(--h) * 0.48); min-inline-size: 1.6em; }
+#hud.touch .vital .bar { display: none; }
+#hud.touch #buffs { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+/* The weapon's control shows the rounds and the name, the bomb and mine buttons their counts. */
+#hud.touch #ammo { display: none; }
 
 /* What sits over the middle of the screen keeps to the free area too. */
 #hud.touch #announce { inset-block-start: 24%; inline-size: 100%; white-space: normal; font-size: clamp(20px, 7cqi, 36px); }
@@ -522,6 +525,8 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #safe-area { position: fixed; inset: 0; visibility: hidden; pointer-events: none;
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
 
+/* In a match on touch the bottom of the screen is the controls and the vitals: the notice goes over the view. */
+html.in-match[data-device="touch"] #toast { bottom: auto; top: calc(var(--free-t) + var(--free-h) * 0.3); padding: 6px 12px; font-size: 13px; }
 #toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); background: var(--stone); border: 1px solid var(--gold); padding: 10px 18px; border-radius: 10px; z-index: 10; animation: rise 0.2s; }
 
 /* ---------------- PERFORMANCE PANEL (F3) ---------------- */

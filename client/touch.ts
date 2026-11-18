@@ -56,14 +56,16 @@ export interface TouchLayout {
   readonly fire: Circle
   readonly leftFire: Circle
   readonly buttons: { readonly [B in TouchButton]: Circle }
-  /** The weapon's name: a tap is the next weapon, a long press opens the picker. */
+  /** The weapon in hand, its ammunition and its name: a tap is the next weapon, a long press opens the picker. */
   readonly weapon: Rect
+  /** The health and armour: on the weapon's row at the left edge in portrait, at the foot of the HUD's column in landscape. */
+  readonly vitals: Rect
   /** The picker's entries, top to bottom: room for every weapon slot. */
   readonly picker: readonly Rect[]
   /**
-   * Where the HUD goes: no control and no resting thumb inside it. In portrait it is everything
-   * above the controls and below the top row; in landscape the column between the controls
-   * on the left and those on the right.
+   * Where the rest of the HUD goes: no control, no resting thumb and no vitals inside it. In portrait
+   * it is everything above the controls and below the top row; in landscape the column between
+   * the controls on the left and those on the right, above the vitals.
    */
   readonly free: Rect
 }
@@ -150,16 +152,10 @@ const cornerR = (f: Frame) => Math.max(22, f.btn * 0.9)
 
 const weaponSize = (f: Frame) => ({ width: clamp(f.short * 0.32, 110, 160), height: f.btn * 1.6 })
 
-/** The weapon's name above the buttons around fire (right). */
-const nameAboveButtons = (f: Frame, buttons: TouchLayout["buttons"]): Rect => {
+/** The weapon above the buttons around fire, within the right thumb's reach. */
+const weaponAboveButtons = (f: Frame, buttons: TouchLayout["buttons"]): Rect => {
   const w = weaponSize(f)
   return { left: f.x0 + f.width - f.margin - w.width, top: buttons.mine.y - f.btn - f.gap - w.height, ...w }
-}
-
-/** The weapon's name in the top-right corner, on the row of the corner buttons. */
-const nameInCorner = (f: Frame): Rect => {
-  const w = weaponSize(f)
-  return { left: f.x0 + f.width - f.margin - w.width, top: f.y0 + f.margin + cornerR(f) - w.height / 2, ...w }
 }
 
 /**
@@ -174,17 +170,16 @@ export const touchLayout = (size: { readonly width: number; readonly height: num
   const leftR = f.fireR * 0.85
   const leftFire: Circle = { x: rest.x, y: rest.y - radius - 2 * gap - leftR, r: leftR }
   const buttons = buttonsAround(f, fire)
-  // In portrait the left column (stick, fire) leaves no room for the name under the HUD: it goes on the top row.
-  const weapon = portrait ? nameInCorner(f) : nameAboveButtons(f, buttons)
-  // The picker opens beside the name, towards the middle and downwards, over the controls it covers while open.
+  const weapon = weaponAboveButtons(f, buttons)
+  // The picker opens beside the weapon, towards the middle and downwards, over the controls it covers while open.
   const toRight = weapon.left + weapon.width / 2 < x0 + width / 2
   const step = weapon.height + gap / 1.5
   const pickerLeft = toRight ? weapon.left + weapon.width + gap : weapon.left - gap - weapon.width
   const picker = SLOTS.map((_, i): Rect => ({ left: pickerLeft, top: weapon.top + i * step, width: weapon.width, height: weapon.height }))
-  // The controls under the thumbs: the stick at rest, the fire buttons, the buttons around them and the name.
+  // The controls under the thumbs: the stick at rest, the fire buttons, the buttons around them and the weapon.
   const box = (c: Circle): Rect => ({ left: c.x - c.r, top: c.y - c.r, width: 2 * c.r, height: 2 * c.r })
   const all = [rest, fire, leftFire, ...TOUCH_BUTTONS.map((b) => buttons[b])].map(box).concat([weapon])
-  // The controls under the thumbs, in the lower half, and those on the top row (the corner buttons, maybe the name).
+  // The controls under the thumbs, in the lower half, and the corner buttons on the top row.
   const low = all.filter((b) => b.top > y0 + height / 2)
   const controlsTop = Math.min(...low.map((b) => b.top))
   const cornersBottom = Math.max(...all.filter((b) => !low.includes(b)).map((b) => b.top + b.height))
@@ -192,15 +187,19 @@ export const touchLayout = (size: { readonly width: number; readonly height: num
   const mid = x0 + width / 2
   const left = Math.max(...all.filter((b) => b.left + b.width / 2 < mid).map((b) => b.left + b.width)) + gap
   const right = Math.min(...all.filter((b) => b.left + b.width / 2 >= mid).map((b) => b.left)) - gap
+  // Portrait: the vitals take the weapon's row, over the left thumb's controls. Landscape: the foot of the column.
+  const vitals: Rect = portrait
+    ? { left: x0 + f.margin, top: weapon.top, width: weapon.left - gap - (x0 + f.margin), height: weapon.height }
+    : { left, top: y0 + height - gap - weapon.height, width: right - left, height: weapon.height }
   const free: Rect = portrait
     ? { left: x0 + f.margin, top: cornersBottom + gap, width: width - 2 * f.margin, height: controlsTop - gap - (cornersBottom + gap) }
-    : { left, top: y0 + gap, width: right - left, height: height - 2 * gap }
+    : { left, top: y0 + gap, width: right - left, height: vitals.top - gap - (y0 + gap) }
   // A thumb holds the stick on and around it.
   const reach = radius * 1.6
   const regionLeft = Math.max(x0, rest.x - reach)
   const regionTop = Math.max(y0, rest.y - reach)
   const region: Rect = { left: regionLeft, top: regionTop, width: rest.x + reach - regionLeft, height: Math.min(y0 + height, rest.y + reach) - regionTop }
-  return { portrait, stick: { region, radius, rest }, fire, leftFire, buttons, weapon, picker, free }
+  return { portrait, stick: { region, radius, rest }, fire, leftFire, buttons, weapon, vitals, picker, free }
 }
 
 export const inCircle = (c: Circle, x: number, y: number) => (x - c.x) ** 2 + (y - c.y) ** 2 <= c.r ** 2

@@ -55,6 +55,12 @@ export class Hud {
     document.documentElement.style.setProperty(prop, value)
   }
 
+  private data(id: string, key: string, value: string) {
+    if (this.written.get(`${id}:d:${key}`) === value) return
+    this.written.set(`${id}:d:${key}`, value)
+    $(id).dataset[key] = value
+  }
+
   private toggleOn(el: Element, key: string, cls: string, on: boolean) {
     if (this.written.get(`${key}:c:${cls}`) === on) return
     this.written.set(`${key}:c:${cls}`, on)
@@ -80,17 +86,26 @@ export class Hud {
     this.toggleOn($("hp").parentElement!, "hp-low", "low", hp < 30 && you.alive)
     this.text("armor", String(you.armor))
     this.style("armor-bar", "width", `${you.armor}%`)
+    // The touch HUD draws the two as rings around their icons.
+    this.style("vitals", "--hp", String(hp))
+    this.style("vitals", "--armor", String(you.armor))
     const a = you.arsenal
     const def = WEAPONS[a.current]
     const endless = def.mode === "melee" || turret
     this.inHand = turret ? "mitraie" : a.current
     this.text("weapon-name", t().weapons[this.inHand].name)
-    this.text("touch-weapon", t().weapons[this.inHand].name)
     const ammo = a.ammo[a.current]
-    this.text("mag", endless ? "∞" : String(localMag ?? ammo.mag))
+    const mag = endless ? "∞" : String(localMag ?? ammo.mag)
+    this.text("mag", mag)
     this.text("reserve", endless ? "" : String(ammo.reserve))
     this.toggleOn($("reserve").previousElementSibling!, "slash", "hidden", endless)
     this.text("bombs", `${t().bomb}: ${"🍶".repeat(a.bombs) || "—"} · ${t().mine}: ${"💣".repeat(a.mines) || "—"}`)
+    // On touch the weapon's control carries the rounds and the name, the bomb and mine buttons how many are left.
+    this.text("touch-weapon-name", t().weapons[this.inHand].name)
+    this.text("touch-mag", mag)
+    this.text("touch-reserve", endless ? "" : `/ ${ammo.reserve}`)
+    this.data("touch-bomb", "n", String(a.bombs))
+    this.data("touch-mine", "n", String(a.mines))
     const slots: [string, WeaponId][] = [["1", a.primary], ["2", "mandi"], ["3", "lanciafrico"], ["4", "mescul"]]
     this.html("slots", slots
       .map(([k, id]) => `<span class="${id === a.current ? "on" : slot.owned(id) ? "" : "off"}">${k} ${t().weapons[id].short}</span>`)
@@ -315,6 +330,12 @@ export class Hud {
     this.pageStyle("--free-w", `${f.width}px`)
     this.pageStyle("--free-h", `${f.height}px`)
     this.toggle("hud", "portrait", layout.portrait)
+    // The vitals, from the free area's corner (they share its box).
+    const v = layout.vitals
+    this.style("vitals", "--x", `${v.left - f.left}px`)
+    this.style("vitals", "--y", `${v.top - f.top}px`)
+    this.style("vitals", "--w", `${v.width}px`)
+    this.style("vitals", "--h", `${v.height}px`)
     const w = layout.weapon
     this.style("touch", "--wx", `${w.left}px`)
     this.style("touch", "--wy", `${w.top}px`)

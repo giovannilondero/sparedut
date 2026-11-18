@@ -656,19 +656,24 @@ for (const [width, height] of [[390, 844], [844, 390], [360, 640], [640, 360], [
       const inside = (r: Rect) => r.left >= safe.left && r.top >= safe.top && r.left + r.width <= safe.left + safe.width && r.top + r.height <= safe.top + safe.height
       const controls: [string, Rect][] = [["stick", box(l.stick.rest)], ["fire", box(l.fire)], ["leftFire", box(l.leftFire)], ...Object.entries(l.buttons).map(([n, c]): [string, Rect] => [n, box(c)]), ["weapon", l.weapon]]
       for (const [name, r] of [...controls, ["free", l.free] as [string, Rect]]) expect({ name, inside: inside(r) }).toEqual({ name, inside: true })
-      // No HUD element under a control: the free area meets none of them.
-      for (const [name, r] of controls) expect({ name, clear: !meets(l.free, r) }).toEqual({ name, clear: true })
-      // Room for the HUD: the score bar and the vitals fit across it.
+      // No HUD element under a control: the free area and the vitals meet none of them, nor each other.
+      for (const [name, r] of controls) expect({ name, clear: !meets(l.free, r) && !meets(l.vitals, r) }).toEqual({ name, clear: true })
+      expect(inside(l.vitals)).toBe(true)
+      expect(meets(l.free, l.vitals)).toBe(false)
+      // Room for the HUD: the score and the kill feed fit across it, the two rings and their numbers in the vitals.
       expect(l.free.width).toBeGreaterThanOrEqual(240)
-      expect(l.free.height).toBeGreaterThanOrEqual(safe.height * (l.portrait ? 0.5 : 0.85))
+      expect(l.free.height).toBeGreaterThanOrEqual(safe.height * (l.portrait ? 0.42 : 0.7))
+      expect(l.vitals.width).toBeGreaterThanOrEqual(150)
       if (l.portrait) {
-        // The controls take the lower third, give or take a home indicator; the HUD sits above them.
-        // Only the corner buttons and the weapon's name sit on the top row, above the HUD.
+        // The controls take the lower part, give or take a home indicator; the HUD sits above them.
+        // Only the corner buttons sit on the top row, above the HUD.
         const top = controls.filter(([, r]) => r.top + r.height <= l.free.top)
-        expect(top.map(([n]) => n).sort()).toEqual(["board", "menu", "phrases", "weapon"])
+        expect(top.map(([n]) => n).sort()).toEqual(["board", "menu", "phrases"])
         const below = controls.filter((c) => !top.includes(c))
-        for (const [name, r] of below) expect({ name, low: r.top >= safe.top + safe.height * 0.6 }).toEqual({ name, low: true })
+        // The weapon sits on the row above the right thumb's buttons, the vitals beside it.
+        for (const [name, r] of below) expect({ name, low: r.top >= safe.top + safe.height * (name === "weapon" ? 0.5 : 0.6) }).toEqual({ name, low: true })
         for (const [, r] of below) expect(l.free.top + l.free.height).toBeLessThanOrEqual(r.top)
+        expect(l.vitals.top).toBe(l.weapon.top)
       }
     })
   }
