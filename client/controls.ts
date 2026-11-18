@@ -9,7 +9,8 @@ import { turretRestSeat, type TurretSpot } from "../shared/map.ts"
 import type { Snapshot } from "../shared/protocol.ts"
 import type { ArsenalValue, TurretState } from "../shared/sim/schema.ts"
 import { TURRET, type WeaponId } from "../shared/weapons.ts"
-import { buttonBit, inCircle, inRect, pickerEntries, TOUCH_BUTTONS, touchLayout, type TouchButton, type TouchLayout, type TouchView } from "./touch.ts"
+import { pointerDevice, type Device } from "./device.ts"
+import { buttonBit, inCircle, inRect, NO_INSETS, pickerEntries, TOUCH_BUTTONS, touchLayout, type Insets, type TouchButton, type TouchLayout, type TouchView } from "./touch.ts"
 
 const KEYS: Record<string, ButtonName> = {
   Space: "jump",
@@ -164,8 +165,14 @@ export class Controls {
   private weaponFinger: { finger: Finger; held: number; opened: boolean } | null = null
   /** What the controls follow of the player, from the last snapshot. */
   private tracked: Tracked | null = null
+  /** The device used last, anywhere on the page (the menu too). */
+  private lastUsed: Device
 
-  constructor(private readonly element: HTMLElement, private readonly handlers: ControlsHandlers) {
+  /** `primary`: the device to assume before any input, from the main pointer (a finger on a phone). */
+  constructor(private readonly element: HTMLElement, private readonly handlers: ControlsHandlers, primary: Device = "keyboard") {
+    this.lastUsed = primary
+    // Before a match there is nothing to drive, but a tap or a key on the menu says what the player holds.
+    document.addEventListener("pointerdown", (e) => (this.lastUsed = pointerDevice(e.pointerType) ?? this.lastUsed), { capture: true })
     document.addEventListener("pointerlockchange", () => {
       this.locked = document.pointerLockElement === element
       if (this.locked) {
@@ -204,6 +211,7 @@ export class Controls {
     })
     window.addEventListener("keydown", (e) => {
       if (e.repeat) return
+      this.lastUsed = "keyboard"
       handlers.onKey(e.code, true)
       if (!this.enabled || !this.locked) return
       if (e.code === "Tab" || e.code === "Space") e.preventDefault()
@@ -231,16 +239,34 @@ export class Controls {
     this.lookDy += dy * s
   }
 
-  /** The touch layout for a canvas of this size: the same object until the size changes. */
-  relayout(size: { readonly width: number; readonly height: number }): TouchLayout {
+  /**
+   * The touch layout for a canvas of this size and these safe-area insets: the same object until
+   * either changes. Without insets, the last ones given (a finger landing does not measure them).
+   */
+  relayout(size: { readonly width: number; readonly height: number }, insets: Insets = this.insets): TouchLayout {
     const l = this.layout
-    if (l && this.layoutW === size.width && this.layoutH === size.height) return l
+    const i = this.insets
+    const same = insets.top === i.top && insets.right === i.right && insets.bottom === i.bottom && insets.left === i.left
+    if (l && same && this.layoutW === size.width && this.layoutH === size.height) return l
     this.layoutW = size.width
     this.layoutH = size.height
-    return (this.layout = touchLayout(size))
+    this.insets = insets
+    return (this.layout = touchLayout(size, insets))
   }
   private layoutW = 0
   private layoutH = 0
+  private insets: Insets = NO_INSETS
+
+  /**
+   * The active device, the one prompts name: touch, the pad or the locked mouse while one drives
+   * the match, else whatever the player used last (in the menu too).
+   */
+  get device(): Device {
+    if (this.touchActive) return "touch"
+    if (this.padActive) return "pad"
+    if (this.locked) return "keyboard"
+    return this.lastUsed
+  }
 
   /** What "use" does now: mount a free turret within reach, dismount, or nothing (the control is hidden). */
   get turretControl(): "use" | "dismount" | null {
@@ -551,6 +577,7 @@ export class Controls {
     const right = stick(p.axes[2] ?? 0, p.axes[3] ?? 0)
     if (down.some(Boolean) || left.x || left.y || right.x || right.y) {
       this.padActive = true
+      this.lastUsed = "pad"
       this.useTouch(false)
     }
 

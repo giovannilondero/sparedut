@@ -7,8 +7,10 @@ import { FLAG_BIT, type BoardRow, type RoomInfo, type SnapSelf, type Snapshot } 
 import type { KillCause } from "../shared/sim/events.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { WARMUP_TICKS } from "../shared/sim/rules.ts"
+import type { Device } from "./device.ts"
 import { t } from "./i18n.ts"
-import { buttonBit, TOUCH_BUTTONS, type PickerEntry, type TouchLayout, type TouchView } from "./touch.ts"
+import { playPrompt, turretPrompt } from "./prompts.ts"
+import { buttonBit, TOUCH_BUTTONS, type Insets, type PickerEntry, type TouchLayout, type TouchView } from "./touch.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -92,11 +94,11 @@ export class Hud {
     this.toggle("sgnape-fx", "on", a.sgnape > 0)
   }
 
-  /** On the turret: the mitraie's heat. Near a free one: the key to use it. */
-  turret(gun: { readonly heat: number; readonly jammed: boolean } | null, prompt: boolean) {
+  /** On the turret: the mitraie's heat. Near a free one: the active device's control to use it. */
+  turret(gun: { readonly heat: number; readonly jammed: boolean } | null, prompt: boolean, device: Device) {
     this.toggle("turret-hud", "hidden", !gun)
     this.toggle("turret-prompt", "hidden", !prompt && !gun)
-    this.html("turret-prompt", gun ? t().hud.turretLeave : t().hud.turretUse)
+    this.html("turret-prompt", turretPrompt(t(), device, !!gun))
     if (!gun) return
     this.style("turret-heat", "width", `${Math.round(gun.heat * 100)}%`)
     this.toggle("turret-hud", "jammed", gun.jammed)
@@ -251,10 +253,21 @@ export class Hud {
   }
 
 
-  /** The prompt to start playing: "tap" where the main pointer is a finger, "click" elsewhere. */
-  clickToPlay(on: boolean, touch: boolean) {
+  /** The prompt to start playing, naming the active device's control: "tap", "click" or a controller's button. */
+  clickToPlay(on: boolean, device: Device) {
     this.toggle("clickplay", "hidden", !on)
-    this.toggle("clickplay", "touch", touch)
+    if (on) this.html("clickplay", playPrompt(t(), device))
+  }
+
+  /** The HUD's layout: around the touch controls while touch is the active device, the desktop one otherwise. */
+  layFor(device: Device) {
+    this.toggle("hud", "touch", device === "touch")
+  }
+
+  /** The screen's safe-area insets (notch, home indicator), as CSS resolves them: read on resize, never per frame. */
+  safeInsets(): Insets {
+    const s = getComputedStyle($("safe-area"))
+    return { top: parseFloat(s.paddingTop) || 0, right: parseFloat(s.paddingRight) || 0, bottom: parseFloat(s.paddingBottom) || 0, left: parseFloat(s.paddingLeft) || 0 }
   }
 
   /** The touch controls are shown only while touch is the active device and nothing covers the match. */
@@ -277,6 +290,13 @@ export class Hud {
       this.style(`touch-${b}`, "--y", `${c.y}px`)
       this.style(`touch-${b}`, "--r", `${c.r}px`)
     }
+    // The HUD's area clear of the controls, and the orientation, for the touch HUD's CSS.
+    const f = layout.free
+    this.style("hud", "--free-l", `${f.left}px`)
+    this.style("hud", "--free-t", `${f.top}px`)
+    this.style("hud", "--free-w", `${f.width}px`)
+    this.style("hud", "--free-h", `${f.height}px`)
+    this.toggle("hud", "portrait", layout.portrait)
     const w = layout.weapon
     this.style("touch", "--wx", `${w.left}px`)
     this.style("touch", "--wy", `${w.top}px`)

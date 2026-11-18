@@ -10,6 +10,7 @@ import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId, Team } from "../shared/map.ts"
 import type { Access, ErrorCode, Reach } from "../shared/protocol.ts"
 import type { WeaponId } from "../shared/weapons.ts"
+import type { Device } from "./device.ts"
 
 export type Lang = "fur" | "it"
 
@@ -21,7 +22,7 @@ export type StaticKey =
   | "roomsTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "reachLabel" | "reachLan" | "reachOnline" | "reachOffline"
   | "ff" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
   | "qHigh" | "autoRes" | "showInfo" | "invert" | "keys" | "vocabTitle" | "connecting" | "chatPh" | "deathTitle" | "deathHint"
-  | "clickplay" | "tapplay" | "language" | "mapLabel" | "crouchMode" | "crouchHold" | "crouchToggle"
+  | "language" | "mapLabel" | "crouchMode" | "crouchHold" | "crouchToggle"
   | "accessLabel" | "accessOpen" | "accessPassword" | "passwordLabel" | "passwordTitle"
 
 export interface Strings {
@@ -116,9 +117,11 @@ export interface Strings {
     readonly stormOutside: string
     readonly spectate: string
     readonly healed: Fn<[string, number]>
-    /** Turrets: the key to mount, to dismount, the heat. */
-    readonly turretUse: string
-    readonly turretLeave: string
+    /** The prompt to start playing, naming the active device's control. */
+    readonly play: Readonly<Record<Device, string>>
+    /** Turrets: the active device's control to mount, to dismount; the heat. */
+    readonly turretUse: Readonly<Record<Device, string>>
+    readonly turretLeave: Readonly<Record<Device, string>>
     /** The touch button that mounts a free turret, and the one that dismounts in its place. */
     readonly touchUse: string
     readonly touchLeave: string
@@ -323,8 +326,6 @@ const fur: Strings = {
     chatPh: "Scrîf… (Invio par mandâ)",
     deathTitle: "Ti àn fat frico!",
     deathHint: "Frache <kbd>B</kbd> par cambiâ l'arme principâl",
-    clickplay: "<div>Fâs clic par zuiâ</div><small>o frache un boton dal controller · Esc pal menù de partide</small>",
-    tapplay: "<div>Tocje par zuiâ</div><small>o frache un boton dal controller</small>",
     language: "Lenghe",
     mapLabel: "Mape"
   },
@@ -517,8 +518,17 @@ const fur: Strings = {
     stormOutside: "Fûr de tampieste! Torne dentri dal cercli",
     spectate: "Une vite sole: tu cjalis fin a la fin de partide.",
     healed: (who, n) => `+${n} a ${who}`,
-    turretUse: "<kbd>E</kbd> Mitraie",
-    turretLeave: "<kbd>E</kbd> / <kbd>Spazi</kbd> lasse la mitraie",
+    play: {
+      keyboard: "<div>Fâs clic par zuiâ</div><small>o frache un boton dal controller · Esc pal menù de partide</small>",
+      pad: "<div>Frache un boton par zuiâ</div><small>Options pal menù de partide</small>",
+      touch: "<div>Tocje par zuiâ</div><small>o frache un boton dal controller</small>"
+    },
+    turretUse: { keyboard: "<kbd>E</kbd> Mitraie", pad: "<kbd>⬇</kbd> Mitraie", touch: "Tocje <kbd>Mitraie</kbd>" },
+    turretLeave: {
+      keyboard: "<kbd>E</kbd> / <kbd>Spazi</kbd> lasse la mitraie",
+      pad: "<kbd>⬇</kbd> / <kbd>✕</kbd> lasse la mitraie",
+      touch: "Tocje <kbd>Lasse</kbd> par lassâ la mitraie"
+    },
     touchUse: "Mitraie",
     touchLeave: "Lasse",
     turretHeat: "Calôr",
@@ -672,8 +682,6 @@ const it: Strings = {
     chatPh: "Scrivi… (Invio per mandare)",
     deathTitle: "Ti hanno fatto frico!",
     deathHint: "Premi <kbd>B</kbd> per cambiare arma principale",
-    clickplay: "<div>Clicca per giocare</div><small>o premi un tasto del controller · Esc per il menu della partita</small>",
-    tapplay: "<div>Tocca per giocare</div><small>o premi un tasto del controller</small>",
     language: "Lingua",
     mapLabel: "Mappa"
   },
@@ -866,8 +874,17 @@ const it: Strings = {
     stormOutside: "Fuori dalla tempesta! Torna dentro il cerchio",
     spectate: "Una vita sola: guardi fino alla fine della partita.",
     healed: (who, n) => `+${n} a ${who}`,
-    turretUse: "<kbd>E</kbd> Mitragliatrice",
-    turretLeave: "<kbd>E</kbd> / <kbd>Spazio</kbd> lascia la mitragliatrice",
+    play: {
+      keyboard: "<div>Clicca per giocare</div><small>o premi un tasto del controller · Esc per il menu della partita</small>",
+      pad: "<div>Premi un tasto per giocare</div><small>Options per il menu della partita</small>",
+      touch: "<div>Tocca per giocare</div><small>o premi un tasto del controller</small>"
+    },
+    turretUse: { keyboard: "<kbd>E</kbd> Mitragliatrice", pad: "<kbd>⬇</kbd> Mitragliatrice", touch: "Tocca <kbd>Mitraglia</kbd>" },
+    turretLeave: {
+      keyboard: "<kbd>E</kbd> / <kbd>Spazio</kbd> lascia la mitragliatrice",
+      pad: "<kbd>⬇</kbd> / <kbd>✕</kbd> lascia la mitragliatrice",
+      touch: "Tocca <kbd>Lascia</kbd> per lasciare la mitragliatrice"
+    },
     touchUse: "Mitraglia",
     touchLeave: "Lascia",
     turretHeat: "Calore",
@@ -978,7 +995,7 @@ const it: Strings = {
   ]
 }
 
-const STRINGS: Record<Lang, Strings> = { fur, it }
+export const STRINGS: Readonly<Record<Lang, Strings>> = { fur, it }
 
 let current: Lang = "fur"
 const listeners = new Set<() => void>()

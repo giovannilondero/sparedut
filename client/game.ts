@@ -23,6 +23,7 @@ import type { Look } from "./looks.ts"
 import type { Menu } from "./menu.ts"
 import type { Connection } from "./connection.ts"
 import { inviteLink } from "./invite.ts"
+import { requestFullscreen } from "./fullscreen.ts"
 import { MatchClock } from "./match-clock.ts"
 import { Predictor } from "./predict.ts"
 import type { Settings } from "./settings.ts"
@@ -126,8 +127,6 @@ export class Game {
   private teams = new Map<string, Team>()
   private board: readonly BoardRow[] = []
   private boardOpen = false
-  /** The main pointer is a finger (a phone or a tablet): the prompt to start says "tap". */
-  private readonly coarsePointer = matchMedia("(pointer: coarse)").matches
   private chatting = false
   private quickOpen = false
   private overlay: "none" | "pause" | "loadout" | "settings" = "none"
@@ -169,7 +168,7 @@ export class Game {
       onKey: (code, down) => this.key(code, down),
       onPause: () => this.padPause(),
       onTouch: (view) => this.hud.drawTouch(view)
-    })
+    }, matchMedia("(pointer: coarse)").matches ? "touch" : "keyboard")
     // Rotating the device re-lays the touch controls; fingers already down keep their control.
     addEventListener("resize", () => this.running && this.placeTouch())
     // No context menu from a long press anywhere during a match (the canvas already refuses it).
@@ -257,9 +256,18 @@ export class Game {
     document.documentElement.classList.remove("in-match")
   }
 
+  /** Lays the touch controls and the HUD's free area for the canvas and the safe area: on start and on every resize, never per frame. */
   private placeTouch() {
     const canvas = this.d.renderer.domElement
-    this.hud.placeTouch(this.controls.relayout({ width: canvas.clientWidth, height: canvas.clientHeight }))
+    this.hud.placeTouch(this.controls.relayout({ width: canvas.clientWidth, height: canvas.clientHeight }, this.hud.safeInsets()))
+  }
+
+  /**
+   * Called from the gesture that enters a match (a tap on the menu): on touch the match goes
+   * fullscreen where the browser grants it to a page. A desktop player keeps the window as it is.
+   */
+  requestFullscreen() {
+    if (this.controls.device === "touch") requestFullscreen()
   }
 
   get active() {
@@ -1324,14 +1332,16 @@ export class Game {
       this.hud.vitals(you, { owned: (id) => owned(you.arsenal, id) }, this.wanted === you.arsenal.current ? this.localMag : null, turret >= 0)
       // At the turret: the heat. Near a free one: the key to mount it (the same decision as the touch "use" button).
       const gun = turret >= 0 ? s?.turrets[turret] ?? null : null
-      this.hud.turret(gun ? { heat: gun.heat, jammed: gun.jammed } : null, this.controls.turretControl === "use")
+      this.hud.turret(gun ? { heat: gun.heat, jammed: gun.jammed } : null, this.controls.turretControl === "use", this.controls.device)
       const speed = b ? Math.hypot(b.vx, b.vz) : 0
       const spread = aiming ? def.spread.aimed : speed > 1.5 || !b?.grounded ? def.spread.moving : def.spread.still
       const px = (Math.tan(spread) / Math.tan(((camera.fov / 2) * Math.PI) / 180)) * (innerHeight / 2)
       this.hud.crosshair(Math.min(60, px * 1.6), view.crosshair)
     }
     const free = this.overlay === "none" && !this.chatting && s?.phase.tag !== "Over"
-    this.hud.clickToPlay(!this.controls.active && free && !this.boardOpen, this.coarsePointer)
+    const device = this.controls.device
+    this.hud.clickToPlay(!this.controls.active && free && !this.boardOpen, device)
+    this.hud.layFor(device)
     this.hud.touchShown(this.controls.touchActive && free)
   }
 
