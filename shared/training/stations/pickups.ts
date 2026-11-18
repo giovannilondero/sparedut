@@ -14,12 +14,15 @@ const PLACE = SAGRE_STATIONS[7]
 /** The trainee took a pickup of this kind this tick. */
 const took = (kind: PickupKind) => (seen: Seen) => seen.events.some((e) => e.t === "pick" && e.k === kind && e.s === seen.me.session)
 
+/** A step that asks for the station's pickup of this kind: put back as the step begins, if it was taken out of turn. */
+const take = (kind: keyof typeof PLACE.pickups) => ({ ...once("move", took(kind)), given: { pickups: [PLACE.pickups[kind]] } })
+
 export const PICKUPS_STATION = station({
   setup: { objective: "none", bots: [], hp: PICKUPS_HP, armor: 0, ammo: "loaded", pickups: Object.values(PLACE.pickups) },
   steps: {
-    frico: once("move", took("frico")),
-    gubane: once("move", took("gubane")),
-    sgnape: once("move", took("sgnape")),
-    munizions: once("move", took("munizions"))
+    frico: take("frico"),
+    gubane: take("gubane"),
+    sgnape: take("sgnape"),
+    munizions: take("munizions")
   }
 })

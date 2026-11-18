@@ -100,6 +100,27 @@ describe("station 8: pickups", () => {
     expect(snap().training).toMatchObject({ station: "pickups", step: "frico", count: 0 })
   })
 
+  test("a pickup taken out of turn is back when its step comes, so the station never waits for it", () => {
+    const { snap, walkTo, drive } = reach("pickups", true)
+    const sgnape = at(PICKUPS.sgnape)
+    walkTo([at(PICKUPS.frico)[0] - 3, 0, -2])
+    walkTo([sgnape[0], 0, -2])
+    walkTo(sgnape)
+    expect(snap().pickups[PICKUPS.sgnape]).toBe("0")
+    // Back around the gubane, to the frico.
+    walkTo([sgnape[0], 0, -2])
+    walkTo([at(PICKUPS.frico)[0] - 1, 0, -2])
+    walkTo(at(PICKUPS.frico))
+    const gubane = walkTo(at(PICKUPS.gubane))
+    expect(steps(gubane)).toEqual(["gubane"])
+    drive(4, () => ({}))
+    expect(snap().training).toMatchObject({ station: "pickups", step: "sgnape", count: 0 })
+    expect(snap().pickups[PICKUPS.sgnape]).toBe("1")
+    // Back well before the pickup's own respawn time.
+    const taken = walkTo(sgnape, 60 * 10)
+    expect(steps(taken)).toEqual(["sgnape"])
+  })
+
   test("each pickup in turn does what it does and completes its own step: gubane, sgnape, munizions", () => {
     const { snap, walkTo } = reach("pickups")
     walkTo(at(PICKUPS.frico))

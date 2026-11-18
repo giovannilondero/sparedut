@@ -102,6 +102,8 @@ export interface StepGiven {
   readonly objective?: ObjectiveId
   /** The storm's course, when the objective is the storm: it starts closing on the tick the step becomes current. */
   readonly storm?: StormClosing
+  /** Pickups (indices in the map's list) put back on the tick the step becomes current: one taken out of turn never makes its step wait for it. */
+  readonly pickups?: readonly number[]
 }
 
 /**

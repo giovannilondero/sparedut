@@ -164,6 +164,10 @@ export const PlayTraining = Game.System(
         const fresh = freshArsenal(primary)
         data.arsenal.set(trainee, { ...fresh, nextPrimary: now.nextPrimary, launcher: now.launcher, current: given.hold ?? (given.primary ? primary : now.current) })
       }
+      if (given.pickups) {
+        const back = given.pickups
+        resources.pickups.set(resources.pickups.get().map((p, i) => (back.includes(i) ? { _tag: "up" as const } : p)))
+      }
       const objective = given.objective
       if (objective === undefined) return
       resources.objective.set(objective)
