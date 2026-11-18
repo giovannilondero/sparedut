@@ -568,7 +568,7 @@ export class Menu {
       const w = WEAPONS[id]
       const text = s.weapons[id]
       const rate = 60 / w.cooldownTicks
-      const tag = isPrimary(id) ? s.menu.tag.primary : id === "lanciafrico" ? s.menu.tag.power : id === "mescul" ? s.menu.tag.melee : s.menu.tag.pistol
+      const tag = isPrimary(id) ? s.menu.tag.primary : w.slot === 3 ? s.menu.tag.power : id === "mescul" ? s.menu.tag.melee : s.menu.tag.pistol
       // A primary is a class: its health and speed come first.
       const figures = isPrimary(id) ? classFigures(s, id as PrimaryId).map(([label, value]) => `<span class="stat figure">${label}<b>${value}</b></span>`).join("") : ""
       return `<span class="tag">${w.slot} · ${tag}</span><b id="${target.id}-${id}">${text.name}</b><span class="blurb" id="${target.id}-${id}-blurb">${text.blurb}</span>

@@ -30,6 +30,7 @@ import {
   Tick,
   Turrets,
   Doors,
+  Panels,
   Training,
   type ArsenalValue,
   type FlagState,
@@ -41,6 +42,7 @@ import {
 } from "./schema.ts"
 import type { Team } from "../map.ts"
 import type { Body } from "../movement.ts"
+import { PANEL_TEAR_TICKS } from "../weapons.ts"
 
 export interface PlayerView {
   readonly session: string
@@ -67,6 +69,9 @@ export type PhaseView =
   | { readonly tag: "Muster" }
   | { readonly tag: "Live"; readonly ends: number }
   | { readonly tag: "Over"; readonly winner: Winner; readonly restarts: number }
+
+/** A panel (`map.panels`): on its wall, being torn off (by whom, from 0 to 1), or off, leaving its gap. */
+export type PanelView = { readonly tag: "wall" } | { readonly tag: "tearing"; readonly by: string; readonly progress: number } | { readonly tag: "off" }
 
 /** The cjar (Spingi il Cjar): where it is, how far it has gone, who is pushing it. */
 export interface CartView {
@@ -114,6 +119,8 @@ export interface WorldView {
   readonly turrets: ReadonlyArray<TurretState>
   /** Health of each breakable door (0 = broken down). */
   readonly doors: readonly number[]
+  /** One per `map.panels`. */
+  readonly panels: readonly PanelView[]
   readonly projectiles: readonly ProjectileValue[]
   readonly players: readonly PlayerView[]
   /** Only in a training. */
@@ -148,7 +155,8 @@ export const ViewWorld = Game.Inspector(
       stormCourse: Game.System.readResource(StormCourse),
       pickups: Game.System.readResource(Pickups),
       turrets: Game.System.readResource(Turrets),
-      doors: Game.System.readResource(Doors)
+      doors: Game.System.readResource(Doors),
+      panels: Game.System.readResource(Panels)
     },
     machines: { match: Game.System.machine(Match), training: Game.System.machine(Training) }
   },
@@ -199,6 +207,7 @@ export const ViewWorld = Game.Inspector(
       pickups: resources.pickups.get().map((p) => p._tag === "up"),
       turrets: resources.turrets.get(),
       doors: resources.doors.get(),
+      panels: resources.panels.get().map((p): PanelView => (p._tag === "tearing" ? { tag: "tearing", by: p.by, progress: Math.min(1, p.ticks / PANEL_TEAR_TICKS) } : { tag: p._tag })),
       projectiles: queries.projectiles.each().map((m) => queries.projectiles.data.projectile.get(m)),
       players: queries.players.each().map((m) => {
         const life = data.life.get(m)

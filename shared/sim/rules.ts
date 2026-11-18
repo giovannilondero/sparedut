@@ -4,7 +4,7 @@
  */
 import type { MapDef, Spawn, Team } from "../map.ts"
 import { CLASSES, RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../weapons.ts"
-import type { Ammo, ArsenalValue, CartValue, FlagState, HillValue, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
+import type { Ammo, ArsenalValue, CartValue, FlagState, HillValue, PanelState, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
 
 export const MAX_ARMOR = 100
 export const RESPAWN_TICKS = 180
@@ -109,7 +109,7 @@ export function freshArsenal(primary: PrimaryId): ArsenalValue {
     current: primary,
     primary,
     nextPrimary: primary,
-    launcher: false,
+    power: null,
     ammo: freshAmmo(),
     action: { _tag: "switch", ticks: 20 },
     bombs: SGNAPE_BOMB.perLife,
@@ -124,15 +124,15 @@ export function freshArsenal(primary: PrimaryId): ArsenalValue {
 export const NO_STATS: StatsValue = { kills: 0, deaths: 0, assists: 0, caps: 0, score: 0, damage: 0, headshots: 0, streak: 0, best: 0 }
 
 /** The weapons the player can hold right now (the mitraie isn't held: you use the turret). */
-export const owned = (a: Pick<ArsenalValue, "primary" | "launcher">, id: WeaponId) =>
-  id === "mescul" || id === "mandi" || id === a.primary || (id === "lanciafrico" && a.launcher)
+export const owned = (a: Pick<ArsenalValue, "primary" | "power">, id: WeaponId) =>
+  id === "mescul" || id === "mandi" || id === a.primary || id === a.power
 
 /**
  * How fast a player moves, as a multiple of the walk: the class's base speed, times the multiplier
  * of the weapon in hand (`requested`, if they own it; else the one they hold), times the sgnape and
  * carrying the frico. The simulation and the client's prediction both move with it.
  */
-export const speedScale = (a: Pick<ArsenalValue, "primary" | "current" | "launcher" | "sgnape">, requested: WeaponId, carrier: boolean) =>
+export const speedScale = (a: Pick<ArsenalValue, "primary" | "current" | "power" | "sgnape">, requested: WeaponId, carrier: boolean) =>
   CLASSES[a.primary].speed * WEAPONS[owned(a, requested) ? requested : a.current].moveScale * (a.sgnape > 0 ? SGNAPE_SPEED : 1) * (carrier ? CARRIER_SPEED : 1)
 
 /** The weapon a number key selects: the one in that slot the player owns (in slot 1, the primary), or null. */
@@ -150,6 +150,8 @@ export const currentStation = (training: { readonly _tag: "Off" | "Complete" } |
 /** Cool, free turrets and intact doors: how they are at match start. */
 export const freshTurrets = (map: MapDef): TurretState[] => map.turrets.map(() => ({ gunner: null, heat: 0, jammed: false, cooldown: 0 }))
 export const freshDoors = (map: MapDef): number[] => map.doors.map((d) => d.hp)
+/** Every panel on its wall: how they are at match start. */
+export const freshPanels = (map: MapDef): PanelState[] => (map.panels ?? []).map(() => ({ _tag: "wall" }))
 
 /** Breakable doors take more from kicks (the mescul) than from pellets. */
 export const DOOR_MELEE_SCALE = 1.6

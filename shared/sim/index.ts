@@ -8,7 +8,7 @@ import type { Team } from "../map.ts"
 import type { PhysicsWorld } from "../physics.ts"
 import type { PrimaryId } from "../weapons.ts"
 import type { GameEvent } from "./events.ts"
-import { freshDoors, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL } from "./rules.ts"
+import { freshDoors, freshPanels, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL } from "./rules.ts"
 import { simulate } from "./schedule.ts"
 import type { Device } from "../devices.ts"
 import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, GoToStation, StartMatch, StepUnavailable, Training, type PickupState, type PostValue } from "./schema.ts"
@@ -56,6 +56,7 @@ export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: H
       Pickups: options.physics.map.pickups.map((): PickupState => ({ _tag: "up" })),
       Turrets: freshTurrets(options.physics.map),
       Doors: freshDoors(options.physics.map),
+      Panels: freshPanels(options.physics.map),
       History: [],
       Rng: Random.seed(options.seed)
     },
@@ -100,6 +101,6 @@ export function createSim(options: SimOptions) {
 }
 
 export { simulate }
-export type { WorldView, PlayerView, PhaseView } from "./view.ts"
+export type { WorldView, PlayerView, PhaseView, PanelView } from "./view.ts"
 export type { GameEvent } from "./events.ts"
 export type { PostValue } from "./schema.ts"

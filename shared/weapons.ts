@@ -4,7 +4,7 @@
  * live in `client/i18n.ts`).
  */
 
-export type WeaponId = "mescul" | "mandi" | "cramar" | "doplete" | "cjampanili" | "mulin" | "miedi" | "gjalinis" | "lanciafrico" | "mitraie"
+export type WeaponId = "mescul" | "mandi" | "cramar" | "doplete" | "cjampanili" | "mulin" | "miedi" | "gjalinis" | "lanciafrico" | "panel" | "mitraie"
 
 /**
  * "beam": short-range automatic stream. It heals teammates (`damage` is the heal per
@@ -241,6 +241,32 @@ export const WEAPONS = {
     shell: "gjaline"
   },
   /**
+   * The casot's panel (Lagune di Maran): torn off its wall and carried in the Lanciafrico's slot.
+   * A strike heavier and slower than the mescul's, and it slows whoever holds it. Starting values,
+   * to be tuned by playing.
+   */
+  panel: {
+    id: "panel",
+    mode: "melee",
+    damage: 70,
+    headMultiplier: 1,
+    pellets: 1,
+    spread: { still: 0, moving: 0, aimed: 0 },
+    cooldownTicks: 45,
+    reloadTicks: 0,
+    magazine: 0,
+    reserve: 0,
+    range: 2.4,
+    falloff: 1,
+    aimFov: 75,
+    scope: false,
+    kick: 0.035,
+    moveScale: 0.85,
+    slot: 3,
+    spinTicks: 0,
+    shell: null
+  },
+  /**
    * The mitraie de postazion: not carried, used by standing behind a turret
    * (`TURRET`). Infinite ammo, but it overheats.
    */
@@ -277,6 +303,16 @@ export const SLOTS: readonly Slot[] = [...new Set(WEAPON_IDS.map((id) => WEAPONS
 /** The primary weapon is chosen before respawning. */
 export type PrimaryId = "cramar" | "doplete" | "cjampanili" | "mulin" | "miedi" | "gjalinis"
 export const PRIMARIES = ["cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis"] as const satisfies readonly PrimaryId[]
+
+/** What a player carries in slot 3, one at a time: the Lanciafrico, picked up, or the casot's panel, torn off. */
+export type PowerId = "lanciafrico" | "panel"
+
+/**
+ * Tearing the casot's panel off its wall: hold "use" this many ticks (about two seconds), inside,
+ * within `PANEL_REACH` metres of it and facing it. Starting values.
+ */
+export const PANEL_TEAR_TICKS = 120
+export const PANEL_REACH = 1.8
 
 /** What a class adds beyond health and speed: the medic's healing (`MEDIC_AURA`, and the beam's heal on teammates). */
 export type ClassTrait = "medic"
