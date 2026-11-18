@@ -17,6 +17,7 @@ import { TURRET, WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
 import { Controls, trackedIn } from "./controls.ts"
+import { touchLayout } from "./touch.ts"
 import { boardHtml, esc, Hud, rosterHtml } from "./hud.ts"
 import { t } from "./i18n.ts"
 import type { Look } from "./looks.ts"
@@ -126,6 +127,8 @@ export class Game {
   private teams = new Map<string, Team>()
   private board: readonly BoardRow[] = []
   private boardOpen = false
+  /** The main pointer is a finger (a phone or a tablet): the prompt to start says "tap". */
+  private readonly coarsePointer = matchMedia("(pointer: coarse)").matches
   private chatting = false
   private quickOpen = false
   private overlay: "none" | "pause" | "loadout" | "settings" = "none"
@@ -165,7 +168,14 @@ export class Game {
       onLastWeapon: () => this.selectWeapon(this.lastWeapon),
       onWheel: (dir) => this.cycleWeapon(dir),
       onKey: (code, down) => this.key(code, down),
-      onPause: () => this.padPause()
+      onPause: () => this.padPause(),
+      onTouch: (view) => this.hud.drawTouch(view)
+    })
+    // Rotating the device re-lays the touch controls; fingers already down keep their control.
+    addEventListener("resize", () => this.running && this.placeTouch())
+    // No context menu from a long press anywhere during a match (the canvas already refuses it).
+    document.addEventListener("contextmenu", (e) => {
+      if (this.running) e.preventDefault()
     })
     d.renderer.domElement.addEventListener("click", () => {
       if (this.running && this.overlay === "none" && !this.chatting) this.controls.lock()
@@ -174,7 +184,8 @@ export class Game {
       if (!this.running) return
       const locked = document.pointerLockElement === d.renderer.domElement
       if (!locked) this.unlockedAt = performance.now()
-      if (!locked && this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over") this.openOverlay("pause")
+      // Touch taking over drops the lock: that is no reason to open the match menu.
+      if (!locked && !this.controls.touchActive && this.overlay === "none" && !this.chatting && this.snap?.phase.tag !== "Over") this.openOverlay("pause")
       if (locked && this.overlay !== "none") this.openOverlay("none")
     })
     const chat = $<HTMLInputElement>("chat-input")
@@ -217,6 +228,9 @@ export class Game {
     this.hud.show(true)
     this.d.viewmodel.setVisible(true)
     this.openOverlay("none")
+    this.controls.inMatch = true
+    document.documentElement.classList.add("in-match")
+    this.placeTouch()
     this.controls.lock()
     this.hud.announce(t().modes[room.mode].name, t().modes[room.mode].rules)
   }
@@ -235,6 +249,14 @@ export class Game {
     this.d.viewmodel.setVisible(false)
     if (document.pointerLockElement) document.exitPointerLock()
     this.controls.track(null)
+    this.controls.inMatch = false
+    this.controls.releaseAll()
+    document.documentElement.classList.remove("in-match")
+  }
+
+  private placeTouch() {
+    const canvas = this.d.renderer.domElement
+    this.hud.placeTouch(touchLayout({ width: canvas.clientWidth, height: canvas.clientHeight }))
   }
 
   get active() {
@@ -1308,7 +1330,9 @@ export class Game {
       const px = (Math.tan(spread) / Math.tan(((camera.fov / 2) * Math.PI) / 180)) * (innerHeight / 2)
       this.hud.crosshair(Math.min(60, px * 1.6), view.crosshair)
     }
-    this.hud.clickToPlay(!this.controls.active && this.overlay === "none" && !this.chatting && !this.boardOpen && s?.phase.tag !== "Over")
+    const free = this.overlay === "none" && !this.chatting && s?.phase.tag !== "Over"
+    this.hud.clickToPlay(!this.controls.active && free && !this.boardOpen, this.coarsePointer)
+    this.hud.touchShown(this.controls.touchActive && free)
   }
 
   render() {

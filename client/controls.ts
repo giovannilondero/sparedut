@@ -1,11 +1,13 @@
 /**
- * First-person keyboard and mouse (pointer lock) and controller (DualShock and
- * any pad with the browser's "standard" mapping): look, movement, buttons.
+ * First-person keyboard and mouse (pointer lock), controller (DualShock and
+ * any pad with the browser's "standard" mapping) and touch: look, movement, buttons.
  * Short presses (a click between two ticks) are held until the next tick.
+ * Whichever device was used last is the active one; switching clears held buttons.
  */
 import { BUTTON, type ButtonName } from "../shared/input.ts"
 import type { Snapshot } from "../shared/protocol.ts"
 import type { WeaponId } from "../shared/weapons.ts"
+import { touchLayout, type TouchView } from "./touch.ts"
 
 const KEYS: Record<string, ButtonName> = {
   Space: "jump",
@@ -47,6 +49,22 @@ const TRIGGER_ON = 0.35
 /** Maximum stick look speed (rad/s), before sensitivity. */
 const LOOK_YAW = 3.4
 const LOOK_PITCH = 2.4
+/** Mouse look (rad per pixel), before sensitivity. */
+const MOUSE_LOOK = 0.0022
+/** Touch look (rad per CSS pixel dragged), before sensitivity: a thumb travels less than a mouse. */
+const TOUCH_LOOK = 0.006
+/** Fraction of the stick's radius that reads as zero. */
+const TOUCH_DEAD = 0.15
+/** Stick tilt from which, pushed forward, the player sprints. */
+const TOUCH_SPRINT = 0.95
+
+/** What a finger on the canvas drives, from where it landed until it lifts. */
+type FingerRole = "stick" | "look" | "fire"
+interface Finger {
+  readonly role: FingerRole
+  x: number
+  y: number
+}
 
 /** What the controls follow of the player, from one snapshot. */
 export interface Tracked {
@@ -70,6 +88,8 @@ export interface ControlsHandlers {
   onKey: (code: string, down: boolean) => void
   /** Options on the pad: opens or closes the match menu. */
   onPause: () => void
+  /** The touch controls changed (a finger landed, moved or lifted): redraw them from the view. */
+  onTouch?: (view: TouchView) => void
 }
 
 export class Controls {
@@ -98,12 +118,27 @@ export class Controls {
   /** L3 turns on sprint: it stays on while the stick is pushed forward. */
   private padSprint = false
   private padIndex: number | null = null
+  /** In a match: touches on the canvas drive the player only then. */
+  inMatch = false
+  /** Playing with touch: no mouse lock to request. */
+  touchActive = false
+  private touchHeld = new Set<ButtonName>()
+  private readonly touchMove = { mx: 0, mz: 0 }
+  private readonly fingers = new Map<number, Finger>()
+  /** Look, movement and fire go through (no menu open); the frame loop says so in `poll`. */
+  private playing = true
+  /** The touch controls as the HUD draws them, updated in place. */
+  readonly touchView: TouchView = { stick: { held: false, ox: 0, oy: 0, kx: 0, ky: 0 }, fire: false }
 
   constructor(private readonly element: HTMLElement, private readonly handlers: ControlsHandlers) {
     document.addEventListener("pointerlockchange", () => {
       this.locked = document.pointerLockElement === element
-      if (this.locked) this.padActive = false
-      if (!this.locked) this.releaseAll()
+      if (this.locked) {
+        this.padActive = false
+        this.useTouch(false)
+      }
+      // Touch taking over drops the lock: its fingers stay down.
+      if (!this.locked) this.touchActive ? this.releaseKeys() : this.releaseAll()
     })
     window.addEventListener("gamepaddisconnected", (e) => {
       if (e.gamepad.index !== this.padIndex) return
@@ -113,13 +148,12 @@ export class Controls {
     })
     document.addEventListener("mousemove", (e) => {
       if (!this.locked || !this.enabled) return
-      const s = 0.0022 * this.sensitivity * this.zoomScale
-      this.yaw -= e.movementX * s
-      this.pitch -= e.movementY * s * (this.invertY ? -1 : 1)
-      this.pitch = Math.max(-1.5, Math.min(1.5, this.pitch))
-      this.lookDx += e.movementX * s
-      this.lookDy += e.movementY * s
+      this.turn(e.movementX * MOUSE_LOOK, e.movementY * MOUSE_LOOK)
     })
+    element.addEventListener("pointerdown", (e) => this.fingerDown(e))
+    element.addEventListener("pointermove", (e) => this.fingerMove(e))
+    element.addEventListener("pointerup", (e) => this.fingerUp(e))
+    element.addEventListener("pointercancel", (e) => this.fingerUp(e))
     element.addEventListener("mousedown", (e) => {
       if (!this.locked) return
       if (e.button === 0) this.press("fire")
@@ -150,6 +184,116 @@ export class Controls {
       if (b && !Object.entries(KEYS).some(([k, v]) => v === b && this.keys.has(k))) this.held.delete(b)
     })
     window.addEventListener("blur", () => this.releaseAll())
+  }
+
+  /** Turns the view by a look change already in radians, before sensitivity and zoom. */
+  private turn(dx: number, dy: number) {
+    const s = this.sensitivity * this.zoomScale
+    this.yaw -= dx * s
+    this.pitch -= dy * s * (this.invertY ? -1 : 1)
+    this.pitch = Math.max(-1.5, Math.min(1.5, this.pitch))
+    this.lookDx += dx * s
+    this.lookDy += dy * s
+  }
+
+  /**
+   * A finger lands on the canvas. The first touch in a match makes touch the active device.
+   * The finger keeps the control it landed on until it lifts: fire, else the stick if no
+   * other thumb holds it and it landed in the stick's region, else look.
+   */
+  private fingerDown(e: PointerEvent) {
+    if (e.pointerType === "mouse") return this.useTouch(false)
+    if (e.pointerType !== "touch" || !this.inMatch || !this.enabled || !this.playing) return
+    e.preventDefault()
+    this.useTouch(true)
+    // A finger that comes down again without an up in between (the up was lost) lets go first.
+    this.fingerUp(e)
+    const rect = this.element.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    const layout = touchLayout(rect)
+    const fire = layout.fire
+    const region = layout.stick.region
+    let role: FingerRole = "look"
+    if ((x - fire.x) ** 2 + (y - fire.y) ** 2 <= fire.r ** 2) role = "fire"
+    else if (!this.touchView.stick.held && x >= region.left && x <= region.left + region.width && y >= region.top && y <= region.top + region.height) role = "stick"
+    this.fingers.set(e.pointerId, { role, x, y })
+    this.element.setPointerCapture?.(e.pointerId)
+    if (role === "fire") {
+      this.touchHeld.add("fire")
+      this.latched |= BUTTON.fire
+      this.touchView.fire = true
+    }
+    if (role === "stick") {
+      const v = this.touchView.stick
+      v.held = true
+      v.ox = v.kx = x
+      v.oy = v.ky = y
+    }
+    this.handlers.onTouch?.(this.touchView)
+  }
+
+  private fingerMove(e: PointerEvent) {
+    const f = this.fingers.get(e.pointerId)
+    if (!f) return
+    const rect = this.element.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    if (f.role === "stick") this.tilt(x, y, touchLayout(rect).stick.radius)
+    else this.turn((x - f.x) * TOUCH_LOOK, (y - f.y) * TOUCH_LOOK)
+    f.x = x
+    f.y = y
+  }
+
+  /** The stick under the thumb at (x, y): analog movement, and sprint when pushed to its edge while forward. */
+  private tilt(x: number, y: number, radius: number) {
+    const v = this.touchView.stick
+    const dx = x - v.ox
+    const dy = y - v.oy
+    const len = Math.hypot(dx, dy)
+    const k = len <= TOUCH_DEAD * radius ? 0 : Math.min(1, (len / radius - TOUCH_DEAD) / (1 - TOUCH_DEAD)) / len
+    // Zero, not minus zero, at rest.
+    this.touchMove.mx = k === 0 ? 0 : dx * k
+    this.touchMove.mz = k === 0 || dy === 0 ? 0 : -dy * k
+    const sprint = len * k >= TOUCH_SPRINT && this.touchMove.mz >= Math.abs(this.touchMove.mx)
+    // Sprinting stands up from a toggled crouch, as it does on the keyboard.
+    if (sprint && !this.touchHeld.has("sprint")) this.crouched = false
+    if (sprint) this.touchHeld.add("sprint")
+    else this.touchHeld.delete("sprint")
+    const rim = len > radius ? radius / len : 1
+    v.kx = v.ox + dx * rim
+    v.ky = v.oy + dy * rim
+    this.handlers.onTouch?.(this.touchView)
+  }
+
+  private fingerUp(e: PointerEvent) {
+    const f = this.fingers.get(e.pointerId)
+    if (!f) return
+    this.fingers.delete(e.pointerId)
+    if (f.role === "stick") {
+      this.touchView.stick.held = false
+      this.touchMove.mx = this.touchMove.mz = 0
+      this.touchHeld.delete("sprint")
+    }
+    if (f.role === "fire" && ![...this.fingers.values()].some((o) => o.role === "fire")) {
+      this.touchHeld.delete("fire")
+      this.touchView.fire = false
+    }
+    this.handlers.onTouch?.(this.touchView)
+  }
+
+  /**
+   * Touch becomes (or stops being) the active device. Taking over releases what the
+   * keyboard and the pad held and drops the mouse lock; giving up lets go of every finger.
+   */
+  private useTouch(on: boolean) {
+    if (on === this.touchActive) return
+    this.touchActive = on
+    if (!on) return this.releaseTouch()
+    this.padActive = false
+    this.releaseKeys()
+    this.releasePad()
+    if (this.locked) document.exitPointerLock()
   }
 
   /** A narrow FOV (scope) slows down aiming. */
@@ -199,9 +343,24 @@ export class Controls {
   }
 
   releaseAll() {
+    this.releaseKeys()
+    this.releasePad()
+    this.releaseTouch()
+  }
+
+  private releaseKeys() {
     this.held.clear()
     this.keys.clear()
-    this.releasePad()
+  }
+
+  private releaseTouch() {
+    if (this.fingers.size === 0 && this.touchHeld.size === 0) return
+    this.fingers.clear()
+    this.touchHeld.clear()
+    this.touchMove.mx = this.touchMove.mz = 0
+    this.touchView.stick.held = false
+    this.touchView.fire = false
+    this.handlers.onTouch?.(this.touchView)
   }
 
   private releasePad() {
@@ -227,6 +386,8 @@ export class Controls {
    * With `playing` false (a menu open) only buttons go through, no look or movement.
    */
   poll(dt: number, playing = true) {
+    this.playing = playing
+    if (!this.enabled || !playing) this.releaseTouch()
     const p = this.pad()
     if (!p) return
     const down = p.buttons.map((b, i) => (i === PAD.l2 || i === PAD.r2 ? b.value > TRIGGER_ON : b.pressed))
@@ -239,7 +400,10 @@ export class Controls {
     }
     const left = stick(p.axes[0] ?? 0, p.axes[1] ?? 0)
     const right = stick(p.axes[2] ?? 0, p.axes[3] ?? 0)
-    if (down.some(Boolean) || left.x || left.y || right.x || right.y) this.padActive = true
+    if (down.some(Boolean) || left.x || left.y || right.x || right.y) {
+      this.padActive = true
+      this.useTouch(false)
+    }
 
     // Options always works (even with the menu open); the rest only in a match and without chat.
     if (edge(PAD.options)) this.handlers.onPause()
@@ -297,25 +461,27 @@ export class Controls {
     void actuator?.playEffect?.("dual-rumble", { duration: ms, strongMagnitude: Math.min(1, strong), weakMagnitude: Math.min(1, weak) }).catch(() => undefined)
   }
 
-  /** Playing: with the mouse locked or with the pad. */
+  /** Playing: with the mouse locked, with the pad or with touch. */
   get active() {
-    return this.locked || this.padActive
+    return this.locked || this.padActive || this.touchActive
   }
 
+  /** Asks for the mouse lock, unless the player is on touch: a tap is no reason to lock a mouse. */
   lock() {
+    if (this.touchActive) return
     // Without a user gesture the browser refuses: a click on the screen retries.
     const r = this.element.requestPointerLock?.() as Promise<void> | undefined
     r?.catch?.(() => undefined)
   }
 
-  /** Movement: strafe and forward, from WASD/arrows or the left stick (analog). */
+  /** Movement: strafe and forward, from WASD/arrows, the left stick or the touch stick (analog). */
   move() {
     if (!this.enabled) return { mx: 0, mz: 0 }
     const k = this.keys
     const mx = (k.has("KeyD") || k.has("ArrowRight") ? 1 : 0) - (k.has("KeyA") || k.has("ArrowLeft") ? 1 : 0)
     const mz = (k.has("KeyW") || k.has("ArrowUp") ? 1 : 0) - (k.has("KeyS") || k.has("ArrowDown") ? 1 : 0)
     if (mx || mz) return { mx, mz }
-    return this.padMove
+    return this.touchActive ? this.touchMove : this.padMove
   }
 
   /** The tick's buttons: held ones plus those pressed and already released. */
@@ -332,12 +498,13 @@ export class Controls {
     let b = 0
     for (const name of this.held) b |= BUTTON[name]
     for (const name of this.padHeld) b |= BUTTON[name]
+    for (const name of this.touchHeld) b |= BUTTON[name]
     if (this.crouched) b |= BUTTON.crouch
     return b
   }
 
   isHeld(b: ButtonName) {
-    return this.held.has(b) || this.padHeld.has(b) || (b === "crouch" && this.crouched)
+    return this.held.has(b) || this.padHeld.has(b) || this.touchHeld.has(b) || (b === "crouch" && this.crouched)
   }
 }
 
