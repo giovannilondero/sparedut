@@ -8,7 +8,7 @@ import type { MapId } from "../shared/map.ts"
  * ends and restarts (common in Tampieste) resets the stats.
  */
 export function playBots(map: MapId, mode: ModeId, seconds = 90, perTeam = 6) {
-  const room = new Room("TEST", "nessuno", "Test", "lan", { mode, map, minutes: 10, reach: "online", access: { kind: "open" }, level: "pari", ff: false })
+  const room = new Room("TEST", "nessuno", "Test", "lan", { mode, map, minutes: 10, reach: "online", access: { kind: "open" }, level: "pari", ff: false, single: null })
   room.fillBots(perTeam)
   room.start()
   const started = performance.now()

@@ -4,7 +4,7 @@
  */
 import type { MapDef, Spawn, Team } from "../map.ts"
 import { CLASSES, RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../weapons.ts"
-import type { Ammo, ArsenalValue, CartValue, FlagState, HillValue, PanelState, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
+import type { Ammo, ArsenalValue, CartValue, FlagState, HillValue, Kit, PanelState, PickupState, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
 
 export const MAX_ARMOR = 100
 export const RESPAWN_TICKS = 180
@@ -106,17 +106,25 @@ export function freshAmmo(): Record<WeaponId, Ammo> {
   return out
 }
 
-export function freshArsenal(primary: PrimaryId): ArsenalValue {
+/** What the room's rules give a player to carry: everything, or under single weapon only its primary and the Mescul. */
+export const kitOf = (rules: Pick<RulesValue, "single">): Kit => (rules.single ? "single" : "full")
+
+/** The primary a player spawns with: the room's single weapon when it is on, else their own. */
+export const primaryOf = (rules: Pick<RulesValue, "single">, own: PrimaryId): PrimaryId => rules.single ?? own
+
+export function freshArsenal(primary: PrimaryId, kit: Kit = "full"): ArsenalValue {
+  const full = kit === "full"
   return {
+    kit,
     current: primary,
     primary,
     nextPrimary: primary,
     power: null,
     ammo: freshAmmo(),
     action: { _tag: "switch", ticks: 20 },
-    bombs: SGNAPE_BOMB.perLife,
+    bombs: full ? SGNAPE_BOMB.perLife : 0,
     bombCooldown: 0,
-    mines: RAIBL_MINE.perLife,
+    mines: full ? RAIBL_MINE.perLife : 0,
     mineCooldown: 0,
     spin: 0,
     sgnape: 0
@@ -125,16 +133,36 @@ export function freshArsenal(primary: PrimaryId): ArsenalValue {
 
 export const NO_STATS: StatsValue = { kills: 0, deaths: 0, assists: 0, caps: 0, score: 0, damage: 0, headshots: 0, streak: 0, best: 0 }
 
-/** The weapons the player can hold right now (the mitraie isn't held: you use the turret). */
-export const owned = (a: Pick<ArsenalValue, "primary" | "power">, id: WeaponId) =>
-  id === "mescul" || id === "mandi" || id === a.primary || id === a.power
+/**
+ * The weapons the player can hold right now (the mitraie isn't held: you use the turret). Under
+ * single weapon (`kit` "single") no pistol; what is in slot 3 (the panel) stays.
+ */
+export const owned = (a: Pick<ArsenalValue, "kit" | "primary" | "power">, id: WeaponId) =>
+  id === "mescul" || id === a.primary || id === a.power || (id === "mandi" && a.kit === "full")
+
+/**
+ * An ammunition pickup taken: every weapon owned back to its full reserve, and with a full kit the
+ * bombs and mines too. Null when there is nothing to fill: the pickup stays for someone else.
+ */
+export function restock(a: ArsenalValue): ArsenalValue | null {
+  const sidearms = a.kit === "full"
+  const full = WEAPON_IDS.every((id) => !owned(a, id) || a.ammo[id].reserve >= WEAPONS[id].reserve) && (!sidearms || (a.bombs >= SGNAPE_BOMB.perLife && a.mines >= RAIBL_MINE.perLife))
+  if (full) return null
+  const ammo = { ...a.ammo }
+  for (const id of WEAPON_IDS) ammo[id] = { mag: ammo[id].mag, reserve: Math.max(ammo[id].reserve, WEAPONS[id].reserve) }
+  return sidearms ? { ...a, ammo, bombs: Math.max(a.bombs, SGNAPE_BOMB.perLife), mines: Math.max(a.mines, RAIBL_MINE.perLife) } : { ...a, ammo }
+}
+
+/** The map's pickups as a match starts them: all there, but the Lanciafrico is not on the map under single weapon. */
+export const freshPickups = (map: MapDef, rules: Pick<RulesValue, "single">): PickupState[] =>
+  map.pickups.map((p): PickupState => (rules.single && p.kind === "lanciafrico" ? { _tag: "absent" } : { _tag: "up" }))
 
 /**
  * How fast a player moves, as a multiple of the walk: the class's base speed, times the multiplier
  * of the weapon in hand (`requested`, if they own it; else the one they hold), times the sgnape and
  * carrying the frico. The simulation and the client's prediction both move with it.
  */
-export const speedScale = (a: Pick<ArsenalValue, "primary" | "current" | "power" | "sgnape">, requested: WeaponId, carrier: boolean) =>
+export const speedScale = (a: Pick<ArsenalValue, "kit" | "primary" | "current" | "power" | "sgnape">, requested: WeaponId, carrier: boolean) =>
   CLASSES[a.primary].speed * WEAPONS[owned(a, requested) ? requested : a.current].moveScale * (a.sgnape > 0 ? SGNAPE_SPEED : 1) * (carrier ? CARRIER_SPEED : 1)
 
 /** The weapon a number key selects: the one in that slot the player owns (in slot 1, the primary), or null. */

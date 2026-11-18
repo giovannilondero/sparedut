@@ -23,6 +23,7 @@ import { esc } from "./hud.ts"
 import { onLangChange, setLang, t, type Lang } from "./i18n.ts"
 import { chooseLook, LOOK_IDS, LOOKS, type LookId } from "./looks.ts"
 import { classFigures, focusOnScreen, MenuModel, SCREENS, type CreateOptions, type Outcome, type PasswordRefusal, type PromptProblem, type Refusal, type Screen } from "./menu-model.ts"
+import type { PrimaryPicker } from "./match-menus.ts"
 import { oneTapRoom, type Settings } from "./settings.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -79,6 +80,9 @@ function selectItems(select: Select, values: readonly number[], label: (n: numbe
   select.value = String(chosen)
 }
 
+/** Single weapon off, as creation's select names its value. */
+const SINGLE_OFF = "off"
+
 /** An access as creation names it: on its card and in the options' summary. */
 const accessLabel = (access: Access): string => (access === "password" ? `🔒 ${t().static.accessPassword}` : t().static.accessOpen)
 
@@ -97,7 +101,7 @@ function roomRow(r: RoomSummary, selectable: boolean, asButton: boolean): string
   const s = t()
   const lock = r.reach !== "offline" && r.access === "password" ? `<i class="lock" role="img" aria-label="${s.menu.passwordRoom}" title="${s.menu.passwordRoom}">🔒</i>` : ""
   const inner = `<span class="room-tags"><i class="chip ${r.reach}">${s.menu.reach[r.reach]}</i>${lock}</span>
-    <span class="room-what"><b>${esc(r.host)}</b><small>${s.modes[r.mode].name} · ${s.maps[r.map].name} · ${s.menu.phase[r.phase]}</small></span>
+    <span class="room-what"><b>${esc(r.host)}</b><small>${s.modes[r.mode].name} · ${s.maps[r.map].name}${r.single ? ` · ${s.menu.single(s.weapons[r.single].name)}` : ""} · ${s.menu.phase[r.phase]}</small></span>
     <span class="room-seats"><b>${r.players}/${r.max}</b><small>${selectable ? r.code : s.menu.full}</small></span>`
   if (!asButton) return `<li><div class="room">${inner}</div></li>`
   return `<li><button class="room${selectable ? "" : " full"}" data-code="${r.code}"${selectable ? "" : " disabled"}>${inner}</button></li>`
@@ -491,6 +495,10 @@ export class Menu {
       }))
     number("c-minutes", (n) => this.model.chooseMinutes(n))
     number("c-bots", (n) => this.model.chooseBots(n))
+    $<Select>("c-single").addEventListener("valuechange", alwaysChosen((value) => {
+      this.model.chooseSingle(value === SINGLE_OFF ? null : (value as PrimaryId))
+      this.renderChoices()
+    }))
     const ff = $<HTMLInputElement>("c-ff")
     ff.addEventListener("change", () => {
       this.model.chooseFriendlyFire(ff.checked)
@@ -530,6 +538,11 @@ export class Menu {
     cardTexts($("c-access"), options.accesses, (v) => [accessLabel(v), ""])
     selectItems($("c-minutes"), options.minutes, s.menu.minutes, choices.minutes)
     selectItems($("c-bots"), options.bots, (n) => (n === 0 ? s.menu.botsNone : String(n)), choices.bots)
+    const single = $<Select>("c-single")
+    single.querySelector("ui-select-content")!.innerHTML = options.singles
+      .map((p) => `<ui-select-item value="${p ?? SINGLE_OFF}">${p ? s.weapons[p].name : s.menu.singleOff}</ui-select-item>`)
+      .join("")
+    single.value = choices.single ?? SINGLE_OFF
     this.renderChoices()
   }
 
@@ -544,7 +557,8 @@ export class Menu {
       s.levels[choices.level].name,
       s.menu.reach[choices.reach],
       ...(fields.access ? [accessLabel(choices.access)] : []),
-      ...(choices.ff ? [s.menu.ffOn] : [])
+      ...(choices.ff ? [s.menu.ffOn] : []),
+      ...(choices.single ? [s.menu.single(s.weapons[choices.single].name)] : [])
     ].join(" · ")
     $("c-access-field").hidden = !fields.access
     $("c-password-field").hidden = !fields.password
@@ -556,9 +570,10 @@ export class Menu {
   /**
    * The weapons: the primaries first, as one group of cards to choose from (UI SDK's radio group: one
    * tab stop, arrow keys, the radio role), then the ones always carried or picked up, to read only.
-   * Drawn into the menu's armoury and, with `onPick`, into a match's.
+   * Drawn into the menu's armoury and, with `onPick`, into a match's. A `locked` picker (single
+   * weapon) shows the host's choice and takes no pick: the player's own primary stays remembered.
    */
-  buildArmarie(target: HTMLElement = $("armarie"), onPick?: (p: PrimaryId) => void) {
+  buildArmarie(target: HTMLElement = $("armarie"), onPick?: (p: PrimaryId) => void, picker: PrimaryPicker = { _tag: "free", chosen: this.settings.primary }) {
     const max = { damage: 110, rate: 10, range: 400, mag: 30 }
     const s = t()
     const bar = (label: string, v: number) => `<span class="stat">${label}<i style="width:${Math.min(100, v * 100)}%"></i></span>`
@@ -581,7 +596,11 @@ export class Menu {
     ).join("")}</ui-radio-group>
       <ul class="weapon-cards carried">${carried.map((id) => `<li class="weapon">${card(id)}</li>`).join("")}</ul>`
     const group = target.querySelector<HTMLElementTagNameMap["ui-radio-group"]>("ui-radio-group")!
-    group.value = this.settings.primary
+    group.value = picker.chosen
+    if (picker._tag === "locked") {
+      for (const radio of group.querySelectorAll("ui-radio")) radio.toggleAttribute("disabled", true)
+      return
+    }
     // A primary is always chosen: a change to none is refused.
     group.addEventListener("valuechange", alwaysChosen((primary) => {
       this.model.choosePrimary(primary as PrimaryId)
