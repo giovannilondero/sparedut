@@ -274,8 +274,7 @@ link.on((msg: ServerMessage) => {
       return
     case "error":
       // A password room: ask for it, saying why when the last one did not work.
-      if (msg.code === "passwordRequired") menu.askPassword(joining)
-      else if (msg.code === "wrongPassword" || msg.code === "tooManyAttempts") menu.askPassword(joining, t().errors[msg.code])
+      if (msg.code === "passwordRequired" || msg.code === "wrongPassword" || msg.code === "tooManyAttempts") menu.hostRefused(joining, msg.code)
       else toast(t().errors[msg.code])
       return
   }

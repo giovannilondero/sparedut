@@ -8,11 +8,13 @@ import type { Access, Reach, RoomSummary } from "../shared/protocol.ts"
 import { PRIMARIES, WEAPON_IDS, WEAPONS, type PrimaryId } from "../shared/weapons.ts"
 // UI SDK's radio group: one tab stop, arrow keys, the radio role. Markup and styling stay the game's.
 import "@ui-sdk/web/radio"
+// UI SDK's dialog, for the password prompt: focus moved in and back, Tab kept inside, Esc and outside presses close it.
+import "@ui-sdk/web/dialog"
 import type { GameAudio } from "./contracts.ts"
 import { esc } from "./hud.ts"
 import { onLangChange, setLang, t, type Lang, type StaticKey } from "./i18n.ts"
-import { MenuModel, SCREENS, type CreateOptions, type Outcome, type Refusal } from "./menu-model.ts"
-import type { Settings } from "./settings.ts"
+import { MenuModel, SCREENS, type CreateOptions, type Outcome, type PasswordRefusal, type PromptProblem, type Refusal, type Screen } from "./menu-model.ts"
+import { oneTapRoom, type Settings } from "./settings.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -30,6 +32,27 @@ export interface MenuHandlers {
 const REACH_LABEL = { lan: "reachLan", online: "reachOnline", offline: "reachOffline" } as const satisfies Record<Reach, StaticKey>
 const ACCESS_LABEL = { open: "accessOpen", password: "accessPassword" } as const satisfies Record<Access, StaticKey>
 
+/** The element each screen shows: the password prompt opens over the home screen. */
+const SCREEN_ELEMENT = {
+  home: "menu-home",
+  password: "menu-home",
+  create: "menu-create",
+  armarie: "menu-armarie",
+  settings: "menu-settings",
+  vocabolari: "menu-vocabolari"
+} as const satisfies Record<Screen, string>
+
+/** A room in the list: reach chip, lock, host, mode and map, players out of seats. A button when it can be chosen. */
+function roomRow(r: RoomSummary, selectable: boolean, asButton: boolean): string {
+  const s = t()
+  const lock = r.reach !== "offline" && r.access === "password" ? `<i class="lock" role="img" aria-label="${s.menu.passwordRoom}" title="${s.menu.passwordRoom}">🔒</i>` : ""
+  const inner = `<span class="room-tags"><i class="chip ${r.reach}">${s.menu.reach[r.reach]}</i>${lock}</span>
+    <span class="room-what"><b>${esc(r.host)}</b><small>${s.modes[r.mode].name} · ${s.maps[r.map].name}</small></span>
+    <span class="room-seats"><b>${r.players}/${r.max}</b><small>${selectable ? r.code : s.menu.full}</small></span>`
+  if (!asButton) return `<li><div class="room">${inner}</div></li>`
+  return `<li><button class="room${selectable ? "" : " full"}" data-code="${r.code}"${selectable ? "" : " disabled"}>${inner}</button></li>`
+}
+
 export class Menu {
   private readonly model: MenuModel
   private tipIndex = Math.floor(Math.random() * 100)
@@ -42,7 +65,7 @@ export class Menu {
         audio.play("ui_click")
         const go = el.dataset.go!
         if (go === "one-tap") this.apply(this.model.oneTap())
-        else this.go(go as (typeof SCREENS)[number])
+        else this.go(go as Screen)
       })
     }
     for (const el of document.querySelectorAll<HTMLButtonElement>("[data-lang]")) {
@@ -56,28 +79,25 @@ export class Menu {
     document.addEventListener("mouseover", (e) => {
       if ((e.target as HTMLElement).closest?.("#menu button")) audio.play("ui_hover", { volume: 0.4 })
     })
-    // Esc: from submenus, go back to the main screen.
-    document.addEventListener("keydown", (e) => {
-      if (e.key !== "Escape" || $("menu").classList.contains("hidden")) return
+    // Esc: from submenus, go back to the main screen. Captured before UI SDK's own listener, which
+    // closes the password prompt: while it is open, Esc is the prompt's.
+    window.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape" || $("menu").classList.contains("hidden") || this.model.screen === "password") return
       if (this.model.back()) {
         e.preventDefault()
         audio.play("ui_click")
         this.render()
       } else if (document.activeElement instanceof HTMLInputElement) document.activeElement.blur()
-    })
+    }, { capture: true })
     const name = $<HTMLInputElement>("name")
     name.value = settings.name
-    name.addEventListener("input", () => this.model.typeName(name.value))
+    name.addEventListener("input", () => {
+      this.model.typeName(name.value)
+      name.removeAttribute("aria-invalid")
+    })
     this.bindCreate()
     this.bindSettings()
-    const code = $<HTMLInputElement>("j-code")
-    code.addEventListener("input", () => this.model.typeCode(code.value))
-    $("j-go").addEventListener("click", () => this.apply(this.model.joinByCode()))
-    code.addEventListener("keydown", (e) => e.key === "Enter" && this.apply(this.model.joinByCode()))
-    const password = $<HTMLInputElement>("pw-input")
-    password.addEventListener("input", () => this.model.typePassword(password.value))
-    $("pw-go").addEventListener("click", () => this.apply(this.model.joinWithPassword()))
-    password.addEventListener("keydown", (e) => e.key === "Enter" && this.apply(this.model.joinWithPassword()))
+    this.bindHome()
     onLangChange(() => this.renderTexts())
     setLang(settings.lang)
     setInterval(() => this.showTip(), 9000)
@@ -90,9 +110,11 @@ export class Menu {
       el.setAttribute("aria-pressed", String(el.dataset.lang === this.settings.lang))
     }
     this.renderCreate()
+    this.renderOneTap()
+    this.renderPrompt()
     this.buildArmarie()
     $("vocabolari").innerHTML = t().menu.vocab.map(([w, d]) => `<p><b>${w}</b> — ${d}</p>`).join("")
-    this.renderRooms()
+    this.renderRooms(true)
     $("tip").textContent = t().tips[this.tipIndex % t().tips.length]
   }
 
@@ -120,7 +142,7 @@ export class Menu {
     $("status").textContent = text
   }
 
-  go(screen: (typeof SCREENS)[number]) {
+  go(screen: Screen) {
     this.apply(this.model.go(screen))
   }
 
@@ -141,31 +163,93 @@ export class Menu {
       const input = $<HTMLInputElement>("name")
       input.focus()
       input.placeholder = t().menu.needName
+      input.setAttribute("aria-invalid", "true")
     } else if (reason === "passwordBad" && this.model.screen === "create") {
       $("c-msg").textContent = t().menu.passwordBad
       $("c-password").focus()
-    } else if (reason === "passwordBad") $("pw-msg").textContent = t().menu.passwordBad
-    // A code that is not four letters, or a full room, sends nothing: the screen already shows why.
+    } else if (reason === "passwordBad") $<HTMLInputElement>("pw-input").select()
+    else if (reason === "codeBad") {
+      $("j-msg").textContent = t().menu.codeBad
+      $("j-code").setAttribute("aria-invalid", "true")
+      $("j-code").focus()
+    }
+    // A full room, or one gone from the list, sends nothing: the list already shows why.
   }
 
   /** Shows the model's screen. */
   private render() {
     const screen = this.model.screen
-    for (const s of SCREENS) $(`menu-${s}`).classList.toggle("hidden", s !== screen)
-    if (screen === "join") setTimeout(() => $("j-code").focus(), 50)
-    if (screen === "password") {
-      $<HTMLInputElement>("pw-input").value = this.model.typedPassword
-      $("pw-for").textContent = t().menu.passwordFor(this.model.passwordFor)
-      setTimeout(() => $("pw-input").focus(), 50)
-    }
+    const shown = SCREEN_ELEMENT[screen]
+    for (const s of SCREENS) $(SCREEN_ELEMENT[s]).classList.toggle("hidden", SCREEN_ELEMENT[s] !== shown)
+    if (screen === "home") this.renderOneTap()
+    const prompt = $<HTMLElementTagNameMap["ui-dialog"]>("pw-dialog")
+    if (screen === "password") this.renderPrompt()
+    // Opened from code: UI SDK moves focus to the field and, on closing, back to what had it before.
+    prompt.open = screen === "password"
   }
 
-  /** Asks for a password room's password; `message` says why the last one did not work. */
-  askPassword(code: string, message = "") {
+  // ---------------------------------------------------------------- home
+
+  /** Listeners only once: the room list is redrawn on every refresh and language change. */
+  private bindHome() {
+    const code = $<HTMLInputElement>("j-code")
+    code.addEventListener("input", () => {
+      this.model.typeCode(code.value)
+      $("j-msg").textContent = ""
+      code.removeAttribute("aria-invalid")
+    })
+    $("j-form").addEventListener("submit", (e) => {
+      e.preventDefault()
+      this.apply(this.model.joinByCode())
+    })
+    $("room-list").addEventListener("click", (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button")
+      if (!b || b.disabled) return
+      this.audio.play("ui_click")
+      if (b.dataset.code) this.apply(this.model.joinFromList(b.dataset.code))
+      else this.go("create")
+    })
+    const password = $<HTMLInputElement>("pw-input")
+    password.addEventListener("input", () => this.model.typePassword(password.value))
+    $("pw-form").addEventListener("submit", (e) => {
+      e.preventDefault()
+      this.apply(this.model.joinWithPassword())
+      this.renderPrompt()
+    })
+    // Closed by Esc, the cancel button or a press outside: back to the home screen, the list where it was.
+    $<HTMLElementTagNameMap["ui-dialog"]>("pw-dialog").addEventListener("openchange", (e) => {
+      if (!e.detail.value && this.model.screen === "password") {
+        this.model.back()
+        this.render()
+      }
+    })
+  }
+
+  /** The one-tap button says what it will start: the remembered mode, map and duration. */
+  private renderOneTap() {
+    const room = oneTapRoom(this.settings)
+    const s = t()
+    $("one-tap-last").textContent = `${s.modes[room.mode].name} · ${s.maps[room.map].name} · ${s.menu.minutes(room.minutes)}`
+  }
+
+  /** The prompt's room, its typed password and what the last attempt got wrong. */
+  private renderPrompt() {
+    const s = t()
+    const room = this.model.promptRoom
+    $("pw-for").textContent = s.menu.passwordFor(this.model.passwordFor)
+    $("pw-room").innerHTML = room ? roomRow(room, true, false) : ""
+    const input = $<HTMLInputElement>("pw-input")
+    if (input.value !== this.model.typedPassword) input.value = this.model.typedPassword
+    const problem: PromptProblem | null = this.model.promptProblem
+    $("pw-msg").textContent = problem === null ? "" : problem === "passwordBad" ? s.menu.passwordBad : s.errors[problem]
+    input.toggleAttribute("aria-invalid", problem !== null)
+  }
+
+  /** The host asked for a room's password, or refused the one sent: the prompt opens again, saying why. */
+  hostRefused(code: string, why: PasswordRefusal) {
     $("menu").classList.remove("hidden")
-    this.apply(this.model.askPassword(code))
-    $("pw-msg").textContent = message
-    $<HTMLInputElement>("pw-input").select()
+    this.apply(this.model.hostRefused(code, why))
+    if (why !== "passwordRequired") $<HTMLInputElement>("pw-input").select()
   }
 
   rooms(list: readonly RoomSummary[]) {
@@ -173,24 +257,24 @@ export class Menu {
     this.renderRooms()
   }
 
-  private renderRooms() {
+  /** What the list last drew: a refresh with the same rooms leaves the DOM, and the focus in it, alone. */
+  private drawnRooms = ""
+
+  private renderRooms(force = false) {
     const list = this.model.roomList
-    const ul = $("room-list")
+    const drawn = JSON.stringify(list)
+    if (!force && drawn === this.drawnRooms) return
+    this.drawnRooms = drawn
+    const box = $("room-list")
+    // Focus inside the list stays inside it: on the same room if it can still be chosen, else on the first that can.
+    const had = box.contains(document.activeElement) ? (document.activeElement as HTMLElement) : null
     const s = t()
-    if (!list.length) {
-      ul.innerHTML = `<li class="muted">${s.menu.roomsEmpty}</li>`
-      return
-    }
-    ul.innerHTML = list
-      .map(({ room: r, selectable }) => {
-        const access = r.reach === "offline" ? null : r.access
-        const passwordMark = access === "password" ? ` <i class="password-mark" role="img" aria-label="${s.menu.passwordRoom}" title="${s.menu.passwordRoom}">🔒</i>` : ""
-        return `<li><button data-code="${r.code}"${selectable ? "" : " disabled"}><span><i class="chip ${r.reach}">${s.menu.reach[r.reach]}</i>${passwordMark} <b>${esc(r.host)}</b> · ${s.modes[r.mode].name} · ${s.maps[r.map].name}</span><span>${selectable ? "" : `${s.menu.full} · `}${r.players}/${r.max}👤 ${r.bots}🤖 · ${r.code}</span></button></li>`
-      })
-      .join("")
-    for (const b of ul.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")) {
-      b.addEventListener("click", () => this.apply(this.model.joinFromList(b.dataset.code!)))
-    }
+    box.innerHTML = list.length
+      ? `<ul class="rooms">${list.map(({ room, selectable }) => roomRow(room, selectable, true)).join("")}</ul>`
+      : `<div class="rooms-empty"><p>${s.menu.roomsEmpty}</p><button class="primary">${s.static.create}</button></div>`
+    if (!had) return
+    const same = had.dataset.code ? box.querySelector<HTMLButtonElement>(`button[data-code="${had.dataset.code}"]:not(:disabled)`) : null
+    ;(same ?? box.querySelector<HTMLButtonElement>("button:not(:disabled)"))?.focus()
   }
 
   // ---------------------------------------------------------------- create match
