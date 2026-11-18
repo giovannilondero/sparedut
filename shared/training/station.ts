@@ -91,6 +91,10 @@ export interface StepRule {
  * the objective in force stays the one before it (the station's, for its first step).
  */
 export interface StepGiven {
+  /** The primary carried for the step (station 5's stalls: one each). Giving a weapon refills every weapon's ammunition; the primary chosen for the next respawn stays the trainee's own. */
+  readonly primary?: PrimaryId
+  /** The weapon in hand as the step begins. */
+  readonly hold?: WeaponId
   /** The objective put in force, its state fresh (the frico at its bases, the plaçute free, the cjar at the start). */
   readonly objective?: ObjectiveId
 }
