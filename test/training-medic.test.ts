@@ -19,7 +19,7 @@ import { alongTheStreet } from "./trainee/pickups.ts"
 
 beforeAll(() => initPhysics())
 
-const WOUNDED = SAGRE_STATIONS[9].wounded.at
+const WOUNDED = SAGRE_STATIONS.medic.wounded.at
 
 /** A training on the in-browser host, played by the automatic player until the medic is the current station and the teammate is there. */
 function atMedic() {

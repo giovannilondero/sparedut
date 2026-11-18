@@ -8,6 +8,10 @@ import type { Bounds, V3 } from "../shared/map.ts"
 import { SAGRE, SAGRE_STATIONS } from "../shared/maps/sagre.ts"
 import { stepBody, type Body } from "../shared/movement.ts"
 import { createPhysicsWorld, initPhysics, type PhysicsWorld } from "../shared/physics.ts"
+import { STATION_IDS } from "../shared/training/index.ts"
+
+/** The stations' places in the training's order. */
+const PLACES = STATION_IDS.map((id) => SAGRE_STATIONS[id])
 
 let open: PhysicsWorld
 let closed: PhysicsWorld
@@ -19,7 +23,7 @@ beforeAll(async () => {
 })
 
 const at = ([x, y, z]: V3): Body => ({ x, y: y + 0.05, z, vx: 0, vy: 0, vz: 0, grounded: true, crouch: false })
-const { bar, beam } = SAGRE_STATIONS[1]
+const { bar, beam } = SAGRE_STATIONS.course
 
 /**
  * Walks straight at `to` as a player would on the obstacle course: a jump just before the bar
@@ -44,27 +48,27 @@ const inside = (a: Bounds, [x, , z]: V3) => x >= a.minX && x <= a.maxX && z >= a
 
 describe("Sagre dal Frico", () => {
   test("there are twelve stations, each with a closed way to the next but the last", () => {
-    expect(SAGRE_STATIONS).toHaveLength(12)
-    expect(SAGRE_STATIONS.map((s) => s.gate)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, null])
+    expect(PLACES).toHaveLength(12)
+    expect(PLACES.map((s) => s.gate)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, null])
     expect(SAGRE.gates).toHaveLength(11)
   })
 
   for (let i = 0; i < 11; i++) {
     test(`with the way open, station ${i + 2} is reached on foot from station ${i + 1}`, () => {
-      expect(walk(open, SAGRE_STATIONS[i].start.at, SAGRE_STATIONS[i + 1].start.at).arrived).toBe(true)
+      expect(walk(open, PLACES[i].start.at, PLACES[i + 1].start.at).arrived).toBe(true)
     })
 
     test(`with the way closed, station ${i + 2} cannot be reached from station ${i + 1}`, () => {
-      const { body, arrived } = walk(closed, SAGRE_STATIONS[i].start.at, SAGRE_STATIONS[i + 1].start.at)
+      const { body, arrived } = walk(closed, PLACES[i].start.at, PLACES[i + 1].start.at)
       expect(arrived).toBe(false)
       // Stopped at the gate, still inside the station it left.
-      expect(inside(SAGRE_STATIONS[i].area, [body.x, body.y, body.z])).toBe(true)
+      expect(inside(PLACES[i].area, [body.x, body.y, body.z])).toBe(true)
     })
   }
 
   test("a host closes and opens the gates in the physics: a closed one stops you like a wall, shots too", () => {
     const world = createPhysicsWorld(SAGRE)
-    const [one, two] = SAGRE_STATIONS
+    const { look: one, course: two } = SAGRE_STATIONS
     world.setGates(SAGRE.gates!.map(() => true))
     expect(walk(world, one.start.at, two.start.at).arrived).toBe(false)
     const gate = SAGRE.gates![0]
@@ -72,7 +76,7 @@ describe("Sagre dal Frico", () => {
     // Only the first way open: station 2 is reached, station 3 is not.
     world.setGates(SAGRE.gates!.map((_, i) => i > 0))
     expect(walk(world, one.start.at, two.start.at).arrived).toBe(true)
-    expect(walk(world, two.start.at, SAGRE_STATIONS[2].start.at).arrived).toBe(false)
+    expect(walk(world, two.start.at, SAGRE_STATIONS.always.start.at).arrived).toBe(false)
     // Closed again, as when the trainee goes back to station 1.
     world.setGates(SAGRE.gates!.map(() => true))
     expect(walk(world, one.start.at, two.start.at).arrived).toBe(false)
@@ -80,7 +84,7 @@ describe("Sagre dal Frico", () => {
   })
 
   test("the bar stops you unless you jump it, the beam unless you crouch under it", () => {
-    const { start, sprintFrom } = SAGRE_STATIONS[1]
+    const { start, sprintFrom } = SAGRE_STATIONS.course
     const noJump = walk(open, start.at, sprintFrom, { jump: false })
     expect(noJump.arrived).toBe(false)
     expect(noJump.body.x).toBeLessThan(bar.min[0])
@@ -91,15 +95,15 @@ describe("Sagre dal Frico", () => {
   })
 
   test("the sprint line lies ahead of the run-up, inside the obstacle course", () => {
-    const { area, sprintFrom, sprintLine } = SAGRE_STATIONS[1]
+    const { area, sprintFrom, sprintLine } = SAGRE_STATIONS.course
     expect(sprintLine - sprintFrom[0]).toBeGreaterThan(6)
     expect(sprintLine).toBeLessThan(area.maxX)
     expect(walk(open, sprintFrom, [sprintLine + 0.5, 0, sprintFrom[2]]).arrived).toBe(true)
   })
 
   test("each station's area holds what its steps need", () => {
-    const [look, , always, , stalls, , bombs, pickups, turret, medic, modes, skirmish] = SAGRE_STATIONS
-    for (const s of SAGRE_STATIONS) expect(inside(s.area, s.start.at)).toBe(true)
+    const { look, always, stalls, throw: bombs, pickups, turret, medic, modes, skirmish } = SAGRE_STATIONS
+    for (const s of PLACES) expect(inside(s.area, s.start.at)).toBe(true)
     expect(inside(look.area, look.marker)).toBe(true)
     // The door to break with the mescul, and targets for the Mandi and the mescul.
     const door = SAGRE.doors[always.door]
@@ -131,7 +135,7 @@ describe("Sagre dal Frico", () => {
   })
 
   test("the player, the bots and every station's start stand on the ground, not inside anything", () => {
-    const spots = [...SAGRE_STATIONS.map((s) => s.start), ...SAGRE.spawns.benandanti, ...SAGRE.spawns.malandanti, SAGRE_STATIONS[9].wounded]
+    const spots = [...PLACES.map((s) => s.start), ...SAGRE.spawns.benandanti, ...SAGRE.spawns.malandanti, SAGRE_STATIONS.medic.wounded]
     for (const s of spots) {
       let b = at(s.at)
       for (let i = 0; i < 30; i++) b = stepBody(b, IDLE_INPUT, open, 1).body
@@ -140,7 +144,7 @@ describe("Sagre dal Frico", () => {
   })
 
   test("every bot route at the stations can be walked, there and back", () => {
-    const [, , always, , stalls, , bombs] = SAGRE_STATIONS
+    const { always, stalls, throw: bombs } = SAGRE_STATIONS
     const routes = [always.targets.mandi, always.targets.aim, ...Object.values(stalls.stalls).map((s) => s.target), bombs.mineRoute]
     for (const route of routes) {
       for (let i = 1; i < route.length; i++) {
@@ -173,7 +177,7 @@ describe("Sagre dal Frico", () => {
   })
 
   test("the door stands between the street and the shed, facing the one who kicks it", () => {
-    const { doorFront, door } = SAGRE_STATIONS[2]
+    const { doorFront, door } = SAGRE_STATIONS.always
     const d = SAGRE.doors[door]
     const towards = { x: (d.min[0] + d.max[0]) / 2 - doorFront[0], y: 0, z: (d.min[2] + d.max[2]) / 2 - doorFront[2] }
     const len = Math.hypot(towards.x, towards.z)

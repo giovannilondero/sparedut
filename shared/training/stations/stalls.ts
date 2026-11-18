@@ -13,7 +13,7 @@ import { MAX_HP } from "../../sim/rules.ts"
 import { WEAPONS, type PrimaryId } from "../../weapons.ts"
 import { counted, station, type ControlId, type Seen, type StationBot, type StepProgress, type StepRule } from "../station.ts"
 
-const PLACE = SAGRE_STATIONS[4]
+const PLACE = SAGRE_STATIONS.stalls
 
 /** A stall: one per primary that shoots. Its id is its weapon's. */
 export type StallId = Exclude<PrimaryId, "miedi">

@@ -8,7 +8,7 @@ import { MAX_HP } from "../../sim/rules.ts"
 import { held, justPressed } from "../../sim/controls.ts"
 import { once, station, type Seen, type StationBot } from "../station.ts"
 
-const PLACE = SAGRE_STATIONS[2]
+const PLACE = SAGRE_STATIONS.always
 
 /** A target: a Malandant that walks its route, or stands, and never fires. */
 const target = (route: StationBot["route"]): StationBot => ({ team: "malandanti", route, fires: false, hp: MAX_HP })

@@ -8,7 +8,7 @@ import { SAGRE_STATIONS } from "../../maps/sagre.ts"
 import { sprinting } from "../../movement.ts"
 import { entering, station, type StepRule } from "../station.ts"
 
-const PLACE = SAGRE_STATIONS[1]
+const PLACE = SAGRE_STATIONS.course
 
 /** How far before the line an unbroken sprint must have begun (metres); the run-up is 9 m before it. */
 export const SPRINT_RUN = 6

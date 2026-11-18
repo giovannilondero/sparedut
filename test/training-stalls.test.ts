@@ -20,7 +20,7 @@ import { shooter, type Shooting } from "./trainee/stalls.ts"
 beforeAll(() => initPhysics())
 
 type Stall = StepOf<"stalls">
-const PLACE = SAGRE_STATIONS[4]
+const PLACE = SAGRE_STATIONS.stalls
 const STALLS: readonly Stall[] = ["cramar", "doplete", "cjampanili", "mulin", "gjalinis"]
 /** A bound on any one drive, so a test that never sees what it waits for fails instead of hanging. */
 const PATIENCE = 60 * 60

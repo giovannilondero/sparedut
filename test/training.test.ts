@@ -45,8 +45,8 @@ function drive(h: ReturnType<typeof started>, ticks: number, input: (tick: numbe
 const steps = (events: GameEvent[]) => events.flatMap((e) => (e.t === "training" && e.a === "step" ? [e.step] : []))
 const view = (me: Client) => me.last("snap")!.training
 const position = (me: Client) => me.last("snap")!.you!.body
-const START = SAGRE_STATIONS[0].start
-const MARKER = SAGRE_STATIONS[0].marker
+const START = SAGRE_STATIONS.look.start
+const MARKER = SAGRE_STATIONS.look.marker
 /** Facing straight east, along the street. */
 const EAST = START.yaw
 
@@ -97,7 +97,7 @@ describe("starting the training", () => {
     expect(h.me.last("snap")!.players).toHaveLength(1)
     // A restart would have killed the trainee and sent them to the skirmish's side of the square.
     expect(h.me.last("snap")!.you!.alive).toBe(true)
-    expect(position(h.me).x).toBeLessThan(SAGRE_STATIONS[0].area.maxX)
+    expect(position(h.me).x).toBeLessThan(SAGRE_STATIONS.look.area.maxX)
     expect(view(h.me)).toMatchObject({ station: "look", step: "lookAround" })
   })
 })
@@ -156,6 +156,6 @@ describe("station 1: look and move", () => {
   })
 
   test("every station has its place on the fair", () => {
-    expect(SAGRE_STATIONS).toHaveLength(STATION_IDS.length)
+    expect(Object.keys(SAGRE_STATIONS).sort()).toEqual([...STATION_IDS].sort())
   })
 })

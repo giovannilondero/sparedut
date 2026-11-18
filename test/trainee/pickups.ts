@@ -5,7 +5,7 @@ import { SAGRE, SAGRE_STATIONS } from "../../shared/maps/sagre.ts"
 import type { Body } from "../../shared/movement.ts"
 import type { Drivers } from "./moves.ts"
 
-const { bar: BAR, beam: BEAM } = SAGRE_STATIONS[1]
+const { bar: BAR, beam: BEAM } = SAGRE_STATIONS.course
 
 /**
  * Sprints along the street straight at a point, jumping the obstacle course's bar and crouching
@@ -19,7 +19,7 @@ export const alongTheStreet = (body: Body, to: V3): Partial<PlayerInput> => {
   return { mz: 1, yaw, buttons: BUTTON.sprint | jump }
 }
 
-const PICKUPS = SAGRE_STATIONS[7].pickups
+const PICKUPS = SAGRE_STATIONS.pickups.pickups
 
 export const PICKUPS_DRIVERS: Drivers<"pickups"> = {
   frico: (sight) => ({ input: alongTheStreet(sight.you.body, SAGRE.pickups[PICKUPS.frico].at) }),

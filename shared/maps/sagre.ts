@@ -9,6 +9,7 @@
  * Axes: x east, y up, z south. Metres. The street is z -6..6, the ground is y 0.
  */
 import { defineMap, type Block, type Bounds, type Building, type DoorDef, type GateDef, type Mat, type PickupKind, type PickupSpot, type Spawn, type TurretSpot, type V3 } from "../map.ts"
+import type { StationId } from "../training/index.ts"
 import type { PrimaryId } from "../weapons.ts"
 
 const BOUNDS = { minX: -156, maxX: 192, minZ: -32, maxZ: 32 } as const
@@ -181,16 +182,16 @@ interface StationArea {
 const station = <const T extends StationArea>(s: T): T => s
 
 /**
- * The training's twelve stations, in order (index 0 is station 1), with the map data each
- * station's steps use. Indices refer to `SAGRE`'s arrays (`doors`, `pickups`, `turrets`, `gates`).
+ * The training's twelve stations, keyed by station (their order is `STATION_IDS`'s), with the map
+ * data each station's steps use. Indices refer to `SAGRE`'s arrays (`doors`, `pickups`, `turrets`, `gates`).
  */
-export const SAGRE_STATIONS = [
+export const SAGRE_STATIONS = {
   /** 1. Look and move. */
-  station({ area: area(0), start: startAt(-148), gate: 0, marker: [-138, 0, 0] as V3 }),
+  look: station({ area: area(0), start: startAt(-148), gate: 0, marker: [-138, 0, 0] as V3 }),
   /** 2. Obstacle course: jump the bar, crouch under the beam, sprint from `sprintFrom` past x = `sprintLine`. */
-  station({ area: area(1), start: startAt(-132), gate: 1, bar: BAR, beam: BEAM, sprintFrom: [-112, 0, 0] as V3, sprintLine: -103 }),
+  course: station({ area: area(1), start: startAt(-132), gate: 1, bar: BAR, beam: BEAM, sprintFrom: [-112, 0, 0] as V3, sprintLine: -103 }),
   /** 3. Always with you: targets for the Mandi, for aiming and for the mescul; the shed's door. */
-  station({
+  always: station({
     area: area(2),
     start: startAt(-98),
     gate: 2,
@@ -204,9 +205,9 @@ export const SAGRE_STATIONS = [
     doorFront: [(SHED.minX + SHED.maxX) / 2, 0, -STREET + 1] as V3
   }),
   /** 4. Changing weapon. */
-  station({ area: area(3), start: startAt(-62), gate: 3 }),
+  switch: station({ area: area(3), start: startAt(-62), gate: 3 }),
   /** 5. The stalls: where to stand (facing east) for each primary, and its target's route. */
-  station({
+  stalls: station({
     area: area(4),
     start: startAt(-48, 1),
     gate: 4,
@@ -219,9 +220,9 @@ export const SAGRE_STATIONS = [
     } satisfies Record<Exclude<PrimaryId, "miedi">, { readonly at: Spawn; readonly target: Route }>
   }),
   /** 6. The armoury. */
-  station({ area: area(5), start: startAt(8), gate: 5 }),
+  armoury: station({ area: area(5), start: startAt(8), gate: 5 }),
   /** 7. Bombs and mines: throw from `bombAt` at the bots standing at `bombTargets`; plant at `mineAt`, on the route a bot walks. */
-  station({
+  throw: station({
     area: area(6),
     start: startAt(22),
     gate: 6,
@@ -231,13 +232,13 @@ export const SAGRE_STATIONS = [
     mineRoute: [[42, 0, -4], [42, 0, 4]] as Route
   }),
   /** 8. Pickups: one of each kind (index in `SAGRE.pickups`). */
-  station({ area: area(7), start: startAt(52), gate: 7, pickups: STATION_PICKUPS }),
+  pickups: station({ area: area(7), start: startAt(52), gate: 7, pickups: STATION_PICKUPS }),
   /** 9. The turret (index in `SAGRE.turrets`, facing east down the street) and the Lanciafrico (index in `SAGRE.pickups`). */
-  station({ area: area(8), start: startAt(74), gate: 8, turret: 0, lanciafrico: LANCIAFRICO }),
+  turret: station({ area: area(8), start: startAt(74), gate: 8, turret: 0, lanciafrico: LANCIAFRICO }),
   /** 10. The medic: where the wounded teammate stands. */
-  station({ area: area(9), start: startAt(110), gate: 9, wounded: { at: [118, 0, 0], yaw: WEST } as Spawn }),
+  medic: station({ area: area(9), start: startAt(110), gate: 9, wounded: { at: [118, 0, 0], yaw: WEST } as Spawn }),
   /** 11. The modes: `SAGRE.flagBases`, the plaçute `SAGRE.hill`, the cjar's `SAGRE.track` and the storm's centre. */
-  station({ area: area(10), start: startAt(126), gate: 10, storm: HILL.at }),
+  modes: station({ area: area(10), start: startAt(126), gate: 10, storm: HILL.at }),
   /** 12. The skirmish: the sides are `SAGRE.spawns`. */
-  station({ area: area(11), start: startAt(156), gate: null })
-] as const
+  skirmish: station({ area: area(11), start: startAt(156), gate: null })
+} as const satisfies Record<StationId, StationArea>

@@ -11,7 +11,7 @@ import { SAGRE_STATIONS } from "../../maps/sagre.ts"
 import { outsideStorm } from "../../sim/rules.ts"
 import { once, station, type Seen, type StepRule, type StormClosing } from "../station.ts"
 
-const PLACE = SAGRE_STATIONS[10]
+const PLACE = SAGRE_STATIONS.modes
 
 /** Points the plaçute must score while the trainee holds it: one a second (`PlayObjectives`). */
 export const PLACUTE_POINTS = 5

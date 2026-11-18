@@ -9,7 +9,6 @@
  */
 import type { MapId } from "../map.ts"
 import type { ModeId } from "../folklore.ts"
-import { SAGRE_STATIONS } from "../maps/sagre.ts"
 import type { StationDef, StepRule } from "./station.ts"
 import { ALWAYS_STATION } from "./stations/always.ts"
 import { ARMOURY_STATION } from "./stations/armoury.ts"
@@ -27,7 +26,7 @@ import { TURRET_STATION } from "./stations/turret.ts"
 /** The training's mode and map: fixed by the training request, never chosen by a regular room. */
 export const TRAINING = { mode: "dutrine", map: "sagre" } as const satisfies { readonly mode: ModeId; readonly map: MapId }
 
-/** The stations, in the order a first run goes through them. Index `i` is station `i + 1` and `SAGRE_STATIONS[i]` on the map. */
+/** The stations, in the order a first run goes through them. Index `i` is station `i + 1`; its place on the map is `SAGRE_STATIONS[id]`. */
 export const STATION_IDS = ["look", "course", "always", "switch", "stalls", "armoury", "throw", "pickups", "turret", "medic", "modes", "skirmish"] as const
 export type StationId = (typeof STATION_IDS)[number]
 
@@ -50,10 +49,6 @@ export const STATIONS = {
 export type StepOf<S extends StationId> = keyof (typeof STATIONS)[S]["steps"] & string
 /** Any step of any station. */
 export type StepId = { [S in StationId]: StepOf<S> }[StationId]
-
-/** Every station has its place on the fair: one entry of `SAGRE_STATIONS` per station, in the same order. */
-const _placed: (typeof SAGRE_STATIONS)["length"] = STATION_IDS.length
-void _placed
 
 /** A station's steps, in order. */
 export const stepsOf = <S extends StationId>(station: S): readonly StepOf<S>[] => Object.keys(STATIONS[station].steps) as StepOf<S>[]

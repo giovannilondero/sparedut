@@ -19,7 +19,7 @@ import { reach, steps } from "./training-station.ts"
 
 beforeAll(() => initPhysics())
 
-const SKIRMISH = SAGRE_STATIONS[11].area
+const SKIRMISH = SAGRE_STATIONS.skirmish.area
 
 /** The training's state as the last snapshot shows it. */
 const at = (r: ReturnType<typeof reach>) => r.snap().training

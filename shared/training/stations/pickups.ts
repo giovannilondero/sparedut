@@ -9,7 +9,7 @@ import { once, station, type Seen } from "../station.ts"
 /** Health on arrival: low enough that a frico heals all it gives (+40). */
 export const PICKUPS_HP = 40
 
-const PLACE = SAGRE_STATIONS[7]
+const PLACE = SAGRE_STATIONS.pickups
 
 /** The trainee took a pickup of this kind this tick. */
 const took = (kind: PickupKind) => (seen: Seen) => seen.events.some((e) => e.t === "pick" && e.k === kind && e.s === seen.me.session)

@@ -6,7 +6,7 @@ import { WEAPONS } from "../../weapons.ts"
 import { SAGRE_STATIONS } from "../../maps/sagre.ts"
 import { once, station, type Seen } from "../station.ts"
 
-const PLACE = SAGRE_STATIONS[8]
+const PLACE = SAGRE_STATIONS.turret
 
 /** The trainee's turret did this, this tick. */
 const turret = (a: "on" | "off" | "hot") => (seen: Seen) => seen.events.some((e) => e.t === "turret" && e.i === PLACE.turret && e.a === a && e.s === seen.me.session)

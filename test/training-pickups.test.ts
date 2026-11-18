@@ -18,7 +18,7 @@ import { alongTheStreet } from "./trainee/pickups.ts"
 
 beforeAll(() => initPhysics())
 
-const PICKUPS = SAGRE_STATIONS[7].pickups
+const PICKUPS = SAGRE_STATIONS.pickups.pickups
 const at = (pickup: number) => SAGRE.pickups[pickup].at
 
 /**
@@ -143,9 +143,9 @@ describe("station 8: pickups", () => {
 })
 
 describe("station 9: the turret and the Lanciafrico", () => {
-  const TURRET = SAGRE.turrets[SAGRE_STATIONS[8].turret]
+  const TURRET = SAGRE.turrets[SAGRE_STATIONS.turret.turret]
   const SEAT = turretRestSeat(TURRET)
-  const LANCIAFRICO = at(SAGRE_STATIONS[8].lanciafrico)
+  const LANCIAFRICO = at(SAGRE_STATIONS.turret.lanciafrico)
   /** Presses a button on every other tick, so that each press is a new one. */
   const tap = (button: number) => (i: number) => ({ yaw: TURRET.yaw, buttons: i % 2 === 0 ? button : 0 })
 
@@ -234,8 +234,8 @@ describe("entering a station again", () => {
   })
 
   test("restarting station 9 puts the Lanciafrico back, and takes it out of the player's hands", () => {
-    const LANCIAFRICO = at(SAGRE_STATIONS[8].lanciafrico)
-    const index = SAGRE_STATIONS[8].lanciafrico
+    const LANCIAFRICO = at(SAGRE_STATIONS.turret.lanciafrico)
+    const index = SAGRE_STATIONS.turret.lanciafrico
     const { me, snap, walkTo, drive } = reach("turret", true)
     walkTo(LANCIAFRICO)
     expect(snap().you!.arsenal.launcher).toBe(true)

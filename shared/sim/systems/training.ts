@@ -7,8 +7,9 @@
  * It is not gated on the `Training` machine: it reads `Out`, and a reader that never ran would
  * keep a regular room's events waiting for it.
  */
-import { SAGRE, SAGRE_STATIONS } from "../../maps/sagre.ts"
-import { STATION_IDS, STATIONS, stepRule, stepsOf } from "../../training/index.ts"
+import { MAPS } from "../../maps/index.ts"
+import { SAGRE_STATIONS } from "../../maps/sagre.ts"
+import { STATION_IDS, STATIONS, stepRule, stepsOf, TRAINING } from "../../training/index.ts"
 import type { Seen, StepRule } from "../../training/station.ts"
 import { hasControl } from "../../training/controls.ts"
 import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS } from "../../weapons.ts"
@@ -211,7 +212,7 @@ export const PlayTraining = Game.System(
       if (place !== "walked") {
         // Placed away from a turret it was manning (restarting the turret's station): off it.
         if (resources.turrets.get().some((t) => t.gunner === session)) resources.turrets.set(resources.turrets.get().map((t) => (t.gunner === session ? { ...t, gunner: null } : t)))
-        const start = SAGRE_STATIONS[index].start
+        const start = SAGRE_STATIONS[id].start
         const motion = data.motion.get(trainee)
         data.motion.set(trainee, {
           body: { x: start.at[0], y: start.at[1], z: start.at[2], vx: 0, vy: 0, vz: 0, grounded: true, crouch: false },
@@ -243,7 +244,7 @@ export const PlayTraining = Game.System(
     // that asks for one broken never lacks it.
     const standDoors = (all: boolean) => {
       const hp = resources.doors.get()
-      if (hp.some((left) => all || left <= 0)) resources.doors.set(freshDoors(SAGRE).map((full, i) => (all || (hp[i] ?? 0) <= 0 ? full : hp[i])))
+      if (hp.some((left) => all || left <= 0)) resources.doors.set(freshDoors(MAPS[TRAINING.map]).map((full, i) => (all || (hp[i] ?? 0) <= 0 ? full : hp[i])))
     }
 
     if (state._tag === "Arriving") {

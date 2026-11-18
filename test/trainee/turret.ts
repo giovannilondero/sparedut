@@ -5,7 +5,7 @@ import { SAGRE, SAGRE_STATIONS } from "../../shared/maps/sagre.ts"
 import type { Driver, Drivers } from "./moves.ts"
 import { alongTheStreet } from "./pickups.ts"
 
-const PLACE = SAGRE_STATIONS[8]
+const PLACE = SAGRE_STATIONS.turret
 const TURRET = SAGRE.turrets[PLACE.turret]
 const SEAT = turretRestSeat(TURRET)
 const LANCIAFRICO = SAGRE.pickups[PLACE.lanciafrico].at

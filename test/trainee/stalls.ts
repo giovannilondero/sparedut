@@ -8,7 +8,7 @@ import { SCOPED_AFTER_TICKS, STALL_SHOOTS_AT, type StallId } from "../../shared/
 import type { WeaponId } from "../../shared/weapons.ts"
 import { walkTo, yawTo, type Act, type Driver, type Drivers, type Sight } from "./moves.ts"
 
-const PLACE = SAGRE_STATIONS[4]
+const PLACE = SAGRE_STATIONS.stalls
 /** Close enough to a stall's spot to shoot from it. */
 const STAND_WITHIN = 0.4
 /** How far from its post a moving target can be: the longest route's length. */

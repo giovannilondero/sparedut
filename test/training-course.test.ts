@@ -63,7 +63,7 @@ const steps = (events: GameEvent[]) => events.flatMap((e) => (e.t === "training"
 const view = (me: Client) => me.last("snap")!.training
 const position = (me: Client) => me.last("snap")!.you!.body
 /** Facing straight east, along the street. */
-const EAST = SAGRE_STATIONS[0].start.yaw
+const EAST = SAGRE_STATIONS.look.start.yaw
 const east = () => ({ mz: 1, yaw: EAST })
 /** Where each gate stands across the street (its west face). */
 const gateX = (i: number) => SAGRE.gates![i].min[0]
@@ -82,7 +82,7 @@ describe("the way forward", () => {
     const h = started()
     expect(completed("look")(auto(h, completed("look")))).toBe(true)
     drive(h, 60 * 3, east)
-    expect(position(h.me).x).toBeGreaterThan(SAGRE_STATIONS[1].area.minX)
+    expect(position(h.me).x).toBeGreaterThan(SAGRE_STATIONS.course.area.minX)
   })
 
   test("a client predicting its own movement from the snapshot is stopped by the gate where the host stops it", () => {
@@ -111,7 +111,7 @@ describe("the way forward", () => {
   })
 })
 
-const COURSE = SAGRE_STATIONS[1]
+const COURSE = SAGRE_STATIONS.course
 const { bar, beam, sprintFrom, sprintLine } = COURSE
 /** Walks east, or west with `back`; with `buttons` held. */
 const along = (buttons = 0, back = false) => () => ({ mz: 1, yaw: back ? -EAST : EAST, buttons })
@@ -173,7 +173,7 @@ describe("station 2: the obstacle course", () => {
     expect(events).toContainEqual({ t: "training", a: "station", station: "course" })
     // The way to station 3 is open.
     drive(h, 60 * 2, east)
-    expect(position(h.me).x).toBeGreaterThan(SAGRE_STATIONS[2].area.minX)
+    expect(position(h.me).x).toBeGreaterThan(SAGRE_STATIONS.always.area.minX)
   })
 
   test("the automatic player completes stations 1 and 2", () => {

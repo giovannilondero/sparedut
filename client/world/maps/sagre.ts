@@ -11,6 +11,7 @@
  */
 import * as THREE from "three"
 import { SAGRE, SAGRE_STATIONS, SQUARE } from "../../../shared/maps/sagre.ts"
+import { STATION_IDS } from "../../../shared/training/index.ts"
 import { fbm, makeHeightfield, smooth } from "../backdrop.ts"
 import { archPanel, archRing, Batch, boxAt, faceMatrix, tri, type V } from "../geo.ts"
 import type { Scenery, SceneryKit } from "../scenery.ts"
@@ -75,6 +76,8 @@ const BUNTING = [["#7fd16b", "#f4ead2", "#e8c84a"], ["#d0435a", "#f4ead2", "#e8b
 function dress(kit: SceneryKit) {
   const { B, C, root, atlas, cylBetween, sphere, face, roof, door } = kit
   const S = SAGRE_STATIONS
+  /** The stations' places in the training's order. */
+  const ALL = STATION_IDS.map((id) => S[id])
   const ids = Object.keys(SIGNS) as SignId[]
   const sheet = kit.paint(ids.map((id) => SIGNS[id]))
   const region = Object.fromEntries(ids.map((id, i) => [id, sheet.regions[i]])) as Record<SignId, Region>
@@ -136,7 +139,7 @@ function dress(kit: SceneryKit) {
 
   // --- over the street: bunting and the stations' boards -----------------------------------
 
-  const entries = S.map((s) => s.area.minX)
+  const entries = ALL.map((s) => s.area.minX)
   for (let x = -146, k = 0; x < SQUARE.minX - 2; x += 7, k++) {
     if (entries.some((e) => Math.abs(e + 1.6 - x) < 2)) continue
     bunting([x, 6.7, -STREET], [x + 2.5, 6.7, STREET], 0.9, BUNTING[k % BUNTING.length], k % 2 === 0)
@@ -151,7 +154,7 @@ function dress(kit: SceneryKit) {
   }
 
   // A board over the start of every station: its number (and, at the first, the fair's name).
-  S.forEach((s, i) => {
+  ALL.forEach((s, i) => {
     const n = `n${i + 1}` as SignId
     const square = s.area.minX >= SQUARE.minX
     const x = s.area.minX + (i === 0 ? 8 : square ? 3.5 : 1.6)
@@ -162,7 +165,7 @@ function dress(kit: SceneryKit) {
 
   // --- 1. look and move: the marker -----------------------------------------------------------
   {
-    const [x, , z] = S[0].marker
+    const [x, , z] = S.look.marker
     ;["#c8394e", "#f4ead2", "#c8394e", "#f4ead2"].forEach((c, i) => disc(x, z, 1.2 - i * 0.3, c, PAINT + i * 0.002))
     // the first stall's own sign, from the town's atlas
     B.add("atlas", atlasQuad(atlas.signs.frico, 0.5).applyMatrix4(faceMatrix(SOUTH, [-139, 3.9, STREET - OFF])))
@@ -170,7 +173,7 @@ function dress(kit: SceneryKit) {
 
   // --- 2. the obstacle course: the bar, the beam, the sprint ----------------------------------
   {
-    const { bar, beam, sprintFrom, sprintLine } = S[1]
+    const { bar, beam, sprintFrom, sprintLine } = S.course
     // red and white bands on both faces of the bar
     const bands = 12
     for (let i = 0; i < bands; i++) {
@@ -224,7 +227,7 @@ function dress(kit: SceneryKit) {
     }
     sign("mandi", SOUTH, [-88, 3.7, STREET], 0.55)
     // the shed: its front in planks, its name over the door, a roof over it all
-    const { doorFront } = S[2]
+    const { doorFront } = S.always
     const x0 = doorFront[0] - 2, x1 = doorFront[0] + 2
     for (let x = x0 + 0.2; x < x1; x += 0.5) B.add("legno", boxAt([x - 0.04, 2.6, -STREET], [x + 0.04, 7, -STREET + 0.03]), C("#5a3a22"))
     sign("mescul", NORTH, [doorFront[0], 3.3, -STREET + 0.03], 0.42)
@@ -254,7 +257,7 @@ function dress(kit: SceneryKit) {
       B.add("stoffa", kit.orient(g, n), C(st.awning[i % 2]))
     }
   }
-  for (const [id, { at }] of Object.entries(S[4].stalls)) {
+  for (const [id, { at }] of Object.entries(S.stalls.stalls)) {
     const [x, , z] = at.at
     strip(x + 0.5, z - 0.7, x + 0.62, z + 0.7, "#f4f1ea")
     if (id === "cjampanili") target(SOUTH, [3, 2.2, STREET], 0.7)
@@ -272,7 +275,7 @@ function dress(kit: SceneryKit) {
 
   // --- 7. bombs and mines: the throwing line, the targets, the mine's spot ----------------------
   {
-    const { bombAt, bombTargets, mineAt, mineRoute } = S[6]
+    const { bombAt, bombTargets, mineAt, mineRoute } = S.throw
     strip(bombAt[0] - 0.08, -STREET + 0.2, bombAt[0] + 0.08, STREET - 0.2, "#f4f1ea")
     for (const [x, , z] of bombTargets) {
       ring(x, z, 0.75, 0.9, "#e8b04a")
@@ -289,7 +292,7 @@ function dress(kit: SceneryKit) {
   }
 
   // --- 8. pickups: a plate and a name for each -------------------------------------------------
-  for (const [kind, i] of Object.entries(S[7].pickups) as [keyof typeof PICKUP_COLOR, number][]) {
+  for (const [kind, i] of Object.entries(S.pickups.pickups) as [keyof typeof PICKUP_COLOR, number][]) {
     const [x, , z] = SAGRE.pickups[i].at
     ring(x, z, 0.85, 1.0, PICKUP_COLOR[kind])
     disc(x, z, 0.85, "#e9e0c8")
@@ -298,13 +301,13 @@ function dress(kit: SceneryKit) {
 
   // --- 9. the turret's range and the Lanciafrico -----------------------------------------------
   {
-    const spot = SAGRE.turrets[S[8].turret]
+    const spot = SAGRE.turrets[S.turret.turret]
     const [tx, , tz] = spot.at
     ring(tx, tz, 1.3, 1.5, "#f4f1ea")
-    for (let x = tx + 5; x < S[8].area.maxX - 2; x += 5) strip(x - 0.06, -STREET + 0.5, x + 0.06, -STREET + 2, "#f4f1ea")
-    for (let x = tx + 5; x < S[8].area.maxX - 2; x += 5) strip(x - 0.06, STREET - 2, x + 0.06, STREET - 0.5, "#f4f1ea")
+    for (let x = tx + 5; x < S.turret.area.maxX - 2; x += 5) strip(x - 0.06, -STREET + 0.5, x + 0.06, -STREET + 2, "#f4f1ea")
+    for (let x = tx + 5; x < S.turret.area.maxX - 2; x += 5) strip(x - 0.06, STREET - 2, x + 0.06, STREET - 0.5, "#f4f1ea")
     sign("mitraie", NORTH, [tx, 3.7, -STREET], 0.5)
-    const [lx, , lz] = SAGRE.pickups[S[8].lanciafrico].at
+    const [lx, , lz] = SAGRE.pickups[S.turret.lanciafrico].at
     ring(lx, lz, 0.95, 1.15, "#e8c84a")
     disc(lx, lz, 0.95, "#8a1d1d")
     sign("lanciafrico", SOUTH, [lx, 3.3, STREET], 0.55)
@@ -312,7 +315,7 @@ function dress(kit: SceneryKit) {
 
   // --- 10. the medic: a blanket for the wounded, green crosses ---------------------------------
   {
-    const [wx, , wz] = S[9].wounded.at
+    const [wx, , wz] = S.medic.wounded.at
     strip(wx - 1.1, wz - 0.6, wx + 1.1, wz + 0.6, "#5a6a8a")
     strip(wx - 1.0, wz - 0.5, wx + 1.0, wz + 0.5, "#7a8aaa")
     for (const [n, z] of [[NORTH, -STREET], [SOUTH, STREET]] as const) {
