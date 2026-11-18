@@ -537,7 +537,6 @@ export class Menu {
       b.textContent = LOOKS[id]
       b.dataset.look = id
       b.setAttribute("aria-pressed", String(id === this.look))
-      b.classList.toggle("selected", id === this.look)
       b.addEventListener("click", () => {
         if (id === this.look) return
         this.audio.play("ui_click")
