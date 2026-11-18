@@ -59,6 +59,7 @@ const gunner = gunnerSpot
       alive: true,
       aim: 0,
       baseFov: 80,
+      aspect: innerWidth / innerHeight,
       look: { yaw: gunnerSpot.yaw + (gunnerAim[0] ?? 0), pitch: gunnerAim[1] ?? 0 },
       sinceShot: q.get("shot") === null ? Infinity : Number(q.get("shot")),
       mag: 0,

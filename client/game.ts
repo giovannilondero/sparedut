@@ -1178,6 +1178,7 @@ export class Game {
       alive: !!you?.alive,
       aim: this.aimBlend,
       baseFov: settings.fov,
+      aspect: camera.aspect,
       mag: you ? (this.localMag ?? you.arsenal.ammo[this.wanted].mag) : 0,
       reserve: you?.arsenal.ammo[this.wanted].reserve ?? 0,
       reload: own && reloadProgress !== null ? { progress: reloadProgress, mag: own.mag, reserve: own.reserve } : null
