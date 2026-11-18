@@ -20,6 +20,7 @@ import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
 import { BrowserHostConnection } from "./offline.ts"
 import { registerServiceWorker } from "./offline-cache/register.ts"
+import { SelfUpdate } from "./offline-cache/self-update.ts"
 import { keepStorage, runsInstalled } from "./installed.ts"
 import { Link } from "./connection.ts"
 import { PerfMonitor } from "./perf.ts"
@@ -129,6 +130,22 @@ const browserHostConnection = new BrowserHostConnection()
 /** What the game talks to: the server, or the browser's host while in an Offline room. */
 const link = new Link([net, browserHostConnection])
 const offline = () => link.uses(browserHostConnection)
+// After one visit online the game opens with no network (`client/offline-cache/`): production
+// build only, after the page has loaded so the worker's downloads don't compete with the boot.
+// `navigator.serviceWorker` is missing over plain http on a LAN address: the game plays as before.
+const serviceWorkers = navigator.serviceWorker as ServiceWorkerContainer | undefined
+const registration = new Promise<ServiceWorkerRegistration | null>((resolve) =>
+  addEventListener("load", () => resolve(registerServiceWorker({ production: import.meta.env.PROD, container: serviceWorkers })), { once: true })
+)
+/** A cached game too old for the server updates itself; a match or an Offline room is never cut. */
+const selfUpdate = new SelfUpdate({
+  registration,
+  container: serviceWorkers,
+  session: sessionStorage,
+  reload: () => location.reload(),
+  tell: (notice) => toast(t().tooOld[notice]),
+  playing: () => Boolean(game?.active) || offline()
+})
 browserHostConnection.onError = (error) => {
   console.error("The Offline room's host failed:", error)
   toast(t().net.offlineFailed)
@@ -244,6 +261,7 @@ function backToMenu() {
   game?.stop()
   menu.show(true)
   audio.menuMusic(true)
+  selfUpdate.atMenu()
 }
 
 link.on((msg: ServerMessage) => {
@@ -277,6 +295,8 @@ link.on((msg: ServerMessage) => {
     case "error":
       // A password room: ask for it, saying why when the last one did not work.
       if (msg.code === "passwordRequired" || msg.code === "wrongPassword" || msg.code === "tooManyAttempts") menu.hostRefused(joining, msg.code)
+      // Too old for the server: fetch the new version and reload into it, once (or say why not).
+      else if (msg.code === "version") selfUpdate.refused()
       else toast(t().errors[msg.code])
       return
   }
@@ -367,15 +387,6 @@ requestAnimationFrame(() =>
     loader.addEventListener("transitionend", () => loader.remove(), { once: true })
     setTimeout(() => loader.remove(), 1000)
   })
-)
-
-// After one visit online the game opens with no network (`client/offline-cache/`): production
-// build only, after the page has loaded so the worker's downloads don't compete with the boot.
-// `navigator.serviceWorker` is missing over plain http on a LAN address: the game plays as before.
-addEventListener(
-  "load",
-  () => void registerServiceWorker({ production: import.meta.env.PROD, container: navigator.serviceWorker as ServiceWorkerContainer | undefined }),
-  { once: true }
 )
 
 // Installed, the game asks the browser to keep its storage (cache, settings, training progress):
