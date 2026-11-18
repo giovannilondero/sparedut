@@ -9,7 +9,7 @@ import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { WARMUP_TICKS } from "../shared/sim/rules.ts"
 import type { Device } from "./device.ts"
 import { t } from "./i18n.ts"
-import { playPrompt, turretPrompt } from "./prompts.ts"
+import { menuControl, playPrompt, turretPrompt } from "./prompts.ts"
 import { buttonBit, TOUCH_BUTTONS, type Insets, type PickerEntry, type TouchLayout, type TouchView } from "./touch.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -151,8 +151,8 @@ export class Hud {
     }
   }
 
-  /** `outside`: I'm alive and outside the Tampieste circle. */
-  top(snap: Snapshot, mode: ModeId, names: Map<string, string>, outside = false) {
+  /** `outside`: I'm alive and outside the Tampieste circle. `device`: the active one, whose controls the banner names. */
+  top(snap: Snapshot, mode: ModeId, names: Map<string, string>, device: Device, outside = false) {
     const s = t()
     const alone = mode === "tampieste"
     const alive = snap.players.filter((p) => p.f & FLAG_BIT.alive).length
@@ -188,7 +188,7 @@ export class Hud {
     this.html("objective", obj)
     this.html(
       "banner",
-      phase.tag === "Warmup" ? s.hud.warmup(fmtClock(WARMUP_TICKS - snap.tick)) : outside ? `<b class="storm">${s.hud.stormOutside}</b>` : ""
+      phase.tag === "Warmup" ? s.hud.warmup(fmtClock(WARMUP_TICKS - snap.tick), menuControl(device)) : outside ? `<b class="storm">${s.hud.stormOutside}</b>` : ""
     )
   }
 
@@ -259,9 +259,15 @@ export class Hud {
     if (on) this.html("clickplay", playPrompt(t(), device))
   }
 
-  /** The HUD's layout: around the touch controls while touch is the active device, the desktop one otherwise. */
+  /**
+   * The HUD's layout: around the touch controls while touch is the active device, the desktop one
+   * otherwise. The page's `data-device` says the same to the menus' CSS (key hints, touch gestures).
+   */
   layFor(device: Device) {
     this.toggle("hud", "touch", device === "touch")
+    if (this.written.get("page:device") === device) return
+    this.written.set("page:device", device)
+    document.documentElement.dataset.device = device
   }
 
   /** The screen's safe-area insets (notch, home indicator), as CSS resolves them: read on resize, never per frame. */

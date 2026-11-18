@@ -342,8 +342,8 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 .overlay > ui-dialog-title, .overlay .overlay-actions { flex: none; }
 .overlay-body { flex: 1 1 auto; min-block-size: 0; overflow-y: auto; overscroll-behavior: contain; }
 .overlay .overlay-actions > button { min-block-size: var(--tap); }
-/* A key hint on a button (the back button's Esc) means nothing on touch. */
-#hud.touch .overlay kbd { display: none; }
+/* A key hint (the back buttons' Esc) and the key legend mean nothing on touch, in the menu as in a match. */
+html[data-device="touch"] :is(#menu, #hud .overlay) kbd, html[data-device="touch"] .keys { display: none; }
 /* On touch the actions take two columns, resume across both, rather than a ragged row. */
 @media (pointer: coarse) {
   .overlay .overlay-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); }

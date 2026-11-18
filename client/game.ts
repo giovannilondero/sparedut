@@ -1445,7 +1445,7 @@ export class Game {
       fx.projectiles(s.proj)
       const outside = !!s.storm && !!you?.alive && !!b && outsideStorm(s.storm, b)
       this.hud.spectating = mode === "tampieste" && s.phase.tag === "Live"
-      this.hud.top(s, mode ?? "bataie", this.names, outside)
+      this.hud.top(s, mode ?? "bataie", this.names, this.controls.device, outside)
       this.hud.death(you, this.names, Math.floor(this.seed / 7))
       if (s.phase.tag === "Over" && Math.floor(t) !== Math.floor(t - dt)) this.renderEnd()
     }
@@ -1467,6 +1467,11 @@ export class Game {
     this.hud.clickToPlay(!this.controls.active && free && !this.boardOpen, device)
     this.hud.layFor(device)
     this.hud.touchShown(this.controls.touchActive && free)
+  }
+
+  /** Out of a match, every frame: the page still follows the device the player holds (the menu's key hints). */
+  menuFrame() {
+    this.hud.layFor(this.controls.device)
   }
 
   render() {

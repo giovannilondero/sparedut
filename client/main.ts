@@ -337,6 +337,7 @@ const loop = (now: number) => {
     game.frame(dt, time)
     game.render()
   } else {
+    game?.menuFrame()
     world.menuCamera(time, camera)
     camera.updateMatrixWorld()
     world.update(dt, time, { pickups: [], flags: null, hill: null, cart: null, storm: null, turrets: [], doors: [], camera })
