@@ -116,7 +116,7 @@ const walkCamera = (dt: number) => {
   return true
 }
 /** The cjar going back and forth along the track, the storm closing in. */
-const extras = (t: number): Pick<WorldFrame, "cart" | "storm" | "turrets" | "doors"> => {
+const extras = (t: number): Pick<WorldFrame, "cart" | "storm" | "turrets" | "doors" | "gates"> => {
   const len = trackLength(map.track)
   const p = trackPoint(map.track, ((Math.sin(t * 0.05) + 1) / 2) * len)
   // the turrets turn and heat up, the doors break and come back
@@ -128,6 +128,8 @@ const extras = (t: number): Pick<WorldFrame, "cart" | "storm" | "turrets" | "doo
       return { yaw: s.yaw + Math.sin(t * 0.7 + i) * 0.8, pitch: Math.sin(t * 0.5) * 0.15, heat, jammed: heat > 0.95, manned: true, mine: false, recoil: 0 }
     }),
     doors: map.doors.map(() => Math.max(0, Math.cos(t * 0.2))),
+    // the gates close and open with the doors
+    gates: (map.gates ?? []).map(() => Math.cos(t * 0.2) > 0),
     cart: mode === "cjar" ? { at: p.at, yaw: p.yaw, contested: Math.floor(t / 5) % 3 === 2, pushers: 1 } : null,
     storm: mode === "tampieste" ? { x: map.hill.at[0], z: map.hill.at[2], radius: 10 + ((Math.cos(t * 0.1) + 1) / 2) * 80 } : null
   }

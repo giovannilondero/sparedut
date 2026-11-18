@@ -14,6 +14,7 @@ import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOt
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
 import { outsideStorm, owned, RAISE_TICKS, weaponInSlot } from "../shared/sim/rules.ts"
 import { TRAINING } from "../shared/training/index.ts"
+import { closedGates, viewedStation } from "../shared/training/gates.ts"
 import { WEAPONS, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
@@ -113,6 +114,10 @@ export class Game {
   private predictor: Predictor
   private world: WorldScene
   private physics: PhysicsWorld
+  /** The map's gates closed (true) or open, as the last snapshot's training says: what prediction collides with and the world draws. */
+  private gates: readonly boolean[] = []
+  /** The station the gates were last closed for (`viewedStation`). */
+  private gatesAt: number | null = null
   private room: RoomInfo | null = null
   private me = ""
   private snap: Snapshot | null = null
@@ -252,6 +257,8 @@ export class Game {
     const stage = this.d.loadMap(room.map)
     this.world = stage.world
     this.physics = stage.physics
+    // A map's physics may be reused from an earlier room: its gates are set again from the first snapshot.
+    this.gates = []
     this.predictor = new Predictor(stage.physics)
     this.wanted = this.d.settings.primary
     this.wantedSeq = 0
@@ -406,6 +413,14 @@ export class Game {
     this.snap = s
     // Broken-down doors no longer stop predicted movement or shots.
     this.physics.setDoors(s.doors.map((hp) => hp > 0))
+    // The training's closed ways stop predicted movement as they stop it on the host.
+    const gates = this.physics.map.gates?.length ?? 0
+    const at = viewedStation(s.training)
+    if (gates !== this.gates.length || at !== this.gatesAt) {
+      this.gates = closedGates(gates, at)
+      this.gatesAt = at
+      this.physics.setGates(this.gates)
+    }
     const you = s.you
     if (you) {
       const mine = players.get(this.me)
@@ -1471,6 +1486,7 @@ export class Game {
           }
         }),
         doors: s.doors.map((hp, i) => hp / (this.physics.map.doors[i]?.hp ?? 1)),
+        gates: this.gates,
         camera
       })
       // The casot's disco: audible only nearby, and muffled while the door is closed.

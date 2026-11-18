@@ -1,6 +1,7 @@
 /** One simulation tick, in the order things happen. */
 import { ApplyDamage } from "./systems/damage.ts"
 import { BreakDoors } from "./systems/doors.ts"
+import { CloseGates } from "./systems/gates.ts"
 import { ApplyInputs } from "./systems/input.ts"
 import { MedicAura } from "./systems/medic.ts"
 import { HandleJoin, HandleLeave, HandleTeamChanges } from "./systems/lobby.ts"
@@ -26,6 +27,7 @@ export const simulate = Game.Schedule(
   MatchFlow,
   Respawn,
   MountTurrets,
+  CloseGates,
   MovePlayers,
   UseWeapons,
   FlyProjectiles,
