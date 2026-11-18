@@ -7,7 +7,7 @@ import { MAP_IDS } from "../../../shared/maps/index.ts"
 import { REACHES } from "../../../shared/protocol.ts"
 import { t } from "../../i18n.ts"
 import {
-  accessBlock, botsSelect, codeJoin, ffCheck, langSwitch, levelCards, lookSwitch, minutesSelect, missing, nameField, oneTapButton, roomList,
+  accessBlock, botsSelect, codeJoin, ffCheck, langSwitch, levelCards, lookSwitch, minutesSelect, missing, nameField, oneTapButton, passwordPrompt, roomList,
   roomsOf, run, trainingEntry, type State
 } from "./kit.ts"
 
@@ -53,7 +53,7 @@ function home(s: State) {
       <div class="c-listhead"><h2>${st.roomsTitle} <i class="count">${count}</i></h2>${codeJoin("c-code inline")}</div>
       <div class="c-list">${roomList(s, "open=1")}</div>
     </main>
-  </div>${s.open ? panel(s) : ""}`
+  </div>${s.open ? panel(s) : ""}${passwordPrompt(s, "c-pw")}`
 }
 
 run(

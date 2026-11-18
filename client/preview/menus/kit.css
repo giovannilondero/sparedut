@@ -91,3 +91,18 @@ button.big small { line-height: 1.3; }
 .check { min-block-size: 44px; }
 .check input { min-block-size: 0; inline-size: 20px; block-size: 20px; accent-color: var(--gold); }
 .count { font-family: var(--sans); font-style: normal; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--gold); color: #1d1408; vertical-align: middle; }
+
+/* The password prompt of a room from the list. */
+.pw-scrim { position: fixed; inset: 0; z-index: 20; background: rgba(8, 6, 4, 0.6); }
+.pw-dialog { position: fixed; z-index: 21; inset: 0; margin: auto; inline-size: min(440px, calc(100% - 28px)); block-size: fit-content; max-block-size: calc(100% - 28px); overflow: auto;
+  display: grid; gap: 10px; padding: 20px; background: #1d1813; border: 1px solid var(--gold); border-radius: 16px; box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6); }
+.pw-dialog h2 { font-size: 22px; }
+.pw-for { margin: 0; font-size: 14px; color: var(--muted); }
+.pw-room .room { cursor: default; background: rgba(255, 255, 255, 0.03); }
+.pw-dialog .pw-input { font-size: 20px; text-align: center; letter-spacing: 0.08em; }
+.pw-buttons { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 8px; }
+@media (orientation: landscape) and (max-height: 560px) {
+  .pw-dialog { inline-size: min(560px, calc(100% - 28px)); grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 14px; padding: 14px 18px; }
+  .pw-dialog > h2, .pw-dialog > .pw-for, .pw-dialog > .form-msg, .pw-dialog > .pw-buttons { grid-column: 1 / -1; }
+  .pw-dialog > .pw-room { align-self: end; }
+}

@@ -29,9 +29,12 @@ export interface State {
   readonly access: Access
   readonly level: BotLevel
   readonly look: LookId
+  /** The room whose password prompt is open ("" for none); `wrong` shows the last password refused. */
+  readonly pw: string
+  readonly wrong: boolean
 }
 
-const DEFAULTS: State = { lang: "fur", screen: "home", step: 1, rooms: "some", open: false, mode: "bataie", map: "glemone", reach: "lan", access: "open", level: "pari", look: "cumo" }
+const DEFAULTS: State = { lang: "fur", screen: "home", step: 1, rooms: "some", open: false, mode: "bataie", map: "glemone", reach: "lan", access: "open", level: "pari", look: "cumo", pw: "", wrong: false }
 
 const oneOf = <T extends string>(ids: readonly T[], v: string | null, fallback: T): T => ids.find((id) => id === v) ?? fallback
 
@@ -48,7 +51,9 @@ function read(): State {
     reach: oneOf(REACHES, q.get("reach"), DEFAULTS.reach),
     access: oneOf(ACCESSES, q.get("access"), DEFAULTS.access),
     level: oneOf(BOT_LEVEL_IDS, q.get("level"), DEFAULTS.level),
-    look: oneOf(LOOK_IDS, q.get("look"), DEFAULTS.look)
+    look: oneOf(LOOK_IDS, q.get("look"), DEFAULTS.look),
+    pw: q.get("pw") ?? "",
+    wrong: q.get("wrong") === "1"
   }
 }
 
@@ -68,6 +73,7 @@ export function go(patch: Partial<State> | string) {
   const next = typeof patch === "string" ? Object.fromEntries(new URLSearchParams(patch)) : patch
   const merged = { ...state, ...next }
   if (typeof next.open === "string") merged.open = next.open === "1"
+  if (typeof next.wrong === "string") merged.wrong = next.wrong === "1"
   if (typeof next.step === "string") merged.step = Number(next.step)
   write(merged as State)
 }
@@ -100,7 +106,7 @@ export function run(root: HTMLElement, draw: (s: State) => string, back: (s: Sta
   })
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return
-    const to = back(state)
+    const to = state.pw ? { pw: "", wrong: false } : back(state)
     if (to) go(to)
   })
   render()
@@ -173,7 +179,8 @@ export function roomRow(r: RoomSummary) {
   const full = r.players >= r.max
   const locked = r.reach !== "offline" && r.access === "password"
   const lock = locked ? `<i class="lock" role="img" aria-label="${s.menu.passwordRoom}" title="${s.menu.passwordRoom}">🔒</i>` : ""
-  return `<li><button class="room${full ? " full" : ""}"${full ? " disabled" : ""}>
+  const set = locked && !full ? ` data-set="pw=${r.code}&wrong=0"` : ""
+  return `<li><button class="room${full ? " full" : ""}"${full ? " disabled" : ""}${set}>
     <span class="room-tags"><i class="chip ${r.reach}">${s.menu.reach[r.reach]}</i>${lock}</span>
     <span class="room-what"><b>${esc(r.host)}</b><small>${s.modes[r.mode].name} · ${s.maps[r.map].name}</small></span>
     <span class="room-seats"><b>${r.players}/${r.max}</b><small>${full ? s.menu.full : r.code}</small></span>
@@ -252,3 +259,23 @@ export function missing(s: State) {
 }
 
 export const brand = (cls = "") => `<header class="brand-x ${cls}"><div class="kicker">${t().static.kicker}</div><h1>Sparedût</h1><div class="sub">${t().static.sub}</div></header>`
+
+/**
+ * The prompt a password room shows when it is picked from the list. `cls` lets each prototype
+ * draw it its own way; `wrong` shows the server's refusal and keeps the room in place.
+ */
+export function passwordPrompt(s: State, cls = "") {
+  const r = FAKE_ROOMS.find((room) => room.code === s.pw)
+  if (!r) return ""
+  const st = t().static
+  const msg = s.wrong ? t().errors.wrongPassword : ""
+  return `<div class="pw-scrim" data-set="pw=&wrong=0"></div>
+  <div class="pw-dialog ${cls}" role="dialog" aria-modal="true" aria-labelledby="pw-title">
+    <h2 id="pw-title">🔒 ${st.passwordTitle}</h2>
+    <p class="pw-for">${t().menu.passwordFor(r.code)}</p>
+    <ul class="rooms pw-room">${roomRow(r).replace(/ data-set="[^"]*"/, " tabindex=\"-1\"")}</ul>
+    <label class="field"><span>${st.passwordLabel}</span><input class="pw-input" data-typed="password" maxlength="32" value="${esc(typed.password)}" autocomplete="off" spellcheck="false" autofocus /></label>
+    <p class="form-msg" role="alert">${msg}</p>
+    <div class="pw-buttons"><button data-set="pw=&wrong=0">${st.back}</button><button class="primary" data-set="wrong=1">${st.joinGo}</button></div>
+  </div>`
+}

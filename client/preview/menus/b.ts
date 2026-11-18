@@ -7,7 +7,7 @@ import { MAP_IDS } from "../../../shared/maps/index.ts"
 import { t } from "../../i18n.ts"
 import {
   accessBlock, botsSelect, codeJoin, ffCheck, langSwitch, levelCards, lookSwitch, mapCard, minutesSelect, missing, modeCard, nameField,
-  oneTapButton, optionsLine, reachCards, roomList, run, tools, trainingEntry, type State
+  oneTapButton, passwordPrompt, optionsLine, reachCards, roomList, run, tools, trainingEntry, type State
 } from "./kit.ts"
 
 function home(s: State) {
@@ -64,6 +64,6 @@ function create(s: State) {
 
 run(
   document.getElementById("app")!,
-  (s) => (s.screen === "create" ? create(s) : home(s)),
+  (s) => (s.screen === "create" ? create(s) : home(s) + passwordPrompt(s)),
   (s) => (s.screen === "create" && s.open ? { open: false } : s.screen !== "home" ? { screen: "home" } : null)
 )
