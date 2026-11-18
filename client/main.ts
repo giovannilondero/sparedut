@@ -13,7 +13,7 @@ import { createFx } from "./fx.ts"
 import { isLocalHost } from "../shared/hosts.ts"
 import { Game } from "./game.ts"
 import { inviteLink } from "./invite.ts"
-import { decideOpening, readOpening } from "./opening.ts"
+import { decideOpening, type Opening, readOpening } from "./opening.ts"
 import { t } from "./i18n.ts"
 import { createLook, lookFromUrl } from "./looks.ts"
 import { loadDetailed } from "./models/detailed.ts"
@@ -167,7 +167,7 @@ const selfUpdate = new SelfUpdate({
   session: sessionStorage,
   reload: () => location.reload(),
   tell: (notice) => toast(t().tooOld[notice]),
-  playing: () => Boolean(game?.active) || offline()
+  playing: () => playing()
 })
 browserHostConnection.onError = (error) => {
   console.error("The Offline room's host failed:", error)
@@ -361,19 +361,28 @@ const reconnect = (ms: number) => {
   retry = window.setTimeout(connect, ms)
 }
 
-/** Acts on how the page was opened (`client/opening.ts`): never over a match in progress (an Offline room counts). */
-function answerOpening() {
-  const action = decideOpening(readOpening(location.search, location.hash), {
-    playing: Boolean(game?.active) || offline(),
-    named: Boolean(settings.name),
-  })
+/** A match is in progress (an Offline room or the training counts). */
+function playing() {
+  return Boolean(game?.active) || offline()
+}
+
+/**
+ * Acts on how the page was opened (`client/opening.ts`): never over a match in progress. An
+ * invite joins through the game server, so only once it is connected; the shortcut starts an
+ * Offline room, so it does not wait for it.
+ */
+function answerOpening(opening: Opening) {
+  const action = decideOpening(opening, { playing: playing(), named: Boolean(settings.name) })
   switch (action.kind) {
     case "join":
       menu.status(t().net.invite(action.code))
       sendJoin(action.code, action.password ?? undefined)
       return
+    case "start":
+      menu.shortcut()
+      return
     case "askName":
-      toast(t().net.inviteNeedName(action.opening.invite.code))
+      toast(action.opening.kind === "invite" ? t().net.inviteNeedName(action.opening.invite.code) : t().net.shortcutNeedName)
       return
     case "nothing":
       return
@@ -390,7 +399,8 @@ async function connect() {
     connecting = false
     menu.status(t().net.connected(settings.name || t().net.stranger))
     net.send({ t: "list" })
-    answerOpening()
+    const opening = readOpening(location.search, location.hash)
+    if (opening.kind === "invite") answerOpening(opening)
   } catch {
     connecting = false
     menu.status(t().net.retry)
@@ -407,6 +417,30 @@ net.onClose = () => {
   menu.status(t().net.lostRetry)
   reconnect(2000)
 }
+// Opened from the installed game's shortcut: answered at once, then the marker leaves the address
+// so that nothing starts again on its own.
+const opened = readOpening(location.search, location.hash)
+if (opened.kind === "shortcut") {
+  forgetRoomAddress()
+  answerOpening(opened)
+}
+// The installed game opened again while open (its icon, its shortcut, a captured invite) focuses
+// this window (`launch_handler` in the manifest) and the launch arrives here, the first launch
+// too: answering it twice is harmless, the first start makes a match in progress.
+;(window as { launchQueue?: LaunchQueue }).launchQueue?.setConsumer(({ targetURL }) => {
+  if (!targetURL) return
+  const target = new URL(targetURL)
+  const opening = readOpening(target.search, target.hash)
+  if (opening.kind === "shortcut") answerOpening(opening)
+  else if (opening.kind === "invite" && !playing()) {
+    // As if the page had been opened on it: joined once the game server is connected.
+    history.replaceState(null, "", `${location.pathname}${target.search}${target.hash}`)
+    if (net.open) {
+      net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
+      answerOpening(opening)
+    }
+  }
+})
 void connect()
 setInterval(() => net.open && !game?.active && net.send({ t: "list" }), 3000)
 

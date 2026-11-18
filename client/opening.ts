@@ -5,13 +5,17 @@
 
 import { type Invite, readInvite } from "./invite.ts"
 
-/** How the page was opened: on an invite, or on nothing in particular. */
-export type Opening = { readonly kind: "invite"; readonly invite: Invite } | { readonly kind: "none" }
+/** How the page was opened: on an invite, from the installed game's shortcut, or on nothing in particular. */
+export type Opening = { readonly kind: "invite"; readonly invite: Invite } | { readonly kind: "shortcut" } | { readonly kind: "none" }
 
-/** How an address (`location.search`, `location.hash`) opened the game. */
+/**
+ * How an address (`location.search`, `location.hash`) opened the game. The shortcut, "Zuie cuintri
+ * i bot" in `client/public/manifest.webmanifest`, opens it with `?shortcut=bots`.
+ */
 export function readOpening(search: string, hash: string): Opening {
   const invite = readInvite(search, hash)
-  return invite ? { kind: "invite", invite } : { kind: "none" }
+  if (invite) return { kind: "invite", invite }
+  return new URLSearchParams(search).get("shortcut") === "bots" ? { kind: "shortcut" } : { kind: "none" }
 }
 
 /** The situation the opening is answered in. */
@@ -25,6 +29,8 @@ export interface OpeningSituation {
 /** What the game does about how it was opened. */
 export type OpeningAction =
   | { readonly kind: "join"; readonly code: string; readonly password: string | null }
+  /** The home screen's button, "Zuie cuintri i bot": the same menu action, so the same match. */
+  | { readonly kind: "start" }
   /** A message asking for the name, about the opening that needed it; nothing else, and nothing remembered. */
   | { readonly kind: "askName"; readonly opening: Exclude<Opening, { kind: "none" }> }
   | { readonly kind: "nothing" }
@@ -33,5 +39,6 @@ export type OpeningAction =
 export function decideOpening(opening: Opening, situation: OpeningSituation): OpeningAction {
   if (opening.kind === "none" || situation.playing) return { kind: "nothing" }
   if (!situation.named) return { kind: "askName", opening }
+  if (opening.kind === "shortcut") return { kind: "start" }
   return { kind: "join", code: opening.invite.code, password: opening.invite.password }
 }

@@ -1,12 +1,14 @@
 import { expect, test } from "bun:test"
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+import { STRINGS } from "../client/i18n.ts"
 import { addsToHomeScreenByHand, keepStorage, runsInstalled } from "../client/installed.ts"
 import { deployOriginInPage, pageForDeploy } from "../scripts/deploy-origin.ts"
 import viteConfig from "../vite.config.ts"
 import { precacheOf } from "../client/offline-cache/precache.ts"
 import { builtFiles } from "../scripts/service-worker.ts"
 import { headersFor } from "../server/static-headers.ts"
+import { readOpening } from "../client/opening.ts"
 
 const PUBLIC = join(import.meta.dir, "../client/public")
 const html = readFileSync(join(import.meta.dir, "../client/index.html"), "utf8")
@@ -276,4 +278,24 @@ test("only iPhone and iPad add the game to the home screen by hand, iPadOS's des
   expect(addsToHomeScreenByHand({ userAgent: mac, maxTouchPoints: 5 })).toBe(true)
   expect(addsToHomeScreenByHand({ userAgent: mac, maxTouchPoints: 0 })).toBe(false)
   expect(addsToHomeScreenByHand({ userAgent: android, maxTouchPoints: 5 })).toBe(false)
+})
+
+interface Shortcut {
+  name: string
+  short_name?: string
+  url: string
+  icons?: Icon[]
+}
+
+test("a long press on the installed game's icon offers the home screen's button, opening the game on the shortcut", () => {
+  const shortcuts = (manifest.shortcuts ?? []) as Shortcut[]
+  expect(shortcuts.map((shortcut) => shortcut.name)).toEqual([STRINGS.fur.static.oneTap])
+  const url = new URL(shortcuts[0]!.url, "https://sparedut.example")
+  expect(url.pathname).toBe("/")
+  expect(readOpening(url.search, url.hash)).toEqual({ kind: "shortcut" })
+  for (const icon of shortcuts[0]!.icons ?? []) expect(pngSize(icon.src)).toEqual(icon.sizes.split("x").map(Number) as [number, number])
+})
+
+test("opening the installed game again brings the open game to the front instead of a new window", () => {
+  expect(manifest.launch_handler).toEqual({ client_mode: "focus-existing" })
 })
