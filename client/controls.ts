@@ -5,10 +5,9 @@
  * Whichever device was used last is the active one; switching clears held buttons.
  */
 import { BUTTON, type ButtonName } from "../shared/input.ts"
-import { turretRestSeat, type TurretSpot } from "../shared/map.ts"
 import type { Snapshot } from "../shared/protocol.ts"
-import type { ArsenalValue, TurretState } from "../shared/sim/schema.ts"
-import { TURRET, type Slot, type WeaponId } from "../shared/weapons.ts"
+import type { ArsenalValue } from "../shared/sim/schema.ts"
+import type { Slot, WeaponId } from "../shared/weapons.ts"
 import { pointerDevice, type Device } from "./device.ts"
 import { buttonBit, inCircle, inRect, NO_INSETS, pickerEntries, TOUCH_BUTTONS, touchLayout, type Insets, type TouchButton, type TouchLayout, type TouchView } from "./touch.ts"
 
@@ -97,17 +96,6 @@ export interface Tracked {
 /** The player `me` in a snapshot, as the controls follow it. */
 export const trackedIn = (s: Snapshot, me: string, mounted: boolean, nearTurret: boolean): Tracked | null =>
   s.you && { alive: s.you.alive, mounted, spawned: s.ev.some((e) => e.t === "spawn" && e.s === me), nearTurret: nearTurret && !mounted, arsenal: s.you.arsenal }
-
-/** A free turret whose seat a body at `at` can reach: the one rule for the turret prompt and the touch "use" button. */
-export const freeTurretInReach = (spots: readonly TurretSpot[], turrets: readonly TurretState[], at: { readonly x: number; readonly y: number; readonly z: number } | null) => {
-  if (!at) return false
-  for (let i = 0; i < spots.length; i++) {
-    if (turrets[i]?.gunner !== null) continue
-    const seat = turretRestSeat(spots[i])
-    if (Math.hypot(at.x - seat[0], at.z - seat[2]) <= TURRET.reach && Math.abs(at.y - seat[1]) < 1.2) return true
-  }
-  return false
-}
 
 export interface ControlsHandlers {
   onSlot: (slot: Slot) => void

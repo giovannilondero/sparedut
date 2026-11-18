@@ -6,7 +6,7 @@ import * as THREE from "three"
 import { BOT_LEVEL_IDS, QUICK_CHAT, TEAM_INFO, type BotLevel } from "../shared/folklore.ts"
 import { rayPose } from "../shared/hitbox.ts"
 import { BUTTON, IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
-import { turretAim, turretSeat, type MapId, type PickupKind, type Team } from "../shared/map.ts"
+import { freeTurretInReach, turretAim, turretSeat, type MapId, type PickupKind, type Team } from "../shared/map.ts"
 import { DISCO } from "../shared/maps/maran.ts"
 import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, seatedBody, sprinting } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
@@ -16,7 +16,7 @@ import { outsideStorm, owned, RAISE_TICKS, weaponInSlot } from "../shared/sim/ru
 import { WEAPONS, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
-import { Controls, freeTurretInReach, trackedIn } from "./controls.ts"
+import { Controls, trackedIn } from "./controls.ts"
 import { boardHtml, esc, Hud, rosterHtml } from "./hud.ts"
 import { t } from "./i18n.ts"
 import type { Look } from "./looks.ts"
@@ -428,7 +428,7 @@ export class Game {
       this.wasAlive = you.alive
       this.seated = you.alive && this.mounted() >= 0
       const mounted = this.mounted() >= 0
-      this.controls.track(trackedIn(s, this.me, mounted, you.alive && !mounted && freeTurretInReach(this.physics.map.turrets, s.turrets, this.predictor.body)))
+      this.controls.track(trackedIn(s, this.me, mounted, you.alive && !mounted && this.predictor.body !== null && freeTurretInReach(this.physics.map.turrets, s.turrets, this.predictor.body) >= 0))
       // The server has already seen my last weapon switch and holds a different one: it
       // switched it itself (lanciafrico pickup, armoury, respawn) or rejected the switch. Follow it.
       const server = you.arsenal.current
