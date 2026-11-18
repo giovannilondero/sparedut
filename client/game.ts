@@ -915,11 +915,11 @@ export class Game {
       <div class="roster" id="p-roster"></div>
       ${
         host
-          ? `<div class="host-tools"><span class="host-label">👑 Host:</span>
+          ? `<div class="host-tools"><span class="host-label">👑 ${p.host}</span>
         <button id="p-start" class="primary"></button>
         <div class="host-bots">
-          <button data-bot="benandanti:1">+ bot ${ben}</button><button data-bot="benandanti:-1">− bot ${ben}</button>
-          <button data-bot="malandanti:1">+ bot ${mal}</button><button data-bot="malandanti:-1">− bot ${mal}</button>
+          <button data-bot="benandanti:1">${p.addBot(ben)}</button><button data-bot="benandanti:-1">${p.removeBot(ben)}</button>
+          <button data-bot="malandanti:1">${p.addBot(mal)}</button><button data-bot="malandanti:-1">${p.removeBot(mal)}</button>
         </div>
         <ui-select id="p-level" class="host-level" presentation="auto" default-value="${room.level}">
           <ui-select-label>${p.level}</ui-select-label>

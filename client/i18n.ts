@@ -156,6 +156,11 @@ export interface Strings {
     readonly start: string
     readonly restart: string
     readonly hostOnly: string
+    /** The host tools' label. */
+    readonly host: string
+    /** The host's buttons that add or remove a bot in a team (its short name). */
+    readonly addBot: Fn
+    readonly removeBot: Fn
     readonly level: string
     readonly switchTeam: Fn
     readonly leave: string
@@ -564,6 +569,9 @@ const fur: Strings = {
     start: "Fâs partî la partide",
     restart: "Torne a scomençâ",
     hostOnly: "L'host (👑) al fâs partî la partide.",
+    host: "Host:",
+    addBot: (team) => `+ bot ${team}`,
+    removeBot: (team) => `− bot ${team}`,
     level: "Bravure",
     switchTeam: (team) => `Passe cui ${team}`,
     leave: "Va fûr · Mandi!"
@@ -925,6 +933,9 @@ const it: Strings = {
     start: "Fai partire la partita",
     restart: "Ricomincia",
     hostOnly: "L'host (👑) fa partire la partita.",
+    host: "Host:",
+    addBot: (team) => `+ bot ${team}`,
+    removeBot: (team) => `− bot ${team}`,
     level: "Bravura",
     switchTeam: (team) => `Passa con i ${team}`,
     leave: "Esci · Mandi!"
