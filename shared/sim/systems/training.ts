@@ -119,7 +119,7 @@ export const PlayTraining = Game.System(
       if (objective === "placute") resources.hill.set({ owner: null, contested: false, ticks: 0 })
       if (objective === "cjar") resources.cart.set({ d: 0, pushers: 0, contested: false, idle: 0 })
       // #49: the storm starts closing on its course now.
-      const course = objective === "storm" ? rule.given?.storm : undefined
+      const course = objective === "storm" ? given.storm : undefined
       resources.stormCourse.set(course ? { x: course.at[0], z: course.at[2], from: course.from, to: course.to, start: resources.tick.get(), ticks: course.ticks } : null)
     }
 
