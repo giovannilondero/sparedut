@@ -24,7 +24,7 @@ import { WEAPONS, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
 import { Controls, trackedIn } from "./controls.ts"
-import { boardHtml, esc, fmtClock, Hud, rosterHtml } from "./hud.ts"
+import { boardHtml, esc, fmtClock, Hud, primaryHtml, rosterHtml } from "./hud.ts"
 import { t } from "./i18n.ts"
 import type { Look } from "./looks.ts"
 import type { Menu } from "./menu.ts"
@@ -40,7 +40,7 @@ import "@ui-sdk/web/dialog"
 import "@ui-sdk/web/select"
 import { takeAwayDeparted } from "./bodies.ts"
 import { alwaysChosen } from "./choice.ts"
-import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, musterFocus, musterScreen, musterTeams, type MatchMenu, type MusterScreen } from "./match-menus.ts"
+import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, menuPrimary, musterFocus, musterScreen, musterTeams, type MatchMenu, type MusterScreen } from "./match-menus.ts"
 import { pickerEntries } from "./touch.ts"
 import { onViewportChange } from "./viewport.ts"
 
@@ -897,7 +897,8 @@ export class Game {
     const playing = this.controls.active && this.overlay === "none"
     if (code === "KeyV" && playing) this.toggleQuick(!this.quickOpen)
     if ((code === "Enter" || code === "KeyT") && playing) this.openChat()
-    if (code === "KeyB") this.openOverlay(this.overlay === "loadout" ? "none" : "loadout")
+    // The armoury opens only where the primary can change: in a training.
+    if (code === "KeyB" && this.room !== null && menuPrimary(this.room, this.me).tag === "armoury") this.openOverlay(this.overlay === "loadout" ? "none" : "loadout")
     return false
   }
 
@@ -1073,6 +1074,7 @@ export class Game {
     const p = s.pause
     // A training's menu has its station list in place of the roster.
     if (training) return
+    $("p-primary").innerHTML = primaryHtml(menuPrimary(room, this.me))
     $("p-roster").innerHTML = rosterHtml(room, this.me)
     $("p-team").textContent = p.switchTeam(s.teams[this.otherTeam()].name)
     if (host) this.syncLevel("p", room)
@@ -1152,7 +1154,7 @@ export class Game {
           ? `<div class="muted pause-reach">${this.entering ? s.training.chooseStation : s.training.menuLine}</div>`
           : this.roomCodeHtml("p", room)
       }
-      ${training ? stationListHtml(stationEntries(this.snap?.training ?? null), s, this.entering ? entryChoice(this.snap?.training ?? null).continues : null) : `<div class="roster" id="p-roster"></div>`}
+      ${training ? stationListHtml(stationEntries(this.snap?.training ?? null), s, this.entering ? entryChoice(this.snap?.training ?? null).continues : null) : `<div class="pause-primary" id="p-primary"></div><div class="roster" id="p-roster"></div>`}
       ${
         training
           ? ""
@@ -1167,7 +1169,7 @@ export class Game {
       <div class="row overlay-actions">
         <button id="p-resume" class="primary">${s.loadout.resume}</button>
         ${training ? `<button id="p-restart"${this.snap?.training?.tag === "station" ? "" : " disabled"}>${s.training.restart}</button><button id="p-over">${s.training.startOver}</button>` : `<button id="p-team"></button>`}
-        <button id="p-loadout">${s.loadout.title}</button>
+        ${training ? `<button id="p-loadout">${s.loadout.title}</button>` : ""}
         <button id="p-settings">${s.static.settings}</button>
         <button id="p-leave">${p.leave}</button>
       </div>`)
@@ -1177,7 +1179,8 @@ export class Game {
     }
     const team = document.getElementById("p-team")
     if (team) team.onclick = () => this.d.net.send({ t: "team", team: this.otherTeam() })
-    $("p-loadout").onclick = () => this.openOverlay("loadout")
+    const loadout = document.getElementById("p-loadout")
+    if (loadout) loadout.onclick = () => this.openOverlay("loadout")
     $("p-leave").onclick = () => {
       this.d.net.send({ t: "leave" })
       this.d.onLeave()

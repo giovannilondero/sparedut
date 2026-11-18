@@ -255,11 +255,17 @@ export class Room {
     this.sim.team(id, team)
   }
 
-  setPrimary(id: string, primary: PrimaryId) {
+  /**
+   * The change-primary intent. The primary is fixed for the match: accepted only in the Muster, from
+   * a member who has not entered the match on, and in a training (where it arrives at once). Refused
+   * (false), with nothing changed, from a player on the map while a match is live or over.
+   */
+  setPrimary(id: string, primary: PrimaryId): boolean {
     const m = this.members.get(id)
-    if (!m) return
+    if (!m || (this.matchOn && m.place === "inMatch")) return false
     m.primary = primary
     if (m.place === "inMatch") this.sim.primary(id, primary)
+    return true
   }
 
   queueInput(id: string, input: PlayerInput) {

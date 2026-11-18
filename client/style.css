@@ -424,7 +424,7 @@ html[data-device="touch"] :is(#menu, #hud .overlay) kbd, html[data-device="touch
   /* A wide, short menu (a phone on its side): the roster and the host tools side by side, so the host's controls show without scrolling. */
   @container overlay (inline-size > 40rem) {
     #pause .overlay-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 0 16px; }
-    #pause .overlay-body > :is(.pause-reach, .pause-code) { grid-column: 1 / -1; }
+    #pause .overlay-body > :is(.pause-reach, .pause-code, .pause-primary) { grid-column: 1 / -1; }
     #pause .overlay-body > :is(.host-tools, .host-only) { margin-block-start: 10px; }
     /* The four bot buttons on one row, so the bot skill stays in view too. */
     #pause .host-bots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -456,6 +456,12 @@ html[data-device="touch"] :is(#menu, #hud .overlay) kbd, html[data-device="touch
 .pause-share { text-align: end; }
 .pause-share button { min-block-size: var(--tap); }
 .pause-reach { font-size: 12px; margin-block-start: 4px; }
+/* The player's primary in the match menu: read-only, fixed until the Muster. */
+.pause-primary { margin-block-start: 10px; font-size: 12px; }
+.pause-primary:empty { display: none; }
+.pause-primary-name { font: 600 16px/1.3 var(--serif); color: var(--ink); }
+.pause-primary-figures { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.pause-primary p { margin: 4px 0 0; }
 .overlay .invite { font-size: clamp(32px, 1rem + 3vw, 44px); }
 .host-only { margin-block-start: 8px; }
 .host-label { white-space: nowrap; }

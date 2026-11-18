@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { afterEscape, endFocus, focusOnOpen, musterFocus, musterScreen, musterTeams } from "../client/match-menus.ts"
+import { afterEscape, endFocus, focusOnOpen, menuPrimary, musterFocus, musterScreen, musterTeams } from "../client/match-menus.ts"
 
 test("Esc closes the in-match menus one step at a time", () => {
   expect(afterEscape("pause", "none")).toBe("none")
@@ -86,4 +86,12 @@ test("joining a Tampieste already on, the screen says they play from the next ma
 
 test("during the results the end screen shows, for a member who has not entered too", () => {
   expect(musterScreen(waiting(), "p2", "Over")).toEqual({ tag: "closed" })
+})
+
+test("the match menu offers the armoury only in a training; in a match it shows the primary, fixed until the Muster", () => {
+  expect(menuPrimary({ ...room(), mode: "bataie" }, "p1")).toEqual({ tag: "fixed", primary: "mulin" })
+  expect(menuPrimary({ ...room(), mode: "tampieste" }, "p2")).toEqual({ tag: "fixed", primary: "miedi" })
+  expect(menuPrimary({ ...room(), mode: "dutrine" }, "p1")).toEqual({ tag: "armoury" })
+  // Somebody not in the roster gets nothing, never the armoury.
+  expect(menuPrimary({ ...room(), mode: "bataie" }, "p9")).toEqual({ tag: "none" })
 })

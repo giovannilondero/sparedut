@@ -185,6 +185,49 @@ for (const host of HOSTS) {
       expect(me.last("snap")!.phase.tag).toBe("Live")
     })
 
+    test("a change of primary by a player on the map during a live match is refused: primary, weapon in hand and ammunition stay", () => {
+      const { connect, play } = harness(host.make)
+      const me = connect()
+      me.say({ ...create, primary: "doplete" })
+      const { you } = me.last("joined")!
+      me.say({ t: "start" })
+      play(120)
+      const before = me.last("snap")!
+      expect(before.phase.tag).toBe("Live")
+      expect(before.you?.arsenal.primary).toBe("doplete")
+      const rooms = me.got.filter((m) => m.t === "room").length
+      me.say({ t: "primary", p: "mulin" })
+      play(60)
+      const after = me.last("snap")!
+      expect(after.you?.arsenal).toEqual(before.you?.arsenal)
+      expect(after.players.find((p) => p.id === you)?.w).toBe("doplete")
+      expect(me.got.filter((m) => m.t === "room")).toHaveLength(rooms)
+      expect(me.last("room")!.room.roster.find((r) => r.id === you)?.primary).toBe("doplete")
+    })
+
+    test("a change of primary during the results is refused too, and the next Muster accepts it", () => {
+      const { connect, play } = harness(host.make)
+      const me = connect()
+      me.say({ ...create, minutes: 2, bots: 0, primary: "doplete" })
+      const { you } = me.last("joined")!
+      me.say({ t: "start" })
+      for (let s = 0; s < 130 && me.last("snap")?.phase.tag !== "Over"; s++) play(60)
+      expect(me.last("snap")!.phase.tag).toBe("Over")
+      const before = me.last("snap")!.you?.arsenal
+      me.say({ t: "primary", p: "mulin" })
+      play(2)
+      expect(me.last("snap")!.phase.tag).toBe("Over")
+      expect(me.last("snap")!.you?.arsenal).toEqual(before)
+      expect(me.last("room")!.room.roster.find((r) => r.id === you)?.primary).toBe("doplete")
+      for (let s = 0; s < 20 && me.last("snap")?.phase.tag !== "Muster"; s++) play(60)
+      expect(me.last("snap")!.phase.tag).toBe("Muster")
+      me.say({ t: "primary", p: "mulin" })
+      expect(me.last("room")!.room.roster.find((r) => r.id === you)?.primary).toBe("mulin")
+      me.say({ t: "start" })
+      play(10)
+      expect(me.last("snap")!.you?.arsenal.primary).toBe("mulin")
+    }, 30_000)
+
     test("after the results the room is in the Muster again, and stays there until the host starts", () => {
       const { connect, play } = harness(host.make)
       const me = connect()
@@ -330,6 +373,20 @@ describe("joining a match already on, on the game server", () => {
     expect(snap.you?.arsenal.primary).toBe("mulin")
     expect(snap.players.find((p) => p.id === you)?.w).toBe("mulin")
     expect(late.last("board")!.rows.find((r) => r.id === you)?.team).toBe(team)
+  })
+
+  test("a change of primary by a member who has not entered is accepted, and refused once they are on the map", () => {
+    const { late, you, entry, play } = live()
+    late.say({ t: "primary", p: "cjampanili" })
+    expect(entry()?.primary).toBe("cjampanili")
+    late.say({ t: "enter" })
+    play(120)
+    expect(late.last("snap")!.you?.arsenal.primary).toBe("cjampanili")
+    late.say({ t: "primary", p: "mulin" })
+    play(30)
+    expect(entry()?.primary).toBe("cjampanili")
+    expect(late.last("snap")!.you?.arsenal.primary).toBe("cjampanili")
+    expect(late.last("snap")!.players.find((p) => p.id === you)?.w).toBe("cjampanili")
   })
 
   test("a bot that would give up its seat keeps playing until the human enters", () => {
@@ -533,6 +590,21 @@ describe("the in-browser host", () => {
       expect(me.last("snap")!.phase.tag).toBe("Over")
     }, 30_000)
   }
+
+  // Only a browser makes a training: the game server has none to test.
+  test("a change of primary in a training is accepted and arrives at once, with its ammunition", () => {
+    const { connect, play } = harness(browser)
+    const me = connect()
+    me.say({ t: "training", primary: "cramar" })
+    play(120)
+    expect(me.last("snap")!.you?.alive).toBe(true)
+    expect(me.last("snap")!.you?.arsenal.primary).toBe("cramar")
+    me.say({ t: "primary", p: "doplete" })
+    play(2)
+    const arsenal = me.last("snap")!.you!.arsenal
+    expect(arsenal.primary).toBe("doplete")
+    expect(arsenal.ammo.doplete.mag).toBeGreaterThan(0)
+  })
 
   test("runs in a browser: nothing it imports needs Bun or Node", async () => {
     const seen = new Set<string>()
