@@ -15,7 +15,57 @@ export interface Connection {
 }
 
 /** Smooths a new round-trip sample into the previous estimate. */
-export const smoothRtt = (rtt: number, sample: number) => (rtt === 0 ? sample : rtt * 0.8 + sample * 0.2)
+const smoothRtt = (rtt: number, sample: number) => (rtt === 0 ? sample : rtt * 0.8 + sample * 0.2)
+
+/** Who hears a connection's messages. */
+class Listeners {
+  private readonly set = new Set<Listener>()
+
+  on(listener: Listener) {
+    this.set.add(listener)
+    return () => void this.set.delete(listener)
+  }
+
+  tell(msg: ServerMessage) {
+    for (const l of this.set) l(msg)
+  }
+}
+
+/**
+ * What the connection to either host does the same way: it hands every message to its listeners,
+ * pings the host once a second while up, and smooths the round trip each pong measures.
+ * The transport (a WebSocket, a worker) is the subclass's.
+ */
+export abstract class HostConnection implements Connection {
+  private readonly listeners = new Listeners()
+  private pingTimer = 0
+  rtt = 0
+
+  abstract send(msg: ClientMessage): void
+
+  on(listener: Listener) {
+    return this.listeners.on(listener)
+  }
+
+  /** A message from the host, as its transport delivered it. */
+  protected receive(data: string) {
+    const msg = JSON.parse(data) as ServerMessage
+    if (msg.t === "pong") this.rtt = smoothRtt(this.rtt, performance.now() - msg.c)
+    this.listeners.tell(msg)
+  }
+
+  /** The host is up: ping it once a second. */
+  protected startPing() {
+    clearInterval(this.pingTimer)
+    this.pingTimer = window.setInterval(() => this.send({ t: "ping", c: performance.now(), rtt: this.rtt }), 1000)
+  }
+
+  /** The host is gone: no more pings, and no round trip until it is back. */
+  protected stopPing() {
+    clearInterval(this.pingTimer)
+    this.rtt = 0
+  }
+}
 
 /**
  * Whether a message belongs to a room: it starts, replaces, feeds or ends a match, so only the
@@ -44,7 +94,7 @@ const OF_A_ROOM = {
  */
 export class Link implements Connection {
   private host: Connection
-  private readonly listeners = new Set<Listener>()
+  private readonly listeners = new Listeners()
 
   constructor(hosts: readonly Connection[]) {
     this.host = hosts[0]
@@ -54,7 +104,7 @@ export class Link implements Connection {
           if (msg.t === "joined") h.send({ t: "leave" })
           return
         }
-        for (const l of this.listeners) l(msg)
+        this.listeners.tell(msg)
       })
   }
 
@@ -72,8 +122,7 @@ export class Link implements Connection {
   }
 
   on(listener: Listener) {
-    this.listeners.add(listener)
-    return () => void this.listeners.delete(listener)
+    return this.listeners.on(listener)
   }
 
   get rtt() {
