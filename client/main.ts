@@ -20,6 +20,7 @@ import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
 import { BrowserHostConnection } from "./offline.ts"
 import { registerServiceWorker } from "./offline-cache/register.ts"
+import { keepStorage, runsInstalled } from "./installed.ts"
 import { Link } from "./connection.ts"
 import { PerfMonitor } from "./perf.ts"
 import { loadSettings, saveSettings } from "./settings.ts"
@@ -376,3 +377,9 @@ addEventListener(
   () => void registerServiceWorker({ production: import.meta.env.PROD, container: navigator.serviceWorker as ServiceWorkerContainer | undefined }),
   { once: true }
 )
+
+// Installed, the game asks the browser to keep its storage (cache, settings, training progress):
+// at every start, since the browser may only grant it later, and in the tab that installs it.
+const storage = navigator.storage as StorageManager | undefined
+void keepStorage({ installed: runsInstalled({ matchMedia: (q) => matchMedia(q), fullscreenElement: document.fullscreenElement, standalone: (navigator as { standalone?: boolean }).standalone }), storage })
+addEventListener("appinstalled", () => void keepStorage({ installed: true, storage }), { once: true })
