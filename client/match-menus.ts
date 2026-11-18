@@ -1,7 +1,11 @@
 /**
  * The in-match menus' steps, with no DOM: which menu Esc goes back to, and where focus lands
- * when one opens. The game draws the menus; this decides the order between them.
+ * when one opens, and what the Muster shows. The game draws the menus; this decides the order
+ * between them and their content.
  */
+import type { Team } from "../shared/map.ts"
+import type { Reach, RoomInfo } from "../shared/protocol.ts"
+import type { PrimaryId } from "../shared/weapons.ts"
 
 /** The menus a player opens over the match: the match menu, the loadout, the settings. */
 export const MATCH_MENUS = ["pause", "loadout", "settings"] as const
@@ -29,3 +33,26 @@ export function focusOnOpen(which: MatchMenu, previous: MatchMenu): string | nul
 
 /** The end screen's first focus: another match for the host, who alone can start one; leaving for the rest. */
 export const endFocus = (host: boolean): string => (host ? "e-again" : "e-leave")
+
+/** A member as the Muster lists them in their team. */
+export interface MusterMember {
+  readonly id: string
+  readonly name: string
+  readonly primary: PrimaryId
+  readonly bot: boolean
+  readonly host: boolean
+}
+
+/** The Muster's two teams, from the room's roster: who is in each, in the roster's order, with their primary. */
+export function musterTeams(room: Pick<RoomInfo, "hostId" | "roster">): Record<Team, MusterMember[]> {
+  const teams: Record<Team, MusterMember[]> = { benandanti: [], malandanti: [] }
+  for (const r of room.roster) teams[r.team].push({ id: r.id, name: r.name, primary: r.primary, bot: r.bot, host: r.id === room.hostId })
+  return teams
+}
+
+/**
+ * The Muster's first focus: start, in an Offline room, whose one player is its host, so that one
+ * press begins the match; elsewhere the screen's first control, so that a host's stray press
+ * does not start a match others are still choosing for.
+ */
+export const musterFocus = (who: { readonly host: boolean; readonly reach: Reach }): string | null => (who.host && who.reach === "offline" ? "m-start" : null)

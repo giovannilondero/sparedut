@@ -41,9 +41,8 @@ export const PlayObjectives = Game.System(
     const { data } = queries.players
     const rules = resources.rules.get()
     const objective = resources.objective.get()
-    const phase = machines.match.get()._tag
-    if (phase === "Over") return
-    const live = phase === "Live"
+    // Objectives are played only in a live match: in the Muster nobody is on the map, after it nothing counts.
+    if (machines.match.get()._tag !== "Live") return
     const { flagBases: FLAG_BASES, hill: HILL, track } = MAPS[rules.map]
     const players = queries.players.each().map((m) => ({
       m,
@@ -84,7 +83,7 @@ export const PlayObjectives = Game.System(
             const home = otherTeam(team)
             if (near(carrier.body, FLAG_BASES[home], TOUCH + 0.4) && flags[home]._tag === "base") {
               flags[team] = { _tag: "base" }
-              if (live) resources.score.update((s) => ({ ...s, [home]: s[home] + 1 }))
+              resources.score.update((s) => ({ ...s, [home]: s[home] + 1 }))
               data.stats.update(carrier.m, (s) => ({ ...s, caps: s.caps + 1, score: s.score + 300 }))
               events.out.emit({ t: "flag", team, a: "captured", s: carrier.session })
             }
@@ -121,7 +120,7 @@ export const PlayObjectives = Game.System(
       if (owner !== hill.owner) events.out.emit({ t: "hill", team: owner })
       const ticks = owner && !contested ? (owner === hill.owner ? hill.ticks + 1 : 1) : 0
       if (owner && !contested && ticks % 60 === 0) {
-        if (live) resources.score.update((s) => ({ ...s, [owner]: s[owner] + 1 }))
+        resources.score.update((s) => ({ ...s, [owner]: s[owner] + 1 }))
         for (const p of inside) data.stats.update(p.m, (s) => ({ ...s, score: s.score + 5 }))
       }
       resources.hill.set({ owner, contested, ticks })
@@ -154,7 +153,7 @@ export const PlayObjectives = Game.System(
       if (!contested && idle === 0 && Math.floor(d / (CART.speed / 2)) !== Math.floor(cart.d / (CART.speed / 2))) {
         for (const p of pushers) data.stats.update(p.m, (s) => ({ ...s, score: s.score + 1 }))
       }
-      if (live) resources.score.set({ benandanti: Math.floor((d / Math.max(1, length)) * 100), malandanti: 0 })
+      resources.score.set({ benandanti: Math.floor((d / Math.max(1, length)) * 100), malandanti: 0 })
       resources.cart.set(next)
     }
   }

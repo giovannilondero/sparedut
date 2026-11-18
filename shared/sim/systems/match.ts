@@ -1,11 +1,12 @@
 /**
- * Match flow: warmup → live → over → live again.
+ * Match flow: Muster → live → over → Muster again. The host's start begins the match from the
+ * Muster; during a live match it ends it and sends the room back to the Muster.
  * Each mode decides when it ends and who wins.
  */
 import { TEAMS } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
 import type { Winner } from "../events.ts"
-import { freshDoors, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL, NO_STATS, OVER_TICKS, START_GRACE_TICKS, WARMUP_TICKS } from "../rules.ts"
+import { freshDoors, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL, NO_STATS, OVER_TICKS, RESPAWN_TICKS, START_GRACE_TICKS } from "../rules.ts"
 import { Attackers, Cart, Doors, Flags, Game, Hill, Life, Match, Out, Pickups, Player, Rules, Score, StartMatch, Stats, Tick, Turrets } from "../schema.ts"
 
 export const AdvanceTick = Game.System(
@@ -66,8 +67,22 @@ export const MatchFlow = Game.System(
         if (life._tag === "Alive") data.life.transition(m, { from: "Alive", to: "Dead", data: { respawn: 1, killer: null } })
         else data.life.update(m, { state: "Dead", data: () => ({ respawn: 1, killer: null }) })
       }
-      nextMachines.match.set({ _tag: "Live", ends: tick + rules.timeLimitTicks })
+      nextMachines.match.transition({ from: "Muster", to: "Live", data: { ends: tick + rules.timeLimitTicks } })
       events.out.emit({ t: "match", a: "start", winner: null })
+    }
+
+    /**
+     * Back to the Muster: everybody leaves the map, nobody credited with it. The wait is a whole
+     * respawn's, so that nobody comes back in this tick, while the match is still live; the
+     * Muster then holds everybody until the start.
+     */
+    const muster = (from: "Live" | "Over") => {
+      const off = { respawn: RESPAWN_TICKS, killer: null }
+      for (const m of queries.players.each()) {
+        if (data.life.get(m)._tag === "Alive") data.life.transition(m, { from: "Alive", to: "Dead", data: off })
+        else data.life.update(m, { state: "Dead", data: () => off })
+      }
+      nextMachines.match.transition({ from, to: "Muster" })
     }
 
     /** The winner if the match ended this tick, otherwise null. */
@@ -108,20 +123,21 @@ export const MatchFlow = Game.System(
     }
 
     switch (match._tag) {
-      case "Warmup":
-        // Without this, if the host never presses "start" points never count.
-        if (startRequested || tick >= WARMUP_TICKS) begin()
+      case "Muster":
+        // Only the host's start begins a match: the Muster never ends by itself.
+        if (startRequested) begin()
         return
       case "Live": {
         const winner = verdict(match.ends)
         if (winner) {
-          nextMachines.match.set({ _tag: "Over", winner, restarts: tick + OVER_TICKS })
+          nextMachines.match.transition({ from: "Live", to: "Over", data: { winner, restarts: tick + OVER_TICKS } })
           events.out.emit({ t: "match", a: "end", winner })
-        } else if (startRequested) begin()
+        } else if (startRequested) muster("Live")
         return
       }
       case "Over":
-        if (startRequested || tick >= match.restarts) begin()
+        // The results are shown, then the Muster; the host's start goes there at once.
+        if (startRequested || tick >= match.restarts) muster("Over")
         return
     }
   }

@@ -1,5 +1,5 @@
 /**
- * The dead count down ticks and respawn at their team's safest point.
+ * The dead count down ticks and respawn at their team's safest point, only while a match is live.
  * In a live Tampieste there's no respawning: one life only. A member with a post (a bot the
  * training keeps at a station) always comes back at it, with its health.
  */
@@ -37,7 +37,8 @@ export const Respawn = Game.System(
     const map = MAPS[rules.map]
     // Match start respawns everyone (Tampieste included); after that, whoever dies stays to watch.
     const started = match._tag === "Live" && resources.tick.get() - (match.ends - rules.timeLimitTicks) > START_GRACE_TICKS
-    const hold = match._tag === "Over" || (started && everyoneAlone(rules))
+    // In the Muster nobody is on the map, and after a match nobody comes back.
+    const hold = match._tag !== "Live" || (started && everyoneAlone(rules))
     const all = queries.players.each()
     const rng = Random.draw(resources.rng)
     for (const m of all) {

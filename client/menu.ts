@@ -28,8 +28,7 @@ import { oneTapRoom, type Settings } from "./settings.ts"
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 
 export interface MenuHandlers {
-  /** `oneTap`: the home screen's button, whose match starts at once, without warm-up. */
-  readonly create: (o: CreateOptions, oneTap?: boolean) => void
+  readonly create: (o: CreateOptions) => void
   /** `password` only once the player typed one (from the prompt or an invite link). */
   readonly join: (code: string, password?: string) => void
   /** The training: always Offline, nothing to choose; `start` from the saved progress. */
@@ -93,12 +92,12 @@ const SCREEN_ELEMENT = {
   vocabolari: "menu-vocabolari"
 } as const satisfies Record<Screen, string>
 
-/** A room in the list: reach chip, lock, host, mode and map, players out of seats. A button when it can be chosen. */
+/** A room in the list: reach chip, lock, host, mode, map and phase (Muster or match), players out of seats. A button when it can be chosen. */
 function roomRow(r: RoomSummary, selectable: boolean, asButton: boolean): string {
   const s = t()
   const lock = r.reach !== "offline" && r.access === "password" ? `<i class="lock" role="img" aria-label="${s.menu.passwordRoom}" title="${s.menu.passwordRoom}">🔒</i>` : ""
   const inner = `<span class="room-tags"><i class="chip ${r.reach}">${s.menu.reach[r.reach]}</i>${lock}</span>
-    <span class="room-what"><b>${esc(r.host)}</b><small>${s.modes[r.mode].name} · ${s.maps[r.map].name}</small></span>
+    <span class="room-what"><b>${esc(r.host)}</b><small>${s.modes[r.mode].name} · ${s.maps[r.map].name} · ${s.menu.phase[r.phase]}</small></span>
     <span class="room-seats"><b>${r.players}/${r.max}</b><small>${selectable ? r.code : s.menu.full}</small></span>`
   if (!asButton) return `<li><div class="room">${inner}</div></li>`
   return `<li><button class="room${selectable ? "" : " full"}" data-code="${r.code}"${selectable ? "" : " disabled"}>${inner}</button></li>`
@@ -221,7 +220,7 @@ export class Menu {
   private apply(o: Outcome) {
     if (o.kind === "send") {
       const r = o.request
-      if (r.t === "create") this.handlers.create(r.room, r.oneTap)
+      if (r.t === "create") this.handlers.create(r.room)
       else if (r.t === "training") this.handlers.training(r.start)
       else if (r.t === "join") this.handlers.join(r.code, r.password)
       // The installable game's requests: the install prompt, the new version.

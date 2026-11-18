@@ -26,7 +26,7 @@ export const MedicAura = Game.System(
   },
   ({ queries, resources, events, machines }) => {
     const { data } = queries.players
-    if (machines.match.get()._tag === "Over" || resources.tick.get() % MEDIC_AURA.everyTicks !== 0) return
+    if (machines.match.get()._tag !== "Live" || resources.tick.get() % MEDIC_AURA.everyTicks !== 0) return
     const rules = resources.rules.get()
     const living = queries.players.each().filter((m) => data.life.get(m)._tag === "Alive")
     for (const medic of living) {

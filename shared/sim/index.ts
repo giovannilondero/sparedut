@@ -33,7 +33,7 @@ export type Sim = ReturnType<typeof createSim>
 
 /** The room's Ritmo runtime; `debug` is used by the devtools (lint, sessions). */
 export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: HostClock.HostClock }) {
-  // The training has no warm-up and no clock: it is live from the start, at its first station.
+  // The training has no Muster and no clock: it is live from the start, at its first station.
   const training = isTraining(options.mode)
   const first = arrival(options.training ?? FIRST_START)
   const made = Game.Runtime.make({
@@ -60,7 +60,7 @@ export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: H
       Rng: Random.seed(options.seed)
     },
     machines: Game.Runtime.machines(
-      Game.Runtime.machine(Match, training ? { _tag: "Live", ends: 0 } : { _tag: "Warmup" }),
+      Game.Runtime.machine(Match, training ? { _tag: "Live", ends: 0 } : { _tag: "Muster" }),
       Game.Runtime.machine(Training, training ? { _tag: "Arriving", station: first.station, unlocked: first.unlocked, completed: first.completed, place: "facingStart" } : { _tag: "Off" })
     ),
     ...(debug ? { debug } : {})

@@ -39,7 +39,7 @@ export const MountTurrets = Game.System(
       return { gunner, heat, jammed, cooldown: Math.max(0, t.cooldown - 1) }
     })
 
-    if (machines.match.get()._tag !== "Over") {
+    if (machines.match.get()._tag === "Live") {
       for (const m of players) {
         const session = data.player.get(m).session
         if (!alive.has(session)) continue
