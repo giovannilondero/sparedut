@@ -932,7 +932,7 @@ export class Game {
         <ui-select id="p-level" class="host-level" presentation="auto" default-value="${room.level}">
           <ui-select-label>${p.level}</ui-select-label>
           <ui-select-trigger><button><ui-select-value></ui-select-value></button></ui-select-trigger>
-          <ui-select-content class="level-list">${BOT_LEVEL_IDS.map((l) => `<ui-select-item value="${l}">${s.levels[l].name}<ui-select-item-indicator aria-hidden="true">✓</ui-select-item-indicator></ui-select-item>`).join("")}</ui-select-content>
+          <ui-select-content class="select-list level-list">${BOT_LEVEL_IDS.map((l) => `<ui-select-item value="${l}">${s.levels[l].name}<ui-select-item-indicator aria-hidden="true">✓</ui-select-item-indicator></ui-select-item>`).join("")}</ui-select-content>
         </ui-select>
       </div>`
           : `<div class="muted host-only">${p.hostOnly}</div>`
