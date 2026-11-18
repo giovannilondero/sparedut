@@ -12,7 +12,7 @@ import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, seatedBody, sprinting } from 
 import type { PhysicsWorld } from "../shared/physics.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
-import { outsideStorm, owned, RAISE_TICKS, weaponInSlot } from "../shared/sim/rules.ts"
+import { outsideStorm, owned, RAISE_TICKS, speedScale, weaponInSlot } from "../shared/sim/rules.ts"
 import { isTraining } from "../shared/training/index.ts"
 import { closedGates, viewedStation } from "../shared/training/gates.ts"
 import type { InterfaceAction } from "../shared/training/interface.ts"
@@ -1404,11 +1404,12 @@ export class Game {
 
   // ---------------------------------------------------------------- fixed tick
 
+  /** The simulation's own speed: the class, the weapon asked for, the sgnape, the frico carried. */
   private speedScale() {
     const you = this.you()
     if (!you) return 1
-    const a = you.arsenal
-    return WEAPONS[this.wanted].moveScale * (a.sgnape > 0 ? 1.3 : 1) * (this.snap?.players.find((p) => p.id === this.me && p.f & FLAG_BIT.carrier) ? 0.9 : 1)
+    const carrier = this.snap?.players.some((p) => p.id === this.me && p.f & FLAG_BIT.carrier) ?? false
+    return speedScale(you.arsenal, this.wanted, carrier)
   }
 
   private fixedStep() {

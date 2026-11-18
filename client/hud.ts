@@ -6,6 +6,7 @@ import type { Team } from "../shared/map.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type SnapSelf, type Snapshot } from "../shared/protocol.ts"
 import type { KillCause } from "../shared/sim/events.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
+import { maxHp } from "../shared/sim/rules.ts"
 import type { TrainingView } from "../shared/sim/view.ts"
 import { STATION_IDS } from "../shared/training/index.ts"
 import type { Device } from "./device.ts"
@@ -138,13 +139,15 @@ export class Hud {
   vitals(you: SnapSelf | null, slot: { owned: (id: WeaponId) => boolean }, localMag: number | null, turret = false) {
     if (!you) return
     const hp = Math.max(0, you.hp)
+    // The bar and the ring are full at the class's health, whatever it is.
+    const share = Math.min(100, Math.round((hp / maxHp(you.arsenal.primary)) * 100))
     this.text("hp", String(hp))
-    this.style("hp-bar", "width", `${hp}%`)
-    this.toggleOn($("hp").parentElement!, "hp-low", "low", hp < 30 && you.alive)
+    this.style("hp-bar", "width", `${share}%`)
+    this.toggleOn($("hp").parentElement!, "hp-low", "low", share < 30 && you.alive)
     this.text("armor", String(you.armor))
     this.style("armor-bar", "width", `${you.armor}%`)
     // The touch HUD draws the two as rings around their icons.
-    this.style("vitals", "--hp", String(hp))
+    this.style("vitals", "--hp", String(share))
     this.style("vitals", "--armor", String(you.armor))
     const a = you.arsenal
     const def = WEAPONS[a.current]
@@ -484,11 +487,11 @@ export function boardHtml(rows: readonly BoardRow[], me: string) {
       const list = rows.filter((r) => r.team === team).sort((a, b) => b.score - a.score)
       const info = t().teams[team]
       return `<h3 style="color:${TEAM_INFO[team].color}">${info.name} <small style="color:var(--muted);font-size:13px">· ${info.motto}</small></h3>
-      <table><tr>${t().hud.board.map((h) => `<th>${h}</th>`).join("")}</tr>
+      <table><tr>${t().hud.board.map((h, i) => (i === 1 ? `<th class="primary">${h}</th>` : `<th>${h}</th>`)).join("")}</tr>
       ${list
         .map(
           (r) =>
-            `<tr class="${r.id === me ? "me" : ""}"><td>${esc(r.name)}${r.bot ? " 🤖" : ""}</td><td>${r.score}</td><td>${r.kills}</td><td>${r.deaths}</td><td>${r.assists}</td><td>${r.caps}</td><td>${r.best}</td><td>${r.bot ? "—" : r.ping}</td></tr>`
+            `<tr class="${r.id === me ? "me" : ""}"><td>${esc(r.name)}${r.bot ? " 🤖" : ""}</td><td class="primary">${t().weapons[r.primary].name}</td><td>${r.score}</td><td>${r.kills}</td><td>${r.deaths}</td><td>${r.assists}</td><td>${r.caps}</td><td>${r.best}</td><td>${r.bot ? "—" : r.ping}</td></tr>`
         )
         .join("")}</table>`
     })

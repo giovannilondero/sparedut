@@ -7,7 +7,7 @@ import type { ObjectiveId } from "../folklore.ts"
 import type { Team, V3 } from "../map.ts"
 import type { Body } from "../movement.ts"
 import type { GameEvent } from "../sim/events.ts"
-import { MAX_HP, type StormValue } from "../sim/rules.ts"
+import { maxHp, type StormValue } from "../sim/rules.ts"
 import type { ArsenalValue, ControlsValue } from "../sim/schema.ts"
 import type { PrimaryId, ProjectileKind, WeaponId } from "../weapons.ts"
 import type { InterfaceAction } from "./interface.ts"
@@ -129,6 +129,11 @@ export interface StormClosing {
   readonly ticks: number
 }
 
+/** What a station's bot carries, and so its class: a bot that fires uses it. */
+export const STATION_BOT_PRIMARY: PrimaryId = "cramar"
+/** A station's bot at full health: its class's. */
+export const STATION_BOT_HP = maxHp(STATION_BOT_PRIMARY)
+
 /**
  * A bot at a station: kept present by the host while the station is current, gone when it is not
  * (`server/station-bot.ts`). It spawns, and comes back after the usual respawn delay when killed,
@@ -140,7 +145,7 @@ export interface StationBot {
   readonly route: readonly V3[]
   /** False: it walks its route and never fires. True: an ordinary bot at the room's skill, which leaves its route to fight. */
   readonly fires: boolean
-  /** Its health on every spawn (`MAX_HP` is full). */
+  /** Its health on every spawn (`STATION_BOT_HP` is full), whatever its class. */
   readonly hp: number
 }
 
@@ -153,7 +158,7 @@ export interface StationSetup {
   readonly primary?: PrimaryId
   /** The weapon in hand on arrival; the trainee's own primary when absent. */
   readonly hold?: WeaponId
-  /** Health on arrival; full when absent. */
+  /** Health on arrival, whatever the trainee's class; the class's full health when absent. */
   readonly hp?: number
   /** Armour on arrival; none when absent. */
   readonly armor?: number
@@ -212,7 +217,7 @@ export const blastHit = (seen: Seen, kind: ProjectileKind) =>
   seen.events.some((e) => e.t === "boom" && e.k === kind) && seen.events.some((e) => e.t === "hit" && e.a === seen.me.session && e.v !== seen.me.session)
 
 /** A target: a Malandant at full health that stands, or walks its route, and never fires. */
-export const harmlessFoe = (route: StationBot["route"]): StationBot => ({ team: "malandanti", route, fires: false, hp: MAX_HP })
+export const harmlessFoe = (route: StationBot["route"]): StationBot => ({ team: "malandanti", route, fires: false, hp: STATION_BOT_HP })
 
 /** Whether the trainee stands within `radius` metres of `at`, horizontally. */
 export const near = (seen: Seen, at: V3, radius: number) => {
