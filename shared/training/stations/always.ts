@@ -5,7 +5,7 @@
  */
 import { SAGRE_STATIONS } from "../../maps/sagre.ts"
 import { MAX_HP } from "../../sim/rules.ts"
-import { held, justPressed } from "../../sim/systems/input.ts"
+import { held, justPressed } from "../../sim/controls.ts"
 import { once, station, type Seen, type StationBot } from "../station.ts"
 
 const PLACE = SAGRE_STATIONS[2]
