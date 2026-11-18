@@ -142,6 +142,29 @@ for (const host of HOSTS) {
       expect(me.last("snap")!.phase.tag).toBe("Muster")
     })
 
+    test("the enter intent is refused in the Muster and from a member already on the map", () => {
+      const { connect, play } = harness(host.make)
+      const me = connect()
+      me.say(create)
+      const { you } = me.last("joined")!
+      play(2)
+      const rooms = me.got.filter((m) => m.t === "room").length
+      me.say({ t: "enter" })
+      play(10)
+      // Nothing changes: still the Muster, nobody on the map, no new roster.
+      expect(me.last("snap")!.phase.tag).toBe("Muster")
+      expect(me.last("snap")!.you?.alive).toBe(false)
+      expect(me.got.filter((m) => m.t === "room")).toHaveLength(rooms)
+      me.say({ t: "start" })
+      play(10)
+      const before = me.last("snap")!.players.length
+      me.say({ t: "enter" })
+      play(10)
+      expect(me.last("snap")!.players).toHaveLength(before)
+      expect(me.last("snap")!.you?.alive).toBe(true)
+      expect(me.last("room")!.room.roster.find((r) => r.id === you)?.onMap).toBe(true)
+    })
+
     test("the host's restart during a live match ends it and returns the room to the Muster", () => {
       const { connect, play } = harness(host.make)
       const me = connect()
@@ -257,6 +280,157 @@ describe("the Muster on the game server", () => {
     play(2)
     browsing.say({ t: "list" })
     expect(browsing.last("rooms")!.rooms.map((r) => r.phase)).toEqual(["Live"])
+  })
+})
+
+describe("joining a match already on, on the game server", () => {
+  const join = (code: string, primary = "miedi") => ({ t: "join", code, primary })
+  /** A host in a live match, and a second player who joins it. */
+  const live = (create: object = HOSTS_CREATE.online) => {
+    const h = harness(HOSTS[0].make)
+    const host = h.connect()
+    host.say(create)
+    host.say({ t: "start" })
+    h.play(120)
+    const late = h.connect()
+    late.say(join(host.last("joined")!.room.code))
+    const you = late.last("joined")!.you
+    const entry = (c = late) => c.last("room")!.room.roster.find((r) => r.id === you)
+    return { ...h, host, late, you, entry }
+  }
+
+  test("a member who joins a live match is in the roster, not on the map, and absent from the match's players", () => {
+    const { host, late, you, entry, play } = live()
+    expect(entry()).toMatchObject({ primary: "miedi", onMap: false })
+    expect(entry(host)?.onMap).toBe(false)
+    // The others are on the map.
+    expect(late.last("room")!.room.roster.filter((r) => r.id !== you).every((r) => r.onMap)).toBe(true)
+    // No time limit: a long wait, and still nothing of them in the match.
+    play(60 * 60)
+    const snaps = [...late.got, ...host.got].filter((m) => m.t === "snap")
+    expect(snaps.every((s) => s.players.every((p) => p.id !== you))).toBe(true)
+    expect(late.last("snap")!.you).toBeNull()
+    expect(late.last("snap")!.phase.tag).toBe("Live")
+    expect(late.last("board")!.rows.some((r) => r.id === you)).toBe(false)
+  })
+
+  test("the enter intent places them on the map with the team and primary they chose", () => {
+    const { host, late, you, entry, play } = live()
+    const team = entry()!.team === "benandanti" ? "malandanti" : "benandanti"
+    play(30)
+    late.say({ t: "team", team })
+    late.say({ t: "primary", p: "mulin" })
+    expect(entry()).toMatchObject({ team, primary: "mulin", onMap: false })
+    late.say({ t: "enter" })
+    expect(entry()?.onMap).toBe(true)
+    expect(entry(host)?.onMap).toBe(true)
+    play(120)
+    const snap = late.last("snap")!
+    expect(snap.you?.alive).toBe(true)
+    expect(snap.you?.arsenal.primary).toBe("mulin")
+    expect(snap.players.find((p) => p.id === you)?.w).toBe("mulin")
+    expect(late.last("board")!.rows.find((r) => r.id === you)?.team).toBe(team)
+  })
+
+  test("a bot that would give up its seat keeps playing until the human enters", () => {
+    const h = harness(HOSTS[0].make)
+    const host = h.connect()
+    host.say({ ...HOSTS_CREATE.online, bots: 7 })
+    // Fill the room to the last seat.
+    while (host.last("room")!.room.roster.length < 16) {
+      host.say({ t: "bot", team: "benandanti", delta: 1 })
+      h.play(60)
+    }
+    host.say({ t: "start" })
+    h.play(120)
+    const late = h.connect()
+    late.say(join(host.last("joined")!.room.code))
+    const { you } = late.last("joined")!
+    const bots = () => host.last("room")!.room.roster.filter((r) => r.bot).length
+    expect(bots()).toBe(15)
+    h.play(600)
+    // Every seat still played: sixteen on the map, the bots among them alive and moving.
+    expect(host.last("snap")!.players).toHaveLength(16)
+    late.say({ t: "enter" })
+    expect(bots()).toBe(14)
+    h.play(120)
+    expect(host.last("snap")!.players).toHaveLength(16)
+    expect(host.last("snap")!.players.some((p) => p.id === you)).toBe(true)
+  })
+
+  test("a full room of humans still refuses a player who joins during a match", () => {
+    const h = harness(HOSTS[0].make)
+    const host = h.connect()
+    host.say({ ...HOSTS_CREATE.online, bots: 7 })
+    while (host.last("room")!.room.roster.length < 16) {
+      host.say({ t: "bot", team: "benandanti", delta: 1 })
+      h.play(60)
+    }
+    host.say({ t: "start" })
+    h.play(60)
+    const code = host.last("joined")!.room.code
+    // Fifteen bots: fifteen players can join while the match is on, each to take one's seat.
+    const joined = Array.from({ length: 15 }, (_, i) => {
+      const c = h.connect(`10.0.0.${i}`)
+      c.say(join(code))
+      return c
+    })
+    expect(joined.every((c) => c.last("joined"))).toBe(true)
+    const extra = h.connect("10.0.1.1")
+    extra.say(join(code))
+    expect(extra.last("joined")).toBeUndefined()
+    expect(extra.last("error")?.code).toBe("full")
+    for (const c of joined) c.say({ t: "enter" })
+    h.play(10)
+    expect(host.last("room")!.room.roster.filter((r) => r.bot)).toHaveLength(0)
+    expect(host.last("snap")!.players).toHaveLength(16)
+  })
+
+  test("a member who never enters stays off the map for the match, and is in the Muster when it ends", () => {
+    const { host, late, you, entry, play } = live({ ...HOSTS_CREATE.online, minutes: 2 })
+    for (let s = 0; s < 130 && late.last("snap")?.phase.tag !== "Over"; s++) play(60)
+    expect(late.last("snap")!.phase.tag).toBe("Over")
+    expect(late.got.filter((m) => m.t === "snap").every((s) => s.players.every((p) => p.id !== you))).toBe(true)
+    // Entering during the results is still entering this match; they wait for the Muster instead.
+    for (let s = 0; s < 20 && late.last("snap")?.phase.tag !== "Muster"; s++) play(60)
+    expect(late.last("snap")!.phase.tag).toBe("Muster")
+    expect(entry()?.onMap).toBe(true)
+    play(2)
+    expect(late.last("snap")!.players.some((p) => p.id === you)).toBe(true)
+    host.say({ t: "start" })
+    play(10)
+    expect(late.last("snap")!.you?.alive).toBe(true)
+    expect(late.last("snap")!.you?.arsenal.primary).toBe("miedi")
+  }, 30_000)
+
+  test("the host's restart sends a member who has not entered to the Muster with everybody", () => {
+    const { host, late, entry, play } = live()
+    host.say({ t: "start" })
+    play(2)
+    expect(late.last("snap")!.phase.tag).toBe("Muster")
+    expect(entry()?.onMap).toBe(true)
+    host.say({ t: "start" })
+    play(10)
+    expect(late.last("snap")!.you?.alive).toBe(true)
+  })
+
+  test("in the Tampieste a member entering after the start does not spawn in that match", () => {
+    const { late, you, entry, play } = live({ ...HOSTS_CREATE.online, mode: "tampieste" })
+    late.say({ t: "enter" })
+    expect(entry()?.onMap).toBe(true)
+    play(600)
+    const snap = late.last("snap")!
+    expect(snap.phase.tag).toBe("Live")
+    expect(snap.you?.alive).toBe(false)
+    expect(snap.players.find((p) => p.id === you)!.f & FLAG_BIT.alive).toBe(0)
+  })
+
+  test("a member who has not entered and leaves is gone from the roster, and the match goes on", () => {
+    const { host, late, you, play } = live()
+    late.say({ t: "leave" })
+    expect(host.last("room")!.room.roster.some((r) => r.id === you)).toBe(false)
+    play(60)
+    expect(host.last("snap")!.phase.tag).toBe("Live")
   })
 })
 

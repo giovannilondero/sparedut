@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { afterEscape, endFocus, focusOnOpen, musterFocus, musterTeams } from "../client/match-menus.ts"
+import { afterEscape, endFocus, focusOnOpen, musterFocus, musterScreen, musterTeams } from "../client/match-menus.ts"
 
 test("Esc closes the in-match menus one step at a time", () => {
   expect(afterEscape("pause", "none")).toBe("none")
@@ -31,9 +31,9 @@ test("the end screen starts on another match for the host, on leaving for everyo
 const room = (over: Partial<Parameters<typeof musterTeams>[0]> = {}): Parameters<typeof musterTeams>[0] => ({
   hostId: "p1",
   roster: [
-    { id: "p1", name: "Toni", team: "benandanti", primary: "mulin", bot: false, away: false },
-    { id: "bot-1", name: "Bepi", team: "malandanti", primary: "cramar", bot: true, away: false },
-    { id: "p2", name: "Mariute", team: "malandanti", primary: "miedi", bot: false, away: false }
+    { id: "p1", name: "Toni", team: "benandanti", primary: "mulin", bot: false, away: false, onMap: true },
+    { id: "bot-1", name: "Bepi", team: "malandanti", primary: "cramar", bot: true, away: false, onMap: true },
+    { id: "p2", name: "Mariute", team: "malandanti", primary: "miedi", bot: false, away: false, onMap: true }
   ],
   ...over
 })
@@ -61,4 +61,29 @@ test("in a LAN or Online room the Muster opens on its first control, for the hos
   expect(musterFocus({ host: true, reach: "lan" })).toBeNull()
   expect(musterFocus({ host: true, reach: "online" })).toBeNull()
   expect(musterFocus({ host: false, reach: "online" })).toBeNull()
+})
+
+const waiting = (mode: "bataie" | "tampieste" = "bataie") => ({
+  ...room({ roster: room().roster.map((r) => (r.id === "p2" ? { ...r, onMap: false } : r)) }),
+  mode
+})
+
+test("in the Muster everybody sees the Muster screen", () => {
+  expect(musterScreen({ ...room(), mode: "bataie" }, "p1", "Muster")).toEqual({ tag: "muster" })
+  expect(musterScreen(waiting(), "p2", "Muster")).toEqual({ tag: "muster" })
+})
+
+test("a member who joined a match already on sees the Muster screen with confirm until they enter; the others see the match", () => {
+  expect(musterScreen(waiting(), "p2", "Live")).toEqual({ tag: "joining", nextMatch: false })
+  expect(musterScreen(waiting(), "p1", "Live")).toEqual({ tag: "closed" })
+  // Entered: the roster puts them on the map, and the screen closes.
+  expect(musterScreen({ ...room(), mode: "bataie" }, "p2", "Live")).toEqual({ tag: "closed" })
+})
+
+test("joining a Tampieste already on, the screen says they play from the next match", () => {
+  expect(musterScreen(waiting("tampieste"), "p2", "Live")).toEqual({ tag: "joining", nextMatch: true })
+})
+
+test("during the results the end screen shows, for a member who has not entered too", () => {
+  expect(musterScreen(waiting(), "p2", "Over")).toEqual({ tag: "closed" })
 })
