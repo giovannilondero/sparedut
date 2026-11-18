@@ -159,6 +159,8 @@ const menu = new Menu(settings, audio, {
       // The room lives in this page: the game server need not be reachable.
       autostart = oneTap
       roomPassword = null
+      // An invite still in the address must not pull the player out when the server comes back.
+      forgetRoomAddress()
       link.use(browserHost)
       browserHost.open(settings.name)
       browserHost.send({ t: "create", ...o, primary: settings.primary })
@@ -223,6 +225,11 @@ function ensureOnline() {
   return false
 }
 
+/** The address no longer names a room: nothing joins it again on its own. */
+function forgetRoomAddress() {
+  history.replaceState(null, "", location.pathname)
+}
+
 function backToMenu() {
   game?.stop()
   menu.show(true)
@@ -254,7 +261,7 @@ link.on((msg: ServerMessage) => {
     case "left":
       if (offline()) leaveOffline()
       roomPassword = null
-      history.replaceState(null, "", location.pathname)
+      forgetRoomAddress()
       backToMenu()
       return
     case "error":
@@ -284,7 +291,8 @@ async function connect() {
     connecting = false
     menu.status(t().net.connected(settings.name || t().net.stranger))
     net.send({ t: "list" })
-    const invite = readInvite(location.search, location.hash)
+    // An invite joins on its own only from the menu: never over a room in progress.
+    const invite = game?.active || offline() ? null : readInvite(location.search, location.hash)
     if (invite && settings.name) {
       menu.status(t().net.invite(invite.code))
       sendJoin(invite.code, invite.password ?? undefined)
@@ -298,6 +306,8 @@ async function connect() {
 net.onClose = () => {
   if (game?.active && !offline()) {
     toast(t().net.lost)
+    roomPassword = null
+    forgetRoomAddress()
     backToMenu()
   }
   menu.status(t().net.lostRetry)
