@@ -10,10 +10,11 @@ import type { PrimaryId } from "../weapons.ts"
 import type { GameEvent } from "./events.ts"
 import { freshDoors, freshTurrets } from "./rules.ts"
 import { simulate } from "./schedule.ts"
-import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, StartMatch, StepUnavailable, Training, type PickupState, type PostValue } from "./schema.ts"
-import type { InterfaceAction } from "../training/interface.ts"
-import { TRAINING, type StationId } from "../training/index.ts"
 import type { Device } from "../devices.ts"
+import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, GoToStation, StartMatch, StepUnavailable, Training, type PickupState, type PostValue } from "./schema.ts"
+import type { InterfaceAction } from "../training/interface.ts"
+import { STATION_IDS, TRAINING, type StationId } from "../training/index.ts"
+import { arrival, FIRST_START, type TrainingStart } from "../training/start.ts"
 import { ReadOutbox, ViewWorld, type WorldView } from "./view.ts"
 
 export interface SimOptions {
@@ -24,6 +25,8 @@ export interface SimOptions {
   readonly seed: number
   /** The map's physics world: the match map is its map. */
   readonly physics: PhysicsWorld
+  /** A training's start, from its request; a training without one starts at station 1. */
+  readonly training?: TrainingStart
 }
 
 export type Sim = ReturnType<typeof createSim>
@@ -32,6 +35,7 @@ export type Sim = ReturnType<typeof createSim>
 export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: HostClock.HostClock }) {
   // The training has no warm-up and no clock: it is live from the start, at its first station.
   const training = options.mode === TRAINING.mode
+  const first = arrival(options.training ?? FIRST_START)
   const made = Game.Runtime.make({
     services: Game.Runtime.services(Game.Runtime.service(Physics, options.physics)),
     resources: {
@@ -57,7 +61,7 @@ export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: H
     },
     machines: Game.Runtime.machines(
       Game.Runtime.machine(Match, training ? { _tag: "Live", ends: 0 } : { _tag: "Warmup" }),
-      Game.Runtime.machine(Training, training ? { _tag: "Arriving", station: 0, unlocked: 1, place: true } : { _tag: "Off" })
+      Game.Runtime.machine(Training, training ? { _tag: "Arriving", station: first.station, unlocked: first.unlocked, place: "facingStart" } : { _tag: "Off" })
     ),
     ...(debug ? { debug } : {})
   })
@@ -81,6 +85,10 @@ export function createSim(options: SimOptions) {
     report: (session: string, action: InterfaceAction) => runtime.send(ReportInterface, { session, action }),
     /** The client's word that its active device has no control for a step: only a training takes it, for its current step, when the step table agrees. */
     unavailable: (session: string, station: StationId, step: string, device: Device) => runtime.send(StepUnavailable, { session, station, step, device }),
+    /** The trainee goes to a station: only an unlocked one is reached (the current one restarts). */
+    goTo: (session: string, station: StationId) => runtime.send(GoToStation, { session, to: { _tag: "station", station: STATION_IDS.indexOf(station) } }),
+    /** The trainee starts the training over: station 1, the others locked again. */
+    startOver: (session: string) => runtime.send(GoToStation, { session, to: { _tag: "startOver" } }),
     /** Advances one tick and returns the game events it produced. */
     step(): GameEvent[] {
       const ticked = runtime.tick(simulate)

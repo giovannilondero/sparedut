@@ -2,6 +2,7 @@
  * The main menu: name, language, rooms, armoury, settings, glossary. It draws the menu model
  * and forwards the player's events to it; what a choice means is the model's to decide.
  */
+import type { TrainingStart } from "../shared/training/start.ts"
 import type { MapId } from "../shared/map.ts"
 import type { Access, RoomSummary } from "../shared/protocol.ts"
 import { PRIMARIES, WEAPON_IDS, WEAPONS, type PrimaryId, type WeaponId } from "../shared/weapons.ts"
@@ -31,8 +32,8 @@ export interface MenuHandlers {
   readonly create: (o: CreateOptions, oneTap?: boolean) => void
   /** `password` only once the player typed one (from the prompt or an invite link). */
   readonly join: (code: string, password?: string) => void
-  /** The training: always Offline, nothing to choose. */
-  readonly training: () => void
+  /** The training: always Offline, nothing to choose; `start` from the saved progress. */
+  readonly training: (start: TrainingStart) => void
   /** The map chosen in the menu: it becomes the background. */
   readonly mapChanged: (id: MapId) => void
   readonly settingsChanged: () => void
@@ -219,7 +220,7 @@ export class Menu {
     if (o.kind === "send") {
       const r = o.request
       if (r.t === "create") this.handlers.create(r.room, r.oneTap)
-      else if (r.t === "training") this.handlers.training()
+      else if (r.t === "training") this.handlers.training(r.start)
       else if (r.t === "join") this.handlers.join(r.code, r.password)
       // The installable game's requests: the install prompt, the new version.
       else if (r.t === "install" || r.t === "update") this.appRequest(r.t)

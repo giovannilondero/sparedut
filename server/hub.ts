@@ -5,6 +5,7 @@ import { ClientMessage, PROTOCOL_VERSION, SERVER_REACHES, type Reach, type Serve
 import { TICK_RATE } from "../shared/movement.ts"
 import type { NetworkId } from "./network.ts"
 import { newCode, Room, TRAINING_ROOM } from "./room.ts"
+import { FIRST_START, type TrainingStart } from "../shared/training/start.ts"
 
 export interface Peer {
   readonly network: NetworkId
@@ -141,7 +142,8 @@ export class Hub {
       case "training": {
         // Always an Offline room: only a host that makes those (the player's browser) makes a training.
         if (!this.reaches.includes(TRAINING_ROOM.reach)) return this.send(peer, { t: "error", code: "invalid" })
-        if (this.openRoom(peer, msg.primary, TRAINING_ROOM)) console.log(`🎓 Training for ${peer.name}`)
+        const start = { unlocked: msg.unlocked ?? FIRST_START.unlocked, from: msg.from ?? FIRST_START.from }
+        if (this.openRoom(peer, msg.primary, TRAINING_ROOM, start)) console.log(`🎓 Training for ${peer.name}`)
         return
       }
       case "join": {
@@ -194,6 +196,13 @@ export class Hub {
       room.sim.unavailable(id, msg.station, msg.step, msg.device)
       return
     }
+    // Going to a station, restarting one, starting over: only a training takes them.
+    if (msg.t === "goTo" || msg.t === "startOver") {
+      if (!room?.training) return this.send(peer, { t: "error", code: "invalid" })
+      if (msg.t === "goTo") room.sim.goTo(id, msg.station)
+      else room.sim.startOver(id)
+      return
+    }
     if (!room) return
     // A training has no host tools, and its player stays a Benandante.
     if (room.training && (msg.t === "team" || msg.t === "start" || msg.t === "bot" || msg.t === "level")) return
@@ -232,7 +241,7 @@ export class Hub {
   }
 
   /** Makes a room with `peer` in it as its host; null, with an error sent, when the host is too busy. */
-  private openRoom(peer: Peer, primary: Parameters<Room["addHuman"]>[2], settings: Room["settings"]): Room | null {
+  private openRoom(peer: Peer, primary: Parameters<Room["addHuman"]>[2], settings: Room["settings"], start?: TrainingStart): Room | null {
     const mine = [...this.rooms.values()].filter((r) => r.networkKey === peer.network.key).length
     if (this.rooms.size >= MAX_ROOMS || mine >= MAX_ROOMS_PER_NETWORK) {
       this.send(peer, { t: "error", code: "busy" })
@@ -240,7 +249,7 @@ export class Hub {
     }
     this.leave(peer)
     const code = newCode((c) => this.rooms.has(c))
-    const room = new Room(code, peer.id!, peer.name || "Furlan", peer.network.key, settings)
+    const room = new Room(code, peer.id!, peer.name || "Furlan", peer.network.key, settings, start)
     this.rooms.set(code, room)
     this.enter(peer, room, primary)
     return room

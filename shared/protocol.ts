@@ -96,7 +96,15 @@ export const ClientMessage = z.discriminatedUnion("t", [
    * The training: an Offline room of its own kind, one player, on the fair in the Dutrine mode.
    * Only the in-browser host makes one; it has no code, no list entry and no host tools.
    */
-  z.object({ t: z.literal("training"), primary: z.enum(PRIMARIES) }).strict(),
+  z
+    .object({
+      t: z.literal("training"),
+      primary: z.enum(PRIMARIES),
+      /** The browser's saved progress (`shared/training/start.ts`); absent, a first training. */
+      unlocked: z.number().int().min(1).max(STATION_IDS.length).optional(),
+      from: z.enum(STATION_IDS).optional()
+    })
+    .strict(),
   z.object({
     t: z.literal("join"),
     code: RoomCode,
@@ -120,7 +128,11 @@ export const ClientMessage = z.discriminatedUnion("t", [
   /** The player's active device has no control for this step of the training (`shared/training/controls.ts`). Only a training accepts it. */
   z
     .object({ t: z.literal("unavailable"), station: z.enum(STATION_IDS), step: z.string(), device: z.enum(DEVICES) })
-    .refine((m) => (stepsOf(m.station) as readonly string[]).includes(m.step))
+    .refine((m) => (stepsOf(m.station) as readonly string[]).includes(m.step)),
+  /** Only in a training: to an unlocked station's start, its setup applied (the current one: restart it). */
+  z.object({ t: z.literal("goTo"), station: z.enum(STATION_IDS) }),
+  /** Only in a training: back to station 1, with only it unlocked. */
+  z.object({ t: z.literal("startOver") })
 ])
 export type ClientMessage = z.infer<typeof ClientMessage>
 
