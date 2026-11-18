@@ -120,7 +120,7 @@ export class Hub {
         this.send(peer, { t: "welcome", id, version: PROTOCOL_VERSION, publicUrl: this.publicUrl })
         return
       case "list":
-        this.send(peer, { t: "rooms", rooms: this.visibleTo(peer) })
+        this.send(peer, { t: "rooms", rooms: this.reachableBy(peer) })
         return
       case "create": {
         if (!this.reaches.includes(msg.reach)) return this.send(peer, { t: "error", code: "invalid" })
@@ -245,7 +245,7 @@ export class Hub {
   }
 
   /** The rooms a peer can reach: the LAN rooms of its own network, then every Online room. */
-  private visibleTo(peer: Peer) {
+  private reachableBy(peer: Peer) {
     const all = [...this.rooms.values()]
     const lan = all.filter((r) => r.settings.reach === "lan" && r.networkKey === peer.network.key)
     const online = all.filter((r) => r.settings.reach === "online")

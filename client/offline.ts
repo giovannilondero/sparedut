@@ -2,7 +2,7 @@
 import { PROTOCOL_VERSION, type ClientMessage } from "../shared/protocol.ts"
 import { HostConnection } from "./connection.ts"
 
-export class BrowserHost extends HostConnection {
+export class BrowserHostConnection extends HostConnection {
   private worker: Worker | null = null
   /** The worker failed (its script or Rapier's WASM did not load). */
   onError: ((error: unknown) => void) | null = null

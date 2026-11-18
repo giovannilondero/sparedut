@@ -1,6 +1,6 @@
 /**
  * How the client talks to whoever hosts its room: the game server (`Net`) or the host in the
- * player's own browser (`BrowserHost`). Both speak the same protocol; the game only sees this.
+ * player's own browser (`BrowserHostConnection`, to the host `client/host.ts` builds). Both speak the same protocol; the game only sees this.
  */
 import type { ClientMessage, ServerMessage } from "../shared/protocol.ts"
 

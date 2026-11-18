@@ -18,7 +18,7 @@ import { createLook, lookFromUrl, mountLookSwitcher } from "./looks.ts"
 import { loadDetailed } from "./models/detailed.ts"
 import { Menu } from "./menu.ts"
 import { Net } from "./net.ts"
-import { BrowserHost } from "./offline.ts"
+import { BrowserHostConnection } from "./offline.ts"
 import { Link } from "./connection.ts"
 import { PerfMonitor } from "./perf.ts"
 import { loadSettings, saveSettings } from "./settings.ts"
@@ -119,11 +119,11 @@ window.addEventListener("keydown", (e: KeyboardEvent) => {
 
 const net = new Net()
 /** An Offline room's host, in a worker of this page: started on create, ended on leave. */
-const browserHost = new BrowserHost()
+const browserHostConnection = new BrowserHostConnection()
 /** What the game talks to: the server, or the browser's host while in an Offline room. */
-const link = new Link([net, browserHost])
-const offline = () => link.uses(browserHost)
-browserHost.onError = (error) => {
+const link = new Link([net, browserHostConnection])
+const offline = () => link.uses(browserHostConnection)
+browserHostConnection.onError = (error) => {
   console.error("The Offline room's host failed:", error)
   toast(t().net.offlineFailed)
   if (offline()) leaveOffline()
@@ -131,7 +131,7 @@ browserHost.onError = (error) => {
 }
 /** Back to the server: the browser's host and its Offline room end. */
 function leaveOffline() {
-  browserHost.close()
+  browserHostConnection.close()
   link.use(net)
 }
 const persist = () => {
@@ -161,9 +161,9 @@ const menu = new Menu(settings, audio, {
       roomPassword = null
       // An invite still in the address must not pull the player out when the server comes back.
       forgetRoomAddress()
-      link.use(browserHost)
-      browserHost.open(settings.name)
-      browserHost.send({ t: "create", ...o, primary: settings.primary })
+      link.use(browserHostConnection)
+      browserHostConnection.open(settings.name)
+      browserHostConnection.send({ t: "create", ...o, primary: settings.primary })
       return
     }
     if (!ensureOnline()) return

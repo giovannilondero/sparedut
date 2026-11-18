@@ -86,15 +86,15 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 .field { min-inline-size: 0; }
 .code-input { font-family: var(--serif); font-size: 46px; letter-spacing: 0.4em; text-transform: uppercase; text-align: center; padding: 10px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--stone-line); border-radius: 10px; }
 
-.lan-box { border-top: 1px solid var(--stone-line); padding-top: 8px; }
-.lan-title { font-family: var(--serif); color: var(--gold); font-size: 15px; }
-.lan-title small { color: var(--muted); font-family: var(--sans); }
-#lan-list { list-style: none; padding: 0; margin: 6px 0 0; display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow: auto; }
-#lan-list li button { width: 100%; display: flex; justify-content: space-between; font-size: 14px; }
-#lan-list li button:disabled { opacity: 0.55; cursor: not-allowed; }
-#lan-list .chip { font-style: normal; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--stone-line); }
-#lan-list .chip.lan { color: var(--gold); border-color: var(--gold); }
-#lan-list .lock { font-style: normal; }
+.room-list-box { border-top: 1px solid var(--stone-line); padding-top: 8px; }
+.room-list-title { font-family: var(--serif); color: var(--gold); font-size: 15px; }
+.room-list-title small { color: var(--muted); font-family: var(--sans); }
+#room-list { list-style: none; padding: 0; margin: 6px 0 0; display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow: auto; }
+#room-list li button { width: 100%; display: flex; justify-content: space-between; font-size: 14px; }
+#room-list li button:disabled { opacity: 0.55; cursor: not-allowed; }
+#room-list .chip { font-style: normal; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--stone-line); }
+#room-list .chip.lan { color: var(--gold); border-color: var(--gold); }
+#room-list .password-mark { font-style: normal; }
 .pw-input { font-size: 22px; text-align: center; padding: 10px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--stone-line); border-radius: 10px; color: var(--ink); }
 .form-msg { margin: 0; min-block-size: 1lh; font-size: 13px; color: #f08a6c; }
 .form-msg:empty { display: none; }

@@ -55,7 +55,7 @@ export class Menu {
         audio.unlock()
         audio.play("ui_click")
         const go = el.dataset.go!
-        if (go === "quick") this.quick()
+        if (go === "one-tap") this.oneTap()
         else this.go(go as ScreenName)
       })
     }
@@ -172,7 +172,7 @@ export class Menu {
   }
 
   /** The home screen's "play against the bots": an Offline match in one tap. */
-  private quick() {
+  private oneTap() {
     if (this.needName()) return
     this.handlers.create(oneTapRoom(this.settings), true)
   }
@@ -184,7 +184,7 @@ export class Menu {
 
   rooms(list: readonly RoomSummary[]) {
     this.roomList = list
-    const ul = $("lan-list")
+    const ul = $("room-list")
     const s = t()
     if (!list.length) {
       ul.innerHTML = `<li class="muted">${s.menu.roomsEmpty}</li>`
@@ -194,8 +194,8 @@ export class Menu {
       .map((r) => {
         const full = r.players >= r.max
         const access = r.reach === "offline" ? null : r.access
-        const lock = access === "password" ? ` <i class="lock" role="img" aria-label="${s.menu.locked}" title="${s.menu.locked}">🔒</i>` : ""
-        return `<li><button data-code="${r.code}" data-access="${access ?? ""}"${full ? " disabled" : ""}><span><i class="chip ${r.reach}">${s.menu.reach[r.reach]}</i>${lock} <b>${esc(r.host)}</b> · ${s.modes[r.mode].name} · ${s.maps[r.map].name}</span><span>${full ? `${s.menu.full} · ` : ""}${r.players}/${r.max}👤 ${r.bots}🤖 · ${r.code}</span></button></li>`
+        const passwordMark = access === "password" ? ` <i class="password-mark" role="img" aria-label="${s.menu.passwordRoom}" title="${s.menu.passwordRoom}">🔒</i>` : ""
+        return `<li><button data-code="${r.code}" data-access="${access ?? ""}"${full ? " disabled" : ""}><span><i class="chip ${r.reach}">${s.menu.reach[r.reach]}</i>${passwordMark} <b>${esc(r.host)}</b> · ${s.modes[r.mode].name} · ${s.maps[r.map].name}</span><span>${full ? `${s.menu.full} · ` : ""}${r.players}/${r.max}👤 ${r.bots}🤖 · ${r.code}</span></button></li>`
       })
       .join("")
     for (const b of ul.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")) {

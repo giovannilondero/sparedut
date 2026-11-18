@@ -134,12 +134,12 @@ test("the old visibility setting is refused", () => {
 // ---------------------------------------------------------------- access
 
 const PASSWORD = "Cjavedal-7q"
-const locked = { ...create, access: { kind: "password", password: PASSWORD } }
+const withPassword = { ...create, access: { kind: "password", password: PASSWORD } }
 
 test("the room list says which rooms need a password, and an open room does not", () => {
   const hub = new Hub()
   connect(hub, "9.9.9.9").say(create)
-  connect(hub, "9.9.9.8").say(locked)
+  connect(hub, "9.9.9.8").say(withPassword)
   const me = connect(hub, "1.2.3.4")
   me.say({ t: "list" })
   expect(rooms(me.got).map((r) => r.reach !== "offline" && r.access)).toEqual(["open", "password"])
@@ -150,7 +150,7 @@ test("a password of 1 to 32 characters after cleaning is accepted, an empty or l
   const tries = ["", "  ‮ ", "x".repeat(33), "x", ` ${"x".repeat(32)}\u0007 `]
   const results = tries.map((password) => {
     const host = connect(hub, `7.7.7.${password.length}`)
-    host.say({ ...locked, access: { kind: "password", password } })
+    host.say({ ...withPassword, access: { kind: "password", password } })
     return host.peer.room ? "created" : host.got.at(-1)
   })
   const invalid = { t: "error", code: "invalid" } as const
@@ -160,7 +160,7 @@ test("a password of 1 to 32 characters after cleaning is accepted, an empty or l
 test("joining a password room asks for the password, refuses a wrong one and accepts the right one", () => {
   const hub = new Hub()
   const host = connect(hub, "9.9.9.9")
-  host.say(locked)
+  host.say(withPassword)
   const code = host.peer.room!.code
   const me = connect(hub, "1.2.3.4")
   me.say({ t: "join", code, primary: "cramar" })
@@ -185,7 +185,7 @@ test("after five wrong passwords a connection waits ten seconds before trying ag
   let now = 1000
   const hub = new Hub(() => now)
   const host = connect(hub, "9.9.9.9")
-  host.say(locked)
+  host.say(withPassword)
   const code = host.peer.room!.code
   const me = connect(hub, "1.2.3.4")
   const join = (password: string) => me.say({ t: "join", code, password, primary: "cramar" })
@@ -219,7 +219,7 @@ test("the password is in no message the server sends and in none of its logs", (
   let now = 0
   const hub = new Hub(() => now)
   const host = connect(hub, "9.9.9.9")
-  host.say({ ...locked, bots: 2 })
+  host.say({ ...withPassword, bots: 2 })
   const code = host.peer.room!.code
   const member = connect(hub, "1.2.3.4")
   member.say({ t: "join", code, password: PASSWORD, primary: "cramar" })
@@ -247,7 +247,7 @@ test("the password is in no message the server sends and in none of its logs", (
 test("the room keeps its access and password when the host leaves, and its members see it", () => {
   const hub = new Hub()
   const host = connect(hub, "9.9.9.9")
-  host.say(locked)
+  host.say(withPassword)
   const code = host.peer.room!.code
   const member = connect(hub, "1.2.3.4")
   member.say({ t: "join", code, password: PASSWORD, primary: "cramar" })

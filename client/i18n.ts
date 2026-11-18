@@ -17,7 +17,7 @@ type Fn<A extends unknown[] = [string]> = (...args: A) => string
 
 /** Static HTML texts: `data-t="key"` (innerHTML) and `data-t-ph="key"` (placeholder). */
 type StaticKey =
-  | "title" | "kicker" | "sub" | "nameLabel" | "namePh" | "quick" | "quickSub" | "create" | "createSub" | "join" | "joinSub"
+  | "title" | "kicker" | "sub" | "nameLabel" | "namePh" | "oneTap" | "oneTapSub" | "create" | "createSub" | "join" | "joinSub"
   | "roomsTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "reachLabel" | "reachLan" | "reachOnline" | "reachOffline"
   | "ff" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
   | "qHigh" | "autoRes" | "showInfo" | "invert" | "keys" | "vocabTitle" | "connecting" | "chatPh" | "deathTitle" | "deathHint"
@@ -42,8 +42,8 @@ export interface Strings {
     readonly reach: Record<Reach, string>
     /** A full room in the list: shown, not selectable. */
     readonly full: string
-    /** The lock on a password room in the list, read out by screen readers. */
-    readonly locked: string
+    /** The mark on a room with a password in the list, read out by screen readers. */
+    readonly passwordRoom: string
     /** The password prompt: which room asks for it. */
     readonly passwordFor: Fn
     /** A password the create form or the prompt refuses before sending it. */
@@ -260,8 +260,8 @@ const fur: Strings = {
     sub: `Bataie tra <b class="ben">Benandants</b> e <b class="mal">Malandants</b> sot dal Cjampanili`,
     nameLabel: "Il to non",
     namePh: "Toni di Glemone",
-    quick: "Zuie cuintri i bot",
-    quickSub: "Offline cuintri il computer, ancje cence server",
+    oneTap: "Zuie cuintri i bot",
+    oneTapSub: "Offline cuintri il computer, ancje cence server",
     create: "Cree une partide",
     createSub: "Offline, te rêt locâl o in linie",
     join: "Jentre cul codiç",
@@ -398,7 +398,7 @@ const fur: Strings = {
     roomsEmpty: "Nissune partide viarte. Creine une!",
     reach: { offline: "Offline", lan: "LAN", online: "In linie" },
     full: "Plene",
-    locked: "Cun password",
+    passwordRoom: "Cun password",
     passwordFor: (code) => `La partide ${code} e domande une password.`,
     passwordBad: "La password e à di vê di 1 a 32 caratars.",
     botsNone: "Nissun (dome personis)",
@@ -595,8 +595,8 @@ const it: Strings = {
     sub: `Battaglia tra <b class="ben">Benandanti</b> e <b class="mal">Malandanti</b> sotto il campanile`,
     nameLabel: "Il tuo nome",
     namePh: "Toni di Gemona",
-    quick: "Gioca contro i bot",
-    quickSub: "Offline contro il computer, anche senza server",
+    oneTap: "Gioca contro i bot",
+    oneTapSub: "Offline contro il computer, anche senza server",
     create: "Crea una partita",
     createSub: "Offline, in rete locale o online",
     join: "Entra con codice",
@@ -733,7 +733,7 @@ const it: Strings = {
     roomsEmpty: "Nessuna partita aperta. Creane una!",
     reach: { offline: "Offline", lan: "LAN", online: "Online" },
     full: "Piena",
-    locked: "Con password",
+    passwordRoom: "Con password",
     passwordFor: (code) => `La partita ${code} chiede una password.`,
     passwordBad: "La password deve avere da 1 a 32 caratteri.",
     botsNone: "Nessuno (solo persone)",
