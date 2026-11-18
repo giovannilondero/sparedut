@@ -1,7 +1,6 @@
 /** Player settings, saved in the browser. */
 import type { BotLevel, ModeId } from "../shared/folklore.ts"
-import type { MapId } from "../shared/map.ts"
-import { MAP_IDS } from "../shared/maps/index.ts"
+import { ROOM_MAP_IDS, type RoomMapId } from "../shared/maps/index.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 import type { CrouchMode } from "./controls.ts"
 import type { Lang } from "./i18n.ts"
@@ -26,7 +25,7 @@ export interface Settings {
   autoRes: boolean
   lastMode: ModeId
   /** The last chosen map: it's also the menu background. */
-  lastMap: MapId
+  lastMap: RoomMapId
   lastBots: number
   lastLevel: BotLevel
   lastMinutes: number
@@ -60,7 +59,7 @@ export function loadSettings(): Settings {
   try {
     const s: Settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") }
     // A value saved by an old version (or a removed map) falls back to the default.
-    if (!MAP_IDS.includes(s.lastMap)) s.lastMap = DEFAULTS.lastMap
+    if (!ROOM_MAP_IDS.includes(s.lastMap)) s.lastMap = DEFAULTS.lastMap
     if (s.crouch !== "hold" && s.crouch !== "toggle") s.crouch = DEFAULTS.crouch
     if (typeof s.lastFf !== "boolean") s.lastFf = DEFAULTS.lastFf
     return s

@@ -1,8 +1,11 @@
 // World preview: map with ?map=osoppo, look with ?look=ver, quality with ?q=alta, menu camera (or fixed with ?cam=x,y,z,lx,ly,lz), mode with ?mode=frico|culine|cjar|tampieste.
+// Walking it on foot with ?walk (from the Benandanti's first spawn, or ?walk=x,z,yaw): click to look with the mouse, WASD, space, C to crouch, shift to sprint.
 // A turret's gunner's view with ?gunner=<turret>&aim=<yaw from its facing>,<pitch> (radians, clamped to the arc) and ?shot=<seconds since a shot>.
 import * as THREE from "three"
+import { BUTTON, IDLE_INPUT } from "../../shared/input.ts"
 import { trackLength, trackPoint, type MapId } from "../../shared/map.ts"
-import { EYE_STAND } from "../../shared/movement.ts"
+import { EYE_STAND, eyeHeight, stepBody, type Body } from "../../shared/movement.ts"
+import { createPhysicsWorld, initPhysics, type PhysicsWorld } from "../../shared/physics.ts"
 import { firstPerson } from "../firstperson.ts"
 import { MAP_IDS, MAPS } from "../../shared/maps/index.ts"
 import type { WorldFrame } from "../contracts.ts"
@@ -76,6 +79,42 @@ const gunnerCamera = () => {
   camera.rotation.set(gunner.mitraie.pitch, gunner.mitraie.yaw, 0, "YXZ")
   return true
 }
+/** On foot: the body moves through the map's physics, a tick at a time, as in a match. */
+const walk = q.get("walk") === null ? null : (() => {
+  const [wx, wz, wyaw = 0] = (q.get("walk") ?? "").split(",").map(Number)
+  const from = Number.isFinite(wx) && Number.isFinite(wz) ? { at: [wx, 0, wz], yaw: wyaw } : map.spawns.benandanti[0]
+  const state = {
+    physics: null as PhysicsWorld | null,
+    body: { x: from.at[0], y: from.at[1] + 0.05, z: from.at[2], vx: 0, vy: 0, vz: 0, grounded: false, crouch: false } as Body,
+    yaw: from.yaw,
+    pitch: 0,
+    keys: new Set<string>(),
+    acc: 0
+  }
+  void initPhysics().then(() => (state.physics = createPhysicsWorld(map)))
+  document.addEventListener("keydown", (e: KeyboardEvent) => state.keys.add(e.code))
+  document.addEventListener("keyup", (e: KeyboardEvent) => state.keys.delete(e.code))
+  canvas.addEventListener("click", () => void canvas.requestPointerLock())
+  document.addEventListener("mousemove", (e: MouseEvent) => {
+    if (document.pointerLockElement !== canvas) return
+    state.yaw -= e.movementX * 0.0025
+    state.pitch = Math.max(-1.5, Math.min(1.5, state.pitch - e.movementY * 0.0025))
+  })
+  return state
+})()
+const walkCamera = (dt: number) => {
+  if (!walk) return false
+  const { physics, keys } = walk
+  if (physics) {
+    const key = (code: string) => (keys.has(code) ? 1 : 0)
+    const buttons = (keys.has("Space") ? BUTTON.jump : 0) | (keys.has("KeyC") || keys.has("ControlLeft") ? BUTTON.crouch : 0) | (keys.has("ShiftLeft") ? BUTTON.sprint : 0)
+    const input = { ...IDLE_INPUT, mz: key("KeyW") - key("KeyS"), mx: key("KeyD") - key("KeyA"), yaw: walk.yaw, buttons }
+    for (walk.acc += dt; walk.acc >= 1 / 60; walk.acc -= 1 / 60) walk.body = stepBody(walk.body, input, physics, 1).body
+  }
+  camera.position.set(walk.body.x, walk.body.y + eyeHeight(walk.body), walk.body.z)
+  camera.rotation.set(walk.pitch, walk.yaw, 0, "YXZ")
+  return true
+}
 /** The cjar going back and forth along the track, the storm closing in. */
 const extras = (t: number): Pick<WorldFrame, "cart" | "storm" | "turrets" | "doors"> => {
   const len = trackLength(map.track)
@@ -102,7 +141,7 @@ const loop = (now: number) => {
   const dt = Math.min(0.1, (now - last) / 1000)
   last = now
   const t = tFixed ?? (now - t0) / 1000
-  if (gunnerCamera()) camera.updateMatrixWorld()
+  if (gunnerCamera() || walkCamera(dt)) camera.updateMatrixWorld()
   else if (cam && cam.length === 6) {
     camera.position.set(cam[0], cam[1], cam[2])
     camera.lookAt(cam[3], cam[4], cam[5])
@@ -123,7 +162,7 @@ const loop = (now: number) => {
     frames = 0
     fpsT = now
     const r = renderer.info.render
-    info.textContent = `fps ${fps.toFixed(0)}  draw ${r.calls}  tri ${(r.triangles / 1000).toFixed(0)}k  build ${buildMs.toFixed(0)} ms\ngeo ${renderer.info.memory.geometries}  tex ${renderer.info.memory.textures}`
+    info.textContent = `fps ${fps.toFixed(0)}  draw ${r.calls}  tri ${(r.triangles / 1000).toFixed(0)}k  build ${buildMs.toFixed(0)} ms\ngeo ${renderer.info.memory.geometries}  tex ${renderer.info.memory.textures}${walk ? `\non foot ${walk.body.x.toFixed(1)} ${walk.body.y.toFixed(1)} ${walk.body.z.toFixed(1)}` : ""}`
   }
   requestAnimationFrame(loop)
 }

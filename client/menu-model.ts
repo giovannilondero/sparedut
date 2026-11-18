@@ -4,8 +4,7 @@
  * why a request is refused; the menu's DOM renders it and forwards the player's events to it.
  */
 import { BOT_LEVEL_IDS, MODE_IDS, type BotLevel, type ModeId } from "../shared/folklore.ts"
-import type { MapId } from "../shared/map.ts"
-import { MAP_IDS } from "../shared/maps/index.ts"
+import { ROOM_MAP_IDS, type RoomMapId } from "../shared/maps/index.ts"
 import { ACCESSES, MAX_BOTS, Password, REACHES, RoomCode, type Access, type ErrorCode, type Reach, type Reached, type RoomAccess, type RoomSummary } from "../shared/protocol.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 import type { Lang } from "./i18n.ts"
@@ -13,7 +12,7 @@ import { oneTapRoom, type Settings } from "./settings.ts"
 
 export type CreateOptions = Reached<RoomAccess> & {
   readonly mode: ModeId
-  readonly map: MapId
+  readonly map: RoomMapId
   readonly minutes: number
   readonly bots: number
   readonly level: BotLevel
@@ -70,7 +69,7 @@ const REACH_PLACE = { lan: 0, online: 1, offline: 2 } as const satisfies Record<
 /** What creation offers, from the sets the game defines: a new mode or map appears here by itself. */
 export const MENU_OPTIONS = {
   modes: MODE_IDS,
-  maps: MAP_IDS,
+  maps: ROOM_MAP_IDS,
   levels: BOT_LEVEL_IDS,
   reaches: [...REACHES].sort((a, b) => REACH_PLACE[a] - REACH_PLACE[b]),
   accesses: ACCESSES,
@@ -82,7 +81,7 @@ export const MENU_OPTIONS = {
 /** Creation's choices as they stand. */
 export interface Choices {
   readonly mode: ModeId
-  readonly map: MapId
+  readonly map: RoomMapId
   readonly minutes: number
   readonly bots: number
   readonly level: BotLevel
@@ -112,7 +111,7 @@ const refused = (reason: Refusal): Outcome => ({ kind: "refused", reason })
 export class MenuModel {
   private current: Screen = "home"
   private mode: ModeId
-  private map: MapId
+  private map: RoomMapId
   private minutes: number
   private bots: number
   private level: BotLevel
@@ -201,7 +200,7 @@ export class MenuModel {
   }
 
   /** The map is remembered at once: it becomes the menu's background. */
-  chooseMap(map: MapId) {
+  chooseMap(map: RoomMapId) {
     this.map = map
     this.remembered.lastMap = map
     this.save()
