@@ -251,10 +251,12 @@
       </div>
 
       <div id="board" class="hidden"></div>
-      <div id="loadout" class="hidden overlay"></div>
-      <div id="pause" class="hidden overlay"></div>
-      <div id="settings-ingame" class="hidden overlay"></div>
-      <div id="endscreen" class="hidden overlay"></div>
+      <!-- The in-match menus: UI SDK dialogs whose content opens in the top layer. client/game.ts draws them, opens
+           them and steps back through them on Esc; Tab stays inside the open one. -->
+      <ui-dialog id="loadout-dialog" class="match-dialog" modal="trap-focus" dismissible="false"><ui-dialog-content id="loadout" class="overlay" final-focus="none" hidden><ui-dialog-title></ui-dialog-title><div class="overlay-main"></div></ui-dialog-content></ui-dialog>
+      <ui-dialog id="pause-dialog" class="match-dialog" modal="trap-focus" dismissible="false"><ui-dialog-content id="pause" class="overlay" final-focus="none" hidden><ui-dialog-title></ui-dialog-title><div class="overlay-main"></div></ui-dialog-content></ui-dialog>
+      <ui-dialog id="settings-dialog" class="match-dialog" modal="trap-focus" dismissible="false"><ui-dialog-content id="settings-ingame" class="overlay" final-focus="none" hidden><ui-dialog-title></ui-dialog-title><div class="overlay-main"></div></ui-dialog-content></ui-dialog>
+      <ui-dialog id="end-dialog" class="match-dialog" modal="trap-focus" dismissible="false"><ui-dialog-content id="endscreen" class="overlay" final-focus="none" hidden><ui-dialog-title></ui-dialog-title><div class="overlay-main"></div></ui-dialog-content></ui-dialog>
       <div id="clickplay" class="hidden"></div>
 
       <!-- Touch controls: drawn where client/touch.ts places them; the canvas below takes the fingers. No text chat on touch. -->

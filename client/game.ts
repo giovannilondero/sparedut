@@ -27,6 +27,21 @@ import { requestFullscreen } from "./fullscreen.ts"
 import { MatchClock } from "./match-clock.ts"
 import { Predictor } from "./predict.ts"
 import type { Settings } from "./settings.ts"
+// UI SDK's dialog holds each in-match menu: focus moved in and kept inside. The game's own Esc steps close them.
+import "@ui-sdk/web/dialog"
+// UI SDK's select, for the host's bot skill: opens on a tap or a key (never on hover), as a sheet on a small touch screen.
+import "@ui-sdk/web/select"
+import { afterEscape, endFocus, focusOnOpen, type MatchMenu } from "./match-menus.ts"
+
+type DialogElement = HTMLElementTagNameMap["ui-dialog"]
+type SelectElement = HTMLElementTagNameMap["ui-select"]
+
+/** Each in-match menu's dialog and the content the game draws into it. */
+const MENU_PARTS = {
+  pause: ["pause-dialog", "pause"],
+  loadout: ["loadout-dialog", "loadout"],
+  settings: ["settings-dialog", "settings-ingame"]
+} as const satisfies Record<Exclude<MatchMenu, "none">, readonly [string, string]>
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 const INTERP_TICKS = 6
@@ -129,7 +144,11 @@ export class Game {
   private boardOpen = false
   private chatting = false
   private quickOpen = false
-  private overlay: "none" | "pause" | "loadout" | "settings" = "none"
+  private overlay: MatchMenu = "none"
+  /** The Esc being handled closes the bot-skill list: the list's, not the match menu's. */
+  private escapeInPopup = false
+  /** Whether the match menu was last drawn for the host (its host tools), null before it is drawn. */
+  private pauseHost: boolean | null = null
   /** Where the armoury was opened from: Esc goes back there. */
   private loadoutFrom: "none" | "pause" = "none"
   /** When the browser released the pointer lock: the same Esc must not also close the pause menu. */
@@ -202,6 +221,10 @@ export class Game {
     })
     d.net.on((msg) => this.running && this.message(msg))
     document.addEventListener("visibilitychange", () => this.syncPause())
+    // Before UI SDK's own listener closes the list: an Esc that finds the bot-skill list open is the list's.
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") this.escapeInPopup = document.querySelector("#hud ui-select-content[data-open]") !== null
+    }, { capture: true })
     // Development only: automated tests drive the player without pointer lock.
     if (import.meta.env.DEV) Object.assign(window, { __sparedut: { controls: this.controls, game: this } })
   }
@@ -248,6 +271,7 @@ export class Game {
     this.avatars.clear()
     this.hud.show(false)
     this.openOverlay("none")
+    $<DialogElement>("end-dialog").open = false
     this.d.viewmodel.setVisible(false)
     if (document.pointerLockElement) document.exitPointerLock()
     this.controls.track(null)
@@ -414,11 +438,12 @@ export class Game {
     this.lastPhase = tag
     if (tag === "Over") {
       if (document.pointerLockElement) document.exitPointerLock()
-      this.renderEnd()
+      this.renderEnd(true)
     } else {
-      $("endscreen").classList.add("hidden")
+      $<DialogElement>("end-dialog").open = false
       if (tag === "Live" && this.overlay === "none") this.controls.lock()
     }
+    if (this.overlay === "pause") this.renderPause()
   }
 
   // ---------------------------------------------------------------- events
@@ -668,8 +693,10 @@ export class Game {
   private key(code: string, down: boolean) {
     if (!this.running || this.chatting) return
     if (code === "Tab") {
-      this.boardOpen = down
-      this.hud.board(this.board, this.me, down)
+      // With a menu open, Tab moves through it: the scoreboard stays shut.
+      const open = down && this.overlay === "none"
+      this.boardOpen = open
+      this.hud.board(this.board, this.me, open)
       return
     }
     if (!down) return
@@ -681,8 +708,10 @@ export class Game {
       this.toggleQuick(false)
       return
     }
-    if (code === "KeyV" && this.controls.active) this.toggleQuick(!this.quickOpen)
-    if ((code === "Enter" || code === "KeyT") && this.controls.active) this.openChat()
+    // Enter presses a menu's button: chat and phrases open only over the match itself.
+    const playing = this.controls.active && this.overlay === "none"
+    if (code === "KeyV" && playing) this.toggleQuick(!this.quickOpen)
+    if ((code === "Enter" || code === "KeyT") && playing) this.openChat()
     if (code === "KeyB") this.openOverlay(this.overlay === "loadout" ? "none" : "loadout")
   }
 
@@ -698,10 +727,15 @@ export class Game {
 
   /** Esc closes whatever is open, one step at a time. Only a click gives back the pointer lock. */
   private escape() {
-    if (this.quickOpen) this.toggleQuick(false)
-    else if (this.overlay === "loadout") this.openOverlay(this.loadoutFrom)
-    else if (this.overlay === "settings") this.openOverlay("pause")
-    else if (this.overlay === "pause" && performance.now() - this.unlockedAt > 300) this.openOverlay("none")
+    if (this.escapeInPopup) {
+      this.escapeInPopup = false
+      return
+    }
+    if (this.quickOpen) return this.toggleQuick(false)
+    // The Esc that released the pointer lock opened the match menu: it must not close it too.
+    if (this.overlay === "pause" && performance.now() - this.unlockedAt <= 300) return
+    const next = afterEscape(this.overlay, this.loadoutFrom)
+    if (next !== this.overlay) this.openOverlay(next)
   }
 
   private toggleQuick(on: boolean) {
@@ -739,40 +773,89 @@ export class Game {
     if (form.parentElement?.id !== "settings-home") $("settings-home").append(form)
   }
 
-  private openOverlay(which: "none" | "pause" | "loadout" | "settings") {
-    if (which === "loadout" && this.overlay !== "loadout") this.loadoutFrom = this.overlay === "pause" ? "pause" : "none"
+  private openOverlay(which: MatchMenu) {
+    const previous = this.overlay
+    if (which === "loadout" && previous !== "loadout") this.loadoutFrom = previous === "pause" ? "pause" : "none"
     this.overlay = which
-    $("settings-ingame").classList.toggle("hidden", which !== "settings")
-    if (which === "settings") {
+    if (which === "settings" && previous !== "settings") {
       // The same form as the main menu: same controls, saved and applied immediately.
-      const el = $("settings-ingame")
-      el.innerHTML = `<h2>${t().static.settings}</h2><div id="settings-slot"></div><div class="row"><button id="st-back">${t().static.back}</button></div>`
+      this.drawMenu("settings-ingame", t().static.settings, `<div id="settings-slot" class="overlay-body"></div><div class="row overlay-actions"><button id="st-back">${t().static.back}</button></div>`)
       $("settings-slot").append($("settings-form"))
       $("st-back").onclick = () => this.openOverlay("pause")
-    } else this.restoreSettings()
-    $("pause").classList.toggle("hidden", which !== "pause")
-    $("loadout").classList.toggle("hidden", which !== "loadout")
-    if (which === "pause") this.renderPause()
-    this.syncPause()
+    } else if (which !== "settings") this.restoreSettings()
+    if (which === "pause" && previous !== "pause") this.renderPause(true)
     if (which === "loadout") {
       if (document.pointerLockElement) document.exitPointerLock()
-      const el = $("loadout")
-      const lo = t().loadout
-      el.innerHTML = `<h2>${lo.title}</h2><p class="muted">${lo.note}</p><div class="weapons" id="loadout-list"></div><div class="row"><button id="lo-close" class="primary">${lo.resume}</button></div>`
-      this.d.menu.buildArmarie($("loadout-list"), (p) => {
-        this.d.net.send({ t: "primary", p })
-        // If I was holding the old primary, switch to the new one right away.
-        const you = this.you()
-        if (you?.alive && this.wanted === you.arsenal.primary && p !== this.wanted) {
-          this.lastWeapon = this.wanted
-          this.wanted = p
-          this.wantedSeq = this.seq + 1
-        }
-      })
-      $("lo-close").onclick = () => {
-        this.openOverlay("none")
-        this.controls.lock()
+      if (previous !== "loadout") this.renderLoadout()
+    }
+    this.showMenus(previous)
+    this.syncPause()
+  }
+
+  /**
+   * Closes every menu but the open one, then opens it with focus where `focusOnOpen` says. With
+   * none open, focus leaves the menus: keys go back to the game.
+   */
+  private showMenus(previous: MatchMenu) {
+    const active = document.activeElement
+    for (const [menu, [dialog]] of Object.entries(MENU_PARTS)) {
+      if (menu !== this.overlay) $<DialogElement>(dialog).open = false
+    }
+    if (this.overlay === "none") {
+      if (active instanceof HTMLElement && active.closest("#pause, #loadout, #settings-ingame")) active.blur()
+      return
+    }
+    const [id, content] = MENU_PARTS[this.overlay]
+    const dialog = $<DialogElement>(id)
+    if (dialog.open) return
+    this.openMenu(id, content, focusOnOpen(this.overlay, previous))
+  }
+
+  /**
+   * Opens a menu's dialog with focus on `focus` (or its first control). UI SDK leaves focus on the
+   * dialog itself when it opens right after a press; with a keyboard, a mouse or a pad it moves on
+   * to the control, so Enter acts at once. On touch the dialog itself keeps it: no ring to show.
+   */
+  private openMenu(dialogId: string, contentId: string, focus: string | null) {
+    const dialog = $<DialogElement>(dialogId)
+    const content = $(contentId)
+    content.setAttribute("initial-focus", focus ? `#${focus}` : "auto")
+    dialog.addEventListener("openchangecomplete", () => {
+      const active = document.activeElement
+      // Opened by the match itself (the end screen), focus can still be outside: bring it in.
+      if (active && content.contains(active) && (active !== content || !focus || this.controls.device === "touch")) return
+      const target = (this.controls.device === "touch" ? null : focus && document.getElementById(focus)) || content
+      target.focus()
+    }, { once: true })
+    dialog.open = true
+  }
+
+  /** A menu's title (the dialog's name, kept in place so UI SDK's labelling holds) and the rest of it. */
+  private drawMenu(contentId: string, title: string, main: string, titleClass = "", color = "") {
+    const content = $(contentId)
+    const head = content.querySelector<HTMLElement>("ui-dialog-title")!
+    head.innerHTML = title
+    head.className = titleClass
+    head.style.color = color
+    content.querySelector(".overlay-main")!.innerHTML = main
+  }
+
+  private renderLoadout() {
+    const lo = t().loadout
+    this.drawMenu("loadout", lo.title, `<div class="overlay-body"><p class="muted">${lo.note}</p><div class="weapons" id="loadout-list"></div></div><div class="row overlay-actions"><button id="lo-close" class="primary">${lo.resume}</button></div>`)
+    this.d.menu.buildArmarie($("loadout-list"), (p) => {
+      this.d.net.send({ t: "primary", p })
+      // If I was holding the old primary, switch to the new one right away.
+      const you = this.you()
+      if (you?.alive && this.wanted === you.arsenal.primary && p !== this.wanted) {
+        this.lastWeapon = this.wanted
+        this.wanted = p
+        this.wantedSeq = this.seq + 1
       }
+    })
+    $("lo-close").onclick = () => {
+      this.openOverlay("none")
+      this.controls.lock()
     }
   }
 
@@ -789,51 +872,74 @@ export class Game {
     if (this.running) this.d.net.send({ t: "pause", paused })
   }
 
-  private renderPause() {
+  /** The match menu: drawn whole when it opens (or the host changes), else only what a room or phase update changes, so focus and the open skill list stay. */
+  private renderPause(full = false) {
     const room = this.room
     if (!room) return
     const host = room.hostId === this.me
-    const el = $("pause")
-    const link = inviteLink(this.d.inviteBase(), room.code, this.d.roomPassword())
-    const myTeam = this.teams.get(this.me)
-    const other: Team = myTeam === "benandanti" ? "malandanti" : "benandanti"
-    const phase = this.snap?.phase.tag ?? "Warmup"
+    if (full || host !== this.pauseHost) this.buildPause(room, host)
     const s = t()
     const p = s.pause
-    el.innerHTML = `
-      <h2>${s.modes[room.mode].name} <small class="muted">· ${s.modes[room.mode].sub}</small></h2>
+    $("p-roster").innerHTML = rosterHtml(room, this.me)
+    $("p-team").textContent = p.switchTeam(s.teams[this.otherTeam()].name)
+    if (!host) return
+    $("p-start").textContent = (this.snap?.phase.tag ?? "Warmup") === "Warmup" ? p.start : p.restart
+    const level = $<SelectElement>("p-level")
+    if (level.value !== room.level) level.value = room.level
+  }
+
+  private otherTeam(): Team {
+    return this.teams.get(this.me) === "benandanti" ? "malandanti" : "benandanti"
+  }
+
+  private buildPause(room: RoomInfo, host: boolean) {
+    this.pauseHost = host
+    const el = $("pause")
+    const s = t()
+    const p = s.pause
+    const ben = TEAM_INFO.benandanti.short
+    const mal = TEAM_INFO.malandanti.short
+    this.drawMenu("pause", `${s.modes[room.mode].name} <small class="muted">· ${s.modes[room.mode].sub}</small>`, `
+      <div class="overlay-body">
       ${
         // An Offline room has no code and no invite link: nobody else can come in.
         room.reach === "offline"
-          ? `<div class="muted" style="font-size:12px">${p.reach.offline}</div>`
-          : `<div class="row" style="align-items:center;justify-content:space-between">
+          ? `<div class="muted pause-reach">${p.reach.offline}</div>`
+          : `<div class="pause-code">
         <div><div class="muted">${p.code}</div><div class="invite">${room.code}</div></div>
-        <div style="text-align:right"><button id="p-copy">${p.copy}</button><div class="muted" style="font-size:12px;margin-top:4px">${p.reach[room.reach]} · ${p.access[room.access]}</div></div>
+        <div class="pause-share"><button id="p-copy">${p.copy}</button><div class="muted pause-reach">${p.reach[room.reach]} · ${p.access[room.access]}</div></div>
       </div>`
       }
-      <div class="roster">${rosterHtml(room, this.me)}</div>
+      <div class="roster" id="p-roster"></div>
       ${
         host
-          ? `<div class="host-tools">👑 Host:
-        <button id="p-start" class="primary">${phase === "Warmup" ? p.start : p.restart}</button>
-        <button data-bot="benandanti:1">+ bot ${TEAM_INFO.benandanti.short}</button><button data-bot="benandanti:-1">− bot ${TEAM_INFO.benandanti.short}</button>
-        <button data-bot="malandanti:1">+ bot ${TEAM_INFO.malandanti.short}</button><button data-bot="malandanti:-1">− bot ${TEAM_INFO.malandanti.short}</button>
-        <label class="inline-field">${p.level} <select id="p-level">${BOT_LEVEL_IDS.map((l) => `<option value="${l}"${l === room.level ? " selected" : ""}>${s.levels[l].name}</option>`).join("")}</select></label>
+          ? `<div class="host-tools"><span class="host-label">👑 Host:</span>
+        <button id="p-start" class="primary"></button>
+        <div class="host-bots">
+          <button data-bot="benandanti:1">+ bot ${ben}</button><button data-bot="benandanti:-1">− bot ${ben}</button>
+          <button data-bot="malandanti:1">+ bot ${mal}</button><button data-bot="malandanti:-1">− bot ${mal}</button>
+        </div>
+        <ui-select id="p-level" class="host-level" presentation="auto" default-value="${room.level}">
+          <ui-select-label>${p.level}</ui-select-label>
+          <ui-select-trigger><button><ui-select-value></ui-select-value></button></ui-select-trigger>
+          <ui-select-content class="level-list">${BOT_LEVEL_IDS.map((l) => `<ui-select-item value="${l}">${s.levels[l].name}<ui-select-item-indicator aria-hidden="true">✓</ui-select-item-indicator></ui-select-item>`).join("")}</ui-select-content>
+        </ui-select>
       </div>`
-          : `<div class="muted" style="margin-top:8px">${p.hostOnly}</div>`
+          : `<div class="muted host-only">${p.hostOnly}</div>`
       }
-      <div class="row">
+      </div>
+      <div class="row overlay-actions">
         <button id="p-resume" class="primary">${s.loadout.resume}</button>
-        <button id="p-team">${p.switchTeam(s.teams[other].name)}</button>
+        <button id="p-team"></button>
         <button id="p-loadout">${s.loadout.title}</button>
         <button id="p-settings">${s.static.settings}</button>
         <button id="p-leave">${p.leave}</button>
-      </div>`
+      </div>`)
     $("p-resume").onclick = () => {
       this.openOverlay("none")
       this.controls.lock()
     }
-    $("p-team").onclick = () => this.d.net.send({ t: "team", team: other })
+    $("p-team").onclick = () => this.d.net.send({ t: "team", team: this.otherTeam() })
     $("p-loadout").onclick = () => this.openOverlay("loadout")
     $("p-leave").onclick = () => {
       this.d.net.send({ t: "leave" })
@@ -842,24 +948,27 @@ export class Game {
     const copy = document.getElementById("p-copy")
     if (copy)
       copy.onclick = () => {
-        void navigator.clipboard?.writeText(link)
+        void navigator.clipboard?.writeText(inviteLink(this.d.inviteBase(), room.code, this.d.roomPassword()))
         copy.textContent = p.copied
       }
     $("p-settings").onclick = () => this.openOverlay("settings")
-    if (host) {
-      $("p-start").onclick = () => {
-        this.d.net.send({ t: "start" })
-        this.openOverlay("none")
-        this.controls.lock()
-      }
-      for (const b of el.querySelectorAll<HTMLButtonElement>("[data-bot]")) {
-        b.onclick = () => {
-          const [team, delta] = b.dataset.bot!.split(":")
-          this.d.net.send({ t: "bot", team: team as Team, delta: Number(delta) as 1 | -1 })
-        }
-      }
-      $<HTMLSelectElement>("p-level").onchange = (e) => this.d.net.send({ t: "level", level: (e.target as HTMLSelectElement).value as BotLevel })
+    if (!host) return
+    $("p-start").onclick = () => {
+      this.d.net.send({ t: "start" })
+      this.openOverlay("none")
+      this.controls.lock()
     }
+    for (const b of el.querySelectorAll<HTMLButtonElement>("[data-bot]")) {
+      b.onclick = () => {
+        const [team, delta] = b.dataset.bot!.split(":")
+        this.d.net.send({ t: "bot", team: team as Team, delta: Number(delta) as 1 | -1 })
+      }
+    }
+    // The room's update sets the value back from code ("imperative"): only the host's own choice is sent.
+    $<SelectElement>("p-level").addEventListener("valuechange", (e) => {
+      if (e.detail.value === null) return e.preventDefault()
+      if (e.detail.reason !== "imperative") this.d.net.send({ t: "level", level: e.detail.value as BotLevel })
+    })
   }
 
   /** Did I win (my team, or me alone in Tampieste)? */
@@ -867,19 +976,35 @@ export class Game {
     return typeof winner === "object" ? winner.player === this.me : winner === this.teams.get(this.me)
   }
 
-  private renderEnd() {
+  /**
+   * The end screen: drawn whole and opened when the match ends (`full`), then only its results and
+   * countdown are redrawn (every second and on each scoreboard), so its buttons and focus stay.
+   */
+  private renderEnd(full = false) {
     const s = this.snap
     if (!s || s.phase.tag !== "Over") return
-    const el = $("endscreen")
-    el.classList.remove("hidden")
+    const host = this.room?.hostId === this.me
     const winner = s.phase.winner
     const en = t().end
-    const title = winner === "pari" ? en.draw : this.won(winner) ? en.win : en.lose
+    if (full) {
+      const title = winner === "pari" ? en.draw : this.won(winner) ? en.win : en.lose
+      const color = winner === "pari" ? "var(--gold)" : typeof winner === "object" ? (this.won(winner) ? "var(--gold)" : "#9fd0ff") : TEAM_INFO[winner].color
+      this.drawMenu("endscreen", title, `
+      <div class="overlay-body"><div id="e-results"></div><p class="muted end-restart" id="e-restart"></p></div>
+      <div class="row overlay-actions"><button id="e-leave">${en.leave}</button>${host ? `<button id="e-again" class="primary">${en.again}</button>` : ""}</div>`, "end-title", color)
+      $("e-leave").onclick = () => {
+        this.d.net.send({ t: "leave" })
+        this.d.onLeave()
+      }
+      const again = document.getElementById("e-again")
+      if (again) again.onclick = () => this.d.net.send({ t: "start" })
+    }
+    // Not drawn yet (a scoreboard before the snapshot that ended the match): nothing to update.
+    if (!document.getElementById("e-results")) return
     const sub =
       winner === "pari" ? en.drawSub
       : typeof winner === "object" ? `${en.lastStanding(esc(winner.name))} · ${en.lastStandingSub}`
       : en.winSub(t().teams[winner].name, t().teams[winner].motto)
-    const color = winner === "pari" ? "var(--gold)" : typeof winner === "object" ? (this.won(winner) ? "var(--gold)" : "#9fd0ff") : TEAM_INFO[winner].color
     const rows = [...this.board]
     const best = <K extends keyof BoardRow>(k: K) => rows.slice().sort((a, b) => (b[k] as number) - (a[k] as number))[0]
     const award = (title: string, row: BoardRow | undefined, value: string) =>
@@ -888,24 +1013,17 @@ export class Game {
     const killer = best("kills")
     const streak = best("best")
     const head = best("headshots")
-    el.innerHTML = `
-      <h1 class="end-title" style="color:${color}">${title}</h1>
-      <p style="text-align:center;font-family:var(--serif);font-style:italic">${sub}${this.room?.mode === "tampieste" ? "" : ` · ${s.score.benandanti} – ${s.score.malandanti}`}</p>
+    $("e-results").innerHTML = `
+      <p class="end-sub">${sub}${this.room?.mode === "tampieste" ? "" : ` · ${s.score.benandanti} – ${s.score.malandanti}`}</p>
       <div class="awards">
         ${award(en.mvp[mvp?.team ?? "benandanti"], mvp, en.points(mvp?.score ?? 0))}
         ${award(en.killer, killer, en.kills(killer?.kills ?? 0))}
         ${award(en.streak, streak, en.row(streak?.best ?? 0))}
         ${award(en.head, head, en.heads(head?.headshots ?? 0))}
       </div>
-      ${boardHtml(rows, this.me)}
-      <p class="muted" style="text-align:center">${en.restartIn(Math.max(0, Math.ceil((s.phase.restarts - s.tick) / 60)))}</p>
-      <div class="row"><button id="e-leave">${en.leave}</button>${this.room?.hostId === this.me ? `<button id="e-again" class="primary">${en.again}</button>` : ""}</div>`
-    $("e-leave").onclick = () => {
-      this.d.net.send({ t: "leave" })
-      this.d.onLeave()
-    }
-    const again = document.getElementById("e-again")
-    if (again) again.onclick = () => this.d.net.send({ t: "start" })
+      ${boardHtml(rows, this.me)}`
+    $("e-restart").textContent = en.restartIn(Math.max(0, Math.ceil((s.phase.restarts - s.tick) / 60)))
+    if (full) this.openMenu("end-dialog", "endscreen", endFocus(host))
   }
 
   // ---------------------------------------------------------------- fixed tick

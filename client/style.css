@@ -298,21 +298,105 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 #board th:first-child, #board td:first-child, .overlay td:first-child, .overlay th:first-child { text-align: left; }
 #board tr.me td { color: var(--gold); }
 #board h3, .overlay h3 { font-family: var(--serif); margin: 10px 0 4px; font-size: 18px; }
-.overlay h2 { font-family: var(--serif); color: var(--gold); margin: 0 0 8px; font-size: 28px; }
+.overlay :is(h2, ui-dialog-title) { display: block; font-family: var(--serif); font-weight: 700; color: var(--gold); margin: 0 0 8px; font-size: clamp(22px, 1rem + 1.6vw, 28px); }
 .overlay .row { margin-top: 12px; }
 .overlay .invite { font-family: var(--serif); font-size: 44px; letter-spacing: 0.3em; color: var(--gold); }
 .overlay .roster { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px; }
 .overlay .roster ul { list-style: none; margin: 0; padding: 0; font-size: 14px; }
 .overlay .roster li { padding: 3px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
 .overlay .host-tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 8px; font-size: 13px; }
-.overlay .host-tools button { padding: 5px 9px; font-size: 13px; }
+.overlay .host-tools button { min-block-size: var(--tap); padding: 5px 9px; font-size: 13px; }
 
-.end-title { font-family: var(--serif); font-size: clamp(36px, 5vw, 64px); text-align: center; margin: 0; }
-.awards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0; }
+.end-title { display: block; font-family: var(--serif); font-size: clamp(36px, 5vw, 64px); text-align: center; margin: 0; }
+.awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 10px; margin: 14px 0; }
 .award { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--stone-line); border-radius: 10px; padding: 10px; text-align: center; }
 .award b { display: block; font-family: var(--serif); color: var(--gold); font-size: 15px; }
 .award span { font-size: 16px; }
 .award small { display: block; opacity: 0.7; font-size: 12px; }
+
+/*
+ * The in-match menus (match menu, loadout, settings, end screen): UI SDK dialogs, their content in
+ * the top layer. Centred as before on a desktop; on a phone they fill the safe area. The title and
+ * the actions stay put while the middle scrolls, so resume and leave are always under a thumb.
+ */
+.match-dialog { display: contents; }
+#hud ui-dialog-content.overlay {
+  /* Today's 7% margin on a desktop, down to 8px on a short screen. */
+  --gap-block: clamp(8px, 14dvh - 52px, 7dvh);
+  --gap-inline: max(8px, 4vw);
+  --top: max(var(--gap-block), env(safe-area-inset-top, 0px));
+  --bottom: max(var(--gap-block), env(safe-area-inset-bottom, 0px));
+  --left: max(var(--gap-inline), env(safe-area-inset-left, 0px));
+  --right: max(var(--gap-inline), env(safe-area-inset-right, 0px));
+  /* A finger's target: 44px on touch, today's sizes with a mouse. */
+  --tap: auto;
+  position: fixed; inset: var(--top) var(--right) var(--bottom) var(--left); margin: auto; transform: none;
+  inline-size: 860px; max-inline-size: calc(100vw - var(--left) - var(--right)); min-inline-size: 0;
+  block-size: fit-content; max-block-size: calc(100dvh - var(--top) - var(--bottom));
+  display: flex; flex-direction: column; overflow: clip; container: overlay / inline-size;
+  padding: clamp(12px, 2.5vw, 18px) clamp(12px, 3vw, 22px); color: var(--ink); font-family: var(--sans); }
+@media (pointer: coarse) { #hud ui-dialog-content.overlay { --tap: 44px; } }
+#hud ui-dialog-content.overlay:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+/* The drawn part holds no box: the body and the actions are the column's own items. */
+.overlay-main { display: contents; }
+.overlay > ui-dialog-title, .overlay .overlay-actions { flex: none; }
+.overlay-body { flex: 1 1 auto; min-block-size: 0; overflow-y: auto; overscroll-behavior: contain; }
+.overlay .overlay-actions > button { min-block-size: var(--tap); }
+/* A key hint on a button (the back button's Esc) means nothing on touch. */
+#hud.touch .overlay kbd { display: none; }
+/* On touch the actions take two columns, resume across both, rather than a ragged row. */
+@media (pointer: coarse) {
+  .overlay .overlay-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); }
+  @container overlay (inline-size <= 40rem) { #pause .overlay-actions > #p-resume { grid-column: 1 / -1; } }
+  /* A wide, short menu (a phone on its side): the roster and the host tools side by side, so the host's controls show without scrolling. */
+  @container overlay (inline-size > 40rem) {
+    #pause .overlay-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 0 16px; }
+    #pause .overlay-body > :is(.pause-reach, .pause-code) { grid-column: 1 / -1; }
+    #pause .overlay-body > :is(.host-tools, .host-only) { margin-block-start: 10px; }
+    /* The four bot buttons on one row, so the bot skill stays in view too. */
+    #pause .host-bots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    #pause .host-bots button { padding-inline: 4px; font-size: 13px; }
+  }
+}
+
+/* The match menu. */
+.pause-code { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.pause-share { text-align: end; }
+.pause-share button { min-block-size: var(--tap); }
+.pause-reach { font-size: 12px; margin-block-start: 4px; }
+.overlay .invite { font-size: clamp(32px, 1rem + 3vw, 44px); }
+.host-only { margin-block-start: 8px; }
+.host-label { white-space: nowrap; }
+.host-bots { display: flex; flex-wrap: wrap; gap: 6px; }
+/* On touch: the start button and the bot skill each take a row, the four bot buttons a grid of two per team. */
+@media (pointer: coarse) {
+  .overlay .host-tools { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .host-bots { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr)); }
+  .overlay .host-tools button { font-size: 14px; }
+}
+.host-level { display: inline-flex; align-items: center; gap: 6px; }
+.overlay .host-level ui-select-trigger > button { display: inline-flex; align-items: center; gap: 8px; min-block-size: var(--tap); padding-block: 5px; padding-inline: 10px 30px; font-size: 13px;
+  background: rgba(0, 0, 0, 0.35) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23e8b64c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center / 12px 8px;
+  border-radius: 8px; }
+@media (pointer: coarse) { .overlay .host-level ui-select-trigger > button { flex: 1; font-size: 15px; } }
+/* The skill list: beside its button with a mouse, a sheet from the bottom on a small touch screen (UI SDK decides). */
+.level-list { min-inline-size: var(--anchor-width); max-block-size: var(--available-height); overflow-y: auto; margin: 0; padding: 4px; display: grid; gap: 2px;
+  background: #1d1813; color: var(--ink); border: 1px solid var(--gold); border-radius: 10px; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55); font-family: var(--sans); font-size: 14px; pointer-events: auto; }
+.level-list ui-select-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-block-size: var(--tap, 36px); padding: 8px 12px; border-radius: 7px; cursor: pointer; }
+.level-list ui-select-item[data-highlighted] { background: rgba(232, 182, 76, 0.16); }
+.level-list ui-select-item[data-selected] { color: var(--gold); }
+.level-list[data-modality="keyboard"] ui-select-item[data-highlighted] { outline: 2px solid var(--gold); outline-offset: -2px; }
+.level-list[data-presentation="sheet"] { inline-size: 100%; max-inline-size: none; border-radius: 16px 16px 0 0; border-block-end: 0; font-size: 17px;
+  padding: 10px 10px max(10px, env(safe-area-inset-bottom, 0px)); padding-inline: max(10px, env(safe-area-inset-left, 0px)) max(10px, env(safe-area-inset-right, 0px)); }
+.level-list[data-presentation="sheet"] ui-select-item { min-block-size: 48px; }
+
+/* The end screen. */
+.end-sub { text-align: center; font-family: var(--serif); font-style: italic; }
+.end-restart { text-align: center; }
+/* The scoreboard's eight columns fit a phone's width: the text and the gaps shrink with the menu. */
+#endscreen table { font-size: clamp(10px, 2.6cqi, 14px); }
+#endscreen :is(th, td) { padding: 4px clamp(3px, 1cqi, 8px); }
+#endscreen th { font-size: clamp(8px, 2.3cqi, 11px); letter-spacing: clamp(0px, 0.15cqi, 1.1px); }
 
 #clickplay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; font-family: var(--serif); font-size: 30px; color: var(--gold); background: rgba(10, 8, 6, 0.7); padding: 18px 30px; border-radius: 14px; border: 1px solid var(--stone-line); }
 #clickplay small { display: block; font-size: 14px; color: var(--muted); font-family: var(--sans); }
