@@ -36,11 +36,13 @@ export interface Settings {
   lastFf: boolean
   /** The training's progress: saved per completed station (`trainingProgressed`). */
   training: TrainingProgress
+  /** The home screen's invitation to the training. Apart from `training`: starting over does not bring it back. */
+  trainingInvitation: TrainingInvitation
 }
 
 /**
- * How far the player has got in the training, as the browser keeps it. Ticket #52 adds whether
- * the home screen's invitation was dismissed here; starting over resets only what is below.
+ * How far the player has got in the training, as the browser keeps it: what starting over resets.
+ * Whether the invitation was dismissed is kept beside it (`Settings.trainingInvitation`).
  */
 export interface TrainingProgress {
   /** How many stations, from the first, are unlocked: 1 to all of them. */
@@ -51,6 +53,13 @@ export interface TrainingProgress {
 
 /** A training never started, and what starting over goes back to. */
 export const FRESH_TRAINING: TrainingProgress = { unlocked: 1, completed: false }
+
+/**
+ * The home screen's invitation to the training: `open` on a first visit, until the player
+ * `dismissed` it or `started` the training once. Either ends it for good.
+ */
+export const TRAINING_INVITATIONS = ["open", "dismissed", "started"] as const
+export type TrainingInvitation = (typeof TRAINING_INVITATIONS)[number]
 
 const KEY = "sparedut.settings"
 const DEFAULTS: Settings = {
@@ -72,18 +81,22 @@ const DEFAULTS: Settings = {
   lastLevel: "pari",
   lastMinutes: 10,
   lastFf: false,
-  training: FRESH_TRAINING
+  training: FRESH_TRAINING,
+  trainingInvitation: "open"
 }
 
 export function loadSettings(): Settings {
   try {
-    const s: Settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") }
+    const saved: Partial<Settings> = JSON.parse(localStorage.getItem(KEY) ?? "{}")
+    const s: Settings = { ...DEFAULTS, ...saved }
     // A value saved by an old version (or a removed map) falls back to the default.
     if (!ROOM_MAP_IDS.includes(s.lastMap)) s.lastMap = DEFAULTS.lastMap
     if (!ROOM_MODE_IDS.includes(s.lastMode)) s.lastMode = DEFAULTS.lastMode
     if (s.crouch !== "hold" && s.crouch !== "toggle") s.crouch = DEFAULTS.crouch
     if (typeof s.lastFf !== "boolean") s.lastFf = DEFAULTS.lastFf
     if (!validProgress(s.training)) s.training = DEFAULTS.training
+    // Saved before the invitation existed (or broken): a player who has progress has started the training.
+    if (!(TRAINING_INVITATIONS as readonly unknown[]).includes(saved.trainingInvitation)) s.trainingInvitation = s.training.completed || s.training.unlocked > 1 ? "started" : "open"
     return s
   } catch {
     return { ...DEFAULTS }

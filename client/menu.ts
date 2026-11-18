@@ -104,6 +104,13 @@ function roomRow(r: RoomSummary, selectable: boolean, asButton: boolean): string
   return `<li><button class="room${selectable ? "" : " full"}" data-code="${r.code}"${selectable ? "" : " disabled"}>${inner}</button></li>`
 }
 
+/**
+ * The invitation's two treatments, for the owner to choose between (`?invite=a|b`): `a`, the
+ * training's entry itself invites; `b`, a card across the home screen's tiles. Delete the other
+ * once chosen.
+ */
+const INVITE_TREATMENT: "a" | "b" = new URLSearchParams(location.search).get("invite") === "b" ? "b" : "a"
+
 export class Menu {
   private readonly model: MenuModel
   private tipIndex = Math.floor(Math.random() * 100)
@@ -153,6 +160,7 @@ export class Menu {
     this.bindCreate()
     this.bindSettings()
     this.bindHome()
+    this.bindTraining()
     this.bindApp()
     onLangChange(() => this.renderTexts())
     setLang(settings.lang)
@@ -168,6 +176,7 @@ export class Menu {
     $("look-label").textContent = t().menu.look
     this.renderCreate()
     this.renderOneTap()
+    this.renderTraining()
     this.renderPrompt()
     this.buildArmarie()
     $("vocabolari").innerHTML = t().menu.vocab.map(([w, d]) => `<p><b>${w}</b> — ${d}</p>`).join("")
@@ -261,7 +270,10 @@ export class Menu {
     this.shown = screen
     const shown = SCREEN_ELEMENT[screen]
     for (const s of SCREENS) $(SCREEN_ELEMENT[s]).classList.toggle("hidden", SCREEN_ELEMENT[s] !== shown)
-    if (screen === "home") this.renderOneTap()
+    if (screen === "home") {
+      this.renderOneTap()
+      this.renderTraining()
+    }
     // The primary may have changed in a match's armoury since this one was drawn.
     if (screen === "armarie") this.buildArmarie()
     const prompt = $<HTMLElementTagNameMap["ui-dialog"]>("pw-dialog")
@@ -272,6 +284,41 @@ export class Menu {
     const focus = focusOnScreen(from, screen)
     if (focus === "first" && screen !== "home" && screen !== "password") FIRST_CONTROL[screen]()
     else if (focus !== null && focus !== "first") document.querySelector<HTMLElement>(`#menu-home [data-go="${focus}"]`)?.focus()
+  }
+
+  // ---------------------------------------------------------------- the training's entry
+
+  private bindTraining() {
+    for (const id of ["invite-close", "invite-dismiss"])
+      $(id).addEventListener("click", () => {
+        this.audio.play("ui_click")
+        this.model.dismissInvitation()
+        this.renderTraining()
+        // The button that had focus is gone: focus stays on the training.
+        $("home-training").querySelector<HTMLElement>(".training-entry")?.focus()
+      })
+  }
+
+  /** The entry's completed mark, and the invitation in the treatment this page was opened with. */
+  private renderTraining() {
+    const s = t().training.entry
+    const { invitation, completed } = this.model.trainingEntry
+    const inviting = invitation === "shown"
+    $("home-training").dataset.invite = inviting ? INVITE_TREATMENT : ""
+    const done = $("training-done")
+    done.hidden = !completed
+    done.textContent = s.completed
+    const ribbon = $("invite-ribbon")
+    ribbon.hidden = !(inviting && INVITE_TREATMENT === "a")
+    ribbon.textContent = s.ribbon
+    const close = $<HTMLButtonElement>("invite-close")
+    close.hidden = ribbon.hidden
+    close.setAttribute("aria-label", s.close)
+    close.title = s.close
+    $("invite-card").hidden = !(inviting && INVITE_TREATMENT === "b")
+    $("invite-text").textContent = s.invite
+    $("invite-start").textContent = s.start
+    $("invite-dismiss").textContent = s.dismiss
   }
 
   // ---------------------------------------------------------------- installing and updating the game

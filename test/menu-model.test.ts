@@ -25,6 +25,7 @@ const remembered = (over: Partial<Remembered> = {}): Remembered => ({
   lastLevel: "pari",
   lastFf: false,
   training: { unlocked: 1, completed: false },
+  trainingInvitation: "open",
   ...over
 })
 
