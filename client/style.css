@@ -82,9 +82,6 @@ select:focus-visible, button:focus-visible, input:focus-visible, ui-radio:focus-
 .inline-field { display: inline-flex; align-items: center; gap: 6px; }
 .inline-field select { padding-block: 5px; font-size: 13px; }
 
-/* Bot skill: three cards instead of a dropdown with long texts. */
-.levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; color: var(--ink); }
-
 /* Language: toggle in the top right. */
 .lang { display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 999px;
   background: var(--stone); border: 1px solid var(--stone-line); backdrop-filter: blur(6px); font-size: 12px; color: var(--muted); }
@@ -104,7 +101,6 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 .form-msg:empty { display: none; }
 .field[hidden] { display: none; }
 
-.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .card { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 10px; }
 .card b { font-family: var(--serif); font-size: 17px; }
 .card small { font-size: 12px; opacity: 0.8; line-height: 1.3; }
@@ -391,17 +387,11 @@ html.in-match #look-switcher { display: none !important; }
 
 #toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); background: var(--stone); border: 1px solid var(--gold); padding: 10px 18px; border-radius: 10px; z-index: 10; animation: rise 0.2s; }
 
-@media (max-width: 860px) {
-  .cards { grid-template-columns: 1fr; }
-}
-
 /* ---------------- PERFORMANCE PANEL (F3) ---------------- */
 #perf { position: fixed; top: 10px; left: 10px; z-index: 20; pointer-events: none; display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 8px;
   background: rgba(10, 8, 6, 0.78); border: 1px solid var(--stone-line); font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); min-width: 220px; }
 #perf b { font-size: 16px; }
 #perf small { color: var(--muted); margin-top: 2px; }
-/* The create form: settings that only a room on the server has (access, password) hide for Offline. */
-#menu-create:not([data-access-applies]) .needs-server { display: none; }
 
 /* ---------------- MENU: HOME ----------------
    Everything at once. One column on a narrow screen, the list after the actions; where there is
@@ -476,6 +466,73 @@ html.in-match #look-switcher { display: none !important; }
   .code-join { padding-block: 8px; }
   .code-join input { flex-basis: 4.5rem; font-size: 17px; letter-spacing: 0.12em; }
   .code-join button { padding-inline: 10px; }
+}
+
+/* ---------------- MENU: CREATE ----------------
+   One page: mode and map in front, the rest folded under "options", whose bar sums them up. One
+   column on a narrow screen; where there is room, the options and the button beside the cards.
+   The button stays in reach at the bottom of the screen, clear of the home indicator. */
+.create { align-self: start; display: grid; gap: 12px 20px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "pick" "side" "go"; }
+@media (prefers-reduced-motion: no-preference) { .create { animation: rise 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); } }
+.create-head { grid-area: head; display: flex; align-items: center; gap: 12px; }
+.create-head button { min-block-size: 44px; font-size: 14px; background: var(--stone); }
+.create-head h2 { margin: 0; font-family: var(--serif); font-size: clamp(22px, 1rem + 1.4vw, 28px); color: var(--gold); text-shadow: 0 2px 8px oklch(0 0 none / 0.6); }
+.create-pick { grid-area: pick; display: grid; gap: 14px; align-content: start; min-inline-size: 0; }
+.create-sec { display: grid; gap: 8px; }
+.create-sec h3 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.create-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 8px; color: var(--ink); }
+/* Mode and map: two across on a phone, three where there is room, never a lone card stretched wide. */
+.create-pick .create-cards { grid-template-columns: repeat(auto-fill, minmax(min(50% - 4px, 200px), 1fr)); }
+.create-reaches { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
+.create-accesses { grid-template-columns: repeat(auto-fit, minmax(min(100%, 110px), 1fr)); }
+.create-cards .card { min-inline-size: 0; min-block-size: 44px; justify-content: center; gap: 2px; padding: 8px 12px; background-color: var(--stone); }
+/* A card's line is cut after two lines: the cards stay one size, the mode's rules are said below them. */
+.create-cards .card small { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; text-wrap: pretty; }
+.create-cards .card small:empty { display: none; }
+.create-cards .card[data-checked] b { color: var(--gold); }
+.create-cards .chip { font-size: 13px; }
+.create-rules { margin: 0; padding: 8px 12px; border-inline-start: 3px solid var(--gold); border-radius: 0 10px 10px 0; background: oklch(0.15 0.01 60 / 0.6);
+  font-size: 13px; line-height: 1.4; font-style: italic; text-wrap: pretty; }
+
+.create-options { grid-area: side; align-self: start; display: block; min-inline-size: 0; scroll-margin-block-start: max(8px, env(safe-area-inset-top, 0px)); }
+.create-fold { inline-size: 100%; min-block-size: 56px; display: flex; align-items: center; gap: 12px; text-align: start; padding: 10px 16px; background: var(--stone); }
+.create-fold > span { flex: 1; display: grid; gap: 2px; min-inline-size: 0; }
+.create-fold b { font-family: var(--serif); font-size: 18px; color: var(--gold); }
+.create-fold small { font-size: 13px; color: var(--muted); text-wrap: pretty; }
+.create-fold i { font-style: normal; font-size: 18px; color: var(--gold); }
+.create-options[data-open] .create-fold { border-color: var(--gold); border-end-start-radius: 0; border-end-end-radius: 0; }
+.create-options[data-open] .create-fold i { rotate: 180deg; }
+@media (prefers-reduced-motion: no-preference) { .create-fold i { transition: rotate 0.2s ease-out; } }
+.create-opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 14px 16px;
+  background: var(--stone); border: 1px solid var(--gold); border-block-start: 0; border-radius: 0 0 12px 12px; }
+.create-opts[hidden], .create-access[hidden] { display: none; }
+.create-wide { grid-column: 1 / -1; }
+.create-access { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px; }
+.create-access input { min-block-size: 44px; }
+.create-access input[aria-invalid] { border-color: #f08a6c; }
+.create .check { min-block-size: 44px; }
+.create .check input { inline-size: 20px; block-size: 20px; accent-color: var(--gold); }
+
+/* Duration and bots: UI SDK selects, drawn like the game's dropdowns; a bottom sheet on a small touch screen. */
+.create-select { display: grid; gap: 4px; }
+.create-select button { inline-size: 100%; min-block-size: 44px; text-align: start; font-size: 15px; border-radius: 8px; padding-block: 8px; padding-inline: 10px 32px;
+  background: rgba(0, 0, 0, 0.35) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23e8b64c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center / 12px 8px; }
+.create-list { min-inline-size: var(--anchor-width); max-block-size: min(var(--available-height, 60dvh), 60dvh); overflow: auto; overscroll-behavior: contain; padding: 4px;
+  color: var(--ink); font-family: var(--sans); background: #1d1813; border: 1px solid var(--gold); border-radius: 10px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55); }
+.create-list ui-select-item { display: flex; align-items: center; min-block-size: 44px; padding-inline: 12px; border-radius: 8px; cursor: pointer; }
+.create-list ui-select-item[data-highlighted] { background: rgba(232, 182, 76, 0.16); }
+.create-list ui-select-item[data-selected] { color: var(--gold); font-weight: 700; }
+.create-list[data-presentation="sheet"] { inline-size: 100%; border-radius: 16px 16px 0 0; border-block-end: 0;
+  padding: 8px max(8px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+
+.create-go { grid-area: go; position: sticky; inset-block-end: 0; z-index: 1; display: grid; gap: 6px;
+  padding-block: 16px max(10px, env(safe-area-inset-bottom, 0px)); background: linear-gradient(transparent, oklch(0.17 0.01 60 / 0.95) 22px); }
+.create-go .primary { min-block-size: 54px; font-size: 18px; }
+.create-go .form-msg { text-align: center; }
+
+@container menu (inline-size > 44rem) {
+  .create { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); grid-template-rows: auto auto 1fr; grid-template-areas: "head head" "pick side" "pick go"; }
+  .create-go { align-self: end; }
 }
 
 /* The password prompt: a UI SDK dialog in the top layer, over the home screen. */

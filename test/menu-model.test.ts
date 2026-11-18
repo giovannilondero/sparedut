@@ -12,6 +12,7 @@ const remembered = (over: Partial<Remembered> = {}): Remembered => ({
   lastMinutes: 10,
   lastBots: 4,
   lastLevel: "pari",
+  lastFf: false,
   ...over
 })
 
@@ -120,6 +121,14 @@ test("friendly fire is carried into the room", () => {
   const { model } = menu()
   model.chooseFriendlyFire(true)
   expect(created(model.create())?.ff).toBe(true)
+})
+
+test("a created room remembers friendly fire, and the next room starts with it", () => {
+  const { model, values } = menu()
+  model.chooseFriendlyFire(true)
+  model.create()
+  expect(values.lastFf).toBe(true)
+  expect(new MenuModel(values, () => {}).choices.ff).toBe(true)
 })
 
 test("the screens that start a match need a name; the others do not", () => {
