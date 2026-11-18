@@ -60,21 +60,19 @@ test("right after dismounting, aiming the Cjampanili gives its scope again", () 
   expect(dismounted.fov).toBeCloseTo(20)
 })
 
-test("mounted, the mitraie sits on its turret's pivot, 1.2 m above the foot, and points where the gunner looks", () => {
+test("mounted, the mitraie is the turret's own gun and points where the gunner looks", () => {
   const v = view({ mount: { turret: 3, spot: SPOT }, look: { yaw: 1.0, pitch: -0.2 } })
   expect(v.mitraie).not.toBeNull()
   expect(v.mitraie!.turret).toBe(3)
-  expect(v.mitraie!.pivot).toEqual([10, 5.2, -20])
   expect(v.mitraie!.yaw).toBeCloseTo(1.0)
   expect(v.mitraie!.pitch).toBeCloseTo(-0.2)
 })
 
-test("across the whole arc and past its ends, the mitraie stays on the same pivot and stops at the arc", () => {
+test("across the whole arc and past its ends, the mitraie stops at the arc", () => {
   for (let i = 0; i <= 40; i++) {
     const yaw = SPOT.yaw - 2 + i * 0.1
     for (const pitch of [-1, -0.45, 0, 0.55, 1]) {
       const pose = view({ mount: { turret: 0, spot: SPOT }, look: { yaw, pitch } }).mitraie!
-      expect(pose.pivot).toEqual([10, 5.2, -20])
       expect(pose.yaw).toBeGreaterThanOrEqual(0.7 - 1.35 - 1e-9)
       expect(pose.yaw).toBeLessThanOrEqual(0.7 + 1.35 + 1e-9)
       expect(pose.pitch).toBeGreaterThanOrEqual(-0.45)
@@ -104,7 +102,7 @@ for (const chosen of PRIMARIES) {
   })
 }
 
-test("a shot throws the mitraie back along its barrel for a moment, without moving its pivot", () => {
+test("a shot throws the mitraie back along its barrel for a moment", () => {
   const at = (sinceShot: number) => view({ mount: { turret: 0, spot: SPOT }, look: { yaw: 0.7, pitch: 0 }, sinceShot }).mitraie!
   expect(at(0).recoil).toBeGreaterThan(0.02)
   expect(at(0).recoil).toBeLessThan(0.08)
@@ -112,10 +110,9 @@ test("a shot throws the mitraie back along its barrel for a moment, without movi
   expect(at(0.03).recoil).toBeGreaterThan(0)
   expect(at(0.2).recoil).toBe(0)
   expect(at(Infinity).recoil).toBe(0)
-  expect(at(0).pivot).toEqual([10, 5.2, -20])
 })
 
-test("on foot there is no mitraie on a pivot", () => {
+test("on foot there is no mitraie", () => {
   expect(view({ chosen: "mulin" }).mitraie).toBeNull()
 })
 

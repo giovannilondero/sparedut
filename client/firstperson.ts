@@ -2,8 +2,8 @@
  * First-person presentation: what the local player's own view shows, decided from
  * plain data. No renderer here; the frame loop and the viewmodel read the result.
  */
-import { turretAim, type TurretSpot, type V3 } from "../shared/map.ts"
-import { TURRET, WEAPONS, type WeaponId } from "../shared/weapons.ts"
+import { turretAim, type TurretSpot } from "../shared/map.ts"
+import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 
 export interface FirstPersonInput {
   /** The weapon the player chose to hold (their loadout slot). */
@@ -27,11 +27,12 @@ export interface FirstPersonInput {
   readonly look: { readonly yaw: number; readonly pitch: number }
 }
 
-/** The mitraie on its turret's tripod, as its gunner sees it: the world's gun, turned around its pivot. */
+/**
+ * The mitraie on its turret's tripod, as its gunner sees it: the world's gun, turned around the
+ * pivot its tripod is built with (`TURRET.pivot`), which no aim or recoil moves.
+ */
 export interface MitraiePose {
   readonly turret: number
-  /** The pivot in the world: fixed on the tripod, whatever the aim. */
-  readonly pivot: V3
   /** The gun's aim around the pivot, kept inside the turret's arc. */
   readonly yaw: number
   readonly pitch: number
@@ -98,10 +99,9 @@ const RECOIL = { back: 0.04, seconds: 0.08 }
 
 const mitraiePose = ({ mount, look, sinceShot }: FirstPersonInput): MitraiePose | null => {
   if (!mount) return null
-  const { at } = mount.spot
   const aim = turretAim(mount.spot, look.yaw, look.pitch)
   const left = Math.max(0, 1 - sinceShot / RECOIL.seconds)
-  return { turret: mount.turret, pivot: [at[0], at[1] + TURRET.pivot, at[2]], yaw: aim.yaw, pitch: aim.pitch, recoil: RECOIL.back * left * left }
+  return { turret: mount.turret, yaw: aim.yaw, pitch: aim.pitch, recoil: RECOIL.back * left * left }
 }
 
 /** What the hen cannon shows: the hen at the mouth and the hens a reload drops in. */
