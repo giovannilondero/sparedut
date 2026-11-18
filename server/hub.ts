@@ -124,8 +124,6 @@ export class Hub {
         return
       case "create": {
         if (!this.reaches.includes(msg.reach)) return this.send(peer, { t: "error", code: "invalid" })
-        // A room on the server says who may come in; an Offline room has nobody to keep out.
-        if ((msg.reach === "offline") !== (msg.access === undefined)) return this.send(peer, { t: "error", code: "invalid" })
         const mine = [...this.rooms.values()].filter((r) => r.networkKey === peer.network.key).length
         if (this.rooms.size >= MAX_ROOMS || mine >= MAX_ROOMS_PER_NETWORK) return this.send(peer, { t: "error", code: "busy" })
         this.leave(peer)
@@ -134,8 +132,7 @@ export class Hub {
           mode: msg.mode,
           map: msg.map,
           minutes: msg.minutes,
-          reach: msg.reach,
-          ...(msg.access ? { access: msg.access } : {}),
+          ...(msg.reach === "offline" ? { reach: msg.reach } : { reach: msg.reach, access: msg.access }),
           level: msg.level,
           ff: msg.ff
         })
@@ -143,7 +140,7 @@ export class Hub {
         this.enter(peer, created, msg.primary)
         created.fillBots(msg.bots)
         this.roomChanged(created)
-        console.log(`🏰 Room ${code} (${msg.mode} on ${msg.map}, ${msg.access ? `${msg.reach}, ${msg.access.kind}` : msg.reach}) by ${peer.name}`)
+        console.log(`🏰 Room ${code} (${msg.mode} on ${msg.map}, ${msg.reach === "offline" ? msg.reach : `${msg.reach}, ${msg.access.kind}`}) by ${peer.name}`)
         return
       }
       case "join": {
@@ -153,7 +150,7 @@ export class Hub {
         if (target.settings.reach === "lan" && target.networkKey !== peer.network.key) {
           return this.send(peer, { t: "error", code: "lanOnly" })
         }
-        if (target.settings.access?.kind === "password") {
+        if (target.settings.access.kind === "password") {
           if (msg.password === undefined) return this.send(peer, { t: "error", code: "passwordRequired" })
           const now = this.clock()
           if (now < limits.waitUntil) return this.send(peer, { t: "error", code: "tooManyAttempts" })

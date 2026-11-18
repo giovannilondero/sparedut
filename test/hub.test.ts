@@ -142,7 +142,7 @@ test("the room list says which rooms need a password, and an open room does not"
   connect(hub, "9.9.9.8").say(locked)
   const me = connect(hub, "1.2.3.4")
   me.say({ t: "list" })
-  expect(rooms(me.got).map((r) => r.access)).toEqual(["open", "password"])
+  expect(rooms(me.got).map((r) => r.reach !== "offline" && r.access)).toEqual(["open", "password"])
 })
 
 test("a password of 1 to 32 characters after cleaning is accepted, an empty or longer one is refused", () => {

@@ -765,7 +765,7 @@ export class Game {
           ? `<div class="muted" style="font-size:12px">${p.reach.offline}</div>`
           : `<div class="row" style="align-items:center;justify-content:space-between">
         <div><div class="muted">${p.code}</div><div class="invite">${room.code}</div></div>
-        <div style="text-align:right"><button id="p-copy">${p.copy}</button><div class="muted" style="font-size:12px;margin-top:4px">${p.reach[room.reach]}${room.access ? ` · ${p.access[room.access]}` : ""}</div></div>
+        <div style="text-align:right"><button id="p-copy">${p.copy}</button><div class="muted" style="font-size:12px;margin-top:4px">${p.reach[room.reach]} · ${p.access[room.access]}</div></div>
       </div>`
       }
       <div class="roster">${rosterHtml(room, this.me)}</div>

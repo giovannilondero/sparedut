@@ -15,7 +15,8 @@ import {
   type RoomSummary,
   type ServerMessage,
   type SnapOther,
-  type Reach,
+  type Access,
+  type Reached,
   type RoomAccess,
   type Snapshot
 } from "../shared/protocol.ts"
@@ -44,13 +45,11 @@ export interface Member {
   credit: number
 }
 
-export interface RoomSettings {
+/** A room's settings. Read the password of its access only through `admits`. */
+export type RoomSettings = Reached<RoomAccess> & {
   readonly mode: ModeId
   readonly map: MapId
   readonly minutes: number
-  readonly reach: Reach
-  /** Absent for a reach without access (Offline, #17). Read the password only through `admits`. */
-  readonly access?: RoomAccess
   readonly level: BotLevel
   readonly ff: boolean
 }
@@ -314,8 +313,8 @@ export class Room {
 
   /** Whether a password lets a player in: always for an open room. */
   admits(password: string | undefined): boolean {
-    const access = this.settings.access
-    return access?.kind !== "password" || password === access.password
+    const s = this.settings
+    return s.reach === "offline" || s.access.kind !== "password" || password === s.access.password
   }
 
   summary(): RoomSummary {
@@ -324,8 +323,7 @@ export class Room {
       host: this.hostName,
       mode: this.settings.mode,
       map: this.settings.map,
-      reach: this.settings.reach,
-      ...(this.settings.access ? { access: this.settings.access.kind } : {}),
+      ...shownReach(this.settings),
       players: this.humans.length,
       bots: this.bots.size,
       max: MAX_PLAYERS,
@@ -359,3 +357,6 @@ export function newCode(taken: (code: string) => boolean) {
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 const r3 = (n: number) => Math.round(n * 1000) / 1000
+
+/** A room's reach as the room list shows it: the access's kind, never its password. */
+const shownReach = (s: Reached<RoomAccess>): Reached<Access> => (s.reach === "offline" ? { reach: s.reach } : { reach: s.reach, access: s.access.kind })

@@ -168,7 +168,7 @@ const menu = new Menu(settings, audio, {
     }
     if (!ensureOnline()) return
     autostart = oneTap
-    roomPassword = o.access?.kind === "password" ? o.access.password : null
+    roomPassword = o.access.kind === "password" ? o.access.password : null
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
     net.send({ t: "create", ...o, primary: settings.primary })
   },

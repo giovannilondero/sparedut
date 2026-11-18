@@ -37,6 +37,8 @@ export const REACHES = ["offline", "lan", "online"] as const
 export type Reach = (typeof REACHES)[number]
 /** The reaches the game server creates rooms with. */
 export const SERVER_REACHES = ["lan", "online"] as const satisfies readonly Reach[]
+/** A reach a room on the game server has: one with an access. */
+export type ServerReach = (typeof SERVER_REACHES)[number]
 /** The reaches the host in the player's browser creates rooms with. */
 export const BROWSER_REACHES = ["offline"] as const satisfies readonly Reach[]
 
@@ -53,22 +55,32 @@ export const RoomAccess = z.discriminatedUnion("kind", [
 ])
 export type RoomAccess = z.infer<typeof RoomAccess>
 
+/**
+ * A room's reach and, for a reach that has one, its access: an Offline room has nobody to keep
+ * out, a LAN or Online room always says who may come in. `A` is the access as written where it is
+ * kept: the host's choice with its password (`RoomAccess`), or what a room list shows (`Access`).
+ */
+export type Reached<A> = { readonly reach: "offline" } | { readonly reach: ServerReach; readonly access: A }
+
+/** What every `create` carries, whatever its reach. */
+const createRoom = {
+  t: z.literal("create"),
+  mode: z.enum(MODE_IDS as [ModeId, ...ModeId[]]),
+  map: z.enum(MAP_IDS as [MapId, ...MapId[]]),
+  minutes: z.number().int().min(2).max(30),
+  bots: z.number().int().min(0).max(7),
+  level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]),
+  ff: z.boolean(),
+  primary: z.enum(PRIMARIES)
+}
+
 export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("hello"), name, version: z.number() }),
   z.object({ t: z.literal("list") }),
-  z.object({
-    t: z.literal("create"),
-    mode: z.enum(MODE_IDS as [ModeId, ...ModeId[]]),
-    map: z.enum(MAP_IDS as [MapId, ...MapId[]]),
-    minutes: z.number().int().min(2).max(30),
-    reach: z.enum(REACHES),
-    /** Absent exactly for Offline, which has no access. */
-    access: RoomAccess.optional(),
-    bots: z.number().int().min(0).max(7),
-    level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]),
-    ff: z.boolean(),
-    primary: z.enum(PRIMARIES)
-  }),
+  z.discriminatedUnion("reach", [
+    z.object({ ...createRoom, reach: z.literal("offline") }).strict(),
+    z.object({ ...createRoom, reach: z.enum(SERVER_REACHES), access: RoomAccess })
+  ]),
   z.object({
     t: z.literal("join"),
     code: z.string().trim().toUpperCase().length(4),
@@ -98,14 +110,12 @@ export interface RosterEntry {
   readonly away: boolean
 }
 
-export interface RoomSummary {
+/** A room in the room list. Its access says whether it asks for a password, never the password itself. */
+export type RoomSummary = Reached<Access> & {
   readonly code: string
   readonly host: string
   readonly mode: ModeId
   readonly map: MapId
-  readonly reach: Reach
-  /** Whether the room asks for a password. Never the password itself. Absent for a reach without access (Offline, #17). */
-  readonly access?: Access
   /** Humans in the room; bots give their seat up to a human who joins. */
   readonly players: number
   readonly bots: number
@@ -113,7 +123,7 @@ export interface RoomSummary {
   readonly phase: PhaseView["tag"]
 }
 
-export interface RoomInfo extends RoomSummary {
+export type RoomInfo = RoomSummary & {
   readonly hostId: string
   readonly minutes: number
   readonly level: BotLevel
