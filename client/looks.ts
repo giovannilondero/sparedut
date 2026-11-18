@@ -49,25 +49,20 @@ export function lookFromUrl(): LookId {
   return isLook(saved) ? saved : "cumo"
 }
 
-/** A small bar to switch look (reloads the page). Hidden while the mouse is captured. */
-export function mountLookSwitcher(current: LookId) {
-  const bar = document.createElement("div")
-  // Hidden during a match on every device (style.css): it belongs to the menu.
-  bar.id = "look-switcher"
-  bar.style.cssText = "position:fixed;right:max(10px, env(safe-area-inset-right, 0px));bottom:max(10px, env(safe-area-inset-bottom, 0px));z-index:50;display:flex;gap:4px;padding:4px;border-radius:8px;background:rgba(12,10,8,.7);font:12px ui-sans-serif,system-ui,sans-serif"
-  for (const id of LOOK_IDS) {
-    const b = document.createElement("button")
-    b.textContent = LOOKS[id]
-    b.style.cssText = `cursor:pointer;padding:4px 9px;border-radius:5px;border:1px solid ${id === current ? "#e8b64c" : "transparent"};background:${id === current ? "#e8b64c" : "transparent"};color:${id === current ? "#1d1408" : "#f3e9d2"};font:inherit`
-    b.addEventListener("click", () => {
-      localStorage.setItem(STORE, id)
-      const url = new URL(location.href)
-      url.searchParams.set("look", id)
-      location.assign(url)
-    })
-    bar.append(b)
-  }
-  document.body.append(bar)
+/** The address a look is chosen at: the same page, everything it carries kept, with `?look=`. */
+export function lookAddress(href: string, id: LookId): string {
+  const url = new URL(href)
+  url.searchParams.set("look", id)
+  return url.href
+}
+
+/**
+ * Chooses a look from the menu: remembered, then the page reloads with it, since a look is
+ * set up once with the renderer.
+ */
+export function chooseLook(id: LookId) {
+  localStorage.setItem(STORE, id)
+  location.assign(lookAddress(location.href, id))
 }
 
 // --- restyling ----------------------------------------------------------------------------

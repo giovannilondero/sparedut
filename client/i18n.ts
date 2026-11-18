@@ -18,11 +18,11 @@ type Fn<A extends unknown[] = [string]> = (...args: A) => string
 
 /** Static HTML texts: `data-t="key"` (innerHTML) and `data-t-ph="key"` (placeholder). */
 export type StaticKey =
-  | "title" | "kicker" | "sub" | "nameLabel" | "namePh" | "oneTap" | "oneTapSub" | "create" | "createSub" | "join" | "joinSub"
-  | "roomsTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "reachLabel" | "reachLan" | "reachOnline" | "reachOffline"
+  | "title" | "nameLabel" | "namePh" | "oneTap" | "oneTapSub" | "create" | "createSub" | "join" | "joinSub"
+  | "roomsTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "reachLabel"
   | "ff" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
   | "qHigh" | "autoRes" | "showInfo" | "invert" | "keys" | "vocabTitle" | "connecting" | "chatPh" | "deathTitle" | "deathHint"
-  | "language" | "mapLabel" | "crouchMode" | "crouchHold" | "crouchToggle"
+  | "language" | "modeLabel" | "mapLabel" | "optionsLabel" | "crouchMode" | "crouchHold" | "crouchToggle"
   | "accessLabel" | "accessOpen" | "accessPassword" | "passwordLabel" | "passwordTitle"
 
 export interface Strings {
@@ -52,19 +52,14 @@ export interface Strings {
     /** A password the create form or the prompt refuses before sending it. */
     readonly passwordBad: string
     readonly botsNone: string
+    /** Bots per team in a few words, for creation's options line. */
+    readonly bots: Fn<[number]>
+    /** Friendly fire on, in creation's options line. */
+    readonly ffOn: string
     readonly minutes: Fn<[number]>
     readonly tag: { readonly primary: string; readonly power: string; readonly melee: string; readonly pistol: string }
     readonly stat: { readonly damage: string; readonly rate: string; readonly range: string; readonly mag: string }
     readonly vocab: readonly (readonly [string, string])[]
-    /** The training's place in the menu: reserved, with no button until the training exists. */
-    readonly training: { readonly name: string; readonly sub: string; readonly soon: string }
-    /** Entering a room: from the room list or with its code. */
-    readonly findRoom: { readonly name: string; readonly sub: string }
-    /** Room creation's parts, as steps or sections (the map's is `static.mapLabel`). */
-    readonly steps: { readonly mode: string; readonly options: string; readonly summary: string }
-    readonly next: string
-    /** Going back to a choice from a summary of the choices. */
-    readonly change: string
     /** One line on who can see and join a room of that reach. */
     readonly reachSub: Record<Reach, string>
     /** The look selector's label (Cumò, Vêr). */
@@ -277,8 +272,6 @@ const WEAPON_NAMES = {
 const fur: Strings = {
   static: {
     title: "Sparedût — Bataie tal Dom di Glemone",
-    kicker: "Glemone · Zone dal Dom · MCMLXXVI → MMXXVI",
-    sub: `Bataie tra <b class="ben">Benandants</b> e <b class="mal">Malandants</b> sot dal Cjampanili`,
     nameLabel: "Il to non",
     namePh: "Toni di Glemone",
     oneTap: "Zuie cuintri i bot",
@@ -295,9 +288,6 @@ const fur: Strings = {
     botsLabel: "Bot par scuadre",
     levelLabel: "Bravure dai bot",
     reachLabel: "Puartade",
-    reachLan: "LAN · dome te stesse rêt",
-    reachOnline: "In linie · par ducj",
-    reachOffline: "Offline (cuintri i bot)",
     accessLabel: "Acès",
     accessOpen: "Viert",
     accessPassword: "Cun password",
@@ -329,7 +319,9 @@ const fur: Strings = {
     deathTitle: "Ti àn fat frico!",
     deathHint: "Frache <kbd>B</kbd> par cambiâ l'arme principâl",
     language: "Lenghe",
-    mapLabel: "Mape"
+    modeLabel: "Modalitât",
+    mapLabel: "Mape",
+    optionsLabel: "Opzions"
   },
   teams: {
     benandanti: { name: "Benandants", motto: "Pal racolt e pe glesie!" },
@@ -423,6 +415,8 @@ const fur: Strings = {
     passwordFor: (code) => `La partide ${code} e domande une password.`,
     passwordBad: "La password e à di vê di 1 a 32 caratars.",
     botsNone: "Nissun (dome personis)",
+    bots: (n) => (n === 0 ? "Cence bot" : `${n} bot`),
+    ffOn: "Fûc amì",
     minutes: (n) => `${n} minûts`,
     tag: {
       primary: "Arme principâl · clic par sielzile",
@@ -432,11 +426,6 @@ const fur: Strings = {
     },
     stat: { damage: "Dam", rate: "Cjadence", range: "Puartade", mag: "Cjamadôr" },
     vocab: VOCAB,
-    training: { name: "Allenament", sub: "Impare i comants, lis armis e lis modalitâts", soon: "Ca di pôc" },
-    findRoom: { name: "Jentre intune partide", sub: "Sielç de liste o scrîf il codiç" },
-    steps: { mode: "Modalitât", options: "Opzions", summary: "Dut pront?" },
-    next: "Indenant",
-    change: "Cambie",
     reachSub: {
       offline: "Dome tu cuintri i bot, in chest navigadôr",
       lan: "Dome cui che al è te tô stesse rêt",
@@ -634,8 +623,6 @@ const fur: Strings = {
 const it: Strings = {
   static: {
     title: "Sparedût — Battaglia nel Duomo di Gemona",
-    kicker: "Gemona del Friuli · Zona del Duomo · MCMLXXVI → MMXXVI",
-    sub: `Battaglia tra <b class="ben">Benandanti</b> e <b class="mal">Malandanti</b> sotto il campanile`,
     nameLabel: "Il tuo nome",
     namePh: "Toni di Gemona",
     oneTap: "Gioca contro i bot",
@@ -652,9 +639,6 @@ const it: Strings = {
     botsLabel: "Bot per squadra",
     levelLabel: "Bravura dei bot",
     reachLabel: "Portata",
-    reachLan: "LAN · solo sulla stessa rete",
-    reachOnline: "Online · per tutti",
-    reachOffline: "Offline (contro i bot)",
     accessLabel: "Accesso",
     accessOpen: "Aperto",
     accessPassword: "Con password",
@@ -686,7 +670,9 @@ const it: Strings = {
     deathTitle: "Ti hanno fatto frico!",
     deathHint: "Premi <kbd>B</kbd> per cambiare arma principale",
     language: "Lingua",
-    mapLabel: "Mappa"
+    modeLabel: "Modalità",
+    mapLabel: "Mappa",
+    optionsLabel: "Opzioni"
   },
   teams: {
     benandanti: { name: "Benandanti", motto: "Per il raccolto e per la chiesa!" },
@@ -780,6 +766,8 @@ const it: Strings = {
     passwordFor: (code) => `La partita ${code} chiede una password.`,
     passwordBad: "La password deve avere da 1 a 32 caratteri.",
     botsNone: "Nessuno (solo persone)",
+    bots: (n) => (n === 0 ? "Senza bot" : `${n} bot`),
+    ffOn: "Fuoco amico",
     minutes: (n) => `${n} minuti`,
     tag: {
       primary: "Arma principale · clic per sceglierla",
@@ -789,11 +777,6 @@ const it: Strings = {
     },
     stat: { damage: "Danno", rate: "Cadenza", range: "Portata", mag: "Caricatore" },
     vocab: VOCAB,
-    training: { name: "Allenamento", sub: "Impara i comandi, le armi e le modalità", soon: "In arrivo" },
-    findRoom: { name: "Entra in una partita", sub: "Scegli dalla lista o scrivi il codice" },
-    steps: { mode: "Modalità", options: "Opzioni", summary: "Tutto pronto?" },
-    next: "Avanti",
-    change: "Cambia",
     reachSub: {
       offline: "Solo tu contro i bot, in questo browser",
       lan: "Solo chi è sulla tua stessa rete",

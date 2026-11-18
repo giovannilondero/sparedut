@@ -82,8 +82,17 @@ select:focus-visible, button:focus-visible, input:focus-visible, ui-radio:focus-
 .inline-field { display: inline-flex; align-items: center; gap: 6px; }
 .inline-field select { padding-block: 5px; font-size: 13px; }
 
-/* Bot skill: three cards instead of a dropdown with long texts. */
-.levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; color: var(--ink); }
+/* The look (Cumò, Vêr), in the header beside the language: after it, on a line of its own, on a narrow screen. */
+.look-switch { order: 1; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 999px;
+  background: var(--stone); border: 1px solid var(--stone-line); backdrop-filter: blur(6px); color: var(--muted); }
+.look-switch > span { padding-inline: 8px 2px; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
+.look-switch button { position: relative; min-block-size: 36px; padding: 5px 12px; font-size: 13px; border-radius: 999px; border-color: transparent; }
+/* A 44px target around a 36px pill. */
+.look-switch button::after { content: ""; position: absolute; inset: min(0px, (100% - 44px) / 2); }
+.look-switch button[aria-pressed="true"] { border-color: var(--gold); background: color-mix(in oklch, var(--gold) 18%, transparent); color: var(--gold); cursor: default; }
+@container menu (inline-size > 46rem) {
+  .look-switch { order: 0; margin-inline-start: auto; }
+}
 
 /* Language: toggle in the top right. */
 .lang { display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 999px;
@@ -104,29 +113,65 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 .form-msg:empty { display: none; }
 .field[hidden] { display: none; }
 
-.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .card { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 10px; }
 .card b { font-family: var(--serif); font-size: 17px; }
 .card small { font-size: 12px; opacity: 0.8; line-height: 1.3; }
 .card.selected, .card[data-checked] { border-color: var(--gold); background: rgba(232, 182, 76, 0.16); box-shadow: inset 0 0 0 1px var(--gold); }
 
-.weapons { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
-.weapon { text-align: left; display: flex; flex-direction: column; gap: 6px; }
+/* The armoury, in the menu and in a match: the primaries to choose from (a UI SDK radio group), then the weapons always carried. */
+.weapons { display: grid; gap: 14px; }
+.weapon-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.weapon { min-inline-size: 0; text-align: start; display: flex; flex-direction: column; gap: 6px; }
 .weapon b { font-family: var(--serif); font-size: 18px; color: var(--gold); }
 .weapon .blurb { font-size: 13px; opacity: 0.85; font-style: italic; }
 .weapon .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
-.weapon.selected { border-color: var(--gold); background: rgba(232, 182, 76, 0.16); }
-.stat { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.weapon[data-checked] { border-color: var(--gold); background: color-mix(in oklch, var(--gold) 16%, transparent); box-shadow: inset 0 0 0 1px var(--gold); }
+.weapon-cards.carried .weapon { padding: 10px 14px; border: 1px dashed var(--stone-line); border-radius: 10px; opacity: 0.75; }
+/* Two columns of bars where the card is wide enough for them, one on a narrow card. */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr)); gap: 3px 14px; }
+.stat { display: grid; grid-template-columns: 5.5em 1fr; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
 .stat i { display: block; height: 5px; border-radius: 3px; background: linear-gradient(90deg, var(--gold-deep), var(--gold)); }
-.weapon.locked { opacity: 0.7; cursor: default; }
 
-.vocab { columns: 2 300px; gap: 24px; font-size: 14px; line-height: 1.5; }
-.vocab p { margin: 0 0 8px; break-inside: avoid; }
+/* Words in rows, not in balanced columns: scrolling down a phone reads every column at once, never back up to the next one. */
+.vocab { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr)); gap: 8px 28px; font-size: 15px; line-height: 1.5; }
+.vocab p { margin: 0; overflow-wrap: break-word; }
 .vocab b { font-family: var(--serif); color: var(--gold); }
 
-.settings-form { display: flex; flex-direction: column; gap: 10px; }
-.settings-form .keys { margin-block-start: 4px; }
-.keys { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; font-size: 13px; color: var(--muted); }
+/* The settings form, in the menu and in a match: rows a thumb can hit, at least 44px tall. */
+.settings-form { display: flex; flex-direction: column; gap: 6px; }
+.settings-form .keys { margin-block-start: 8px; }
+.keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr)); gap: 6px 14px; font-size: 13px; color: var(--muted); }
+.s-range, .s-range ui-slider { display: block; }
+.s-range-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 13px; color: var(--muted); }
+.s-range ui-slider-value { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* The control is where a press lands: as tall as a thumb, with room for the knob at both ends. */
+.s-range ui-slider-control { display: flex; align-items: center; block-size: 40px; padding-inline: 12px; cursor: pointer;
+  /* UI SDK writes touch-action: none here, which stops a thumb scrolling the form across a slider: a vertical swipe scrolls (client/menu.ts puts the value back). */
+  touch-action: pan-y !important; }
+.s-range ui-slider-track { display: block; flex: 1; block-size: 6px; border-radius: 3px; background: oklch(1 0 none / 0.12); }
+.s-range ui-slider-indicator { display: block; border-radius: inherit; background: linear-gradient(90deg, var(--gold-deep), var(--gold)); }
+.s-range ui-slider-thumb { display: block; inline-size: 24px; block-size: 24px; border-radius: 50%; background: var(--gold); border: 2px solid #fff3cf; box-shadow: 0 1px 4px oklch(0 0 none / 0.5); }
+.s-range ui-slider-thumb:has(:focus-visible) { outline: 2px solid var(--gold); outline-offset: 3px; }
+.s-range ui-slider-thumb[data-dragging] { scale: 1.12; }
+.s-switch { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-block-size: 44px; font-size: 14px; cursor: pointer; }
+.s-switch ui-switch { flex: none; display: inline-flex; align-items: center; inline-size: 48px; block-size: 28px; padding: 3px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--stone-line); background: oklch(0 0 none / 0.35); }
+.s-switch ui-switch[data-checked] { border-color: #f7d483; background: var(--gold); }
+.s-switch ui-switch:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.s-switch ui-switch-thumb { display: block; inline-size: 20px; block-size: 20px; border-radius: 50%; background: var(--ink); }
+.s-switch ui-switch-thumb[data-checked] { translate: 20px 0; background: #1d1408; }
+.s-switch:active ui-switch-thumb { scale: 0.92; }
+.settings-form select { min-block-size: 44px; }
+@media (prefers-reduced-motion: no-preference) {
+  .s-switch ui-switch-thumb { transition: translate 0.15s ease-out, scale 0.1s ease-out; }
+  .s-range ui-slider-thumb { transition: scale 0.1s ease-out; }
+}
+
+/* The reference screens (armoury, settings, vocabulary) run long on a phone: the way back stays at the bottom while they scroll, above the home indicator. */
+/* It sticks to the menu's edge, not to the inside of its padding: the padding goes into its own, past the home indicator. */
+.screen-foot { position: sticky; inset-block-end: calc(-1 * max(var(--pad), env(safe-area-inset-bottom, 0px))); z-index: 1; margin: 4px -20px -20px; padding: 6px 20px max(8px, env(safe-area-inset-bottom, 0px));
+  border-block-start: 1px solid var(--stone-line); border-end-start-radius: 14px; border-end-end-radius: 14px; background: oklch(0.19 0.012 60 / 0.96); }
+.screen-foot button { min-block-size: 44px; }
 
 .menu-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 20px; }
 .tip { font-family: var(--serif); font-style: italic; max-width: 760px; font-size: 15px; color: var(--ink); opacity: 0.88; transition: opacity 0.5s; }
@@ -465,24 +510,16 @@ html.in-match input { user-select: text; -webkit-user-select: text; }
 #hud.touch #quickchat.tap { inset-inline-start: var(--free-l); inset-block-start: var(--free-t); max-inline-size: var(--free-w); max-block-size: var(--free-h); }
 #hud.touch #clickplay { inline-size: max-content; max-inline-size: calc(100% - 32px); font-size: clamp(22px, 6vw, 30px); }
 
-/* The look selector belongs to the menu: never over a match. */
-html.in-match #look-switcher { display: none !important; }
 #safe-area { position: fixed; inset: 0; visibility: hidden; pointer-events: none;
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
 
 #toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); background: var(--stone); border: 1px solid var(--gold); padding: 10px 18px; border-radius: 10px; z-index: 10; animation: rise 0.2s; }
-
-@media (max-width: 860px) {
-  .cards { grid-template-columns: 1fr; }
-}
 
 /* ---------------- PERFORMANCE PANEL (F3) ---------------- */
 #perf { position: fixed; top: 10px; left: 10px; z-index: 20; pointer-events: none; display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 8px;
   background: rgba(10, 8, 6, 0.78); border: 1px solid var(--stone-line); font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); min-width: 220px; }
 #perf b { font-size: 16px; }
 #perf small { color: var(--muted); margin-top: 2px; }
-/* The create form: settings that only a room on the server has (access, password) hide for Offline. */
-#menu-create:not([data-access-applies]) .needs-server { display: none; }
 
 /* ---------------- MENU: HOME ----------------
    Everything at once. One column on a narrow screen, the list after the actions; where there is
@@ -557,6 +594,73 @@ html.in-match #look-switcher { display: none !important; }
   .code-join { padding-block: 8px; }
   .code-join input { flex-basis: 4.5rem; font-size: 17px; letter-spacing: 0.12em; }
   .code-join button { padding-inline: 10px; }
+}
+
+/* ---------------- MENU: CREATE ----------------
+   One page: mode and map in front, the rest folded under "options", whose bar sums them up. One
+   column on a narrow screen; where there is room, the options and the button beside the cards.
+   The button stays in reach at the bottom of the screen, clear of the home indicator. */
+.create { align-self: start; display: grid; gap: 12px 20px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "pick" "side" "go"; }
+@media (prefers-reduced-motion: no-preference) { .create { animation: rise 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); } }
+.create-head { grid-area: head; display: flex; align-items: center; gap: 12px; }
+.create-head button { min-block-size: 44px; font-size: 14px; background: var(--stone); }
+.create-head h2 { margin: 0; font-family: var(--serif); font-size: clamp(22px, 1rem + 1.4vw, 28px); color: var(--gold); text-shadow: 0 2px 8px oklch(0 0 none / 0.6); }
+.create-pick { grid-area: pick; display: grid; gap: 14px; align-content: start; min-inline-size: 0; }
+.create-sec { display: grid; gap: 8px; }
+.create-sec h3 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.create-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 8px; color: var(--ink); }
+/* Mode and map: two across on a phone, three where there is room, never a lone card stretched wide. */
+.create-pick .create-cards { grid-template-columns: repeat(auto-fill, minmax(min(50% - 4px, 200px), 1fr)); }
+.create-reaches { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
+.create-accesses { grid-template-columns: repeat(auto-fit, minmax(min(100%, 110px), 1fr)); }
+.create-cards .card { min-inline-size: 0; min-block-size: 44px; justify-content: center; gap: 2px; padding: 8px 12px; background-color: var(--stone); }
+/* A card's line is cut after two lines: the cards stay one size, the mode's rules are said below them. */
+.create-cards .card small { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; text-wrap: pretty; }
+.create-cards .card small:empty { display: none; }
+.create-cards .card[data-checked] b { color: var(--gold); }
+.create-cards .chip { font-size: 13px; }
+.create-rules { margin: 0; padding: 8px 12px; border-inline-start: 3px solid var(--gold); border-radius: 0 10px 10px 0; background: oklch(0.15 0.01 60 / 0.6);
+  font-size: 13px; line-height: 1.4; font-style: italic; text-wrap: pretty; }
+
+.create-options { grid-area: side; align-self: start; display: block; min-inline-size: 0; scroll-margin-block-start: max(8px, env(safe-area-inset-top, 0px)); }
+.create-fold { inline-size: 100%; min-block-size: 56px; display: flex; align-items: center; gap: 12px; text-align: start; padding: 10px 16px; background: var(--stone); }
+.create-fold > span { flex: 1; display: grid; gap: 2px; min-inline-size: 0; }
+.create-fold b { font-family: var(--serif); font-size: 18px; color: var(--gold); }
+.create-fold small { font-size: 13px; color: var(--muted); text-wrap: pretty; }
+.create-fold i { font-style: normal; font-size: 18px; color: var(--gold); }
+.create-options[data-open] .create-fold { border-color: var(--gold); border-end-start-radius: 0; border-end-end-radius: 0; }
+.create-options[data-open] .create-fold i { rotate: 180deg; }
+@media (prefers-reduced-motion: no-preference) { .create-fold i { transition: rotate 0.2s ease-out; } }
+.create-opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 14px 16px;
+  background: var(--stone); border: 1px solid var(--gold); border-block-start: 0; border-radius: 0 0 12px 12px; }
+.create-opts[hidden], .create-access[hidden] { display: none; }
+.create-wide { grid-column: 1 / -1; }
+.create-access { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px; }
+.create-access input { min-block-size: 44px; }
+.create-access input[aria-invalid] { border-color: #f08a6c; }
+.create .check { min-block-size: 44px; }
+.create .check input { inline-size: 20px; block-size: 20px; accent-color: var(--gold); }
+
+/* Duration and bots: UI SDK selects, drawn like the game's dropdowns; a bottom sheet on a small touch screen. */
+.create-select { display: grid; gap: 4px; }
+.create-select button { inline-size: 100%; min-block-size: 44px; text-align: start; font-size: 15px; border-radius: 8px; padding-block: 8px; padding-inline: 10px 32px;
+  background: rgba(0, 0, 0, 0.35) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23e8b64c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center / 12px 8px; }
+.create-list { min-inline-size: var(--anchor-width); max-block-size: min(var(--available-height, 60dvh), 60dvh); overflow: auto; overscroll-behavior: contain; padding: 4px;
+  color: var(--ink); font-family: var(--sans); background: #1d1813; border: 1px solid var(--gold); border-radius: 10px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55); }
+.create-list ui-select-item { display: flex; align-items: center; min-block-size: 44px; padding-inline: 12px; border-radius: 8px; cursor: pointer; }
+.create-list ui-select-item[data-highlighted] { background: rgba(232, 182, 76, 0.16); }
+.create-list ui-select-item[data-selected] { color: var(--gold); font-weight: 700; }
+.create-list[data-presentation="sheet"] { inline-size: 100%; border-radius: 16px 16px 0 0; border-block-end: 0;
+  padding: 8px max(8px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+
+.create-go { grid-area: go; position: sticky; inset-block-end: 0; z-index: 1; display: grid; gap: 6px;
+  padding-block: 16px max(10px, env(safe-area-inset-bottom, 0px)); background: linear-gradient(transparent, oklch(0.17 0.01 60 / 0.95) 22px); }
+.create-go .primary { min-block-size: 54px; font-size: 18px; }
+.create-go .form-msg { text-align: center; }
+
+@container menu (inline-size > 44rem) {
+  .create { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); grid-template-rows: auto auto 1fr; grid-template-areas: "head head" "pick side" "pick go"; }
+  .create-go { align-self: end; }
 }
 
 /* The password prompt: a UI SDK dialog in the top layer, over the home screen. */

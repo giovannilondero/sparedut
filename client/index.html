@@ -40,6 +40,8 @@
     <div id="menu">
       <header class="brand">
         <h1 class="brand-title">Sparedût</h1>
+        <!-- The look the world is drawn in: chosen here only, never shown over a match. Its buttons come from client/looks.ts. -->
+        <div id="look-switch" class="look-switch" role="group" aria-labelledby="look-label"><span id="look-label"></span></div>
         <div class="lang" role="group" aria-labelledby="lang-label"><span id="lang-label" data-t="language"></span><button data-lang="fur">Furlan</button><button data-lang="it">Italiano</button></div>
       </header>
 
@@ -94,56 +96,97 @@
         </ui-dialog-content>
       </ui-dialog>
 
-      <section id="menu-create" class="panel hidden">
-        <h2 data-t="create"></h2>
-        <div id="mode-cards" class="cards"></div>
-        <div class="field"><span data-t="mapLabel"></span><div id="map-cards" class="cards maps"></div></div>
-        <div class="grid2">
-          <label class="field"><span data-t="minutesLabel"></span><select id="c-minutes"></select></label>
-          <label class="field"><span data-t="botsLabel"></span><select id="c-bots"></select></label>
-        </div>
-        <div class="field"><span data-t="levelLabel"></span><div id="c-level" class="levels" role="radiogroup"></div></div>
-        <div class="field"><span id="c-reach-label" data-t="reachLabel"></span><ui-radio-group id="c-reach" class="cards reaches" aria-labelledby="c-reach-label"></ui-radio-group></div>
-        <div class="grid2 needs-server">
-          <label class="field"><span data-t="accessLabel"></span><select id="c-access"></select></label>
-          <label class="field" id="c-password-field" hidden><span data-t="passwordLabel"></span><input id="c-password" maxlength="32" autocomplete="off" spellcheck="false" /></label>
-        </div>
-        <p id="c-msg" class="form-msg" role="alert"></p>
-        <label class="check"><input type="checkbox" id="c-ff" /> <span data-t="ff"></span></label>
-        <div class="row">
+      <!-- Creation on one page: mode and map in front, the rest folded under "options", whose bar sums them up. -->
+      <section id="menu-create" class="create hidden" aria-labelledby="c-title">
+        <header class="create-head">
           <button data-go="home" data-t="back"></button>
-          <button class="primary" id="c-go" data-t="createGo"></button>
+          <h2 id="c-title" data-t="create"></h2>
+        </header>
+        <div class="create-pick">
+          <section class="create-sec">
+            <h3 id="c-mode-label" data-t="modeLabel"></h3>
+            <ui-radio-group id="c-mode" class="create-cards" aria-labelledby="c-mode-label" aria-describedby="c-rules"></ui-radio-group>
+            <p id="c-rules" class="create-rules"></p>
+          </section>
+          <section class="create-sec">
+            <h3 id="c-map-label" data-t="mapLabel"></h3>
+            <ui-radio-group id="c-map" class="create-cards" aria-labelledby="c-map-label"></ui-radio-group>
+          </section>
         </div>
+        <ui-collapsible id="c-options" class="create-options">
+          <ui-collapsible-trigger><button type="button" class="create-fold">
+            <span><b data-t="optionsLabel"></b><small id="c-summary"></small></span><i aria-hidden="true">▾</i>
+          </button></ui-collapsible-trigger>
+          <ui-collapsible-panel class="create-opts" keep-mounted hidden>
+            <div class="field">
+              <ui-select id="c-minutes" class="create-select" presentation="auto">
+                <ui-select-label data-t="minutesLabel"></ui-select-label>
+                <ui-select-trigger><button type="button"><ui-select-value></ui-select-value></button></ui-select-trigger>
+                <ui-select-content class="create-list"></ui-select-content>
+              </ui-select>
+            </div>
+            <div class="field">
+              <ui-select id="c-bots" class="create-select" presentation="auto">
+                <ui-select-label data-t="botsLabel"></ui-select-label>
+                <ui-select-trigger><button type="button"><ui-select-value></ui-select-value></button></ui-select-trigger>
+                <ui-select-content class="create-list"></ui-select-content>
+              </ui-select>
+            </div>
+            <div class="field create-wide"><span id="c-level-label" data-t="levelLabel"></span><ui-radio-group id="c-level" class="create-cards" aria-labelledby="c-level-label"></ui-radio-group></div>
+            <div class="field create-wide"><span id="c-reach-label" data-t="reachLabel"></span><ui-radio-group id="c-reach" class="create-cards create-reaches" aria-labelledby="c-reach-label"></ui-radio-group></div>
+            <div class="create-wide create-access" id="c-access-field">
+              <div class="field"><span id="c-access-label" data-t="accessLabel"></span><ui-radio-group id="c-access" class="create-cards create-accesses" aria-labelledby="c-access-label"></ui-radio-group></div>
+              <label class="field" id="c-password-field" hidden><span data-t="passwordLabel"></span><input id="c-password" maxlength="32" autocomplete="off" spellcheck="false" aria-describedby="c-msg" /></label>
+            </div>
+            <label class="check create-wide"><input type="checkbox" id="c-ff" /> <span data-t="ff"></span></label>
+          </ui-collapsible-panel>
+        </ui-collapsible>
+        <footer class="create-go">
+          <p id="c-msg" class="form-msg" role="alert"></p>
+          <button class="primary" id="c-go" data-t="createGo"></button>
+        </footer>
       </section>
 
       <section id="menu-armarie" class="panel wide hidden">
         <h2 data-t="armarieTitle"></h2>
         <div id="armarie" class="weapons"></div>
-        <div class="row"><button data-go="home" data-t="back"></button></div>
+        <div class="row screen-foot"><button data-go="home" data-t="back"></button></div>
       </section>
 
       <section id="menu-settings" class="panel hidden">
         <h2 data-t="settings"></h2>
         <!-- The form moves into the match menu when it is opened from there. -->
         <div id="settings-home"><div id="settings-form" class="settings-form">
-          <label class="field"><span><span data-t="sens"></span> <b id="s-sens-v"></b></span><input type="range" id="s-sens" min="0.2" max="3" step="0.05" /></label>
-          <label class="field"><span><span data-t="fov"></span> <b id="s-fov-v"></b></span><input type="range" id="s-fov" min="65" max="105" step="1" /></label>
-          <label class="field"><span><span data-t="volume"></span> <b id="s-master-v"></b></span><input type="range" id="s-master" min="0" max="1" step="0.05" /></label>
-          <label class="field"><span><span data-t="music"></span> <b id="s-music-v"></b></span><input type="range" id="s-music" min="0" max="1" step="0.05" /></label>
+          <ui-field class="s-range"><ui-slider id="s-sens" min="0.2" max="3" step="0.05">
+            <div class="s-range-head"><ui-field-label data-t="sens"></ui-field-label><ui-slider-value></ui-slider-value></div>
+            <ui-slider-control><ui-slider-track><ui-slider-indicator></ui-slider-indicator><ui-slider-thumb></ui-slider-thumb></ui-slider-track></ui-slider-control>
+          </ui-slider></ui-field>
+          <ui-field class="s-range"><ui-slider id="s-fov" min="65" max="105" step="1">
+            <div class="s-range-head"><ui-field-label data-t="fov"></ui-field-label><ui-slider-value></ui-slider-value></div>
+            <ui-slider-control><ui-slider-track><ui-slider-indicator></ui-slider-indicator><ui-slider-thumb></ui-slider-thumb></ui-slider-track></ui-slider-control>
+          </ui-slider></ui-field>
+          <ui-field class="s-range"><ui-slider id="s-master" min="0" max="1" step="0.05">
+            <div class="s-range-head"><ui-field-label data-t="volume"></ui-field-label><ui-slider-value></ui-slider-value></div>
+            <ui-slider-control><ui-slider-track><ui-slider-indicator></ui-slider-indicator><ui-slider-thumb></ui-slider-thumb></ui-slider-track></ui-slider-control>
+          </ui-slider></ui-field>
+          <ui-field class="s-range"><ui-slider id="s-music" min="0" max="1" step="0.05">
+            <div class="s-range-head"><ui-field-label data-t="music"></ui-field-label><ui-slider-value></ui-slider-value></div>
+            <ui-slider-control><ui-slider-track><ui-slider-indicator></ui-slider-indicator><ui-slider-thumb></ui-slider-thumb></ui-slider-track></ui-slider-control>
+          </ui-slider></ui-field>
           <label class="field"><span data-t="quality"></span><select id="s-quality"><option value="bassa" data-t="qLow"></option><option value="media" data-t="qMid"></option><option value="alta" data-t="qHigh"></option></select></label>
-          <label class="check"><input type="checkbox" id="s-autores" /> <span data-t="autoRes"></span></label>
-          <label class="check"><input type="checkbox" id="s-info" /> <span data-t="showInfo"></span></label>
-          <label class="check"><input type="checkbox" id="s-invert" /> <span data-t="invert"></span></label>
+          <label class="s-switch"><span data-t="autoRes"></span><ui-switch id="s-autores"><ui-switch-thumb></ui-switch-thumb></ui-switch></label>
+          <label class="s-switch"><span data-t="showInfo"></span><ui-switch id="s-info"><ui-switch-thumb></ui-switch-thumb></ui-switch></label>
+          <label class="s-switch"><span data-t="invert"></span><ui-switch id="s-invert"><ui-switch-thumb></ui-switch-thumb></ui-switch></label>
           <label class="field"><span data-t="crouchMode"></span><select id="s-crouch"><option value="hold" data-t="crouchHold"></option><option value="toggle" data-t="crouchToggle"></option></select></label>
           <div class="keys" data-t="keys"></div>
         </div></div>
-        <div class="row"><button data-go="home" data-t="back"></button></div>
+        <div class="row screen-foot"><button data-go="home" data-t="back"></button></div>
       </section>
 
       <section id="menu-vocabolari" class="panel wide hidden">
         <h2 data-t="vocabTitle"></h2>
         <div id="vocabolari" class="vocab"></div>
-        <div class="row"><button data-go="home" data-t="back"></button></div>
+        <div class="row screen-foot"><button data-go="home" data-t="back"></button></div>
       </section>
 
       <footer class="menu-foot">
