@@ -66,3 +66,43 @@ export function takeOver(registration: RegistrationLike | null): boolean {
   waiting.postMessage(TAKE_OVER)
   return true
 }
+
+/** A registration that says when the browser found a new version to download. */
+export interface WatchedRegistration extends RegistrationLike {
+  addEventListener(type: "updatefound", listener: () => void): void
+}
+
+/**
+ * Calls `onWaiting` whenever a new version waits beside the one in control: one already waiting
+ * when the page opens, and each one the browser finds later, once installed. The first version a
+ * page installs is not new: nothing controlled the page before it (`controlled`).
+ */
+export function watchNewVersion(registration: WatchedRegistration, controlled: () => boolean, onWaiting: () => void) {
+  const check = () => {
+    if (controlled()) void newVersionWaiting(registration).then((waiting) => waiting && onWaiting())
+  }
+  registration.addEventListener("updatefound", check)
+  check()
+}
+
+/**
+ * The update notice's tap: the waiting version takes over, and the page reloads once it has
+ * control. With none waiting any more (another tab of the game let it take over) the page reloads
+ * at once, into the version now in control.
+ */
+export function loadNewVersion(
+  registration: RegistrationLike | null,
+  container: { addEventListener(type: "controllerchange", listener: () => void): void } | undefined,
+  reload: () => void
+) {
+  let reloaded = false
+  container?.addEventListener("controllerchange", () => {
+    if (reloaded) return
+    reloaded = true
+    reload()
+  })
+  if (!takeOver(registration)) {
+    reloaded = true
+    reload()
+  }
+}

@@ -21,6 +21,15 @@ export function runsInstalled(env: Surroundings): boolean {
   return env.matchMedia("(display-mode: fullscreen)").matches && !env.fullscreenElement
 }
 
+/**
+ * Whether the game is added to the home screen by hand, from the share menu, because the browser
+ * offers no install prompt: iPhone and iPad. iPadOS asks for desktop pages by default, so its
+ * Safari says "Macintosh"; a Mac has no touch points.
+ */
+export function addsToHomeScreenByHand(nav: { readonly userAgent: string; readonly maxTouchPoints: number }): boolean {
+  return /\b(iPhone|iPad|iPod)\b/.test(nav.userAgent) || (/\bMacintosh\b/.test(nav.userAgent) && nav.maxTouchPoints > 1)
+}
+
 /** The part of `navigator.storage` used here. */
 export interface StorageKeeper {
   persisted(): Promise<boolean>
