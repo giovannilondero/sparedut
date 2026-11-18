@@ -46,7 +46,7 @@ test("the icon's shortcut address opens the game on the shortcut", () => {
 })
 
 test("the shortcut used from the menu by a named player starts the home button's match", () => {
-  expect(decideOpening(readOpening("?shortcut=bots", ""), MENU)).toEqual({ kind: "start" })
+  expect(decideOpening(readOpening("?shortcut=bots", ""), MENU)).toEqual({ kind: "start", button: "one-tap" })
 })
 
 test("the shortcut used from the menu with no name asks for the name and starts nothing", () => {

@@ -272,7 +272,7 @@ const physicsReady = initPhysics().then(() => {
     saveSettings: () => saveSettings(settings),
     onLeave: backToMenu,
     leaveForOneTap: () => {
-      afterLeft = () => menu.oneTap()
+      afterLeft = () => menu.press("one-tap")
       link.send({ t: "leave" })
       backToMenu()
     },
@@ -379,7 +379,7 @@ function answerOpening(opening: Opening) {
       sendJoin(action.code, action.password ?? undefined)
       return
     case "start":
-      menu.shortcut()
+      menu.press(action.button)
       return
     case "askName":
       toast(action.message(t().net))

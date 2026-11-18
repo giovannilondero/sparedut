@@ -3,7 +3,10 @@
  * turns into, which fields apply and why a request is refused.
  */
 import { expect, test } from "bun:test"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { focusOnScreen, MenuModel, type Remembered } from "../client/menu-model.ts"
+import { decideOpening, readOpening } from "../client/opening.ts"
 
 const remembered = (over: Partial<Remembered> = {}): Remembered => ({
   name: "Toni",
@@ -438,16 +441,15 @@ test("the update notice is never shown during a match, and appears on return to 
   expect(model.updateNotice).toBe("hidden")
 })
 
-test("the icon's shortcut asks for the same match as the home screen's button, from the same settings", () => {
-  for (const over of [{}, { lastMode: "frico", lastMap: "trincee", lastMinutes: 20, lastBots: 6, lastLevel: "plevan", lastFf: true }] as const) {
-    const request = menu(over).model.oneTap()
-    expect(request.kind).toBe("send")
-    expect(menu(over).model.shortcut()).toEqual(request)
-  }
-})
-
-test("the icon's shortcut with no name is refused like the home screen's button", () => {
-  const { model } = menu({ name: "" })
-  expect(model.shortcut()).toEqual(menu({ name: "" }).model.oneTap())
-  expect(model.shortcut().kind).toBe("refused")
+test("the icon's shortcut presses the home screen's own \"Zuie cuintri i bot\" button, so it asks for the same match", () => {
+  const html = readFileSync(join(import.meta.dir, "../client/index.html"), "utf8")
+  const homeButton = /<button[^>]*data-go="([^"]+)"[^>]*>\s*<span data-t="oneTap">/.exec(html)?.[1]
+  const action = decideOpening(readOpening("?shortcut=bots", ""), { playing: false, named: true })
+  if (action.kind !== "start") throw new Error(`the shortcut did not start a match: ${action.kind}`)
+  expect<string | undefined>(action.button).toBe(homeButton)
+  const { model } = menu({ lastMode: "frico", lastMap: "trincee", lastMinutes: 20, lastBots: 6, lastLevel: "plevan" })
+  expect(model.press(action.button)).toEqual({
+    kind: "send",
+    request: { t: "create", oneTap: true, room: { mode: "frico", map: "trincee", minutes: 20, reach: "offline", bots: 6, level: "plevan", ff: false } }
+  })
 })

@@ -5,6 +5,7 @@
 
 import type { Strings } from "./i18n.ts"
 import { type Invite, readInvite } from "./invite.ts"
+import type { MenuButton } from "./menu-model.ts"
 
 /** How the page was opened: on an invite, from the installed game's shortcut, or on nothing in particular. */
 export type Opening = { readonly kind: "invite"; readonly invite: Invite } | { readonly kind: "shortcut" } | { readonly kind: "none" }
@@ -30,8 +31,8 @@ export interface OpeningSituation {
 /** What the game does about how it was opened. */
 export type OpeningAction =
   | { readonly kind: "join"; readonly code: string; readonly password: string | null }
-  /** The home screen's button, "Zuie cuintri i bot": the same menu action, so the same match. */
-  | { readonly kind: "start" }
+  /** Presses the home screen's button, "Zuie cuintri i bot": the same menu action, so the same match. */
+  | { readonly kind: "start"; readonly button: Extract<MenuButton, "one-tap"> }
   /** A message asking for the name, in the player's language, about the opening that needed it; nothing else, and nothing remembered. */
   | { readonly kind: "askName"; readonly message: (texts: Strings["net"]) => string }
   | { readonly kind: "nothing" }
@@ -44,6 +45,6 @@ export function decideOpening(opening: Opening, situation: OpeningSituation): Op
     const { code } = opening.invite
     return { kind: "askName", message: (texts) => texts.inviteNeedName(code) }
   }
-  if (opening.kind === "shortcut") return { kind: "start" }
+  if (opening.kind === "shortcut") return { kind: "start", button: "one-tap" }
   return { kind: "join", code: opening.invite.code, password: opening.invite.password }
 }

@@ -29,6 +29,9 @@ export type FormSetting = "sensitivity" | "fov" | "master" | "music" | "quality"
 export const SCREENS = ["home", "create", "password", "armarie", "settings", "vocabolari"] as const
 export type Screen = (typeof SCREENS)[number]
 
+/** A button of the menu that leads somewhere (its `data-go`): the home screen's one-tap match, the training, or a screen. */
+export type MenuButton = "one-tap" | "training" | Screen
+
 /** What the menu asks the game to do. */
 export type MenuRequest =
   /** `oneTap`: the home screen's button, whose match starts at once, without warm-up. */
@@ -198,6 +201,13 @@ export class MenuModel {
     return { access, password: access && this.access === "password" }
   }
 
+  /** A `data-go` button pressed, by the player or for them (the installed game's shortcut, `client/opening.ts`). */
+  press(button: MenuButton): Outcome {
+    if (button === "one-tap") return this.oneTap()
+    if (button === "training") return this.training()
+    return this.go(button)
+  }
+
   go(screen: Screen): Outcome {
     if (NEED_NAME.has(screen) && !this.remembered.name) return this.needName()
     this.current = screen
@@ -302,11 +312,6 @@ export class MenuModel {
   oneTap(): Outcome {
     if (!this.remembered.name) return this.needName()
     return { kind: "send", request: { t: "create", room: oneTapRoom(this.remembered), oneTap: true } }
-  }
-
-  /** The installed game's shortcut, "Zuie cuintri i bot" (`client/opening.ts`): exactly the home screen's button. */
-  shortcut(): Outcome {
-    return this.oneTap()
   }
 
   /**
