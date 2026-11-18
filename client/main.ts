@@ -41,10 +41,12 @@ renderer.info.autoReset = false
 const perf = new PerfMonitor(renderer)
 const chosenLook = lookFromUrl()
 // Vêr chosen with no network and never fetched: Cumò for this page, and the saved choice kept,
-// so Vêr comes back by itself once it can load (`client/offline-cache/ver.ts`).
+// so Vêr comes back by itself once it can load (`client/offline-cache/ver.ts`). Asked only when
+// the browser says it is offline: online, the boot waits for nothing (and the `load` listeners
+// below are added before the page's `load`, which a top-level await would let pass).
 const shownLook = lookToShow(
   chosenLook,
-  chosenLook === "ver" ? await verState({ caches: "caches" in globalThis ? caches : undefined, fetch: (url, init) => fetch(url, init) }) : "reachable"
+  chosenLook === "ver" && !navigator.onLine ? await verState({ caches: "caches" in globalThis ? caches : undefined, fetch: (url, init) => fetch(url, init) }) : "reachable"
 )
 const look = createLook(shownLook.look, renderer)
 
