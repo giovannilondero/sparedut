@@ -8,7 +8,7 @@ import type { Team } from "../map.ts"
 import type { PhysicsWorld } from "../physics.ts"
 import type { PrimaryId } from "../weapons.ts"
 import type { GameEvent } from "./events.ts"
-import { freshDoors, freshTurrets } from "./rules.ts"
+import { freshDoors, freshTurrets, FRESH_CART, FRESH_FLAGS, FRESH_HILL } from "./rules.ts"
 import { simulate } from "./schedule.ts"
 import type { Device } from "../devices.ts"
 import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, GoToStation, StartMatch, StepUnavailable, Training, type PickupState, type PostValue } from "./schema.ts"
@@ -49,9 +49,9 @@ export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: H
       Objective: MODE_OBJECTIVE[options.mode],
       Tick: 0,
       Score: { benandanti: 0, malandanti: 0 },
-      Flags: { benandanti: { _tag: "base" }, malandanti: { _tag: "base" } },
-      Hill: { owner: null, contested: false, ticks: 0 },
-      Cart: { d: 0, pushers: 0, contested: false, idle: 0 },
+      Flags: FRESH_FLAGS,
+      Hill: FRESH_HILL,
+      Cart: FRESH_CART,
       StormCourse: null,
       Pickups: options.physics.map.pickups.map((): PickupState => ({ _tag: "up" })),
       Turrets: freshTurrets(options.physics.map),

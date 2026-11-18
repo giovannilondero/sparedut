@@ -13,7 +13,7 @@ import { STATION_IDS, STATIONS, stepRule, stepsOf, TRAINING } from "../../traini
 import type { Seen, StepRule } from "../../training/station.ts"
 import { hasControl } from "../../training/controls.ts"
 import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS } from "../../weapons.ts"
-import { freshArsenal, freshDoors, MAX_HP, stormOnCourse } from "../rules.ts"
+import { freshArsenal, freshDoors, FRESH_CART, FRESH_FLAGS, FRESH_HILL, MAX_HP, stormOnCourse } from "../rules.ts"
 import {
   Arsenal,
   Cart,
@@ -172,9 +172,9 @@ export const PlayTraining = Game.System(
       const objective = given.objective
       if (objective === undefined) return
       resources.objective.set(objective)
-      if (objective === "frico") resources.flags.set({ benandanti: { _tag: "base" }, malandanti: { _tag: "base" } })
-      if (objective === "placute") resources.hill.set({ owner: null, contested: false, ticks: 0 })
-      if (objective === "cjar") resources.cart.set({ d: 0, pushers: 0, contested: false, idle: 0 })
+      if (objective === "frico") resources.flags.set(FRESH_FLAGS)
+      if (objective === "placute") resources.hill.set(FRESH_HILL)
+      if (objective === "cjar") resources.cart.set(FRESH_CART)
       // #49: the storm starts closing on its course now.
       const course = objective === "storm" ? given.storm : undefined
       resources.stormCourse.set(course ? { x: course.at[0], z: course.at[2], from: course.from, to: course.to, start: resources.tick.get(), ticks: course.ticks } : null)
