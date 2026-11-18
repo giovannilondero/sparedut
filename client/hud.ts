@@ -7,9 +7,12 @@ import { FLAG_BIT, type BoardRow, type RoomInfo, type SnapSelf, type Snapshot } 
 import type { KillCause } from "../shared/sim/events.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { WARMUP_TICKS } from "../shared/sim/rules.ts"
+import type { TrainingView } from "../shared/sim/view.ts"
+import { STATION_IDS, stepRule } from "../shared/training/index.ts"
+import type { StepText } from "./training-text/index.ts"
 import type { Device } from "./device.ts"
 import { t } from "./i18n.ts"
-import { menuControl, playPrompt, turretPrompt } from "./prompts.ts"
+import { menuControl, playPrompt, trainingControl, turretPrompt } from "./prompts.ts"
 import { buttonBit, TOUCH_BUTTONS, type Insets, type PickerEntry, type TouchLayout, type TouchView } from "./touch.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -71,6 +74,47 @@ export class Hud {
     if (this.written.get(`${id}:c:${cls}`) === on) return
     this.written.set(`${id}:c:${cls}`, on)
     $(id).classList.toggle(cls, on)
+  }
+
+  /** What the training panel last showed: it is written again only when one of these changes. */
+  private trainingShown: { strings: unknown; station: string; step: string | null; count: number; device: Device | null } = { strings: null, station: "", step: null, count: -1, device: null }
+  private trainingDoneTimer = 0
+
+  /**
+   * The training's panel: the station and its number out of the total, the current step's
+   * instruction naming its control, and its count when it has one. Hidden outside a training.
+   */
+  training(view: TrainingView | null, device: Device) {
+    this.toggle("training", "hidden", view === null)
+    if (view === null) return
+    const s = t()
+    const station = view.tag === "station" ? view.station : ""
+    const step = view.tag === "station" ? view.step : null
+    const count = view.tag === "station" ? view.count : -1
+    const shown = this.trainingShown
+    if (shown.strings === s && shown.station === station && shown.step === step && shown.count === count && shown.device === device) return
+    this.trainingShown = { strings: s, station, step, count, device }
+    if (view.tag === "complete") {
+      this.text("training-station", s.training.complete)
+      this.html("training-step", "")
+      return
+    }
+    this.text("training-station", s.training.station(STATION_IDS.indexOf(view.station) + 1, STATION_IDS.length, s.training.stations[view.station]))
+    if (view.step === null) return this.html("training-step", "")
+    const instruction = (s.training.steps[view.station] as Readonly<Record<string, StepText>>)[view.step]
+    const control = trainingControl(s, stepRule(view.station, view.step).control, device)
+    this.html("training-step", `${instruction(control)}${view.target > 1 ? ` <b class="count">${s.training.count(view.count, view.target)}</b>` : ""}`)
+  }
+
+  /** The brief confirmation that a step was done. */
+  trainingDone() {
+    const el = $("training-done")
+    el.textContent = `✓ ${t().training.stepDone}`
+    el.classList.remove("pop")
+    void el.offsetWidth
+    el.classList.add("pop")
+    clearTimeout(this.trainingDoneTimer)
+    this.trainingDoneTimer = window.setTimeout(() => (el.textContent = ""), 1600)
   }
 
   show(on: boolean) {
@@ -177,6 +221,18 @@ export class Hud {
   /** `outside`: I'm alive and outside the Tampieste circle. `device`: the active one, whose controls the banner names. */
   top(snap: Snapshot, mode: ModeId, names: Map<string, string>, device: Device, outside = false) {
     const s = t()
+    if (snap.training) {
+      // A training has no score and no clock: its panel says where the trainee is.
+      this.text("name-ben", "")
+      this.text("name-mal", "")
+      this.text("score-ben", "")
+      this.text("score-mal", "")
+      this.text("clock", "")
+      this.text("mode-label", `${s.modes[mode].name} · ${s.modes[mode].sub}`)
+      this.html("objective", "")
+      this.html("banner", "")
+      return
+    }
     const alone = mode === "tampieste"
     const alive = snap.players.filter((p) => p.f & FLAG_BIT.alive).length
     // In the Tampieste there are no teams: instead of the score, how many are still standing.

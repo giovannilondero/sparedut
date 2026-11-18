@@ -21,6 +21,7 @@ import {
   type Snapshot
 } from "../shared/protocol.ts"
 import { createSim, type GameEvent, type Sim, type WorldView } from "../shared/sim/index.ts"
+import { TRAINING } from "../shared/training/index.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
 import { BotBrain } from "./bot.ts"
 import { navGraph } from "./nav.ts"
@@ -54,6 +55,9 @@ export type RoomSettings = Reached<RoomAccess> & {
   readonly ff: boolean
 }
 
+/** A training's settings: the request fixes them all. Always Offline, on the fair, in the Dutrine. */
+export const TRAINING_ROOM: RoomSettings = { reach: "offline", mode: TRAINING.mode, map: TRAINING.map, minutes: 0, level: "zovin", ff: false }
+
 let botCounter = 0
 
 export class Room {
@@ -84,6 +88,11 @@ export class Room {
     this.world = this.sim.view()
   }
 
+  /** A training: one player, a Benandante, and no host tools. */
+  get training() {
+    return this.settings.mode === TRAINING.mode
+  }
+
   get humans() {
     return [...this.members.values()].filter((m) => !m.bot)
   }
@@ -107,7 +116,7 @@ export class Room {
       if (!bot) return false
       this.removeMember(bot.id)
     }
-    const team = this.smallerTeam()
+    const team = this.training ? "benandanti" : this.smallerTeam()
     this.members.set(id, { id, name, team, bot: false, send, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
     this.arriving.set(id, () => this.sim.join(id, name, team, false, primary))
     return true
@@ -264,6 +273,7 @@ export class Room {
       pickups: w.pickups.map((p) => (p ? "1" : "0")).join(""),
       proj: w.projectiles.map((p) => [p.kind, r2(p.x), r2(p.y), r2(p.z)] as const),
       players: others,
+      training: w.training,
       ev: this.events
     }
     this.events = []

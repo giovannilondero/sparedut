@@ -32,3 +32,8 @@ test("the Offline room has no access: nobody else can come in", () => {
   const room = oneTapRoom(loadSettings())
   expect("access" in room).toBe(false)
 })
+
+test("a saved mode or map a room cannot choose (the training's) falls back to the defaults", () => {
+  storage({ lastMode: "dutrine", lastMap: "sagre" })
+  expect(oneTapRoom(loadSettings())).toMatchObject({ mode: "bataie", map: "glemone" })
+})

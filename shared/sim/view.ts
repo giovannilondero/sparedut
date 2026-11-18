@@ -4,6 +4,7 @@
 import type { ObjectiveId } from "../folklore.ts"
 import { trackLength, trackPoint, type V3 } from "../map.ts"
 import { MAPS } from "../maps/index.ts"
+import { STATION_IDS, stepRule, stepsOf, type StationId, type StepId } from "../training/index.ts"
 import type { GameEvent, Winner } from "./events.ts"
 import { CART, stormAt, type StormValue } from "./rules.ts"
 import {
@@ -28,6 +29,7 @@ import {
   Tick,
   Turrets,
   Doors,
+  Training,
   type ArsenalValue,
   type FlagState,
   type HillValue,
@@ -76,6 +78,22 @@ export interface CartView {
   readonly back: boolean
 }
 
+/**
+ * The training's progress, as the trainee's HUD shows it: the station, the current step (null
+ * while arriving), how many times its action happened out of how many, and how many stations,
+ * from the first, are unlocked.
+ */
+export type TrainingView =
+  | {
+      readonly tag: "station"
+      readonly station: StationId
+      readonly step: StepId | null
+      readonly count: number
+      readonly target: number
+      readonly unlocked: number
+    }
+  | { readonly tag: "complete" }
+
 export interface WorldView {
   readonly tick: number
   readonly phase: PhaseView
@@ -96,6 +114,8 @@ export interface WorldView {
   readonly doors: readonly number[]
   readonly projectiles: readonly ProjectileValue[]
   readonly players: readonly PlayerView[]
+  /** Only in a training. */
+  readonly training: TrainingView | null
 }
 
 export const ViewWorld = Game.Inspector(
@@ -127,7 +147,7 @@ export const ViewWorld = Game.Inspector(
       turrets: Game.System.readResource(Turrets),
       doors: Game.System.readResource(Doors)
     },
-    machines: { match: Game.System.machine(Match) }
+    machines: { match: Game.System.machine(Match), training: Game.System.machine(Training) }
   },
   ({ queries, resources, machines }): WorldView => {
     const { data } = queries.players
@@ -153,6 +173,15 @@ export const ViewWorld = Game.Inspector(
       match._tag === "Live" ? { tag: "Live", ends: match.ends }
       : match._tag === "Over" ? { tag: "Over", winner: match.winner, restarts: match.restarts }
       : { tag: "Warmup" }
+    const progress = machines.training.get()
+    let training: TrainingView | null = null
+    if (progress._tag === "Complete") training = { tag: "complete" }
+    else if (progress._tag === "Arriving") training = { tag: "station", station: STATION_IDS[progress.station], step: null, count: 0, target: 0, unlocked: progress.unlocked }
+    else if (progress._tag === "Step") {
+      const station = STATION_IDS[progress.station]
+      const step = stepsOf(station)[progress.step]
+      training = { tag: "station", station, step, count: progress.count, target: stepRule(station, step).target, unlocked: progress.unlocked }
+    }
     const storm = objective === "storm" && match._tag === "Live" ? stormAt(map, rules, match.ends - rules.timeLimitTicks, tick) : null
     return {
       tick,
@@ -192,7 +221,8 @@ export const ViewWorld = Game.Inspector(
           seq: controls.input.seq,
           buttons: controls.input.buttons
         }
-      })
+      }),
+      training
     }
   }
 )

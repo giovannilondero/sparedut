@@ -266,3 +266,22 @@ export const Match = Game.StateMachine("Sparedut/Match", {
     restarts: z.number().int()
   })
 })
+
+/**
+ * The training's progress (`shared/training/`): which station, which step, how far the step has
+ * got. A regular room is `Off` for good. Stations and steps are indices into `STATION_IDS` and
+ * the station's `stepsOf`. `unlocked`: how many stations, from the first, the trainee may go to.
+ */
+export const Training = Game.StateMachine(
+  "Sparedut/Training",
+  {
+    Off: {},
+    /** On the way into a station: its setup is applied on the first tick the trainee is alive. `place`: put them at the station's start. */
+    Arriving: z.object({ station: z.number().int(), unlocked: z.number().int(), place: z.boolean() }),
+    /** At a station, on one of its steps: how many times its action happened, and what the step keeps (`StepProgress`). */
+    Step: z.object({ station: z.number().int(), step: z.number().int(), count: z.number().int(), mark: z.number(), unlocked: z.number().int() }),
+    /** Every station done: all of them unlocked. */
+    Complete: {}
+  },
+  { transitions: { Off: [], Arriving: ["Step", "Complete"], Step: ["Complete"], Complete: [] } }
+)

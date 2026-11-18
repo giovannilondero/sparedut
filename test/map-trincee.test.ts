@@ -1,5 +1,5 @@
 import { beforeAll, expect, test } from "bun:test"
-import { MODE_IDS } from "../shared/folklore.ts"
+import { ROOM_MODE_IDS } from "../shared/folklore.ts"
 import { IDLE_INPUT } from "../shared/input.ts"
 import { TRINCEE } from "../shared/maps/trincee.ts"
 import { stepBody, type Body } from "../shared/movement.ts"
@@ -10,7 +10,7 @@ beforeAll(async () => {
   await initPhysics()
 })
 
-for (const mode of MODE_IDS) {
+for (const mode of ROOM_MODE_IDS) {
   test(`bots play in the trinceis: ${mode}`, () => {
     const { kills, view: v } = playBots("trincee", mode)
     console.log("trincee", mode, { score: v.score, kills })

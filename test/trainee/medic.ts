@@ -1,0 +1,4 @@
+/** Station "medic": no steps yet. */
+import type { Drivers } from "./moves.ts"
+
+export const MEDIC: Drivers<"medic"> = {}

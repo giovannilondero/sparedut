@@ -9,8 +9,11 @@
 import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId, Team } from "../shared/map.ts"
 import type { Access, ErrorCode, Reach } from "../shared/protocol.ts"
+import type { StationId } from "../shared/training/index.ts"
+import type { ControlId } from "../shared/training/station.ts"
 import type { WeaponId } from "../shared/weapons.ts"
 import type { Device } from "./device.ts"
+import { stepsIn, type StepsIn } from "./training-text/index.ts"
 
 export type Lang = "fur" | "it"
 
@@ -23,10 +26,28 @@ type StaticKey =
   | "ff" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
   | "qHigh" | "autoRes" | "showInfo" | "invert" | "keys" | "vocabTitle" | "connecting" | "chatPh" | "deathTitle" | "deathHint"
   | "language" | "modeLabel" | "mapLabel" | "optionsLabel" | "crouchMode" | "crouchHold" | "crouchToggle"
-  | "accessLabel" | "accessOpen" | "accessPassword" | "passwordLabel" | "passwordTitle"
+  | "accessLabel" | "accessOpen" | "accessPassword" | "passwordLabel" | "passwordTitle" | "training" | "trainingSub"
 
 export interface Strings {
   readonly static: Record<StaticKey, string>
+  /** The training's HUD and announcements. Step instructions are in `client/training-text/`, one file per station. */
+  readonly training: {
+    /** Station `n` of `total`, with its name: the head of the training's panel. */
+    readonly station: Fn<[n: number, total: number, name: string]>
+    readonly stations: Record<StationId, string>
+    readonly steps: StepsIn
+    /** Each control a step names, as the keyboard and mouse show it (markup). Controller and touch: ticket #53. */
+    readonly keys: Record<ControlId, string>
+    /** A repeated step's count so far. */
+    readonly count: Fn<[done: number, target: number]>
+    /** The brief confirmation of a step done. */
+    readonly stepDone: string
+    readonly stationDone: string
+    readonly complete: string
+    readonly completeSub: string
+    /** The match menu's line in place of the room's reach. */
+    readonly menuLine: string
+  }
   readonly teams: Record<Team, { readonly name: string; readonly motto: string }>
   readonly modes: Record<ModeId, { readonly name: string; readonly sub: string; readonly rules: string }>
   readonly maps: Record<MapId, { readonly name: string; readonly sub: string }>
@@ -286,6 +307,8 @@ const fur: Strings = {
     namePh: "Toni di Glemone",
     oneTap: "Zuie cuintri i bot",
     oneTapSub: "Offline cuintri il computer, ancje cence server",
+    training: "Impare a zuiâ",
+    trainingSub: "La Dutrine a la Sagre dal Frico, ancje cence server",
     create: "Cree une partide",
     createSub: "Offline, te rêt locâl o in linie",
     join: "Jentre cul codiç",
@@ -332,6 +355,49 @@ const fur: Strings = {
     mapLabel: "Mape",
     optionsLabel: "Opzions"
   },
+  training: {
+    station: (n, total, name) => `Stazion ${n} di ${total} · ${name}`,
+    stations: {
+      look: "Cjale e cjamine",
+      course: "Il percors",
+      always: "Simpri cun te",
+      switch: "Gambiâ arme",
+      stalls: "Lis bancjarelis",
+      armoury: "La armarie",
+      throw: "Bombis e minis",
+      pickups: "Robe di cjapâ sù",
+      turret: "La mitraie e il Lanciafrico",
+      medic: "Il miedi",
+      modes: "Lis modalitâts",
+      skirmish: "La scaramucie"
+    },
+    steps: stepsIn("fur"),
+    keys: {
+      look: "<kbd>Mouse</kbd>",
+      move: "<kbd>WASD</kbd>",
+      jump: "<kbd>Spazi</kbd>",
+      crouch: "<kbd>Ctrl</kbd>/<kbd>C</kbd>",
+      sprint: "<kbd>Shift</kbd>",
+      fire: "<kbd>Mouse çampe</kbd>",
+      aim: "<kbd>Mouse drete</kbd>",
+      reload: "<kbd>R</kbd>",
+      slot: "<kbd>1-4</kbd>",
+      lastWeapon: "<kbd>Q</kbd>",
+      cycle: "<kbd>Rodele dal mouse</kbd>",
+      armoury: "<kbd>B</kbd>",
+      bomb: "<kbd>G</kbd>",
+      mine: "<kbd>F</kbd>",
+      use: "<kbd>E</kbd>",
+      board: "<kbd>Tab</kbd>",
+      phrases: "<kbd>V</kbd>"
+    },
+    count: (done, target) => `${done} di ${target}`,
+    stepDone: "Fat!",
+    stationDone: "Stazion finide",
+    complete: "Dutrine finide!",
+    completeSub: "Cumò tu sâs dut: va a zuiâ",
+    menuLine: "Dutrine · Offline, dome tu"
+  },
   teams: {
     benandanti: { name: "Benandants", motto: "Pal racolt e pe glesie!" },
     malandanti: { name: "Malandants", motto: "La tampieste e je nestre!" }
@@ -361,6 +427,11 @@ const fur: Strings = {
       name: "La Tampieste",
       sub: "Ducj cuintri ducj",
       rules: "Nissune scuadre, une vite sole. La tampieste e strenç: fûr dal cercli la grampe e fâs mâl. L'ultin in pîts al vinç."
+    },
+    dutrine: {
+      name: "Dutrine",
+      sub: "La sagre che e insegne a zuiâ",
+      rules: "Une stazion daûr di chê altre: fâs ogni pas che al ti vegn domandât e la strade si vierç."
     }
   },
   maps: {
@@ -640,6 +711,8 @@ const it: Strings = {
     namePh: "Toni di Gemona",
     oneTap: "Gioca contro i bot",
     oneTapSub: "Offline contro il computer, anche senza server",
+    training: "Impara a giocare",
+    trainingSub: "La Dutrine alla Sagre dal Frico, anche senza server",
     create: "Crea una partita",
     createSub: "Offline, in rete locale o online",
     join: "Entra con codice",
@@ -686,6 +759,49 @@ const it: Strings = {
     mapLabel: "Mappa",
     optionsLabel: "Opzioni"
   },
+  training: {
+    station: (n, total, name) => `Stazione ${n} di ${total} · ${name}`,
+    stations: {
+      look: "Guarda e cammina",
+      course: "Il percorso",
+      always: "Sempre con te",
+      switch: "Cambiare arma",
+      stalls: "Le bancarelle",
+      armoury: "L'armeria",
+      throw: "Bombe e mine",
+      pickups: "Cose da raccogliere",
+      turret: "La mitragliatrice e il Lanciafrico",
+      medic: "Il medico",
+      modes: "Le modalità",
+      skirmish: "La scaramuccia"
+    },
+    steps: stepsIn("it"),
+    keys: {
+      look: "<kbd>Mouse</kbd>",
+      move: "<kbd>WASD</kbd>",
+      jump: "<kbd>Spazio</kbd>",
+      crouch: "<kbd>Ctrl</kbd>/<kbd>C</kbd>",
+      sprint: "<kbd>Shift</kbd>",
+      fire: "<kbd>Mouse Sx</kbd>",
+      aim: "<kbd>Mouse Dx</kbd>",
+      reload: "<kbd>R</kbd>",
+      slot: "<kbd>1-4</kbd>",
+      lastWeapon: "<kbd>Q</kbd>",
+      cycle: "<kbd>Rotellina</kbd>",
+      armoury: "<kbd>B</kbd>",
+      bomb: "<kbd>G</kbd>",
+      mine: "<kbd>F</kbd>",
+      use: "<kbd>E</kbd>",
+      board: "<kbd>Tab</kbd>",
+      phrases: "<kbd>V</kbd>"
+    },
+    count: (done, target) => `${done} di ${target}`,
+    stepDone: "Fatto!",
+    stationDone: "Stazione completata",
+    complete: "Dutrine completata!",
+    completeSub: "Ora sai tutto: vai a giocare",
+    menuLine: "Dutrine · Offline, solo tu"
+  },
   teams: {
     benandanti: { name: "Benandanti", motto: "Per il raccolto e per la chiesa!" },
     malandanti: { name: "Malandanti", motto: "La grandine è nostra!" }
@@ -715,6 +831,11 @@ const it: Strings = {
       name: "La Tampieste",
       sub: "Tutti contro tutti",
       rules: "Niente squadre, una vita sola. La tempesta si stringe: fuori dal cerchio la grandine fa male. L'ultimo in piedi vince."
+    },
+    dutrine: {
+      name: "Dutrine",
+      sub: "La sagra che insegna a giocare",
+      rules: "Una stazione dopo l'altra: fai ogni passo che ti viene chiesto e la strada si apre."
     }
   },
   maps: {

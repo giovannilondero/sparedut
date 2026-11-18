@@ -180,6 +180,16 @@ const menu = new Menu(settings, audio, {
     net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
     net.send({ t: "create", ...o, primary: settings.primary })
   },
+  training: () => {
+    // Like an Offline room: in this page, with or without the game server, entered from the tap.
+    game?.requestFullscreen()
+    autostart = false
+    roomPassword = null
+    forgetRoomAddress()
+    link.use(browserHostConnection)
+    browserHostConnection.open(settings.name)
+    browserHostConnection.send({ t: "training", primary: settings.primary })
+  },
   mapChanged: (id) => {
     if (!game?.active) loadMap(id)
   },

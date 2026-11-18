@@ -10,7 +10,8 @@ import type { PrimaryId } from "../weapons.ts"
 import type { GameEvent } from "./events.ts"
 import { freshDoors, freshTurrets } from "./rules.ts"
 import { simulate } from "./schedule.ts"
-import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, StartMatch, type PickupState } from "./schema.ts"
+import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, StartMatch, Training, type PickupState } from "./schema.ts"
+import { TRAINING } from "../training/index.ts"
 import { ReadOutbox, ViewWorld, type WorldView } from "./view.ts"
 
 export interface SimOptions {
@@ -27,6 +28,8 @@ export type Sim = ReturnType<typeof createSim>
 
 /** The room's Ritmo runtime; `debug` is used by the devtools (lint, sessions). */
 export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: HostClock.HostClock }) {
+  // The training has no warm-up and no clock: it is live from the start, at its first station.
+  const training = options.mode === TRAINING.mode
   const made = Game.Runtime.make({
     services: Game.Runtime.services(Game.Runtime.service(Physics, options.physics)),
     resources: {
@@ -49,7 +52,10 @@ export function makeRuntime(options: SimOptions, debug?: { readonly hostClock: H
       History: [],
       Rng: Random.seed(options.seed)
     },
-    machines: Game.Runtime.machines(Game.Runtime.machine(Match, { _tag: "Warmup" })),
+    machines: Game.Runtime.machines(
+      Game.Runtime.machine(Match, training ? { _tag: "Live", ends: 0 } : { _tag: "Warmup" }),
+      Game.Runtime.machine(Training, training ? { _tag: "Arriving", station: 0, unlocked: 1, place: true } : { _tag: "Off" })
+    ),
     ...(debug ? { debug } : {})
   })
   if (!made.ok) throw new Error(`Invalid simulation: ${JSON.stringify(made.error)}`)

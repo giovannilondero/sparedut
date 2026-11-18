@@ -92,6 +92,9 @@ export const MatchFlow = Game.System(
           if (all.length >= 2 && alive.length <= 1) return last()
           return timeUp ? last() : null
         }
+        case "dutrine":
+          // The training ends when its last step completes, never by time or score.
+          return null
         case "cjar":
           // The Benandanti win by reaching the end; when time runs out, the Malandanti have held.
           if (score.benandanti >= rules.scoreLimit) return "benandanti"

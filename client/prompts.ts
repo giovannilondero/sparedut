@@ -4,6 +4,7 @@
  * opens the match menu. Plain lookups: the HUD
  * asks every frame, and nothing is allocated.
  */
+import type { ControlId } from "../shared/training/station.ts"
 import type { Device } from "./device.ts"
 import type { Strings } from "./i18n.ts"
 
@@ -15,3 +16,6 @@ const MENU_CONTROL = { keyboard: "<kbd>Esc</kbd>", pad: "<kbd>Options</kbd>", to
 export const menuControl = (device: Device): string => MENU_CONTROL[device]
 
 export const turretPrompt = (s: Strings, device: Device, mounted: boolean): string => (mounted ? s.hud.turretLeave : s.hud.turretUse)[device]
+
+/** The control a training step names, as the active device shows it. Keyboard and mouse for every device until ticket #53. */
+export const trainingControl = (s: Strings, control: ControlId, _device: Device): string => s.training.keys[control]
