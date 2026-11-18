@@ -54,4 +54,7 @@ try {
   console.log(`${await evaluate(`const c = document.querySelector("canvas"); c.width + "x" + c.height`)}  fps ${fps.join(" ")}  =>  ${(1000 / mean).toFixed(1)} ms/frame`)
 } finally {
   child.kill()
+  await child.exited
+  // The profile is never reused: left behind, every run keeps about 100 MB of /tmp.
+  await Bun.$`rm -rf /tmp/render-fps-${port}`.quiet()
 }
