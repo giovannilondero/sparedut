@@ -54,6 +54,11 @@ export interface PhysicsWorld {
    * simulation calls it every tick with the saved state, the client on every snapshot.
    */
   readonly setDoors: (standing: readonly boolean[]) => void
+  /**
+   * Gates closed (true) or open, in `map.gates` order; open when absent. Idempotent, like
+   * `setDoors`: the simulation calls it every tick, the client on every snapshot.
+   */
+  readonly setGates: (closed: readonly boolean[]) => void
 }
 
 let ready: Promise<void> | null = null
@@ -93,6 +98,18 @@ export function createPhysicsWorld(map: MapDef, tuning: Partial<typeof KCC> = {}
       RAPIER.ColliderDesc.cuboid(hx, hy, hz)
         .setTranslation(d.min[0] + hx, d.min[1] + hy, d.min[2] + hz)
         .setCollisionGroups(WORLD_GROUPS)
+    )
+  })
+  // Gates start open: a closed gate is a wall to bodies and shots alike, but not a door.
+  const gateColliders = (map.gates ?? []).map((g) => {
+    const hx = (g.max[0] - g.min[0]) / 2
+    const hy = (g.max[1] - g.min[1]) / 2
+    const hz = (g.max[2] - g.min[2]) / 2
+    return world.createCollider(
+      RAPIER.ColliderDesc.cuboid(hx, hy, hz)
+        .setTranslation(g.min[0] + hx, g.min[1] + hy, g.min[2] + hz)
+        .setCollisionGroups(WORLD_GROUPS)
+        .setEnabled(false)
     )
   })
   const doorOf = new Map(doorColliders.map((c, i) => [c.handle, i]))
@@ -178,6 +195,17 @@ export function createPhysicsWorld(map: MapDef, tuning: Partial<typeof KCC> = {}
         }
       })
       // Queries (rays, character controller) see the change after one step.
+      if (changed) world.step()
+    },
+    setGates(closed) {
+      let changed = false
+      gateColliders.forEach((c, i) => {
+        const on = closed[i] ?? false
+        if (c.isEnabled() !== on) {
+          c.setEnabled(on)
+          changed = true
+        }
+      })
       if (changed) world.step()
     }
   }

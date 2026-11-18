@@ -200,6 +200,38 @@ function turretModel(envMap: THREE.Texture | null) {
   return { root, yawG, pitchG, hot, jacket, steam, muzzle }
 }
 
+/**
+ * A closed gate of the training's fair (the size of its block): a tall fence of posts and rails
+ * with a striped pole along the top, as high as the way it closes, so nobody tries to jump it.
+ * One merged mesh per gate.
+ */
+function gateModel(min: readonly number[], max: readonly number[]) {
+  const w = max[0] - min[0]
+  const h = max[1] - min[1]
+  const d = max[2] - min[2]
+  const alongZ = d > w
+  const span = alongZ ? d : w
+  const thick = alongZ ? w : d
+  /** A box `len` long across the way, centred at `a` along it and `y` up. */
+  const across = (a: number, y: number, len: number, height: number, depth: number) => {
+    const g = new THREE.BoxGeometry(alongZ ? depth : len, height, alongZ ? len : depth)
+    g.translate(alongZ ? 0 : a, y, alongZ ? a : 0)
+    return g
+  }
+  const parts: [THREE.BufferGeometry, string][] = []
+  const posts = Math.max(2, Math.round(span / 3) + 1)
+  for (let i = 0; i < posts; i++) parts.push([across(-span / 2 + (span * i) / (posts - 1), 0, 0.16, h, thick * 0.6), "#5a3c22"])
+  for (let k = 0; k < 5; k++) parts.push([across(0, -h / 2 + 0.35 + k * ((h - 0.9) / 4), span, 0.14, thick * 0.35), k % 2 ? "#8a6038" : "#7a5434"])
+  // the striped pole on top, red and white like a level crossing
+  const stripes = Math.max(2, Math.round(span / 0.8))
+  for (let i = 0; i < stripes; i++) parts.push([across(-span / 2 + (span * (i + 0.5)) / stripes, h / 2 - 0.12, span / stripes, 0.22, thick * 0.7), i % 2 ? "#f2ead8" : "#c0392b"])
+  const m = new THREE.Mesh(bake(parts), new THREE.MeshLambertMaterial({ vertexColors: true }))
+  m.castShadow = true
+  m.position.set((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2)
+  m.visible = false
+  return m
+}
+
 /** A plank door (the size of its block), with crossbars. */
 function doorModel(min: readonly number[], max: readonly number[]) {
   const g = new THREE.Group()
@@ -244,6 +276,12 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
     const g = doorModel(d.min, d.max)
     scene.add(g)
     return { g, rest: g.position.clone() }
+  })
+  // The training's gates: drawn only while they close the way. Open is how a plain map's physics starts.
+  const gates = (map.gates ?? []).map((g) => {
+    const m = gateModel(g.min, g.max)
+    scene.add(m)
+    return m
   })
   const hotColor = new THREE.Color()
   // --- pickups ---
@@ -514,6 +552,7 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
         d.g.rotation.set(hurt * 0.05, hurt * 0.12, hurt * 0.04)
         d.g.position.set(d.rest.x, d.rest.y - hurt * 0.04, d.rest.z)
       })
+      for (let i = 0; i < gates.length; i++) gates[i].visible = frame.gates[i] ?? false
       const c = frame.cart
       cart.visible = trail.m.visible = !!c
       if (c) {

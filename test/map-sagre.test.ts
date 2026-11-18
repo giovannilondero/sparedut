@@ -62,6 +62,23 @@ describe("Sagre dal Frico", () => {
     })
   }
 
+  test("a host closes and opens the gates in the physics: a closed one stops you like a wall, shots too", () => {
+    const world = createPhysicsWorld(SAGRE)
+    const [one, two] = SAGRE_STATIONS
+    world.setGates(SAGRE.gates!.map(() => true))
+    expect(walk(world, one.start.at, two.start.at).arrived).toBe(false)
+    const gate = SAGRE.gates![0]
+    expect(world.raycast({ x: gate.min[0] - 2, y: 1.5, z: 0 }, { x: 1, y: 0, z: 0 }, 4)).toMatchObject({ door: null })
+    // Only the first way open: station 2 is reached, station 3 is not.
+    world.setGates(SAGRE.gates!.map((_, i) => i > 0))
+    expect(walk(world, one.start.at, two.start.at).arrived).toBe(true)
+    expect(walk(world, two.start.at, SAGRE_STATIONS[2].start.at).arrived).toBe(false)
+    // Closed again, as when the trainee goes back to station 1.
+    world.setGates(SAGRE.gates!.map(() => true))
+    expect(walk(world, one.start.at, two.start.at).arrived).toBe(false)
+    expect(world.raycast({ x: gate.min[0] - 2, y: 1.5, z: 0 }, { x: 1, y: 0, z: 0 }, 4)).not.toBeNull()
+  })
+
   test("the bar stops you unless you jump it, the beam unless you crouch under it", () => {
     const { start, sprintFrom } = SAGRE_STATIONS[1]
     const noJump = walk(open, start.at, sprintFrom, { jump: false })
