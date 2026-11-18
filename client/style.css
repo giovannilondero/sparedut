@@ -403,12 +403,14 @@ html[data-device="touch"] :is(#menu, #hud .overlay) kbd, html[data-device="touch
 
 /*
  * During a match a finger never zooms, scrolls, refreshes, selects or opens a callout. The canvas takes
- * the fingers (the HUD lets them through); the match menus still scroll, without zooming.
+ * the fingers (the HUD lets them through); the match menus still scroll, without zooming, and their
+ * text (the room code) can be selected. With a mouse nothing changes: selection is the page's own.
  */
 #view { touch-action: none; }
-html.in-match, html.in-match body { overscroll-behavior: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+html.in-match, html.in-match body { overscroll-behavior: none; }
+html.in-match[data-device="touch"] body { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 html.in-match .overlay { touch-action: pan-x pan-y; overscroll-behavior: contain; }
-html.in-match input { user-select: text; -webkit-user-select: text; }
+html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
 
 /* Touch controls: positions come from client/touch.ts through custom properties; moving them is a transform only. */
 #touch { position: absolute; inset: 0; pointer-events: none; }

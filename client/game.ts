@@ -190,9 +190,10 @@ export class Game {
     }, matchMedia("(pointer: coarse)").matches ? "touch" : "keyboard")
     // Rotating the device re-lays the touch controls; fingers already down keep their control.
     addEventListener("resize", () => this.running && this.placeTouch())
-    // No context menu from a long press anywhere during a match (the canvas already refuses it).
+    // On touch, no context menu from a long press during a match (the canvas always refuses it), except
+    // in the match's menus: there, as on a desktop, the room code can be selected and copied.
     document.addEventListener("contextmenu", (e) => {
-      if (this.running) e.preventDefault()
+      if (this.running && this.controls.device === "touch" && !(e.target as Element).closest?.(".overlay")) e.preventDefault()
     })
     d.renderer.domElement.addEventListener("click", () => {
       if (this.running && this.overlay === "none" && !this.chatting) this.controls.lock()
