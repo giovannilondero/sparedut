@@ -13,7 +13,7 @@ import { simulate } from "./schedule.ts"
 import type { Device } from "../devices.ts"
 import { ChangePrimary, ChangeTeam, Game, InputArrived, Join, Leave, Match, Physics, ReportInterface, GoToStation, StartMatch, StepUnavailable, Training, type PickupState, type PostValue } from "./schema.ts"
 import type { InterfaceAction } from "../training/interface.ts"
-import { STATION_IDS, TRAINING, type StationId } from "../training/index.ts"
+import { STATION_IDS, TRAINING, type StationId, type StepId } from "../training/index.ts"
 import { arrival, FIRST_START, type TrainingStart } from "../training/start.ts"
 import { ReadOutbox, ViewWorld, type WorldView } from "./view.ts"
 
@@ -84,7 +84,7 @@ export function createSim(options: SimOptions) {
     /** The client's report of an interface step: only a training's current step that declares this action takes it. */
     report: (session: string, action: InterfaceAction) => runtime.send(ReportInterface, { session, action }),
     /** The client's word that its active device has no control for a step: only a training takes it, for its current step, when the step table agrees. */
-    unavailable: (session: string, station: StationId, step: string, device: Device) => runtime.send(StepUnavailable, { session, station, step, device }),
+    unavailable: (session: string, station: StationId, step: StepId, device: Device) => runtime.send(StepUnavailable, { session, station, step, device }),
     /** The trainee goes to a station: only an unlocked one is reached (the current one restarts). */
     goTo: (session: string, station: StationId) => runtime.send(GoToStation, { session, to: { _tag: "station", station: STATION_IDS.indexOf(station) } }),
     /** The trainee starts the training over: station 1, the others locked again. */

@@ -8,7 +8,7 @@ import type { Device } from "../shared/devices.ts"
 import type { ClientMessage } from "../shared/protocol.ts"
 import type { TrainingView } from "../shared/sim/view.ts"
 import { hasControl } from "../shared/training/controls.ts"
-import { stepRule } from "../shared/training/index.ts"
+import { stepRule, type StationId, type StepId } from "../shared/training/index.ts"
 
 /** How long a step is shown as not available before the client says so, and between tellings while it stays current (ms). */
 export const UNAVAILABLE_SHOWN_MS = 2000
@@ -17,8 +17,8 @@ type Unavailable = Extract<ClientMessage, { t: "unavailable" }>
 
 /** Asked every frame; allocates only on the frame it has something to send. */
 export class UnavailableSteps {
-  private station: string | null = null
-  private step: string | null = null
+  private station: StationId | null = null
+  private step: StepId | null = null
   private device: Device | null = null
   /** When the current unavailable step was first shown on this device, and when it was last told. */
   private since = 0

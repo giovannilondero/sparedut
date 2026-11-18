@@ -14,7 +14,7 @@ import type { PhysicsWorld } from "../physics.ts"
 import type { ModeId, ObjectiveId } from "../folklore.ts"
 import type { PrimaryId, ProjectileKind, WeaponId } from "../weapons.ts"
 import type { InterfaceAction } from "../training/interface.ts"
-import type { StationId } from "../training/index.ts"
+import type { StationId, StepId } from "../training/index.ts"
 import type { Device } from "../devices.ts"
 import type { GameEvent, KillCause } from "./events.ts"
 
@@ -259,7 +259,7 @@ export const StartMatch = Descriptor.Event<{}>()("Sparedut/StartMatch")
 /** From the host, only in a training: the client's report of an interface step (`shared/training/interface.ts`). */
 export const ReportInterface = Descriptor.Event<{ readonly session: string; readonly action: InterfaceAction }>()("Sparedut/ReportInterface")
 /** From the host, only in a training: the client says its active device has no control for this step (`shared/training/controls.ts`). */
-export const StepUnavailable = Descriptor.Event<{ readonly session: string; readonly station: StationId; readonly step: string; readonly device: Device }>()("Sparedut/StepUnavailable")
+export const StepUnavailable = Descriptor.Event<{ readonly session: string; readonly station: StationId; readonly step: StepId; readonly device: Device }>()("Sparedut/StepUnavailable")
 /** From the host, only in a training: the trainee goes to a station (`station`, an index) or starts over. */
 export const GoToStation = Descriptor.Event<{ readonly session: string; readonly to: { readonly _tag: "station"; readonly station: number } | { readonly _tag: "startOver" } }>()("Sparedut/GoToStation")
 

@@ -54,6 +54,15 @@ export type StepId = { [S in StationId]: StepOf<S> }[StationId]
 // `Object.keys` is typed `string[]`; a station's keys are its steps by construction (`StepOf`).
 export const stepsOf = <S extends StationId>(station: S): readonly StepOf<S>[] => Object.keys(STATIONS[station].steps) as StepOf<S>[]
 
+/** Whether `step` is one of `station`'s steps. */
+export const isStepOf = (station: StationId, step: string): boolean => {
+  const steps: readonly string[] = stepsOf(station)
+  return steps.includes(step)
+}
+
+/** Whether a value is the id of some station's step: what a client's word about a step is checked against. */
+export const isStepId = (value: unknown): value is StepId => typeof value === "string" && STATION_IDS.some((station) => isStepOf(station, value))
+
 /** Every station's steps by id, as the rules see them. */
 const STEP_RULES: Readonly<Record<StationId, StationDef>> = STATIONS
 
