@@ -253,6 +253,7 @@ class Debris {
 // --- bullet tracers ----------------------------------------------------------------------
 const TRACER: Record<WeaponId, { color: THREE.Color; speed: number; len: number; width: number } | null> = {
   mescul: null,
+  panel: null,
   mandi: { color: C(0xffd27a), speed: 380, len: 3.5, width: 0.02 },
   cramar: { color: C(0xffa14a), speed: 420, len: 4.5, width: 0.022 },
   doplete: { color: C(0xfff0c0), speed: 330, len: 2.2, width: 0.014 },

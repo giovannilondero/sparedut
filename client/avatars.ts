@@ -7,7 +7,7 @@ import * as THREE from "three"
 import type { Avatar, AvatarPose } from "./contracts.ts"
 import type { Team } from "../shared/map.ts"
 import { TEAM_INFO } from "../shared/folklore.ts"
-import type { WeaponId } from "../shared/weapons.ts"
+import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { Baker, bakedMaterial, canvasTexture, clamp, damp, flashTex, rng } from "./models/kit.ts"
 import { bakedWeapon } from "./models/weapons.ts"
 
@@ -191,6 +191,8 @@ const GRIP: Record<WeaponId, { p: [number, number, number]; r: [number, number, 
   miedi: { p: [0.14, -0.12, -0.28], r: [0, 0, 0] },
   gjalinis: { p: [0.15, -0.13, -0.2], r: [0, 0, 0] },
   lanciafrico: { p: [0.16, -0.13, -0.24], r: [0, 0, 0] },
+  // the panel across the chest, held by its right edge: a shield in front of the body
+  panel: { p: [0.3, -0.12, -0.32], r: [0, 0, 0] },
   mitraie: { p: [0.14, -0.1, -0.3], r: [0, 0, 0] },
   motosee: { p: [0.15, -0.16, -0.24], r: [0, 0, 0] }
 }
@@ -488,7 +490,7 @@ export function createAvatar(team: Team, name: string): Avatar {
     },
     flash() {
       rec = 1
-      if (curWeapon !== "mescul") flashT = 0
+      if (curWeapon === null || WEAPONS[curWeapon].mode !== "melee") flashT = 0
     },
     setTeam(next) {
       if (next === team) return

@@ -166,7 +166,7 @@ export class Hub {
           }
           limits.wrong = 0
         }
-        if (target.full && ![...target.members.values()].some((m) => m.bot)) return this.send(peer, { t: "error", code: "full" })
+        if (!target.admitsAnother) return this.send(peer, { t: "error", code: "full" })
         this.leave(peer)
         this.enter(peer, target, msg.primary)
         this.roomChanged(target)
@@ -224,6 +224,9 @@ export class Hub {
         return
       case "start":
         if (room.hostId === id) room.start()
+        return
+      case "enter":
+        if (room.enter(id)) this.roomChanged(room)
         return
       case "bot":
         if (room.hostId !== id) return

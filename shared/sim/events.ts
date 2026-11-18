@@ -34,6 +34,8 @@ export type GameEvent =
   | { readonly t: "turret"; readonly i: number; readonly s: string | null; readonly a: "on" | "off" | "hot" | "cool" }
   /** A door hit (splinters) or broken down. */
   | { readonly t: "door"; readonly i: number; readonly s: string; readonly a: "hit" | "broken" }
+  /** A panel torn off its wall by `s`, who now holds it. */
+  | { readonly t: "panel"; readonly i: number; readonly s: string; readonly a: "torn" }
   /** Feathers from a gjaline that burst on you: you can't see anything for a while. */
   | { readonly t: "plumis"; readonly v: string; readonly n: number }
   | { readonly t: "match"; readonly a: "start" | "end"; readonly winner: Winner | null }

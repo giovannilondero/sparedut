@@ -314,6 +314,9 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 @keyframes plumis { 0%, 55% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes plumi-fall { 0% { transform: translate(-50%, -50%) rotate(var(--r)); } 100% { transform: translate(-50%, 140%) rotate(calc(var(--r) + 120deg)); } }
 #turret-prompt { position: absolute; top: 60%; left: 50%; transform: translateX(-50%); font-family: var(--serif); color: var(--ink); background: var(--stone); border: 1px solid var(--stone-line); padding: 4px 12px; border-radius: 8px; font-size: 15px; }
+#panel-prompt { position: absolute; top: 60%; left: 50%; transform: translateX(-50%); min-width: 220px; text-align: center; font-family: var(--serif); color: var(--ink); background: var(--stone); border: 1px solid var(--stone-line); padding: 4px 12px 6px; border-radius: 8px; font-size: 15px; }
+#panel-prompt .bar { height: 6px; margin-top: 4px; background: rgba(0, 0, 0, 0.35); border-radius: 3px; overflow: hidden; }
+#panel-prompt .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #c9a26b, #8a5a32); }
 #turret-hud { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); width: 260px; text-align: center; font-family: var(--serif); color: var(--ink); background: var(--stone); border: 1px solid var(--stone-line); padding: 6px 12px; border-radius: 10px; }
 #turret-hud .bar { height: 8px; margin-top: 4px; background: rgba(0, 0, 0, 0.35); border-radius: 4px; overflow: hidden; }
 #turret-hud .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #f0c060, #ff6a20); transition: width 0.1s linear; }
@@ -354,6 +357,8 @@ html.in-muster #hud { background: var(--night); }
 html.in-muster #hud-free, html.in-muster #death, html.in-muster #board { visibility: hidden; }
 #muster .muster-chat { max-block-size: 9rem; overflow-y: auto; font-size: 14px; padding: 4px 0; }
 #muster .muster-chat-input { inline-size: 100%; min-block-size: var(--tap); margin-block-start: 4px; }
+#muster .muster-match { font-family: var(--serif); font-size: 1.15rem; font-variant-numeric: tabular-nums; margin-block: 6px; }
+#muster .muster-note { color: var(--gold); margin-block: 4px; }
 
 .end-title { display: block; font-family: var(--serif); font-size: clamp(36px, 5vw, 64px); text-align: center; margin: 0; }
 .awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 10px; margin: 14px 0; }
@@ -555,7 +560,7 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #hud-free, #hud-status { display: contents; }
 #hud.touch #hud-free { position: absolute; inset-inline-start: var(--free-l); inset-block-start: var(--free-t); inline-size: var(--free-w); block-size: var(--free-h);
   display: flex; flex-direction: column; align-items: center; gap: 4px; }
-#hud.touch :is(#turret-prompt, #turret-hud, #topbar, #killfeed, #banner, #chat, #training) { position: static; inset: auto; transform: none; }
+#hud.touch :is(#turret-prompt, #panel-prompt, #turret-hud, #topbar, #killfeed, #banner, #chat, #training) { position: static; inset: auto; transform: none; }
 /* The score on one line: the two numbers in their team's colour around the clock. The objective, when the mode has one, on a line under it. */
 #hud.touch #topbar { order: 0; max-inline-size: 100%; flex-wrap: wrap; align-items: baseline; justify-content: center; column-gap: 10px; padding: 2px 12px;
   border-radius: 12px; border: 1px solid var(--stone-line); background: rgba(10, 8, 6, 0.72); }
@@ -588,6 +593,7 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #hud.touch #chat-log div { max-inline-size: 100%; padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #hud.touch #chat-log div:nth-last-child(n + 3) { display: none; }
 #hud.touch #turret-prompt { order: 4; font-size: 13px; }
+#hud.touch #panel-prompt { order: 4; font-size: 13px; min-width: 0; }
 #hud.touch #turret-hud { order: 5; inline-size: min(260px, 100%); padding: 3px 10px; display: flex; align-items: center; gap: 8px; font-size: 13px; }
 #hud.touch #turret-hud .bar { flex: 1; margin: 0; }
 /*

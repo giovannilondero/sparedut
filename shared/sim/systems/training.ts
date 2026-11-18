@@ -167,7 +167,7 @@ export const PlayTraining = Game.System(
         const now = data.arsenal.get(trainee)
         const primary = given.primary ?? now.primary
         const fresh = freshArsenal(primary)
-        data.arsenal.set(trainee, { ...fresh, nextPrimary: now.nextPrimary, launcher: now.launcher, current: given.hold ?? (given.primary ? primary : now.current) })
+        data.arsenal.set(trainee, { ...fresh, nextPrimary: now.nextPrimary, power: now.power, current: given.hold ?? (given.primary ? primary : now.current) })
         const life = data.life.get(trainee)
         if (life._tag === "Alive") data.life.update(trainee, { state: "Alive", data: (l) => ({ hp: hpFor(primary, l.hp), armor: l.armor, shield: l.shield }) })
       }

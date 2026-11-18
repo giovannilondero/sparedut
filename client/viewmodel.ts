@@ -31,6 +31,8 @@ const HOLD: Record<WeaponId, Hold> = {
   miedi: { hip: [0.15, -0.17, -0.36], rot: [0.03, 0.06, 0], aim: [0.1, -0.16, -0.34], kickZ: 0, kickR: 0, flash: 0 },
   gjalinis: { hip: [0.16, -0.19, -0.36], rot: [0.03, 0.07, 0], aim: [0.09, -0.19, -0.36], kickZ: 0.07, kickR: 0.16, flash: 0.22 },
   lanciafrico: { hip: [0.17, -0.21, -0.4], rot: [0.03, 0.06, 0], aim: null, kickZ: 0.08, kickR: 0.2, flash: 0.3 },
+  // the casot's panel: low and to the right, its top edge under the crosshair, turned a little inwards
+  panel: { hip: [0.34, -0.56, -0.62], rot: [0.12, -0.3, 0.04], aim: null, kickZ: 0, kickR: 0, flash: 0 },
   // at the turret: the gun sits in front, centred, held with both hands
   mitraie: { hip: [0.09, -0.25, -0.34], rot: [0, 0, 0], aim: null, kickZ: 0.008, kickR: 0.01, flash: 0.18 },
   // held low with both hands, the bar forward; no aiming
@@ -40,6 +42,8 @@ const HOLD: Record<WeaponId, Hold> = {
 const SWITCH_DOWN = 0.16
 const SWITCH_UP = 0.22
 const SWING = 0.42
+/** The panel's strike: thrust forward and up, then back. */
+const BASH = 0.5
 const TOSS = 0.6
 /** How far the sight stays below the line of sight when aiming (m). */
 const AIM_DROP = 0.035
@@ -160,6 +164,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
   let spinA = 0
   let rec = 0
   let swingT = -1
+  let bashT = -1
   let boltT = -1
   let tossT = -1
   let loaded = true
@@ -195,6 +200,7 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     cur.model.muzzle.add(flash)
     flash.scale.setScalar(cur.hold.flash)
     swingT = -1
+    bashT = -1
     boltT = -1
   }
 
@@ -489,6 +495,18 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
       A.pz -= bump(p, 0.2, 0.65) * 0.12
       if (p >= 1) swingT = -1
     }
+    // panel strike: shoved out from the chest, top edge first
+    if (bashT >= 0) {
+      bashT += dt
+      const p = bashT / BASH
+      const k = bump(p, 0.08, 0.7)
+      A.pz -= k * 0.3
+      A.py += k * 0.12
+      A.px -= k * 0.08
+      A.rx -= k * 0.25
+      A.ry += k * 0.2
+      if (p >= 1) bashT = -1
+    }
 
     // cjampanili bolt after the shot
     if (boltT >= 0 && !reloading) {
@@ -601,6 +619,10 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
       if (!cur) return
       if (cur.id === "mescul") {
         swingT = 0
+        return
+      }
+      if (cur.id === "panel") {
+        bashT = 0
         return
       }
       rec = 1

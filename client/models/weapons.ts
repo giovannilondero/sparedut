@@ -291,6 +291,37 @@ function lanciafrico(): WeaponModel {
   return { root, muzzle, parts: { frico }, left: new THREE.Vector3(0, 0.0, -0.2), sightH: 0.165 }
 }
 
+/**
+ * The casot's panel, torn off its wall: four weathered planks on two battens and a brace, the nails
+ * still in, splinters where it gave. Held by its right edge (the grip is the origin), the left
+ * hand on the far edge, its face towards -z: a board carried in front like a shield.
+ */
+export const PANEL_SIZE = { w: 1, h: 1 } as const
+function panel(): WeaponModel {
+  const root = new THREE.Group()
+  const { w, h } = PANEL_SIZE
+  const x0 = 0.08 - w
+  const n = 4
+  const pw = w / n
+  const y0 = -0.55
+  for (let i = 0; i < n; i++) {
+    // the planks are not all as long: they broke off the sill and lintel where they would
+    const cut = [0.02, 0.06, 0.0, 0.04][i]
+    put(root, B(pw - 0.012, h - cut, 0.028), i % 2 ? M.darkWood() : M.wood(), x0 + pw * (i + 0.5), y0 + (h - cut) / 2 + (i % 2) * cut, 0)
+  }
+  // battens and brace behind, towards whoever holds it
+  for (const y of [0.25, -0.33]) put(root, B(w - 0.06, 0.08, 0.026), M.darkWood(), x0 + w / 2, y, 0.027)
+  put(root, B(0.07, Math.hypot(w - 0.16, 0.5), 0.024), M.darkWood(), x0 + w / 2, -0.04, 0.03, 0, 0, Math.atan2(w - 0.16, 0.5))
+  // the nails through the planks into the battens
+  for (const y of [0.25, -0.33]) for (const x of [0.12, 0.62]) put(root, C(0.007, 0.007, 0.01, 6), M.darkSteel(), x0 + x + (y > 0 ? 0 : 0.25), y, -0.018, Math.PI / 2)
+  // splinters where it was torn from the wall
+  for (const [x, a] of [[0.2, 0.3], [0.55, -0.25], [0.8, 0.15]] as const) put(root, B(0.02, 0.07, 0.008), M.beech(), x0 + x, y0 - 0.02, 0, 0, 0, a)
+  // a strap of rope to hold it by
+  put(root, T(0.045, 0.008, Math.PI, 10), M.rope(), 0.02, 0, 0.05, 0, Math.PI / 2, 0)
+  const muzzle = marker(root, x0 + w / 2, 0, -0.04)
+  return { root, muzzle, parts: {}, left: new THREE.Vector3(x0 + 0.08, -0.05, 0.05), sightH: 0.1 }
+}
+
 /** The Mulin: six barrels around an axis, behind them the mill's millstone and the crank. */
 function mulin(): WeaponModel {
   const root = new THREE.Group()
@@ -461,7 +492,7 @@ function mitraie(): WeaponModel {
   return { root, muzzle, parts: {}, left: new THREE.Vector3(-0.18, 0, 0.06), sightH: 0.14 }
 }
 
-const BUILDERS: Record<WeaponId, () => WeaponModel> = { mescul, mandi, cramar, doplete, cjampanili, mulin, miedi, gjalinis, lanciafrico, mitraie, motosee }
+const BUILDERS: Record<WeaponId, () => WeaponModel> = { mescul, mandi, cramar, doplete, cjampanili, mulin, miedi, gjalinis, lanciafrico, panel, mitraie, motosee }
 
 export const buildWeapon = (id: WeaponId): WeaponModel => BUILDERS[id]()
 

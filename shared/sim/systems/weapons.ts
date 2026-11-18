@@ -1,6 +1,6 @@
 /**
  * Weapons: switching, reloading, hitscan fire with lag compensation,
- * melee, the Motosee's held melee, the miedi's beam, the Mulin's and the Motosee's spin-up, frico and hen launches,
+ * melee (the mescul and the casot's panel), the Motosee's held melee, the miedi's beam, the Mulin's and the Motosee's spin-up, frico and hen launches,
  * sgnape bombs and Raibl mines, the turrets' mitraie. Sprinting players keep the weapon
  * lowered and don't fire. Shots and kicks splinter breakable doors.
  */
@@ -253,7 +253,7 @@ export const UseWeapons = Game.System(
             const hit = rayPose(eye, dir, pose) ?? rayPose(eye, lookDir(input.yaw, input.pitch - 0.25), pose)
             if (hit && hit.dist <= def.range && (!best || hit.dist < best.dist)) best = { session: other, dist: hit.dist, head: hit.head }
           }
-          if (best) events.damage.emit({ victim: best.session, attacker: session, amount: damageAt("mescul", best.dist, best.head), weapon: "mescul", head: best.head, push: null })
+          if (best) events.damage.emit({ victim: best.session, attacker: session, amount: damageAt(a.current, best.dist, best.head), weapon: a.current, head: best.head, push: null })
           else {
             // A kick at the door.
             const wall = physics.raycast(eye, dir, def.range)
