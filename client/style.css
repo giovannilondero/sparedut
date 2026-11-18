@@ -355,6 +355,11 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 /* The Muster stands in for the world: the HUD's readouts go, and a plain ground covers the canvas, which is not drawn. */
 html.in-muster #hud { background: var(--night); }
 html.in-muster #hud-free, html.in-muster #death, html.in-muster #board { visibility: hidden; }
+#muster .muster-countdown { font-family: var(--serif); font-size: clamp(20px, 3vw, 28px); color: var(--gold); text-align: center; }
+#muster .muster-countdown:empty { display: none; }
+#muster .ready-mark { color: var(--gold); font-weight: bold; }
+#muster [aria-pressed="true"] { outline: 2px solid var(--gold); outline-offset: -2px; }
+#muster [aria-pressed="true"]::before { content: "✓ "; }
 #muster .muster-chat { max-block-size: 9rem; overflow-y: auto; font-size: 14px; padding: 4px 0; }
 #muster .muster-chat-input { inline-size: 100%; min-block-size: var(--tap); margin-block-start: 4px; }
 #muster .muster-match { font-family: var(--serif); font-size: 1.15rem; font-variant-numeric: tabular-nums; margin-block: 6px; }

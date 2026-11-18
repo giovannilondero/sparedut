@@ -261,6 +261,12 @@ export interface Strings {
     readonly enter: string
     /** Joining a Tampieste already on: entering now plays from the next match. */
     readonly nextMatch: string
+    /** The ready mark: the toggle that sets and takes it back, and the mark beside a ready member. */
+    readonly ready: string
+    /** The host cancels the countdown. */
+    readonly cancel: string
+    /** The countdown: whole seconds left before the match. */
+    readonly countdown: Fn<[number]>
   }
   readonly perf: { readonly snaps: string; readonly players: string; readonly corrections: string; readonly hide: string; readonly menu: string; readonly dynRes: string }
   readonly tips: readonly string[]
@@ -758,7 +764,10 @@ const fur: Strings = {
     chat: "Cjacaris",
     chatPlaceholder: "Scrîf ai altris e frache Invio",
     enter: "Jentre te partide",
-    nextMatch: "La Tampieste e je za scomençade: tu zuiarâs de prossime partide."
+    nextMatch: "La Tampieste e je za scomençade: tu zuiarâs de prossime partide.",
+    ready: "Pront",
+    cancel: "Ferme la partence",
+    countdown: (s) => `La partide e partìs tra ${s} s`
   },
   perf: { snaps: "istantanis", players: "zuiadôrs", corrections: "corezions", hide: "F3 par platâ", menu: "menù", dynRes: "ris. dinamiche" },
   tips: [
@@ -1205,7 +1214,10 @@ const it: Strings = {
     chat: "Chiacchiere",
     chatPlaceholder: "Scrivi agli altri e premi Invio",
     enter: "Entra in partita",
-    nextMatch: "La Tampieste è già cominciata: giocherai dalla prossima partita."
+    nextMatch: "La Tampieste è già cominciata: giocherai dalla prossima partita.",
+    ready: "Pronto",
+    cancel: "Ferma la partenza",
+    countdown: (s) => `La partita parte tra ${s} s`
   },
   perf: { snaps: "istantanee", players: "giocatori", corrections: "correzioni", hide: "F3 per nascondere", menu: "menu", dynRes: "ris. dinamica" },
   tips: [

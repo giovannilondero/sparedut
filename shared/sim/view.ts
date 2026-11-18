@@ -66,7 +66,8 @@ export interface PlayerView {
 }
 
 export type PhaseView =
-  | { readonly tag: "Muster" }
+  /** `starts`: the tick the countdown ends, null while none runs. */
+  | { readonly tag: "Muster"; readonly starts: number | null }
   | { readonly tag: "Live"; readonly ends: number }
   | { readonly tag: "Over"; readonly winner: Winner; readonly restarts: number }
 
@@ -183,7 +184,7 @@ export const ViewWorld = Game.Inspector(
     const phase: PhaseView =
       match._tag === "Live" ? { tag: "Live", ends: match.ends }
       : match._tag === "Over" ? { tag: "Over", winner: match.winner, restarts: match.restarts }
-      : { tag: "Muster" }
+      : { tag: "Muster", starts: match.starts }
     const progress = machines.training.get()
     let training: TrainingView | null = null
     if (progress._tag === "Complete") training = { tag: "complete" }

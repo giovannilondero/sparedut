@@ -61,7 +61,7 @@ describe("simulation", () => {
     const run = (deliver: (send: () => void, i: number) => void) => {
       const sim = createSim({ mode: "bataie", minutes: 5, seed: 3, physics })
       sim.join("a", "Toni", "benandanti", false, "cramar")
-      sim.start()
+      sim.start(true)
       for (let i = 0; i < 5; i++) sim.step()
       let seq = 1
       const send = () => sim.input("a", { ...IDLE_INPUT, seq: seq++, mz: 1, yaw: Math.PI, view: 0 })
@@ -88,7 +88,7 @@ describe("simulation", () => {
     const sim = createSim({ mode: "bataie", minutes: 5, seed: 7, physics })
     sim.join("a", "Toni", "benandanti", false, "cramar")
     sim.join("b", "Strie", "malandanti", false, "cramar")
-    sim.start()
+    sim.start(true)
     for (let i = 0; i < 10; i++) sim.step()
     const routes: Record<string, [number, number][]> = { a: [[3, -36], [3, 22]], b: [[3, 48]] }
     let seq = 1
@@ -130,7 +130,7 @@ describe("simulation", () => {
   test("a picked-up lanciafrico stays in hand even with commands already in flight", () => {
     const sim = createSim({ mode: "bataie", minutes: 5, seed: 5, physics })
     sim.join("a", "Toni", "benandanti", false, "cramar")
-    sim.start()
+    sim.start(true)
     for (let i = 0; i < 30; i++) sim.step()
     const route: [number, number][] = [[3, -36], [3, -2], [9, -2]]
     let seq = 1
@@ -158,7 +158,7 @@ describe("simulation", () => {
   test("a new primary weapon from the armoury arrives immediately", () => {
     const sim = createSim({ mode: "bataie", minutes: 5, seed: 5, physics })
     sim.join("a", "Toni", "benandanti", false, "cramar")
-    sim.start()
+    sim.start(true)
     for (let i = 0; i < 30; i++) sim.step()
     expect(sim.view().players[0].arsenal.current).toBe("cramar")
     sim.primary("a", "doplete")
@@ -174,7 +174,7 @@ describe("simulation", () => {
     for (let i = 0; i < 60 * 60; i++) sim.step()
     expect(sim.view().phase.tag).toBe("Muster")
     expect(sim.view().players[0].alive).toBe(false)
-    sim.start()
+    sim.start(true)
     for (let i = 0; i < 3; i++) sim.step()
     expect(sim.view().phase.tag).toBe("Live")
     expect(sim.view().players[0].alive).toBe(true)

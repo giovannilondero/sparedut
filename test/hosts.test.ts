@@ -9,6 +9,7 @@ import { ROOM_MODE_IDS } from "../shared/folklore.ts"
 import { initPhysics } from "../shared/physics.ts"
 import { harness } from "./harness.ts"
 import { FLAG_BIT, type Snapshot } from "../shared/protocol.ts"
+import { COUNTDOWN_TICKS } from "../shared/sim/rules.ts"
 
 beforeAll(() => initPhysics())
 
@@ -92,6 +93,50 @@ for (const host of HOSTS) {
       expect(entered!.players.every((p) => p.f & FLAG_BIT.alive)).toBe(true)
       expect(entered!.players.map((p) => [p.id, p.w]).sort()).toEqual(shown.map((r) => [r.id, r.primary]).sort())
       expect(entered!.you?.arsenal.primary).toBe("doplete")
+    })
+
+    test("ready is a member's own mark, set and taken back in the Muster, and shown in the roster", () => {
+      const { connect } = harness(host.make)
+      const me = connect()
+      me.say(create)
+      const { you } = me.last("joined")!
+      const mine = () => me.last("room")!.room.roster.find((r) => r.id === you)!
+      expect(mine().ready).toBe(false)
+      me.say({ t: "ready", ready: true })
+      expect(mine().ready).toBe(true)
+      me.say({ t: "ready", ready: false })
+      expect(mine().ready).toBe(false)
+    })
+
+    test("bots count as ready: with one human member the host's start goes live at once, with no countdown", () => {
+      const { connect, play } = harness(host.make)
+      const me = connect()
+      me.say({ ...create, bots: 4 })
+      play(2)
+      expect(me.last("snap")!.phase).toEqual({ tag: "Muster", starts: null })
+      expect(me.last("room")!.room.roster.filter((r) => r.bot).every((r) => r.ready)).toBe(true)
+      me.say({ t: "start" })
+      play(2)
+      expect(me.last("snap")!.phase.tag).toBe("Live")
+    })
+
+    test("ready is refused outside the Muster, and every mark is cleared when the room enters it", () => {
+      const { connect, play } = harness(host.make)
+      const me = connect()
+      me.say(create)
+      const { you } = me.last("joined")!
+      const mine = () => me.last("room")!.room.roster.find((r) => r.id === you)!
+      me.say({ t: "ready", ready: true })
+      me.say({ t: "start" })
+      play(30)
+      expect(me.last("snap")!.phase.tag).toBe("Live")
+      me.say({ t: "ready", ready: false })
+      expect(mine().ready).toBe(true)
+      // The host's restart: back to the Muster, where nobody is ready yet.
+      me.say({ t: "start" })
+      play(2)
+      expect(me.last("snap")!.phase).toEqual({ tag: "Muster", starts: null })
+      expect(mine().ready).toBe(false)
     })
 
     test("a regular create request on the training's map is refused", () => {
@@ -225,17 +270,119 @@ describe("the game server", () => {
 describe("the Muster on the game server", () => {
   const join = (code: string) => ({ t: "join", code, primary: "miedi" })
 
-  test("only the host can start", () => {
-    const { connect, play } = harness(HOSTS[0].make)
-    const host = connect()
-    host.say(HOSTS_CREATE.online)
-    const other = connect()
+  /** A room on the server with its host and one more human member, both in the Muster. */
+  const twoHumans = (create: object = HOSTS_CREATE.online) => {
+    const h = harness(HOSTS[0].make)
+    const host = h.connect()
+    host.say(create)
+    const other = h.connect()
     other.say(join(host.last("joined")!.room.code))
+    h.play(2)
+    return { ...h, host, other, otherId: other.last("joined")!.you }
+  }
+
+  test("only the host can start", () => {
+    const { play, host, other } = twoHumans()
     other.say({ t: "start" })
     play(60)
-    expect(other.last("snap")!.phase.tag).toBe("Muster")
+    expect(other.last("snap")!.phase).toEqual({ tag: "Muster", starts: null })
+    host.say({ t: "start" })
+    play(COUNTDOWN_TICKS + 2)
+    expect(other.last("snap")!.phase.tag).toBe("Live")
+  })
+
+  test("the host's start begins a countdown every member sees, and the match goes live at its end", () => {
+    const { play, host, other } = twoHumans()
     host.say({ t: "start" })
     play(2)
+    const counting = other.last("snap")!
+    expect(host.last("snap")!.phase).toEqual(counting.phase)
+    if (counting.phase.tag !== "Muster" || counting.phase.starts === null) throw new Error("no countdown")
+    // Ten seconds from the start, which the room took at most a tick ago.
+    expect(counting.phase.starts - counting.tick).toBeWithin(COUNTDOWN_TICKS - 2, COUNTDOWN_TICKS + 1)
+    play(counting.phase.starts - counting.tick - 2)
+    expect(other.last("snap")!.phase.tag).toBe("Muster")
+    expect(other.last("snap")!.players.every((p) => (p.f & FLAG_BIT.alive) === 0)).toBe(true)
+    play(4)
+    expect(other.last("snap")!.phase.tag).toBe("Live")
+  })
+
+  test("a team and primary changed during the countdown are the ones entered with; a member who did nothing enters as shown", () => {
+    const { play, host, other, otherId } = twoHumans({ ...HOSTS_CREATE.online, bots: 4 })
+    const hostId = host.last("joined")!.you
+    host.say({ t: "start" })
+    play(COUNTDOWN_TICKS / 2)
+    host.say({ t: "primary", p: "mulin" })
+    host.say({ t: "team", team: "malandanti" })
+    const shown = other.last("room")!.room.roster
+    expect(shown.find((r) => r.id === hostId)).toMatchObject({ primary: "mulin", team: "malandanti" })
+    play(COUNTDOWN_TICKS / 2 + 4)
+    const live = other.last("snap")!
+    expect(live.phase.tag).toBe("Live")
+    expect(live.players.map((p) => [p.id, p.w]).sort()).toEqual(shown.map((r) => [r.id, r.primary]).sort())
+    // The other member did nothing: they enter with the primary they joined with, on the team shown for them.
+    expect(other.last("snap")!.you?.arsenal.primary).toBe("miedi")
+    play(60)
+    const board = other.last("board")!.rows
+    expect(board.map((r) => [r.id, r.team]).sort()).toEqual(shown.map((r) => [r.id, r.team]).sort())
+    expect(board.find((r) => r.id === otherId)?.team).toBe(shown.find((r) => r.id === otherId)?.team)
+  })
+
+  test("the host's start while a countdown runs restarts it from the beginning", () => {
+    const { play, host, other } = twoHumans()
+    host.say({ t: "start" })
+    play(COUNTDOWN_TICKS - 60)
+    host.say({ t: "start" })
+    play(120)
+    expect(other.last("snap")!.phase.tag).toBe("Muster")
+    play(COUNTDOWN_TICKS - 120 + 4)
+    expect(other.last("snap")!.phase.tag).toBe("Live")
+  })
+
+  test("with every human member ready, the host's start goes live at once", () => {
+    const { play, host, other } = twoHumans()
+    other.say({ t: "ready", ready: true })
+    host.say({ t: "start" })
+    play(2)
+    expect(other.last("snap")!.phase.tag).toBe("Live")
+  })
+
+  test("the host's start marks the host ready; a running countdown ends as soon as the last human member becomes ready", () => {
+    const { play, host, other } = twoHumans()
+    const hostId = host.last("joined")!.you
+    host.say({ t: "start" })
+    expect(other.last("room")!.room.roster.find((r) => r.id === hostId)?.ready).toBe(true)
+    play(60)
+    expect(other.last("snap")!.phase.tag).toBe("Muster")
+    other.say({ t: "ready", ready: true })
+    play(2)
+    expect(other.last("snap")!.phase.tag).toBe("Live")
+  })
+
+  test("a member's ready marks only that member", () => {
+    const { host, other, otherId } = twoHumans()
+    other.say({ t: "ready", ready: true })
+    const roster = host.last("room")!.room.roster.filter((r) => !r.bot)
+    expect(roster.map((r) => [r.id, r.ready])).toEqual([[host.last("joined")!.you, false], [otherId, true]])
+  })
+
+  test("only the host can cancel the countdown; after it the room is in the Muster with no countdown", () => {
+    const { play, host, other } = twoHumans()
+    host.say({ t: "start" })
+    play(60)
+    other.say({ t: "cancel" })
+    play(2)
+    expect(other.last("snap")!.phase).toMatchObject({ tag: "Muster", starts: expect.any(Number) })
+    host.say({ t: "cancel" })
+    play(2)
+    expect(other.last("snap")!.phase).toEqual({ tag: "Muster", starts: null })
+    play(COUNTDOWN_TICKS * 2)
+    expect(other.last("snap")!.phase).toEqual({ tag: "Muster", starts: null })
+    // A new start counts down again from the beginning.
+    host.say({ t: "start" })
+    play(COUNTDOWN_TICKS - 30)
+    expect(other.last("snap")!.phase.tag).toBe("Muster")
+    play(40)
     expect(other.last("snap")!.phase.tag).toBe("Live")
   })
 
@@ -397,6 +544,8 @@ describe("joining a match already on, on the game server", () => {
     expect(entry()?.onMap).toBe(true)
     play(2)
     expect(late.last("snap")!.players.some((p) => p.id === you)).toBe(true)
+    // Everybody ready: the host's start goes live at once, with no countdown to wait out.
+    late.say({ t: "ready", ready: true })
     host.say({ t: "start" })
     play(10)
     expect(late.last("snap")!.you?.alive).toBe(true)
@@ -409,6 +558,7 @@ describe("joining a match already on, on the game server", () => {
     play(2)
     expect(late.last("snap")!.phase.tag).toBe("Muster")
     expect(entry()?.onMap).toBe(true)
+    late.say({ t: "ready", ready: true })
     host.say({ t: "start" })
     play(10)
     expect(late.last("snap")!.you?.alive).toBe(true)

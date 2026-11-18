@@ -51,6 +51,8 @@ export interface Member {
   team: Team
   /** The primary chosen: the roster shows it, and the member enters a match with it. */
   primary: PrimaryId
+  /** Marked ready in the Muster (cleared whenever the room enters it); a bot always is. */
+  ready: boolean
   readonly bot: boolean
   send: ((msg: ServerMessage) => void) | null
   queue: PlayerInput[]
@@ -90,6 +92,8 @@ export class Room {
    */
   private readonly arriving = new Map<string, () => void>()
   private world: WorldView
+  /** A start sent to the simulation since its last step: it may have begun a countdown the view does not show yet. */
+  private startSent = false
   level: BotLevel
 
   constructor(
@@ -175,7 +179,7 @@ export class Room {
   addHuman(id: string, name: string, primary: PrimaryId, send: (msg: ServerMessage) => void) {
     if (!this.admitsAnother) return false
     const team = this.training ? "benandanti" : this.smallerTeam()
-    const m: Member = { id, place: "waiting", name, team, primary, bot: false, send, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT }
+    const m: Member = { id, place: "waiting", name, team, primary, ready: false, bot: false, send, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT }
     if (!this.matchOn) this.seat(m)
     this.members.set(id, m)
     return true
@@ -205,7 +209,7 @@ export class Room {
     const used = new Set([...this.members.values()].map((m) => m.name))
     const name = BOT_NAMES[team].find((n) => !used.has(n)) ?? `${BOT_NAMES[team][0]} ${botCounter}`
     const primary = primaryFor(botCounter)
-    this.members.set(id, { id, place: "inMatch", name, team, primary, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
+    this.members.set(id, { id, place: "inMatch", name, team, primary, ready: true, bot: true, send: null, queue: [], last: IDLE_INPUT, ping: 0, credit: MAX_CREDIT })
     this.arriving.set(id, () => this.sim.join(id, name, team, true, primary, post))
     return id
   }
@@ -234,6 +238,8 @@ export class Room {
         this.hostName = next.name
       }
     }
+    // The one member not ready may be the one who left.
+    this.goIfAllReady()
   }
 
   setTeam(id: string, team: Team) {
@@ -282,8 +288,57 @@ export class Room {
     this.broadcast({ t: "chat", from, name: m.name, team: m.team, text })
   }
 
+  /** Every human member is ready (bots always are). */
+  private get allReady() {
+    return this.humans.every((m) => m.ready)
+  }
+
+  /** In the Muster: the countdown, or nothing yet. */
+  private get countingDown() {
+    const phase = this.world.phase
+    return phase.tag === "Muster" && (phase.starts !== null || this.startSent)
+  }
+
+  /** A member marks themselves ready or takes the mark back: only a human, only in the Muster. */
+  setReady(id: string, ready: boolean) {
+    const m = this.members.get(id)
+    if (!m || m.bot || this.world.phase.tag !== "Muster") return
+    m.ready = ready
+    this.goIfAllReady()
+  }
+
+  /** A running countdown ends as soon as every human member is ready. */
+  private goIfAllReady() {
+    if (this.countingDown && this.allReady) this.sim.start(true)
+  }
+
+  /**
+   * The host's start. In the Muster it counts as the host's ready mark and begins the countdown,
+   * or the match at once if every human member is ready; a start while a countdown runs restarts
+   * it. During a match it sends the room back to the Muster.
+   */
   start() {
-    this.sim.start()
+    const host = this.members.get(this.hostId)
+    if (this.world.phase.tag === "Muster" && host) host.ready = true
+    this.sim.start(this.world.phase.tag !== "Muster" || this.allReady)
+    this.startSent = true
+  }
+
+  /**
+   * A running countdown starts again from the beginning, so that everybody has time to take in a
+   * change to the room (single weapon, #82). Nothing when no countdown runs.
+   */
+  restartCountdown() {
+    if (!this.countingDown) return
+    this.sim.start(false)
+    this.startSent = true
+  }
+
+  /** The host cancels the countdown: the room stays in the Muster with none running. */
+  cancelCountdown() {
+    if (!this.countingDown) return
+    this.sim.cancelCountdown()
+    this.startSent = false
   }
 
   /** One tick: inputs, bots, simulation. */
@@ -307,7 +362,13 @@ export class Room {
     for (const [id, brain] of this.bots) this.sim.input(id, brain.think(this.world))
     for (const [id, brain] of this.stationBots) this.sim.input(id, brain.think(this.world))
     const events = this.sim.step()
-    this.world = this.sim.view()
+    const before = this.world.phase.tag
+    const world = this.sim.view()
+    this.world = world
+    this.startSent = false
+    // Entering the Muster clears every ready mark: the members must see it.
+    const mustered = before !== "Muster" && world.phase.tag === "Muster"
+    if (mustered) for (const m of this.humans) m.ready = false
     const swapped = (this.training && this.keepStationBots()) || this.seatWaiting()
     for (const e of events) {
       this.events.push(e)
@@ -320,7 +381,7 @@ export class Room {
     if (this.world.tick % 60 === 0) this.broadcast({ t: "board", rows: this.board() })
     // The roster names and colours the bodies the client draws from the snapshots: it must have the
     // new bots before the first snapshot that brings them, or they are drawn nameless in the wrong colours.
-    if (swapped) this.broadcast({ t: "room", room: this.info() })
+    if (swapped || mustered) this.broadcast({ t: "room", room: this.info() })
   }
 
   /**
@@ -479,7 +540,7 @@ export class Room {
       minutes: this.settings.minutes,
       level: this.level,
       ff: this.settings.ff,
-      roster: [...this.members.values()].map((m) => ({ id: m.id, name: m.name, team: m.team, primary: m.primary, bot: m.bot, away: false, onMap: m.place === "inMatch" }))
+      roster: [...this.members.values()].map((m) => ({ id: m.id, name: m.name, team: m.team, primary: m.primary, ready: m.ready, bot: m.bot, away: false, onMap: m.place === "inMatch" }))
     }
   }
 
