@@ -57,6 +57,10 @@ export interface Strings {
     /** The match menu's station list and its actions (ticket #51). */
     readonly stationList: string
     readonly here: string
+    /** On entering the training, the station that continues where the player left off. */
+    readonly continueHere: string
+    /** On entering the training, above the station list: choose where to start. */
+    readonly chooseStation: string
     readonly locked: string
     readonly restart: string
     readonly startOver: string
@@ -418,6 +422,8 @@ const fur: Strings = {
     done: { home: "Torne al inizi" },
     stationList: "Lis stazions",
     here: "Tu sês culì",
+    continueHere: "Va indenant",
+    chooseStation: "Sielç la stazion di dulà tacâ",
     locked: "Ancjemò sierade",
     restart: "Torne a tacâ la stazion",
     startOver: "Torne a tacâ dal principi",
@@ -831,6 +837,8 @@ const it: Strings = {
     done: { home: "Torna all'inizio" },
     stationList: "Le stazioni",
     here: "Sei qui",
+    continueHere: "Continua",
+    chooseStation: "Scegli la stazione da cui partire",
     locked: "Ancora chiusa",
     restart: "Ricomincia la stazione",
     startOver: "Ricomincia da capo",
