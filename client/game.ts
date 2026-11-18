@@ -31,6 +31,7 @@ import type { Settings } from "./settings.ts"
 import "@ui-sdk/web/dialog"
 // UI SDK's select, for the host's bot skill: opens on a tap or a key (never on hover), as a sheet on a small touch screen.
 import "@ui-sdk/web/select"
+import { alwaysChosen } from "./choice.ts"
 import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, type MatchMenu } from "./match-menus.ts"
 import { pickerEntries } from "./touch.ts"
 
@@ -974,10 +975,9 @@ export class Game {
       }
     }
     // The room's update sets the value back from code ("imperative"): only the host's own choice is sent.
-    $<SelectElement>("p-level").addEventListener("valuechange", (e) => {
-      if (e.detail.value === null) return e.preventDefault()
-      if (e.detail.reason !== "imperative") this.d.net.send({ t: "level", level: e.detail.value as BotLevel })
-    })
+    $<SelectElement>("p-level").addEventListener("valuechange", alwaysChosen((level, reason) => {
+      if (reason !== "imperative") this.d.net.send({ t: "level", level: level as BotLevel })
+    }))
   }
 
   /** Did I win (my team, or me alone in Tampieste)? */

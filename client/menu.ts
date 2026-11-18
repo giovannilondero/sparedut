@@ -17,6 +17,7 @@ import "@ui-sdk/web/collapsible"
 import "@ui-sdk/web/switch"
 import "@ui-sdk/web/slider"
 import "@ui-sdk/web/field"
+import { alwaysChosen } from "./choice.ts"
 import type { GameAudio } from "./contracts.ts"
 import { esc } from "./hud.ts"
 import { onLangChange, setLang, t, type Lang } from "./i18n.ts"
@@ -53,10 +54,7 @@ const FIRST_CONTROL: { readonly [S in Exclude<Screen, "home" | "password">]: () 
  */
 function cardGroup(group: RadioGroup, values: readonly string[], choose: (value: string) => void) {
   group.innerHTML = values.map((v) => `<ui-radio class="card" value="${v}"><b></b><small></small></ui-radio>`).join("")
-  group.addEventListener("valuechange", (e) => {
-    if (e.detail.value === null) return e.preventDefault()
-    choose(e.detail.value as string)
-  })
+  group.addEventListener("valuechange", alwaysChosen(choose))
 }
 
 /** Writes each card's name (HTML) and line (text) in the active language. */
@@ -373,11 +371,10 @@ export class Menu {
       chosen()
     })
     const number = (id: string, choose: (n: number) => void) =>
-      $<Select>(id).addEventListener("valuechange", (e) => {
-        if (e.detail.value === null) return e.preventDefault()
-        choose(Number(e.detail.value))
+      $<Select>(id).addEventListener("valuechange", alwaysChosen((value) => {
+        choose(Number(value))
         this.renderChoices()
-      })
+      }))
     number("c-minutes", (n) => this.model.chooseMinutes(n))
     number("c-bots", (n) => this.model.chooseBots(n))
     const ff = $<HTMLInputElement>("c-ff")
@@ -470,13 +467,12 @@ export class Menu {
       <ul class="weapon-cards carried">${carried.map((id) => `<li class="weapon">${card(id)}</li>`).join("")}</ul>`
     const group = target.querySelector<HTMLElementTagNameMap["ui-radio-group"]>("ui-radio-group")!
     group.value = this.settings.primary
-    group.addEventListener("valuechange", (e) => {
-      // A primary is always chosen: a change to none is refused.
-      if (e.detail.value === null) return e.preventDefault()
-      this.model.choosePrimary(e.detail.value as PrimaryId)
+    // A primary is always chosen: a change to none is refused.
+    group.addEventListener("valuechange", alwaysChosen((primary) => {
+      this.model.choosePrimary(primary as PrimaryId)
       this.audio.play("switch")
       onPick?.(this.settings.primary)
-    })
+    }))
   }
 
   // ---------------------------------------------------------------- settings
