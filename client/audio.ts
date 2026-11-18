@@ -36,6 +36,7 @@ const SPECS: Record<SoundName, Spec> = {
   shot_cjampanili: spec("far", 3, 1, 0.02),
   shot_mulin: spec("far", 10, 0.55, 0.05),
   spin_mulin: spec("mid", 2, 0.6, 0.02),
+  cut_motosee: spec("far", 3, 0.5, 0.05),
   beam_miedi: spec("mid", 4, 0.45, 0.06),
   launch_gjaline: spec("far", 3, 0.85, 0.06),
   boom_gjaline: spec("far", 4, 0.9, 0.08),

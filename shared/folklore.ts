@@ -82,7 +82,8 @@ export const QUICK_CHAT = [
   "Il frico al è nestri!",
   "Salût e frico!",
   "Va ben, va ben...",
-  "Cjale il cjampanili!"
+  "Cjale il cjampanili!",
+  "A rivin chei di Paulâr"
 ]
 
 export const BOT_NAMES = {

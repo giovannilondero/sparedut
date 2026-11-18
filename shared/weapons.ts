@@ -4,13 +4,18 @@
  * live in `client/i18n.ts`).
  */
 
-export type WeaponId = "mescul" | "mandi" | "cramar" | "doplete" | "cjampanili" | "mulin" | "miedi" | "gjalinis" | "lanciafrico" | "panel" | "mitraie"
+export type WeaponId = "mescul" | "mandi" | "cramar" | "doplete" | "cjampanili" | "mulin" | "miedi" | "gjalinis" | "lanciafrico" | "panel" | "mitraie" | "motosee"
 
 /**
  * "beam": short-range automatic stream. It heals teammates (`damage` is the heal per
  * hit) and deals `beamDamage` to enemies.
+ * "held": melee for as long as the trigger is held (the Motosee): after the spin-up, it hits the nearest
+ * hostile player in front within `range` every `cooldownTicks`, or the door in front.
  */
-export type FireMode = "melee" | "semi" | "auto" | "projectile" | "beam"
+export type FireMode = "melee" | "semi" | "auto" | "projectile" | "beam" | "held"
+
+/** Arm's length: how far the Mescul and the Motosee reach. */
+const MELEE_REACH = 2.4
 
 export interface WeaponDef {
   readonly id: WeaponId
@@ -61,7 +66,7 @@ export const WEAPONS = {
     reloadTicks: 0,
     magazine: 0,
     reserve: 0,
-    range: 2.4,
+    range: MELEE_REACH,
     falloff: 1,
     aimFov: 75,
     scope: false,
@@ -267,6 +272,31 @@ export const WEAPONS = {
     shell: null
   },
   /**
+   * The Motosee, a chainsaw: held melee, no ammunition, a short rev (the Mulin's spin-up). Starting
+   * values, to be tuned by playing. No aiming: the aimed view is the Mescul's, and nothing is aimed.
+   */
+  motosee: {
+    id: "motosee",
+    mode: "held",
+    damage: 14,
+    headMultiplier: 1,
+    pellets: 1,
+    spread: { still: 0, moving: 0, aimed: 0 },
+    cooldownTicks: 4,
+    reloadTicks: 0,
+    magazine: 0,
+    reserve: 0,
+    range: MELEE_REACH,
+    falloff: 1,
+    aimFov: 75,
+    scope: false,
+    kick: 0.004,
+    moveScale: 1,
+    slot: 1,
+    spinTicks: 20,
+    shell: null
+  },
+  /**
    * The mitraie de postazion: not carried, used by standing behind a turret
    * (`TURRET`). Infinite ammo, but it overheats.
    */
@@ -295,14 +325,17 @@ export const WEAPONS = {
 
 export const WEAPON_IDS = Object.keys(WEAPONS) as WeaponId[]
 
+/** Whether a weapon has a magazine to empty and reload: the Mescul and the Motosee have none (nor the turrets' mitraie). */
+export const usesAmmo = (id: WeaponId) => WEAPONS[id].magazine > 0
+
 /** A number key; the primaries share 1. */
 export type Slot = WeaponDef["slot"]
 /** The number keys in order, from the weapons' own slots. */
 export const SLOTS: readonly Slot[] = [...new Set(WEAPON_IDS.map((id) => WEAPONS[id].slot))].sort((a, b) => a - b)
 
 /** The primary weapon is chosen before respawning. */
-export type PrimaryId = "cramar" | "doplete" | "cjampanili" | "mulin" | "miedi" | "gjalinis"
-export const PRIMARIES = ["cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis"] as const satisfies readonly PrimaryId[]
+export type PrimaryId = "cramar" | "doplete" | "cjampanili" | "mulin" | "miedi" | "gjalinis" | "motosee"
+export const PRIMARIES = ["cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis", "motosee"] as const satisfies readonly PrimaryId[]
 
 /** What a player carries in slot 3, one at a time: the Lanciafrico, picked up, or the casot's panel, torn off. */
 export type PowerId = "lanciafrico" | "panel"
@@ -333,7 +366,8 @@ export const CLASSES = {
   cjampanili: { hp: 75, speed: 0.95, trait: null },
   mulin: { hp: 150, speed: 0.8, trait: null },
   miedi: { hp: 90, speed: 1.05, trait: "medic" },
-  gjalinis: { hp: 100, speed: 0.95, trait: null }
+  gjalinis: { hp: 100, speed: 0.95, trait: null },
+  motosee: { hp: 125, speed: 1.12, trait: null }
 } as const satisfies Record<PrimaryId, ClassDef>
 
 /** The Cassele dal Miedi on enemies: damage per hit (the heal on teammates is `damage`). */
