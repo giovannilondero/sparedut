@@ -534,6 +534,70 @@ export interface Atlas {
   bannerM: Region
 }
 
+/** A painted sign: its text, background (transparent with `rgba(0,0,0,0)`), ink and font. */
+export interface SignSpec {
+  readonly text: string
+  readonly bg: string
+  readonly fg: string
+  readonly font: string
+}
+
+const SIGN_ROW = 72
+
+/** Paints signs in rows, left to right, from the top of a canvas `width` wide: their rectangles in pixels. */
+function packSigns(g: Ctx, specs: readonly SignSpec[], width: number): [number, number, number, number][] {
+  const out: [number, number, number, number][] = []
+  let x = 0, y = 0
+  for (const { text, bg, fg, font } of specs) {
+    g.font = font
+    const w = Math.min(width, Math.ceil(g.measureText(text).width) + 48)
+    if (x + w > width) {
+      x = 0
+      y += SIGN_ROW + 4
+    }
+    if (bg !== "rgba(0,0,0,0)") {
+      g.fillStyle = bg
+      roundRect(g, x + 2, y + 2, w - 4, SIGN_ROW - 4, 8)
+      g.fill()
+      g.strokeStyle = fg
+      g.lineWidth = 3
+      roundRect(g, x + 8, y + 8, w - 16, SIGN_ROW - 16, 6)
+      g.stroke()
+    }
+    g.fillStyle = fg
+    g.textAlign = "center"
+    g.textBaseline = "middle"
+    g.fillText(text, x + w / 2, y + SIGN_ROW / 2 + 2)
+    out.push([x, y, w, SIGN_ROW])
+    x += w + 4
+  }
+  return out
+}
+
+/** A sheet of painted signs of a map's own (one texture): each spec's region, in order. */
+export function makeSignSheet(specs: readonly SignSpec[]): { texture: THREE.Texture; regions: Region[] } {
+  const W = 1024
+  const rows = (() => {
+    const [, g] = canvas(1, 1)
+    let x = 0, n = 1
+    for (const { text, font } of specs) {
+      g.font = font
+      const w = Math.min(W, Math.ceil(g.measureText(text).width) + 48)
+      if (x + w > W) {
+        x = 0
+        n++
+      }
+      x += w + 4
+    }
+    return n
+  })()
+  const H = 2 ** Math.ceil(Math.log2(rows * (SIGN_ROW + 4)))
+  const [c, g] = canvas(W, H)
+  g.clearRect(0, 0, W, H)
+  const regions = packSigns(g, specs, W).map(([x, y, w, h]): Region => ({ u0: x / W, u1: (x + w) / W, v0: 1 - (y + h) / H, v1: 1 - y / H, aspect: w / h }))
+  return { texture: toTex(c, false), regions }
+}
+
 export function makeAtlas(): Atlas {
   const S = 1024
   const [c, g] = canvas(S)
@@ -559,31 +623,11 @@ export function makeAtlas(): Atlas {
     ["place", "Place dal Municipi", "#f4f1ea", "#1d1d1d", "bold 40px sans-serif"]
   ]
   const signs = {} as Record<SignId, Region>
-  let x = 0, y = 0
-  const RH = 72
-  for (const [id, text, bg, fg, font] of specs) {
-    g.font = font
-    const w = Math.ceil(g.measureText(text).width) + 48
-    if (x + w > S) {
-      x = 0
-      y += RH + 4
-    }
-    if (bg !== "rgba(0,0,0,0)") {
-      g.fillStyle = bg
-      roundRect(g, x + 2, y + 2, w - 4, RH - 4, 8)
-      g.fill()
-      g.strokeStyle = fg
-      g.lineWidth = 3
-      roundRect(g, x + 8, y + 8, w - 16, RH - 16, 6)
-      g.stroke()
-    }
-    g.fillStyle = fg
-    g.textAlign = "center"
-    g.textBaseline = "middle"
-    g.fillText(text, x + w / 2, y + RH / 2 + 2)
-    signs[id] = region(x, y, w, RH)
-    x += w + 4
-  }
+  const packed = packSigns(g, specs.map(([, text, bg, fg, font]) => ({ text, bg, fg, font })), S)
+  specs.forEach(([id], i) => {
+    const [x, y, w, h] = packed[i]
+    signs[id] = region(x, y, w, h)
+  })
 
   // Rose window: stained glass and stone tracery (bottom left, 512²).
   const rose = (() => {

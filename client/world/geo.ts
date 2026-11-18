@@ -210,3 +210,54 @@ export function faceMatrix(n: V, p: V, out = new THREE.Matrix4()): THREE.Matrix4
 }
 
 export const tf = (g: THREE.BufferGeometry, m: THREE.Matrix4) => g.applyMatrix4(m)
+
+const UP = new THREE.Vector3(0, 1, 0)
+
+/** One face of a box as a quad (outward normal). */
+export function face(min: V, max: V, side: "top" | "bottom" | "east" | "west" | "south" | "north"): THREE.BufferGeometry {
+  const [x0, y0, z0] = min
+  const [x1, y1, z1] = max
+  switch (side) {
+    case "top": return quad([x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0])
+    case "bottom": return quad([x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1])
+    case "south": return quad([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1])
+    case "north": return quad([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0])
+    case "east": return quad([x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1])
+    case "west": return quad([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0])
+  }
+}
+
+/** Rotates the geometry so its normal faces `dir`. */
+export function orient(g: THREE.BufferGeometry, dir: V): THREE.BufferGeometry {
+  g.computeVertexNormals()
+  const n = g.getAttribute("normal")
+  if (n.getX(0) * dir[0] + n.getY(0) * dir[1] + n.getZ(0) * dir[2] >= 0) return g
+  if (g.index) {
+    const a = g.index.array as Uint16Array
+    for (let i = 0; i < a.length; i += 3) [a[i + 1], a[i + 2]] = [a[i + 2], a[i + 1]]
+    g.index.needsUpdate = true
+  } else {
+    const p = g.getAttribute("position") as THREE.BufferAttribute
+    for (let i = 0; i < p.count; i += 3) {
+      const [x, y, z] = [p.getX(i + 1), p.getY(i + 1), p.getZ(i + 1)]
+      p.setXYZ(i + 1, p.getX(i + 2), p.getY(i + 2), p.getZ(i + 2))
+      p.setXYZ(i + 2, x, y, z)
+    }
+  }
+  g.computeVertexNormals()
+  return g
+}
+
+/** Cylinder between two points (statue limbs, poles). */
+export function cylBetween(a: V, b: V, r0: number, r1 = r0, seg = 8): THREE.BufferGeometry {
+  const va = new THREE.Vector3(...a), vb = new THREE.Vector3(...b)
+  const len = va.distanceTo(vb)
+  const g = new THREE.CylinderGeometry(r1, r0, len, seg)
+  g.translate(0, len / 2, 0)
+  const q = new THREE.Quaternion().setFromUnitVectors(UP, vb.clone().sub(va).normalize())
+  g.applyQuaternion(q)
+  g.translate(...a)
+  return g
+}
+
+export const sphere = (c: V, r: number, sy = 1, seg = 10) => new THREE.SphereGeometry(r, seg, Math.max(6, seg - 2)).scale(1, sy, 1).translate(...c)
