@@ -222,6 +222,8 @@ export const ChangePrimary = Descriptor.Event<{ readonly session: string; readon
 export const StartMatch = Descriptor.Event<{}>()("Sparedut/StartMatch")
 /** From the host, only in a training: the client's report of an interface step (`shared/training/interface.ts`). */
 export const ReportInterface = Descriptor.Event<{ readonly session: string; readonly action: InterfaceAction }>()("Sparedut/ReportInterface")
+/** From the host, only in a training: the trainee goes to a station (`station`, an index) or starts over. */
+export const GoToStation = Descriptor.Event<{ readonly session: string; readonly to: { readonly _tag: "station"; readonly station: number } | { readonly _tag: "startOver" } }>()("Sparedut/GoToStation")
 
 export interface DamageValue {
   readonly victim: string
@@ -254,7 +256,7 @@ export const Game = Schema.bind(
     components: { Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers, Projectile },
     requires: [Schema.requires(Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers)],
     resources: { Rules, Objective, Tick, Score, Flags, Hill, Cart, Pickups, Turrets, Doors, History, Rng },
-    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, ReportInterface, Damage, Heal, DoorHit, Out }
+    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, ReportInterface, GoToStation, Damage, Heal, DoorHit, Out }
   }),
   Root
 )
@@ -275,16 +277,25 @@ export const Match = Game.StateMachine("Sparedut/Match", {
  * got. A regular room is `Off` for good. Stations and steps are indices into `STATION_IDS` and
  * the station's `stepsOf`. `unlocked`: how many stations, from the first, the trainee may go to.
  */
+/** Where an arrival puts the trainee: see `Training.Arriving`. */
+export const ARRIVAL_PLACES = ["walked", "facingStart", "keepingLook"] as const
+export type ArrivalPlace = (typeof ARRIVAL_PLACES)[number]
+
 export const Training = Game.StateMachine(
   "Sparedut/Training",
   {
     Off: {},
-    /** On the way into a station: its setup is applied on the first tick the trainee is alive. `place`: put them at the station's start. */
-    Arriving: z.object({ station: z.number().int(), unlocked: z.number().int(), place: z.boolean() }),
+    /**
+     * On the way into a station: its setup is applied on the first tick the trainee is alive.
+     * `place` (`ARRIVAL_PLACES`): left where they are (walked in), or put at the station's start,
+     * facing along the street (a training's first arrival) or keeping their look (going to a
+     * station: the client owns the look, and a turn it did not make would complete a look step).
+     */
+    Arriving: z.object({ station: z.number().int(), unlocked: z.number().int(), place: z.enum(ARRIVAL_PLACES) }),
     /** At a station, on one of its steps: how many times its action happened, and what the step keeps (`StepProgress`). */
     Step: z.object({ station: z.number().int(), step: z.number().int(), count: z.number().int(), mark: z.number(), unlocked: z.number().int() }),
     /** Every station done: all of them unlocked. */
     Complete: {}
   },
-  { transitions: { Off: [], Arriving: ["Step", "Complete"], Step: ["Complete"], Complete: [] } }
+  { transitions: { Off: [], Arriving: ["Step", "Complete"], Step: ["Complete", "Arriving"], Complete: ["Arriving"] } }
 )

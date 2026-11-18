@@ -10,7 +10,7 @@ import { SAGRE, SAGRE_STATIONS } from "../shared/maps/sagre.ts"
 import { initPhysics } from "../shared/physics.ts"
 import type { GameEvent } from "../shared/sim/events.ts"
 import { MAX_HP } from "../shared/sim/rules.ts"
-import type { StationId } from "../shared/training/index.ts"
+import { STATION_IDS, type StationId } from "../shared/training/index.ts"
 import { WEAPONS } from "../shared/weapons.ts"
 import { harness } from "./harness.ts"
 import { Trainee } from "./trainee/index.ts"
@@ -21,11 +21,14 @@ beforeAll(() => initPhysics())
 const PICKUPS = SAGRE_STATIONS[7].pickups
 const at = (pickup: number) => SAGRE.pickups[pickup].at
 
-/** A training on the in-browser host, played by the automatic player until `station` is the current one. */
-function reach(station: StationId) {
+/**
+ * A training on the in-browser host, played by the automatic player until `station` is the current
+ * one; `started`: begun there instead, as a browser that saved it as unlocked asks.
+ */
+function reach(station: StationId, started = false) {
   const h = harness(createBrowserHost)
   const me = h.connect()
-  me.say({ t: "training", primary: "cramar" })
+  me.say({ t: "training", primary: "cramar", ...(started ? { from: station, unlocked: STATION_IDS.indexOf(station) + 1 } : {}) })
   for (let i = 0; i < 120 && !me.last("snap")?.you?.alive; i++) h.play(1)
   const you = me.last("joined")!.you
   const auto = new Trainee(you)
@@ -193,6 +196,33 @@ describe("the automatic player", () => {
   })
 })
 
-// Entering a station again (the go-to-station and restart-station intents) arrives with the
-// station's pickups back on their spots (`StationSetup.pickups`); the intents are ticket #51's.
-test.todo("pickups and the Lanciafrico are there again when station 8 or 9 is entered again")
+describe("entering a station again", () => {
+  test("restarting station 8 puts back the pickups already taken, and its first step from nothing", () => {
+    const { me, snap, walkTo, drive } = reach("pickups", true)
+    const hurt = snap().you!.hp
+    walkTo(at(PICKUPS.frico))
+    expect(snap().pickups[PICKUPS.frico]).toBe("0")
+    expect(snap().training).toMatchObject({ step: "gubane" })
+    me.say({ t: "goTo", station: "pickups" })
+    drive(6, () => ({}))
+    expect(snap().pickups[PICKUPS.frico]).toBe("1")
+    expect(snap().training).toMatchObject({ station: "pickups", step: "frico", count: 0 })
+    expect(snap().you!.hp).toBe(hurt)
+    const again = walkTo(at(PICKUPS.frico))
+    expect(steps(again)).toEqual(["frico"])
+  })
+
+  test("restarting station 9 puts the Lanciafrico back, and takes it out of the player's hands", () => {
+    const LANCIAFRICO = at(SAGRE_STATIONS[8].lanciafrico)
+    const index = SAGRE_STATIONS[8].lanciafrico
+    const { me, snap, walkTo, drive } = reach("turret", true)
+    walkTo(LANCIAFRICO)
+    expect(snap().you!.arsenal.launcher).toBe(true)
+    expect(snap().pickups[index]).toBe("0")
+    me.say({ t: "goTo", station: "turret" })
+    drive(6, () => ({}))
+    expect(snap().pickups[index]).toBe("1")
+    expect(snap().you!.arsenal.launcher).toBe(false)
+    expect(snap().training).toMatchObject({ station: "turret", step: "mount", count: 0 })
+  })
+})

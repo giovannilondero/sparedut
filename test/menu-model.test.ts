@@ -24,6 +24,7 @@ const remembered = (over: Partial<Remembered> = {}): Remembered => ({
   lastBots: 4,
   lastLevel: "pari",
   lastFf: false,
+  training: { unlocked: 1, completed: false },
   ...over
 })
 
@@ -350,7 +351,7 @@ test("a screen opens on its first control, and going back lands on the home scre
 
 test("the training starts in one tap from the home screen, with nothing to choose", () => {
   const { model } = menu()
-  expect(model.training()).toEqual({ kind: "send", request: { t: "training" } })
+  expect(model.training()).toEqual({ kind: "send", request: { t: "training", start: { unlocked: 1, from: "look" } } })
 })
 
 test("the training, like any room, needs a name first", () => {

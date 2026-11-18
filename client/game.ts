@@ -16,6 +16,9 @@ import { outsideStorm, owned, RAISE_TICKS, weaponInSlot } from "../shared/sim/ru
 import { TRAINING } from "../shared/training/index.ts"
 import { closedGates, viewedStation } from "../shared/training/gates.ts"
 import type { InterfaceAction } from "../shared/training/interface.ts"
+import type { StationId } from "../shared/training/index.ts"
+import { FRESH_TRAINING, trainingProgressed } from "./settings.ts"
+import { stationEntries, stationListHtml } from "./training-menu.ts"
 import { WEAPONS, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
@@ -677,6 +680,12 @@ export class Game {
         return
       }
       case "training": {
+        // Saved per completed station, with the other settings: the next training resumes from it.
+        const progress = trainingProgressed(this.d.settings.training, e)
+        if (progress !== this.d.settings.training) {
+          this.d.settings.training = progress
+          this.d.saveSettings()
+        }
         const tr = t().training
         if (e.a === "step") {
           this.hud.trainingDone()
@@ -927,8 +936,9 @@ export class Game {
     if (full || host !== this.pauseHost) this.buildPause(room, host)
     const s = t()
     const p = s.pause
-    $("p-roster").innerHTML = rosterHtml(room, this.me)
+    // A training's menu has its station list in place of the roster.
     if (training) return
+    $("p-roster").innerHTML = rosterHtml(room, this.me)
     $("p-team").textContent = p.switchTeam(s.teams[this.otherTeam()].name)
     if (!host) return
     $("p-start").textContent = (this.snap?.phase.tag ?? "Warmup") === "Warmup" ? p.start : p.restart
@@ -961,7 +971,7 @@ export class Game {
         <div class="pause-share"><button id="p-copy">${p.copy}</button><div class="muted pause-reach">${p.reach[room.reach]} · ${p.access[room.access]}</div></div>
       </div>`
       }
-      <div class="roster" id="p-roster"></div>
+      ${training ? stationListHtml(stationEntries(this.snap?.training ?? null), s) : `<div class="roster" id="p-roster"></div>`}
       ${
         training
           ? ""
@@ -983,7 +993,7 @@ export class Game {
       </div>
       <div class="row overlay-actions">
         <button id="p-resume" class="primary">${s.loadout.resume}</button>
-        ${training ? "" : `<button id="p-team"></button>`}
+        ${training ? `<button id="p-restart"${this.snap?.training?.tag === "station" ? "" : " disabled"}>${s.training.restart}</button><button id="p-over">${s.training.startOver}</button>` : `<button id="p-team"></button>`}
         <button id="p-loadout">${s.loadout.title}</button>
         <button id="p-settings">${s.static.settings}</button>
         <button id="p-leave">${p.leave}</button>
@@ -1006,6 +1016,7 @@ export class Game {
         copy.textContent = p.copied
       }
     $("p-settings").onclick = () => this.openOverlay("settings")
+    if (training) this.bindTrainingMenu(el)
     if (!host) return
     $("p-start").onclick = () => {
       this.d.net.send({ t: "start" })
@@ -1022,6 +1033,39 @@ export class Game {
     $<SelectElement>("p-level").addEventListener("valuechange", alwaysChosen((level, reason) => {
       if (reason !== "imperative") this.d.net.send({ t: "level", level: level as BotLevel })
     }))
+  }
+
+  /**
+   * The training's match menu: a station from the list, restart this station, start over. Each
+   * closes the menu, so the training resumes there. Starting over takes a second press: it
+   * clears the saved progress.
+   */
+  private bindTrainingMenu(el: HTMLElement) {
+    const resume = () => {
+      this.openOverlay("none")
+      this.controls.lock()
+    }
+    const goTo = (station: StationId) => {
+      this.d.net.send({ t: "goTo", station })
+      resume()
+    }
+    for (const b of el.querySelectorAll<HTMLButtonElement>("[data-station]")) b.onclick = () => goTo(b.dataset.station as StationId)
+    $("p-restart").onclick = () => {
+      const view = this.snap?.training
+      if (view?.tag === "station") goTo(view.station)
+    }
+    const over = $("p-over")
+    over.onclick = () => {
+      if (!over.classList.contains("confirm")) {
+        over.classList.add("confirm")
+        over.textContent = t().training.startOverSure
+        return
+      }
+      this.d.settings.training = FRESH_TRAINING
+      this.d.saveSettings()
+      this.d.net.send({ t: "startOver" })
+      resume()
+    }
   }
 
   /** Did I win (my team, or me alone in Tampieste)? */
