@@ -10,10 +10,10 @@ import type { BotLevel, ModeId } from "../shared/folklore.ts"
 import type { MapId, Team } from "../shared/map.ts"
 import type { Access, ErrorCode, Reach } from "../shared/protocol.ts"
 import type { StationId } from "../shared/training/index.ts"
-import type { ControlId } from "../shared/training/station.ts"
 import type { WeaponId } from "../shared/weapons.ts"
 import type { Device } from "./device.ts"
 import type { Notice } from "./offline-cache/too-old.ts"
+import { CONTROL_TEXT, type ControlTexts } from "./training-text/controls.ts"
 import { stepsIn, type StepsIn } from "./training-text/index.ts"
 
 export type Lang = "fur" | "it"
@@ -37,8 +37,10 @@ export interface Strings {
     readonly station: Fn<[n: number, total: number, name: string]>
     readonly stations: Record<StationId, string>
     readonly steps: StepsIn
-    /** Each control a step names, as the keyboard and mouse show it (markup). Controller and touch: ticket #53. */
-    readonly keys: Record<ControlId, string>
+    /** Each control a step names, as each device that has it shows it (markup): `client/training-text/controls.ts`. */
+    readonly controls: ControlTexts
+    /** In place of a step's instruction when the active device has no control for it. */
+    readonly unavailable: string
     /** A repeated step's count so far. */
     readonly count: Fn<[done: number, target: number]>
     /** The brief confirmation of a step done. */
@@ -385,25 +387,8 @@ const fur: Strings = {
       skirmish: "La scaramucie"
     },
     steps: stepsIn("fur"),
-    keys: {
-      look: "<kbd>Mouse</kbd>",
-      move: "<kbd>WASD</kbd>",
-      jump: "<kbd>Spazi</kbd>",
-      crouch: "<kbd>Ctrl</kbd>/<kbd>C</kbd>",
-      sprint: "<kbd>Shift</kbd>",
-      fire: "<kbd>Mouse çampe</kbd>",
-      aim: "<kbd>Mouse drete</kbd>",
-      reload: "<kbd>R</kbd>",
-      slot: "<kbd>1-4</kbd>",
-      lastWeapon: "<kbd>Q</kbd>",
-      cycle: "<kbd>Rodele dal mouse</kbd>",
-      armoury: "<kbd>B</kbd>",
-      bomb: "<kbd>G</kbd>",
-      mine: "<kbd>F</kbd>",
-      use: "<kbd>E</kbd>",
-      board: "<kbd>Tab</kbd>",
-      phrases: "<kbd>V</kbd>"
-    },
+    controls: CONTROL_TEXT.fur,
+    unavailable: "No si pues fâ cun chest dispositîf",
     count: (done, target) => `${done} di ${target}`,
     stepDone: "Fat!",
     stationDone: "Stazion finide",
@@ -802,25 +787,8 @@ const it: Strings = {
       skirmish: "La scaramuccia"
     },
     steps: stepsIn("it"),
-    keys: {
-      look: "<kbd>Mouse</kbd>",
-      move: "<kbd>WASD</kbd>",
-      jump: "<kbd>Spazio</kbd>",
-      crouch: "<kbd>Ctrl</kbd>/<kbd>C</kbd>",
-      sprint: "<kbd>Shift</kbd>",
-      fire: "<kbd>Mouse Sx</kbd>",
-      aim: "<kbd>Mouse Dx</kbd>",
-      reload: "<kbd>R</kbd>",
-      slot: "<kbd>1-4</kbd>",
-      lastWeapon: "<kbd>Q</kbd>",
-      cycle: "<kbd>Rotellina</kbd>",
-      armoury: "<kbd>B</kbd>",
-      bomb: "<kbd>G</kbd>",
-      mine: "<kbd>F</kbd>",
-      use: "<kbd>E</kbd>",
-      board: "<kbd>Tab</kbd>",
-      phrases: "<kbd>V</kbd>"
-    },
+    controls: CONTROL_TEXT.it,
+    unavailable: "Non si può fare con questo dispositivo",
     count: (done, target) => `${done} di ${target}`,
     stepDone: "Fatto!",
     stationDone: "Stazione completata",
