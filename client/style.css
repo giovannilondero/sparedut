@@ -290,9 +290,12 @@ html.in-match input { user-select: text; -webkit-user-select: text; }
   border-radius: 50%; border: 2px solid rgba(243, 233, 210, 0.35); background: rgba(10, 8, 6, 0.18); transform: translate(var(--rest-x), var(--rest-y)); opacity: 0.45; }
 #touch-stick.held { opacity: 1; }
 #touch-knob { position: absolute; left: 50%; top: 50%; width: 46%; height: 46%; margin: -23% 0 0 -23%; border-radius: 50%; background: rgba(243, 233, 210, 0.55); box-shadow: 0 0 6px rgba(0, 0, 0, 0.5); }
-#touch-fire { position: absolute; left: var(--fire-x); top: var(--fire-y); width: calc(var(--fire-r) * 2); height: calc(var(--fire-r) * 2); transform: translate(-50%, -50%);
+#touch-fire { left: var(--fire-x); top: var(--fire-y); width: calc(var(--fire-r) * 2); height: calc(var(--fire-r) * 2); }
+/* Layout B's second fire, under the left thumb. */
+#touch-fire-left { left: var(--lfire-x); top: var(--lfire-y); width: calc(var(--lfire-r) * 2); height: calc(var(--lfire-r) * 2); }
+:is(#touch-fire, #touch-fire-left) { position: absolute; transform: translate(-50%, -50%);
   border-radius: 50%; border: 2px solid rgba(232, 182, 76, 0.75); background: radial-gradient(circle, rgba(232, 182, 76, 0.55) 0 22%, rgba(10, 8, 6, 0.3) 24%); }
-#touch-fire.held { background: radial-gradient(circle, rgba(232, 182, 76, 0.9) 0 26%, rgba(232, 182, 76, 0.25) 28%); }
+:is(#touch-fire, #touch-fire-left).held { background: radial-gradient(circle, rgba(232, 182, 76, 0.9) 0 26%, rgba(232, 182, 76, 0.25) 28%); }
 /* The other buttons: `--x`, `--y`, `--r` per button, set once per size by the HUD. */
 .touch-btn { position: absolute; left: var(--x); top: var(--y); width: calc(var(--r) * 2); height: calc(var(--r) * 2); transform: translate(-50%, -50%);
   display: grid; place-items: center; border-radius: 50%; border: 2px solid rgba(243, 233, 210, 0.4); background: rgba(10, 8, 6, 0.32);

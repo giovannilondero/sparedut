@@ -6,7 +6,7 @@ import type { WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "../client/firstperson.ts"
 import type { Tracked } from "../client/controls.ts"
 import type { Device } from "../client/device.ts"
-import type { Circle, Insets, Rect, TouchView } from "../client/touch.ts"
+import { NO_INSETS, TOUCH_LAYOUT_IDS, type Circle, type Insets, type Rect, type TouchLayoutId, type TouchView } from "../client/touch.ts"
 
 type Listener = (e: Record<string, unknown>) => void
 
@@ -50,15 +50,16 @@ const pad = {
 let Controls: typeof import("../client/controls.ts").Controls
 let touchLayout: typeof import("../client/touch.ts").touchLayout
 let TOUCH_BUTTONS: typeof import("../client/touch.ts").TOUCH_BUTTONS
+let touchLayoutFromUrl: typeof import("../client/touch.ts").touchLayoutFromUrl
 beforeAll(async () => {
   Object.assign(globalThis, { document: doc, window: { addEventListener: on(winListeners) } })
   Object.defineProperty(globalThis.navigator, "getGamepads", { value: () => [pad], configurable: true })
   ;({ Controls } = await import("../client/controls.ts"))
-  ;({ touchLayout, TOUCH_BUTTONS } = await import("../client/touch.ts"))
+  ;({ touchLayout, TOUCH_BUTTONS, touchLayoutFromUrl } = await import("../client/touch.ts"))
 })
 
 /** A player in a match on a phone; each finger is a pointer of type "touch". */
-const phone = (primary?: Device) => {
+const phone = (primary?: Device, id: TouchLayoutId = "a") => {
   for (const m of [docListeners, winListeners, elListeners]) m.clear()
   doc.pointerLockElement = null
   size.width = 844
@@ -72,7 +73,7 @@ const phone = (primary?: Device) => {
     onKey: (code, down) => calls.push(`${code}:${down ? "down" : "up"}`),
     onPause: () => calls.push("pause"),
     onTouch: (v) => views.push(v)
-  }, primary)
+  }, primary, id)
   c.inMatch = true
   const finger = (pointerId: number, pointerType = "touch") => ({
     down: (x: number, y: number) => emit(elListeners, "pointerdown", { pointerId, pointerType, clientX: x, clientY: y }),
@@ -80,7 +81,7 @@ const phone = (primary?: Device) => {
     up: (x = 0, y = 0) => emit(elListeners, "pointerup", { pointerId, pointerType, clientX: x, clientY: y }),
     cancel: () => emit(elListeners, "pointercancel", { pointerId, pointerType, clientX: 0, clientY: 0 })
   })
-  const layout = () => touchLayout(size)
+  const layout = () => touchLayout(size, NO_INSETS, id)
   /** A quick tap with its own finger on a control of the layout. */
   const tap = (at: Circle, pointerId = 7) => {
     finger(pointerId).down(at.x, at.y)
@@ -317,10 +318,10 @@ test("rotating the device re-lays the controls without dropping a finger already
 const player = (over: Partial<Tracked> = {}): Tracked => ({ alive: true, mounted: false, spawned: false, nearTurret: false, arsenal: freshArsenal("cramar"), ...over })
 const centre = (r: { left: number; top: number; width: number; height: number }): Circle => ({ x: r.left + r.width / 2, y: r.top + r.height / 2, r: 0 })
 
-for (const [width, height] of [[390, 844], [844, 390], [360, 640], [640, 360], [768, 1024], [1024, 768]]) {
-  test(`at ${width}x${height} every control fits on the canvas and none covers another`, () => {
-    const l = touchLayout({ width, height })
-    const circles: [string, Circle][] = [["stick", l.stick.rest], ["fire", l.fire], ...Object.entries(l.buttons)]
+for (const id of TOUCH_LAYOUT_IDS) for (const [width, height] of [[390, 844], [844, 390], [360, 640], [640, 360], [768, 1024], [1024, 768]]) {
+  test(`layout ${id} at ${width}x${height}: every control fits on the canvas and none covers another`, () => {
+    const l = touchLayout({ width, height }, NO_INSETS, id)
+    const circles: [string, Circle][] = [["stick", l.stick.rest], ["fire", l.fire], ...(l.leftFire ? [["leftFire", l.leftFire] as [string, Circle]] : []), ...Object.entries(l.buttons)]
     const boxes: [string, { left: number; top: number; width: number; height: number }][] = [
       ...circles.map(([n, c]): [string, { left: number; top: number; width: number; height: number }] => [n, { left: c.x - c.r, top: c.y - c.r, width: 2 * c.r, height: 2 * c.r }]),
       ["weapon", l.weapon]
@@ -584,15 +585,15 @@ const NOTCH: Record<"portrait" | "landscape", Insets> = {
 const box = (c: Circle): Rect => ({ left: c.x - c.r, top: c.y - c.r, width: 2 * c.r, height: 2 * c.r })
 const meets = (a: Rect, b: Rect) => a.left < b.left + b.width && b.left < a.left + a.width && a.top < b.top + b.height && b.top < a.top + a.height
 
-for (const [width, height] of [[390, 844], [844, 390], [360, 640], [640, 360], [820, 1180], [1180, 820]]) {
+for (const id of TOUCH_LAYOUT_IDS) for (const [width, height] of [[390, 844], [844, 390], [360, 640], [640, 360], [820, 1180], [1180, 820]]) {
   // Phones with a notch are tall ones: 640x360 has none.
   for (const notch of Math.max(width, height) >= 800 ? [false, true] : [false]) {
     const insets = notch ? NOTCH[height > width ? "portrait" : "landscape"] : { top: 0, right: 0, bottom: 0, left: 0 }
-    test(`at ${width}x${height}${notch ? " with a notch" : ""} the controls keep to the safe area and leave the HUD a free area`, () => {
-      const l = touchLayout({ width, height }, insets)
+    test(`layout ${id} at ${width}x${height}${notch ? " with a notch" : ""}: the controls keep to the safe area and leave the HUD a free area`, () => {
+      const l = touchLayout({ width, height }, insets, id)
       const safe: Rect = { left: insets.left, top: insets.top, width: width - insets.left - insets.right, height: height - insets.top - insets.bottom }
       const inside = (r: Rect) => r.left >= safe.left && r.top >= safe.top && r.left + r.width <= safe.left + safe.width && r.top + r.height <= safe.top + safe.height
-      const controls: [string, Rect][] = [["stick", box(l.stick.rest)], ["fire", box(l.fire)], ...Object.entries(l.buttons).map(([n, c]): [string, Rect] => [n, box(c)]), ["weapon", l.weapon]]
+      const controls: [string, Rect][] = [["stick", box(l.stick.rest)], ["fire", box(l.fire)], ...(l.leftFire ? [["leftFire", box(l.leftFire)] as [string, Rect]] : []), ...Object.entries(l.buttons).map(([n, c]): [string, Rect] => [n, box(c)]), ["weapon", l.weapon]]
       for (const [name, r] of [...controls, ["free", l.free] as [string, Rect]]) expect({ name, inside: inside(r) }).toEqual({ name, inside: true })
       // No HUD element under a control: the free area meets none of them.
       for (const [name, r] of controls) expect({ name, clear: !meets(l.free, r) }).toEqual({ name, clear: true })
@@ -601,7 +602,10 @@ for (const [width, height] of [[390, 844], [844, 390], [360, 640], [640, 360], [
       expect(l.free.height).toBeGreaterThanOrEqual(safe.height * (l.portrait ? 0.5 : 0.85))
       if (l.portrait) {
         // The controls take the lower third, give or take a home indicator; the HUD sits above them.
-        const below = controls.filter(([n]) => n !== "menu" && n !== "board" && n !== "phrases")
+        // Only the corner buttons (and in B the weapon's name) sit on the top row, above the HUD.
+        const top = controls.filter(([, r]) => r.top + r.height <= l.free.top)
+        expect(top.map(([n]) => n).sort()).toEqual(id === "b" ? ["board", "menu", "phrases", "weapon"] : ["board", "menu", "phrases"])
+        const below = controls.filter((c) => !top.includes(c))
         for (const [name, r] of below) expect({ name, low: r.top >= safe.top + safe.height * 0.6 }).toEqual({ name, low: true })
         for (const [, r] of below) expect(l.free.top + l.free.height).toBeLessThanOrEqual(r.top)
       }
@@ -646,3 +650,195 @@ test("while touch drives the match, a stray key does not change what the prompts
   expect(c.touchActive).toBe(true)
   expect(c.device).toBe("touch")
 })
+
+// ---------------------------------------------------------------- layouts B and C
+// Under trial until the owner picks one (#35); the layouts not kept lose their tests here (#36).
+
+test("?touch= picks the layout, read from the page's query; without one, or with an unknown one, it is A", () => {
+  expect(touchLayoutFromUrl("")).toBe("a")
+  expect(touchLayoutFromUrl("?touch=a")).toBe("a")
+  expect(touchLayoutFromUrl("?touch=b")).toBe("b")
+  expect(touchLayoutFromUrl("?p=ABCD&touch=C")).toBe("c")
+  expect(touchLayoutFromUrl("?touch=z")).toBe("a")
+})
+
+test("the controls lay out the layout they were made with", () => {
+  expect(phone(undefined, "a").c.relayout(size).leftFire).toBe(null)
+  expect(phone(undefined, "b").c.relayout(size).leftFire).not.toBe(null)
+  expect(phone(undefined, "c").c.relayout(size).autoFire).toBe(true)
+})
+
+for (const [width, height] of [[844, 390], [390, 844]]) {
+  test(`layout B at ${width}x${height}: either fire button shoots, and the right thumb looks without touching one`, () => {
+    const { c, finger, layout } = phone(undefined, "b")
+    size.width = width
+    size.height = height
+    const l = layout()
+    const left = l.leftFire!
+    expect(left.x).toBeLessThan(width / 2)
+    expect(l.fire.x).toBeGreaterThan(width / 2)
+    finger(1).down(left.x, left.y)
+    expect(c.isHeld("fire")).toBe(true)
+    finger(1).up(left.x, left.y)
+    expect(c.isHeld("fire")).toBe(false)
+    c.buttons()
+    finger(2).down(l.fire.x, l.fire.y)
+    expect(c.isHeld("fire")).toBe(true)
+    finger(2).up(l.fire.x, l.fire.y)
+    c.buttons()
+    // The right thumb on empty screen above its buttons: it looks, and fires nothing.
+    const look = finger(3)
+    look.down(width * 0.75, l.free.top + 10)
+    look.move(width * 0.75 + 60, l.free.top + 10)
+    expect(c.yaw).toBeLessThan(-0.2)
+    expect(c.buttons() & BUTTON.fire).toBe(0)
+    // The left thumb holds fire and the right one looks at once.
+    finger(1).down(left.x, left.y)
+    look.move(width * 0.75, l.free.top + 10)
+    expect(c.isHeld("fire")).toBe(true)
+    expect(c.yaw).toBeCloseTo(0, 6)
+  })
+}
+
+for (const id of ["b", "c"] as const) {
+  test(`layout ${id}: the stick is fixed, and a thumb landing beside its centre tilts it at once`, () => {
+    const { c, finger, layout, view } = phone(undefined, id)
+    const { rest, radius } = layout().stick
+    const thumb = finger(1)
+    thumb.down(rest.x, rest.y - radius)
+    expect(c.move().mz).toBeCloseTo(1, 5)
+    expect(view().stick.ox).toBe(rest.x)
+    expect(view().stick.oy).toBe(rest.y)
+    thumb.move(rest.x + radius / 2, rest.y)
+    expect(c.move().mx).toBeGreaterThan(0.3)
+    expect(c.move().mz).toBeCloseTo(0, 5)
+    thumb.up()
+    expect(c.move()).toEqual({ mx: 0, mz: 0 })
+    // Far from the stick, a thumb on the left looks.
+    const far = finger(2)
+    far.down(rest.x, rest.y - radius * 3.2)
+    far.move(rest.x + 60, rest.y - radius * 3.2)
+    expect(c.move()).toEqual({ mx: 0, mz: 0 })
+    expect(c.yaw).toBeLessThan(-0.2)
+  })
+
+  test(`layout ${id}: every action A has is reachable`, () => {
+    const { c, calls, finger, layout, tap } = phone(undefined, id)
+    // Fire, as layout C does it for a weapon it does not fire by itself.
+    c.track(player({ arsenal: { ...freshArsenal("cramar"), current: id === "c" ? "mescul" : "cramar" }, nearTurret: true }))
+    tap(layout().fire)
+    expect(c.buttons() & BUTTON.fire).toBe(BUTTON.fire)
+    for (const b of ["jump", "reload", "bomb", "mine", "use"] as const) {
+      tap(layout().buttons[b])
+      expect({ b, on: (c.buttons() & BUTTON[b]) !== 0 }).toEqual({ b, on: true })
+    }
+    tap(layout().buttons.aim)
+    expect(c.isHeld("aim")).toBe(true)
+    tap(layout().buttons.crouch)
+    expect(c.isHeld("crouch")).toBe(true)
+    for (const b of ["menu", "board", "phrases"] as const) tap(layout().buttons[b])
+    tap(centre(layout().weapon))
+    expect(calls).toEqual(["pause", "Tab:down", "KeyV:down", "KeyV:up", "wheel1"])
+    const name = centre(layout().weapon)
+    finger(6).down(name.x, name.y)
+    c.poll(0.6)
+    finger(6).up(name.x, name.y)
+    const entry = centre(layout().picker[1])
+    tap(entry)
+    expect(calls.at(-1)).toBe("slot2")
+    expect(c.yaw).toBe(0)
+  })
+}
+
+/** A player holding `current`, with the Cramar as primary. */
+const holding = (current: WeaponId, over: Partial<Tracked> = {}) => player({ arsenal: { ...freshArsenal("cramar"), current }, ...over })
+
+for (const [width, height] of [[390, 844], [844, 390]]) {
+  test(`layout C at ${width}x${height}: a gun fires only while an enemy is under the crosshair, and no fire control is shown for it`, () => {
+    const { c, finger, layout, tap, view } = phone(undefined, "c")
+    size.width = width
+    size.height = height
+    c.track(holding("cramar"))
+    expect(c.autoFiring).toBe(false) // not before touch drives the match
+    finger(2).down(width * 0.75, height * 0.3)
+    finger(2).up()
+    expect(c.autoFiring).toBe(true)
+    expect(view().fireShown).toBe(false)
+    tap(layout().fire) // where the manual fire would be: only look
+    expect(c.buttons() & BUTTON.fire).toBe(0)
+    c.sight(true)
+    expect(c.buttons() & BUTTON.fire).toBe(BUTTON.fire)
+    expect(c.buttons() & BUTTON.fire).toBe(BUTTON.fire) // an automatic weapon keeps firing
+    c.sight(false)
+    expect(c.buttons() & BUTTON.fire).toBe(0)
+  })
+}
+
+test("layout C: a semi-automatic weapon is pressed anew for each shot while the enemy stays under the crosshair", () => {
+  const { c, finger } = phone(undefined, "c")
+  c.track(holding("mandi"))
+  finger(2).down(600, 100)
+  c.sight(true)
+  const ticks = Array.from({ length: 4 }, () => c.buttons() & BUTTON.fire)
+  expect(ticks).toEqual([BUTTON.fire, 0, BUTTON.fire, 0])
+})
+
+test("layout C never moves the aim", () => {
+  const { c, finger } = phone(undefined, "c")
+  c.track(holding("cramar"))
+  finger(2).down(600, 100)
+  finger(2).move(640, 80)
+  const { yaw, pitch } = c
+  for (const on of [true, true, false, true]) {
+    c.sight(on)
+    c.buttons()
+    c.poll(1 / 60)
+  }
+  expect(c.yaw).toBe(yaw)
+  expect(c.pitch).toBe(pitch)
+})
+
+for (const [what, tracked] of [
+  ["the mescul", holding("mescul")],
+  ["the Lanciafrico", holding("lanciafrico")],
+  ["a mounted mitraie", holding("cramar", { mounted: true })]
+] as const) {
+  test(`layout C: ${what} does not fire by itself; a manual fire is shown for it`, () => {
+    const { c, finger, layout, view } = phone(undefined, "c")
+    c.track(tracked)
+    finger(2).down(600, 100)
+    finger(2).up()
+    expect(c.autoFiring).toBe(false)
+    expect(view().fireShown).toBe(true)
+    c.sight(true)
+    expect(c.buttons() & BUTTON.fire).toBe(0)
+    const fire = layout().fire
+    finger(3).down(fire.x, fire.y)
+    expect(c.buttons() & BUTTON.fire).toBe(BUTTON.fire)
+  })
+}
+
+test("layout C: nothing fires by itself once the player is dead or touch stops driving the match", () => {
+  const { c, finger } = phone(undefined, "c")
+  c.track(holding("cramar"))
+  finger(2).down(600, 100)
+  c.sight(true)
+  c.track(holding("cramar", { alive: false }))
+  expect(c.buttons() & BUTTON.fire).toBe(0)
+  c.track(holding("cramar"))
+  finger(9, "mouse").down(400, 200)
+  expect(c.autoFiring).toBe(false)
+  expect(c.buttons() & BUTTON.fire).toBe(0)
+})
+
+for (const id of ["a", "b"] as const) {
+  test(`layout ${id}: nothing fires by itself, and fire is always shown`, () => {
+    const { c, finger, view } = phone(undefined, id)
+    c.track(holding("cramar"))
+    finger(2).down(600, 100)
+    expect(c.autoFiring).toBe(false)
+    expect(view().fireShown).toBe(true)
+    c.sight(true)
+    expect(c.buttons() & BUTTON.fire).toBe(0)
+  })
+}
