@@ -353,6 +353,9 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
     #pause .overlay-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 0 16px; }
     #pause .overlay-body > :is(.pause-reach, .pause-code) { grid-column: 1 / -1; }
     #pause .overlay-body > :is(.host-tools, .host-only) { margin-block-start: 10px; }
+    /* The four bot buttons on one row, so the bot skill stays in view too. */
+    #pause .host-bots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    #pause .host-bots button { padding-inline: 4px; font-size: 13px; }
   }
 }
 
