@@ -6,13 +6,13 @@ import * as THREE from "three"
 import { BOT_LEVEL_IDS, QUICK_CHAT, TEAM_INFO, type BotLevel } from "../shared/folklore.ts"
 import { rayPose } from "../shared/hitbox.ts"
 import { BUTTON, IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
-import { freeTurretInReach, turretAim, turretSeat, type MapId, type PickupKind, type Team } from "../shared/map.ts"
+import { facesPanel, freeTurretInReach, turretAim, turretSeat, type MapId, type PickupKind, type Team } from "../shared/map.ts"
 import { DISCO } from "../shared/maps/maran.ts"
 import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, seatedBody, sprinting } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
-import { outsideStorm, owned, RAISE_TICKS, weaponInSlot } from "../shared/sim/rules.ts"
+import { outsideStorm, owned, RAISE_TICKS, speedScale, weaponInSlot } from "../shared/sim/rules.ts"
 import { isTraining } from "../shared/training/index.ts"
 import { closedGates, viewedStation } from "../shared/training/gates.ts"
 import type { InterfaceAction } from "../shared/training/interface.ts"
@@ -24,7 +24,7 @@ import { WEAPONS, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
 import { Controls, trackedIn } from "./controls.ts"
-import { boardHtml, esc, Hud, rosterHtml } from "./hud.ts"
+import { boardHtml, esc, fmtClock, Hud, rosterHtml } from "./hud.ts"
 import { t } from "./i18n.ts"
 import type { Look } from "./looks.ts"
 import type { Menu } from "./menu.ts"
@@ -40,7 +40,7 @@ import "@ui-sdk/web/dialog"
 import "@ui-sdk/web/select"
 import { takeAwayDeparted } from "./bodies.ts"
 import { alwaysChosen } from "./choice.ts"
-import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, musterFocus, musterTeams, type MatchMenu } from "./match-menus.ts"
+import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, musterFocus, musterScreen, musterTeams, type MatchMenu, type MusterScreen } from "./match-menus.ts"
 import { pickerEntries } from "./touch.ts"
 import { onViewportChange } from "./viewport.ts"
 
@@ -188,6 +188,10 @@ export class Game {
   private pauseHost: boolean | null = null
   /** Whether the Muster was last drawn for the host (start and the host tools), null before it is drawn. */
   private musterHost: boolean | null = null
+  /** The Muster screen last drawn (the Muster, or joining a match already on), null before it is drawn. */
+  private musterDrawn: string | null = null
+  /** The match's score and time last written on the joining screen. */
+  private musterMatch = ""
   /** The room's last chat messages, drawn in the Muster. */
   private musterChat: string[] = []
   /** Where the armoury was opened from: Esc goes back there. */
@@ -300,6 +304,8 @@ export class Game {
     this.entering = false
     this.lastPhase = ""
     this.musterHost = null
+    this.musterDrawn = null
+    this.musterMatch = ""
     this.musterChat = []
     this.clock = new MatchClock(() => performance.now())
     this.applySettings()
@@ -310,8 +316,9 @@ export class Game {
     this.controls.inMatch = true
     document.documentElement.classList.add("in-match")
     this.placeTouch()
-    // A room opens on its Muster: the pointer stays free for its screen, which the first snapshot opens.
-    if (room.phase === "Muster") return
+    // A room opens on its Muster, and a match already on on the Muster screen until the player
+    // enters: the pointer stays free for its screen, which the first snapshot opens.
+    if (musterScreen(room, me, room.phase).tag !== "closed") return
     if (!this.choosing) this.controls.lock()
     this.hud.announce(t().modes[room.mode].name, t().modes[room.mode].rules)
   }
@@ -434,12 +441,29 @@ export class Game {
     }
     if (this.overlay === "pause") this.renderPause()
     if (this.snap?.phase.tag === "Over") this.renderEnd()
-    if (this.inMuster) this.renderMuster()
+    // Having entered a match already on closes the Muster screen; its roster changes redraw it.
+    const was = this.musterDrawn !== null
+    this.syncMusterScreen()
+    if (this.inMuster) this.renderMuster(!was)
   }
 
-  /** The room is in its Muster: nobody on the map, its screen open. */
+  /** The Muster screen this player sees: the room's Muster, joining a match already on, or none. */
+  private get musterView(): MusterScreen {
+    return this.snap && this.room ? musterScreen(this.room, this.me, this.snap.phase.tag) : { tag: "closed" }
+  }
+
+  /** The Muster screen is open: nobody on the map in the Muster, and not this player while they choose before entering. */
   private get inMuster() {
-    return this.snap?.phase.tag === "Muster"
+    return this.musterView.tag !== "closed"
+  }
+
+  /** The Muster screen stands in for the world: the HUD's readouts go, and the world is not drawn (`render`). */
+  private syncMusterScreen() {
+    const open = this.inMuster
+    document.documentElement.classList.toggle("in-muster", open)
+    if (open) return
+    $<DialogElement>(MENU_PARTS.muster[0]).open = false
+    this.musterDrawn = null
   }
 
   private onSnapshot(s: Snapshot) {
@@ -460,6 +484,8 @@ export class Game {
     this.snap = s
     // Broken-down doors no longer stop predicted movement or shots.
     this.physics.setDoors(s.doors.map((hp) => hp > 0))
+    // A panel torn off leaves its gap: predicted shots pass through it (bodies still cannot).
+    this.physics.setPanels(s.panels.map((p) => p.tag !== "off"))
     // The training's closed ways stop predicted movement as they stop it on the host.
     const gates = this.physics.map.gates?.length ?? 0
     const at = viewedStation(s.training)
@@ -494,7 +520,13 @@ export class Game {
       this.seated = you.alive && this.mounted() >= 0
       const mounted = this.mounted() >= 0
       const body = this.predictor.body
-      this.controls.track(trackedIn(s, this.me, { mounted, freeTurret: body !== null && freeTurretInReach(this.physics.map.turrets, s.turrets, body) >= 0 }))
+      this.controls.track(
+        trackedIn(s, this.me, {
+          mounted,
+          freeTurret: body !== null && freeTurretInReach(this.physics.map.turrets, s.turrets, body) >= 0,
+          panel: you.alive && body !== null && this.panelToTear(s, body) >= 0
+        })
+      )
       // The server has already seen my last weapon switch and holds a different one: it
       // switched it itself (lanciafrico pickup, armoury, respawn) or rejected the switch. Follow it.
       const server = you.arsenal.current
@@ -505,6 +537,7 @@ export class Game {
     }
     for (const e of s.ev) this.event(e)
     if (prev?.phase.tag !== s.phase.tag) this.phaseChanged(s)
+    if (this.musterView.tag === "joining") this.renderMusterMatch(s)
     // Entered with progress: the station list, as soon as the trainee is there. Opening it pauses the training.
     if (this.choosing && you?.alive && s.training?.tag === "station") {
       this.choosing = false
@@ -519,16 +552,16 @@ export class Game {
     const tag = s.phase.tag
     if (tag === this.lastPhase) return
     this.lastPhase = tag
-    // The Muster's screen stands in for the world: the HUD's readouts go, and the world is not drawn (`render`).
-    document.documentElement.classList.toggle("in-muster", tag === "Muster")
-    if (tag !== "Muster") $<DialogElement>(MENU_PARTS.muster[0]).open = false
+    this.syncMusterScreen()
     if (tag === "Over") {
       if (document.pointerLockElement) document.exitPointerLock()
       this.renderEnd(true)
     } else {
       $<DialogElement>(MENU_PARTS.end[0]).open = false
-      if (tag === "Live" && this.overlay === "none" && !this.choosing) this.controls.lock()
+      if (tag === "Live" && this.overlay === "none" && !this.choosing && !this.inMuster) this.controls.lock()
     }
+    // Joined a match already on: the Muster screen, to choose before entering.
+    if (tag === "Live" && this.inMuster) this.renderMuster(true)
     if (tag === "Muster") {
       if (document.pointerLockElement) document.exitPointerLock()
       if (this.chatting) this.closeChat()
@@ -659,6 +692,15 @@ export class Game {
         if (broken) this.hud.announce(t().game.doorBroken(this.names.get(e.s) ?? "?"), t().game.doorSub)
         return
       }
+      case "panel": {
+        const panel = this.physics.map.panels?.[e.i]
+        if (!panel) return
+        const at: P3 = [(panel.min[0] + panel.max[0]) / 2, (panel.min[1] + panel.max[1]) / 2, (panel.min[2] + panel.max[2]) / 2]
+        fx.splinters(at, true)
+        audio.play("door_break", { at })
+        this.hud.announce(t().game.panelTorn(this.names.get(e.s) ?? "?"), t().game.panelSub)
+        return
+      }
       case "bounce":
         audio.play("bounce", { at: e.p, volume: 0.6 })
         return
@@ -774,6 +816,19 @@ export class Game {
   }
 
   /** The turret I'm using, or -1. */
+  /**
+   * The panel holding "use" would tear off now, as the simulation decides it (`TearPanels`): on its
+   * wall or being torn by me, faced from inside with slot 3 free. -1 when none.
+   */
+  private panelToTear(s: Snapshot, body: { readonly x: number; readonly y: number; readonly z: number }): number {
+    const defs = this.physics.map.panels ?? []
+    if (defs.length === 0 || s.you?.arsenal.power !== null) return -1
+    return defs.findIndex((def, i) => {
+      const state = s.panels[i]
+      return state !== undefined && (state.tag === "wall" || (state.tag === "tearing" && state.by === this.me)) && facesPanel(def, body, this.controls.yaw)
+    })
+  }
+
   private mounted() {
     return this.snap?.turrets.findIndex((t) => t.gunner === this.me) ?? -1
   }
@@ -1145,9 +1200,11 @@ export class Game {
    */
   private renderMuster(full = false) {
     const room = this.room
-    if (!room || !this.inMuster) return
+    const view = this.musterView
+    if (!room || view.tag === "closed") return
     const host = room.hostId === this.me
-    if (full || host !== this.musterHost) this.buildMuster(room, host)
+    const drawn = JSON.stringify(view)
+    if (full || host !== this.musterHost || drawn !== this.musterDrawn) this.buildMuster(room, host, view)
     const s = t()
     const teams = musterTeams(room)
     $("m-roster").innerHTML = (["benandanti", "malandanti"] as const)
@@ -1162,9 +1219,12 @@ export class Game {
     if (host) this.syncLevel("m", room)
   }
 
-  private buildMuster(room: RoomInfo, host: boolean) {
+  private buildMuster(room: RoomInfo, host: boolean, view: Exclude<MusterScreen, { tag: "closed" }>) {
     const wasOpen = $<DialogElement>(MENU_PARTS.muster[0]).open
     this.musterHost = host
+    this.musterDrawn = JSON.stringify(view)
+    this.musterMatch = ""
+    const joining = view.tag === "joining"
     const s = t()
     const p = s.pause
     const m = s.muster
@@ -1172,6 +1232,7 @@ export class Game {
       <div class="overlay-body">
         <div class="muted pause-reach">${s.modes[room.mode].name} · ${s.maps[room.map].name} · ${s.menu.minutes(room.minutes)}</div>
         ${this.roomCodeHtml("m", room)}
+        ${joining ? `<div class="muster-match" id="m-match" aria-live="off"></div>${view.nextMatch ? `<p class="muster-note">${m.nextMatch}</p>` : ""}` : ""}
         <div class="roster" id="m-roster"></div>
         ${host ? `<div class="host-tools"><span class="host-label">👑 ${p.host}</span>${this.botToolsHtml("m", room)}</div>` : `<div class="muted host-only">${p.hostOnly}</div>`}
         <h3>${m.primary}</h3>
@@ -1181,7 +1242,7 @@ export class Game {
         <input id="m-chat" class="muster-chat-input" maxlength="120" placeholder="${m.chatPlaceholder}" aria-label="${m.chat}" />
       </div>
       <div class="row overlay-actions">
-        ${host ? `<button id="m-start" class="primary">${p.start}</button>` : ""}
+        ${joining ? `<button id="m-enter" class="primary">${m.enter}</button>` : host ? `<button id="m-start" class="primary">${p.start}</button>` : ""}
         <button id="m-team"></button>
         <button id="m-leave">${p.leave}</button>
       </div>`)
@@ -1204,8 +1265,16 @@ export class Game {
       this.d.net.send({ t: "leave" })
       this.d.onLeave()
     }
-    if (host) {
-      this.bindBotTools(el, "m")
+    if (joining) {
+      $("m-enter").onclick = () => {
+        this.d.net.send({ t: "enter" })
+        // Still inside the press: the one moment the browser grants the pointer lock the match needs.
+        this.controls.lock()
+      }
+      if (this.snap) this.renderMusterMatch(this.snap)
+    }
+    if (host) this.bindBotTools(el, "m")
+    if (host && !joining) {
       $("m-start").onclick = () => {
         this.d.net.send({ t: "start" })
         // Still inside the press: the one moment the browser grants the pointer lock the match needs.
@@ -1213,6 +1282,23 @@ export class Game {
       }
     }
     if (!wasOpen) this.openMenu(...MENU_PARTS.muster, musterFocus({ host, reach: room.reach }))
+  }
+
+  /** Joining a match already on: its score and the time left, written only when they change. */
+  private renderMusterMatch(snap: Snapshot) {
+    const el = document.getElementById("m-match")
+    const room = this.room
+    if (!el || !room || snap.phase.tag !== "Live") return
+    const s = t()
+    const clock = fmtClock(snap.phase.ends - snap.tick)
+    const pct = room.mode === "cjar" ? "%" : ""
+    const text =
+      room.mode === "tampieste"
+        ? `${s.hud.alive(snap.players.filter((p) => p.f & FLAG_BIT.alive).length)} · ${clock}`
+        : `${s.teams.benandanti.name} ${snap.score.benandanti}${pct} – ${snap.score.malandanti} ${s.teams.malandanti.name} · ${clock}`
+    if (text === this.musterMatch) return
+    this.musterMatch = text
+    el.textContent = text
   }
 
   private renderMusterChat() {
@@ -1348,11 +1434,12 @@ export class Game {
 
   // ---------------------------------------------------------------- fixed tick
 
+  /** The simulation's own speed: the class, the weapon asked for, the sgnape, the frico carried. */
   private speedScale() {
     const you = this.you()
     if (!you) return 1
-    const a = you.arsenal
-    return WEAPONS[this.wanted].moveScale * (a.sgnape > 0 ? 1.3 : 1) * (this.snap?.players.find((p) => p.id === this.me && p.f & FLAG_BIT.carrier) ? 0.9 : 1)
+    const carrier = this.snap?.players.some((p) => p.id === this.me && p.f & FLAG_BIT.carrier) ?? false
+    return speedScale(you.arsenal, this.wanted, carrier)
   }
 
   private fixedStep() {
@@ -1361,7 +1448,7 @@ export class Game {
     let buttons = c.buttons()
     const you = this.you()
     // Outside a live match (the Muster, the results) nobody moves or fires.
-    const over = this.snap?.phase.tag !== "Live"
+    const over = this.snap?.phase.tag !== "Live" || this.inMuster
     if (over || this.overlay !== "none") buttons = 0
     // At the turret the view stays within the arc the gun can turn through.
     const turret = you?.alive ? this.mounted() : -1
@@ -1754,6 +1841,7 @@ export class Game {
           }
         }),
         doors: s.doors.map((hp, i) => hp / (this.physics.map.doors[i]?.hp ?? 1)),
+        panels: s.panels.map((p) => (p.tag === "off" ? null : p.tag === "tearing" ? p.progress : 0)),
         gates: this.gates,
         camera
       })
@@ -1779,12 +1867,15 @@ export class Game {
       // At the turret: the heat. Near a free one: the key to mount it (the same decision as the touch "use" button).
       const gun = turret >= 0 ? s?.turrets[turret] ?? null : null
       this.hud.turret(gun ? { heat: gun.heat, jammed: gun.jammed } : null, this.controls.turretControl === "use", this.controls.device)
+      // Facing the casot's panel: the control to hold, and how far my tear has got (the same decision as the touch "use" button).
+      const tearing = s?.panels.find((p) => p.tag === "tearing" && p.by === this.me)
+      this.hud.panel(this.controls.turretControl === "tear", tearing?.tag === "tearing" ? tearing.progress : 0, this.controls.device)
       const speed = b ? Math.hypot(b.vx, b.vz) : 0
       const spread = aiming ? def.spread.aimed : speed > 1.5 || !b?.grounded ? def.spread.moving : def.spread.still
       const px = (Math.tan(spread) / Math.tan(((camera.fov / 2) * Math.PI) / 180)) * (innerHeight / 2)
       this.hud.crosshair(Math.min(60, px * 1.6), view.crosshair)
     }
-    const free = this.overlay === "none" && !this.chatting && s?.phase.tag === "Live" && !this.trainingEnded
+    const free = this.overlay === "none" && !this.chatting && s?.phase.tag === "Live" && !this.trainingEnded && !this.inMuster
     const device = this.controls.device
     this.hud.clickToPlay(!this.controls.active && free && !this.boardOpen, device)
     this.hud.layFor(device)

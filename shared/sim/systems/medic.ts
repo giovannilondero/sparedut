@@ -1,8 +1,8 @@
 /**
- * The medic: whoever has the Cassele dal Miedi as primary weapon slowly heals themselves
+ * The medic, the Miedi class's trait: whoever has the Cassele dal Miedi as primary slowly heals themselves
  * and nearby teammates. It only sends heals: `ApplyDamage` applies them.
  */
-import { MEDIC_AURA } from "../../weapons.ts"
+import { CLASSES, MEDIC_AURA } from "../../weapons.ts"
 import { allied } from "../rules.ts"
 import { Arsenal, Game, Heal, Life, Match, Motion, Player, Rules, TeamOf, Tick } from "../schema.ts"
 
@@ -30,7 +30,7 @@ export const MedicAura = Game.System(
     const rules = resources.rules.get()
     const living = queries.players.each().filter((m) => data.life.get(m)._tag === "Alive")
     for (const medic of living) {
-      if (data.arsenal.get(medic).primary !== "miedi") continue
+      if (CLASSES[data.arsenal.get(medic).primary].trait !== "medic") continue
       const healer = data.player.get(medic).session
       const team = data.team.get(medic)
       const at = data.motion.get(medic).body

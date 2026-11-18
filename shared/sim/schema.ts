@@ -12,7 +12,7 @@ import type { MapId, Team, V3 } from "../map.ts"
 import type { Body } from "../movement.ts"
 import type { PhysicsWorld } from "../physics.ts"
 import type { ModeId, ObjectiveId } from "../folklore.ts"
-import type { PrimaryId, ProjectileKind, WeaponId } from "../weapons.ts"
+import type { PowerId, PrimaryId, ProjectileKind, WeaponId } from "../weapons.ts"
 import type { InterfaceAction } from "../training/interface.ts"
 import type { StationId, StepId } from "../training/index.ts"
 import type { Device } from "../devices.ts"
@@ -105,7 +105,8 @@ export interface ArsenalValue {
   readonly primary: PrimaryId
   /** The primary weapon chosen for the next respawn. */
   readonly nextPrimary: PrimaryId
-  readonly launcher: boolean
+  /** What is carried in slot 3: the Lanciafrico or the casot's panel, never both; null when nothing. */
+  readonly power: PowerId | null
   readonly ammo: Readonly<Record<WeaponId, Ammo>>
   readonly action: WeaponAction
   readonly bombs: number
@@ -223,6 +224,17 @@ export const Turrets = Descriptor.Resource<ReadonlyArray<TurretState>>()("Spared
 /** Health of the breakable doors (one per `map.doors`): 0 means broken down. */
 export const Doors = Descriptor.Resource<ReadonlyArray<number>>()("Sparedut/Doors")
 
+/**
+ * A panel (one per `map.panels`): on the wall, being torn off by one player (`ticks` of "use" held
+ * so far), or off the wall, leaving its gap, until the next match. Once off it is in its
+ * carrier's arsenal (`ArsenalValue.power`), not here.
+ */
+export type PanelState =
+  | { readonly _tag: "wall" }
+  | { readonly _tag: "tearing"; readonly by: string; readonly ticks: number }
+  | { readonly _tag: "off" }
+export const Panels = Descriptor.Resource<ReadonlyArray<PanelState>>()("Sparedut/Panels")
+
 export type PickupState = { readonly _tag: "up" } | { readonly _tag: "down"; readonly ticks: number }
 /** One per `PICKUPS` point, in the same order. */
 export const Pickups = Descriptor.Resource<ReadonlyArray<PickupState>>()("Sparedut/Pickups")
@@ -293,7 +305,7 @@ export const Game = Schema.bind(
   Schema.fragment({
     components: { Player, TeamOf, Post, Motion, Controls, Life, Arsenal, Stats, Attackers, Projectile },
     requires: [Schema.requires(Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers)],
-    resources: { Rules, Objective, Tick, Score, Flags, Hill, Cart, StormCourse, Pickups, Turrets, Doors, History, Rng },
+    resources: { Rules, Objective, Tick, Score, Flags, Hill, Cart, StormCourse, Pickups, Turrets, Doors, Panels, History, Rng },
     events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, ReportInterface, GoToStation, StepUnavailable, Damage, Heal, DoorHit, Out }
   }),
   Root

@@ -56,3 +56,17 @@ export function musterTeams(room: Pick<RoomInfo, "hostId" | "roster">): Record<T
  * does not start a match others are still choosing for.
  */
 export const musterFocus = (who: { readonly host: boolean; readonly reach: Reach }): string | null => (who.host && who.reach === "offline" ? "m-start" : null)
+
+/**
+ * The Muster screen a member sees, if any. `muster`: the room is in its Muster. `joining`: they
+ * joined a live match and have not entered it, so they choose, see the score and the time, and
+ * confirm; `nextMatch` when entering now plays from the next match (the Tampieste has one life).
+ * During the results the end screen shows instead, for everybody.
+ */
+export type MusterScreen = { readonly tag: "closed" } | { readonly tag: "muster" } | { readonly tag: "joining"; readonly nextMatch: boolean }
+
+export function musterScreen(room: Pick<RoomInfo, "roster" | "mode">, me: string, phase: RoomInfo["phase"]): MusterScreen {
+  if (phase === "Muster") return { tag: "muster" }
+  if (phase === "Live" && room.roster.find((r) => r.id === me)?.onMap === false) return { tag: "joining", nextMatch: room.mode === "tampieste" }
+  return { tag: "closed" }
+}

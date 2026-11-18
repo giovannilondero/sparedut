@@ -9,7 +9,7 @@ import { turretRestSeat } from "../shared/map.ts"
 import { SAGRE, SAGRE_STATIONS } from "../shared/maps/sagre.ts"
 import { initPhysics } from "../shared/physics.ts"
 import type { GameEvent } from "../shared/sim/events.ts"
-import { MAX_HP } from "../shared/sim/rules.ts"
+import { maxHp } from "../shared/sim/rules.ts"
 import { STATION_IDS, type StationId } from "../shared/training/index.ts"
 import { WEAPONS } from "../shared/weapons.ts"
 import { harness } from "./harness.ts"
@@ -69,7 +69,7 @@ describe("station 8: pickups", () => {
   test("the player arrives hurt, without armour and low on ammunition, with every pickup there", () => {
     const { snap } = reach("pickups")
     const you = snap().you!
-    expect(you.hp).toBeLessThan(MAX_HP)
+    expect(you.hp).toBeLessThan(maxHp(you.arsenal.primary))
     expect(you.armor).toBe(0)
     expect(you.arsenal.ammo.cramar.reserve).toBeLessThan(WEAPONS.cramar.reserve)
     expect(you.arsenal.bombs).toBe(0)
@@ -178,12 +178,12 @@ describe("station 9: the turret and the Lanciafrico", () => {
     drive(10, tap(BUTTON.use), (e) => e.some((x) => x.t === "turret" && x.a === "on"))
     drive(60 * 10, () => ({ yaw: TURRET.yaw, buttons: BUTTON.fire }), (e) => e.some((x) => x.t === "turret" && x.a === "hot"))
     drive(10, tap(BUTTON.use), (e) => e.some((x) => x.t === "turret" && x.a === "off"))
-    expect(snap().you!.arsenal.launcher).toBe(false)
+    expect(snap().you!.arsenal.power).toBeNull()
 
     const picked = walkTo(LANCIAFRICO)
     expect(picked).toContainEqual(expect.objectContaining({ t: "pick", k: "lanciafrico" }))
     expect(steps(picked)).toEqual(["pickLanciafrico"])
-    expect(snap().you!.arsenal).toMatchObject({ launcher: true, current: "lanciafrico" })
+    expect(snap().you!.arsenal).toMatchObject({ power: "lanciafrico", current: "lanciafrico" })
 
     // One press, one frico: it is not automatic.
     const fired = drive(60 * 3, (i) => ({ ...tap(BUTTON.fire)(i), weapon: "lanciafrico" }), (e) => e.some((x) => x.t === "training" && x.a === "station"))
@@ -238,12 +238,12 @@ describe("entering a station again", () => {
     const index = SAGRE_STATIONS.turret.lanciafrico
     const { me, snap, walkTo, drive } = reach("turret", true)
     walkTo(LANCIAFRICO)
-    expect(snap().you!.arsenal.launcher).toBe(true)
+    expect(snap().you!.arsenal.power).toBe("lanciafrico")
     expect(snap().pickups[index]).toBe("0")
     me.say({ t: "goTo", station: "turret" })
     drive(6, () => ({}))
     expect(snap().pickups[index]).toBe("1")
-    expect(snap().you!.arsenal.launcher).toBe(false)
+    expect(snap().you!.arsenal.power).toBeNull()
     expect(snap().training).toMatchObject({ station: "turret", step: "mount", count: 0 })
   })
 })

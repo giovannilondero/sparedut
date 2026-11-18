@@ -346,7 +346,7 @@ test("rotating the device re-lays the controls without dropping a finger already
 })
 
 /** The player as the controls follow it from a snapshot: alive, on foot, away from turrets. */
-const player = (over: Partial<Tracked> = {}): Tracked => ({ alive: true, mounted: false, spawned: false, nearTurret: false, arsenal: freshArsenal("cramar"), ...over })
+const player = (over: Partial<Tracked> = {}): Tracked => ({ alive: true, mounted: false, spawned: false, nearTurret: false, nearPanel: false, arsenal: freshArsenal("cramar"), ...over })
 const centre = (r: { left: number; top: number; width: number; height: number }): Circle => ({ x: r.left + r.width / 2, y: r.top + r.height / 2, r: 0 })
 
 for (const [width, height] of [[390, 844], [844, 390], [360, 640], [640, 360], [768, 1024], [1024, 768]]) {
@@ -532,7 +532,7 @@ test("a tap on the weapon's name is the next weapon", () => {
   expect(calls).toEqual(["wheel1"])
 })
 
-const arsenal = (launcher: boolean): ArsenalValue => ({ ...freshArsenal("cjampanili"), launcher })
+const arsenal = (launcher: boolean): ArsenalValue => ({ ...freshArsenal("cjampanili"), power: launcher ? "lanciafrico" : null })
 
 for (const launcher of [false, true]) {
   test(`a long press on the name opens a picker of the owned weapons${launcher ? ", with a picked-up Lanciafrico" : ""}, and each one switches`, () => {

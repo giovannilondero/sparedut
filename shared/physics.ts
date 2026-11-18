@@ -55,6 +55,11 @@ export interface PhysicsWorld {
    */
   readonly setDoors: (standing: readonly boolean[]) => void
   /**
+   * Panels on the wall (true) or torn off, in `map.panels` order; on the wall when absent.
+   * Idempotent, like `setDoors`.
+   */
+  readonly setPanels: (onWall: readonly boolean[]) => void
+  /**
    * Gates closed (true) or open, in `map.gates` order; open when absent. Idempotent, like
    * `setDoors`: the simulation calls it every tick, the client on every snapshot.
    */
@@ -97,6 +102,17 @@ export function createPhysicsWorld(map: MapDef, tuning: Partial<typeof KCC> = {}
     return world.createCollider(
       RAPIER.ColliderDesc.cuboid(hx, hy, hz)
         .setTranslation(d.min[0] + hx, d.min[1] + hy, d.min[2] + hz)
+        .setCollisionGroups(WORLD_GROUPS)
+    )
+  })
+  // Panels start on the wall: a wall to bodies and shots alike, but not a door.
+  const panelColliders = (map.panels ?? []).map((p) => {
+    const hx = (p.max[0] - p.min[0]) / 2
+    const hy = (p.max[1] - p.min[1]) / 2
+    const hz = (p.max[2] - p.min[2]) / 2
+    return world.createCollider(
+      RAPIER.ColliderDesc.cuboid(hx, hy, hz)
+        .setTranslation(p.min[0] + hx, p.min[1] + hy, p.min[2] + hz)
         .setCollisionGroups(WORLD_GROUPS)
     )
   })
@@ -195,6 +211,17 @@ export function createPhysicsWorld(map: MapDef, tuning: Partial<typeof KCC> = {}
         }
       })
       // Queries (rays, character controller) see the change after one step.
+      if (changed) world.step()
+    },
+    setPanels(onWall) {
+      let changed = false
+      panelColliders.forEach((c, i) => {
+        const on = onWall[i] ?? true
+        if (c.isEnabled() !== on) {
+          c.setEnabled(on)
+          changed = true
+        }
+      })
       if (changed) world.step()
     },
     setGates(closed) {
