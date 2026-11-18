@@ -298,7 +298,7 @@ html.in-match input { user-select: text; -webkit-user-select: text; }
   font-family: var(--serif); font-size: 15px; color: var(--ink); overflow: hidden; white-space: nowrap; }
 #touch-weapon { left: var(--wx); top: var(--wy); width: var(--ww); height: var(--wh); }
 #touch-picker > div.on { border-color: var(--gold); color: var(--gold); }
-#quickchat.tap { pointer-events: auto; top: 76px; bottom: auto; left: 12px; max-width: calc(100% - 24px); max-height: calc(100% - 90px); overflow-y: auto; touch-action: pan-y; font-size: 15px; gap: 0; }
+#quickchat.tap { pointer-events: auto; z-index: 1; top: 76px; bottom: auto; left: 12px; max-width: calc(100% - 24px); max-height: calc(100% - 90px); overflow-y: auto; touch-action: pan-y; font-size: 15px; gap: 0; }
 #quickchat.tap div { padding: 7px 4px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
 #quickchat.tap div:first-child { border-top: 0; }
 #quickchat.tap kbd { display: none; }
