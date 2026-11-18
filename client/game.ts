@@ -544,7 +544,6 @@ export class Game {
           const seconds = WEAPONS[e.w].reloadTicks / 60
           const ammo = this.you()?.arsenal.ammo[e.w]
           this.ownReload = ammo ? { weapon: e.w, at: this.time, seconds, mag: ammo.mag, reserve: ammo.reserve, hensIn: 0 } : null
-          this.d.viewmodel.reload(seconds)
         }
         else {
           const at = this.posOf(e.s)
@@ -1157,6 +1156,9 @@ export class Game {
     if (reload && (!you?.alive || reload.weapon !== this.wanted || (this.time - reload.at >= reload.seconds && you.arsenal.action._tag !== "reload")))
       this.ownReload = null
     if (!paused) this.sinceShot += dt
+    // The reload's one clock: the animation, the clucks and the hen at the mouth all read this.
+    const own = this.ownReload
+    const reloadProgress = own && Math.min(1, (this.time - own.at) / own.seconds)
     const spot = turret >= 0 ? this.physics.map.turrets[turret] : undefined
     const view = firstPerson({
       chosen: this.wanted,
@@ -1168,7 +1170,7 @@ export class Game {
       baseFov: settings.fov,
       mag: you ? (this.localMag ?? you.arsenal.ammo[this.wanted].mag) : 0,
       reserve: you?.arsenal.ammo[this.wanted].reserve ?? 0,
-      reload: this.ownReload && { progress: Math.min(1, (this.time - this.ownReload.at) / this.ownReload.seconds), mag: this.ownReload.mag, reserve: this.ownReload.reserve }
+      reload: own && reloadProgress !== null ? { progress: reloadProgress, mag: own.mag, reserve: own.reserve } : null
     })
     if (this.ownReload && view.hensIn > this.ownReload.hensIn) {
       audio.play("cluck_gjaline")
@@ -1226,7 +1228,8 @@ export class Game {
         sgnape: you.arsenal.sgnape > 0,
         spin: def.spinTicks > 0 ? this.localSpin / def.spinTicks : 0,
         henAtMouth: view.henAtMouth,
-        reloadHens: view.reloadHens
+        reloadHens: view.reloadHens,
+        reload: own?.weapon === inHand ? reloadProgress : null
       })
     }
 

@@ -152,7 +152,6 @@ function reload() {
   const w = WEAPONS[WEAPON_IDS[wIndex]]
   if (w.reloadTicks <= 0 || ammo.reload || ammo.mag >= w.magazine || ammo.reserve <= 0) return
   ammo.reload = { at: t, mag: ammo.mag, reserve: ammo.reserve }
-  vm.reload(w.reloadTicks / 60)
 }
 vm.setWeapon(WEAPON_IDS[wIndex])
 const muzzle = new THREE.Vector3()
@@ -273,7 +272,8 @@ function frame() {
     spin: Math.max(0, Math.sin(t * 0.5)),
     sgnape: Math.sin(t * 0.13) > 0.8,
     henAtMouth: view.henAtMouth,
-    reloadHens: view.reloadHens
+    reloadHens: view.reloadHens,
+    reload: ammo.reload && progress
   })
 
   // background effects in the third-person view

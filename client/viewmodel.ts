@@ -154,8 +154,6 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
   let cur: Slot | null = null
   let pending: WeaponId | null = null
   let switchT = -1 // <SWITCH_DOWN: lower; then raise
-  let reloadT = -1
-  let reloadDur = 1
   let fireT = 9
   let spinA = 0
   let rec = 0
@@ -194,7 +192,6 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     cur.model.root.visible = true
     cur.model.muzzle.add(flash)
     flash.scale.setScalar(cur.hold.flash)
-    reloadT = -1
     swingT = -1
     boltT = -1
   }
@@ -399,7 +396,9 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
     s.leftArm.position.copy(s.leftBase)
     A.px = A.py = A.pz = A.rx = A.ry = A.rz = 0
 
-    const reloading = reloadT >= 0
+    const reload = f.reload !== null && f.reload < 1 ? f.reload : null
+    const reloading = reload !== null
+    if (reloading) boltT = -1
     aimB = damp(aimB, f.aiming && !reloading && sw === 0 ? 1 : 0, 16, dt)
     sprintB = damp(sprintB, f.sprinting && !f.aiming && !reloading && swingT < 0 ? 1 : 0, 8, dt)
     crouchB = damp(crouchB, f.crouch ? 1 : 0, 10, dt)
@@ -499,15 +498,8 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
 
     // reload
     let handW = 0
-    if (reloading) {
-      reloadT += dt
-      const p = clamp(reloadT / reloadDur, 0, 1)
-      handW = clamp(animateReload(s, p), 0, 1)
-      if (p >= 1) {
-        reloadT = -1
-        if (s.id === "lanciafrico") loaded = true
-      }
-    }
+    if (reload !== null) handW = clamp(animateReload(s, reload), 0, 1)
+    else if (f.reload !== null && s.id === "lanciafrico") loaded = true
     if (handW > 0.001) s.leftArm.position.lerp(hand, handW)
     s.leftArm.visible = s.model.left !== null || handW > 0.01
 
@@ -594,7 +586,6 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
         return
       }
       pending = id
-      reloadT = -1
       // if it was being raised, lower it again from the same height
       if (switchT < 0) switchT = 0
       else if (switchT >= SWITCH_DOWN) switchT = SWITCH_DOWN * (1 - ramp(switchT, SWITCH_DOWN, SWITCH_DOWN + SWITCH_UP))
@@ -609,12 +600,6 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
       fireT = 0
       if (cur.id === "cjampanili") boltT = 0
       if (cur.id === "lanciafrico") loaded = false
-    },
-    reload(seconds) {
-      if (!cur || cur.id === "mescul") return
-      reloadT = 0
-      reloadDur = Math.max(0.2, seconds)
-      boltT = -1
     },
     throwBomb() {
       tossT = 0
