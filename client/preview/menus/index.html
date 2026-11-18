@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Sparedût — menu prototypes</title>
+    <link rel="stylesheet" href="../../style.css" />
+    <link rel="stylesheet" href="./kit.css" />
+    <!-- Throwaway (spec #20): the owner picks one prototype, then this folder is deleted. -->
+    <style>
+      #app { display: block; }
+      .ix { max-inline-size: 980px; margin-inline: auto; display: grid; gap: 18px; }
+      .ix h1 { margin: 0; }
+      .ix > p { margin: 0; color: var(--muted); max-inline-size: 60ch; line-height: 1.5; }
+      .ix-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 14px; }
+      .ix-card { display: grid; gap: 10px; align-content: start; padding: 18px; }
+      .ix-card h2 a { color: inherit; text-decoration: none; }
+      .ix-card p { margin: 0; font-size: 14px; line-height: 1.45; }
+      .ix-card ul { margin: 0; padding-inline-start: 18px; font-size: 13px; line-height: 1.7; color: var(--muted); }
+      .ix-card a { color: var(--gold); }
+      .ix-open { display: flex; gap: 8px; }
+      .ix-open a { flex: 1; display: grid; place-items: center; min-block-size: 44px; border-radius: 10px; border: 1px solid var(--stone-line); text-decoration: none; font-weight: 600; }
+      .ix-open a:first-child { background: linear-gradient(180deg, #f0c45d, #c68c27); color: #1d1408; border-color: #f7d483; }
+    </style>
+  </head>
+  <body>
+    <main id="app">
+      <div class="ix">
+        <div class="brand-x"><div class="kicker">Spec #20 · menu prototypes</div><h1 class="logo" style="font-size: 56px">Sparedût</h1></div>
+        <p>Three throwaway prototypes of the home screen and room creation, with the game's own texts. Each one switches between Friulian and Italian, and every
+          screen has its own address. Draw a phone-sized window (portrait and landscape) before judging the desktop. <kbd>Esc</kbd> goes back one screen.</p>
+        <div class="ix-grid">
+          <section class="ix-card stone">
+            <h2><a href="./a.html">A · Stepwise</a></h2>
+            <p>Home is four big choices. The room list is one level down, with join by code. Creation is a guided sequence: mode, map, options, then a summary with the create button.</p>
+            <div class="ix-open"><a href="./a.html">Furlan</a><a href="./a.html#lang=it">Italiano</a></div>
+            <ul>
+              <li><a href="./a.html#screen=rooms">Room list</a> · <a href="./a.html#screen=rooms&rooms=empty">empty</a> · <a href="./a.html#screen=rooms&pw=OSOF">password prompt</a></li>
+              <li>Creation: <a href="./a.html#screen=create&step=1">mode</a> · <a href="./a.html#screen=create&step=2">map</a> · <a href="./a.html#screen=create&step=3&reach=online&access=password">options</a> · <a href="./a.html#screen=create&step=4">summary</a></li>
+            </ul>
+          </section>
+          <section class="ix-card stone">
+            <h2><a href="./b.html">B · Compact page</a></h2>
+            <p>Home shows everything at once, the room list included. Creation is one page: mode and map in front; duration, bots, skill, reach, access and friendly fire folded under "options".</p>
+            <div class="ix-open"><a href="./b.html">Furlan</a><a href="./b.html#lang=it">Italiano</a></div>
+            <ul>
+              <li><a href="./b.html#rooms=empty">Empty list</a> · <a href="./b.html#pw=OSOF">password prompt</a></li>
+              <li>Creation: <a href="./b.html#screen=create">folded</a> · <a href="./b.html#screen=create&open=1&reach=online&access=password">options open</a></li>
+            </ul>
+          </section>
+          <section class="ix-card stone">
+            <h2><a href="./c.html">C · List as home</a></h2>
+            <p>The room list is the home screen, with join by code above it and the two ways to play under the thumb. Creation opens as a side panel, a bottom sheet on an upright phone.</p>
+            <div class="ix-open"><a href="./c.html">Furlan</a><a href="./c.html#lang=it">Italiano</a></div>
+            <ul>
+              <li><a href="./c.html#rooms=empty">Empty list</a> · <a href="./c.html#pw=RAIB">password prompt</a></li>
+              <li>Creation: <a href="./c.html#open=1">panel</a> · <a href="./c.html#open=1&reach=online&access=password">with password</a></li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>
