@@ -6,10 +6,9 @@
  * The storm has no match clock to close by, as a regular room's does: its step gives it a course
  * of its own (`STORM_CLOSING`), from the tick the step begins.
  */
-import type { ObjectiveId } from "../../folklore.ts"
 import { SAGRE_STATIONS } from "../../maps/sagre.ts"
 import { outsideStorm } from "../../sim/rules.ts"
-import { once, station, type Seen, type StepRule, type StormClosing } from "../station.ts"
+import { once, pointsSince, station, type Seen, type StepRule, type StormClosing } from "../station.ts"
 
 const PLACE = SAGRE_STATIONS.modes
 
@@ -47,22 +46,13 @@ const insideTheStorm: StepRule = {
 /** The cjar reached the end of its track this tick: only a Benandante beside it pushes it (`PlayObjectives`). */
 const arrived = (seen: Seen) => seen.events.some((e) => e.t === "cart" && e.a === "arrived")
 
-/** Counts the Benandanti's points since the step began: `mark` is their score then. */
-const scoring = (target: number, objective: ObjectiveId): StepRule => ({
-  control: "move",
-  target,
-  given: { objective },
-  begin: (seen) => ({ count: 0, mark: seen.score.benandanti }),
-  advance: (seen, now) => ({ count: seen.score.benandanti - now.mark, mark: now.mark })
-})
-
 export const MODES_STATION = station({
   setup: { objective: "none", bots: [] },
   steps: {
     /** Take the enemy frico at its base and bring it home, to the Benandanti's own. */
     frico: { ...once("move", broughtHome), given: { objective: "frico" } },
     /** Stand in the plaçute until it has scored `PLACUTE_POINTS`. */
-    placute: scoring(PLACUTE_POINTS, "placute"),
+    placute: { ...pointsSince("move", PLACUTE_POINTS), given: { objective: "placute" } },
     /** Push the cjar, from the start of its short track, to the end. */
     cjar: { ...once("move", arrived), given: { objective: "cjar" } },
     /** Stay inside the storm while it closes, `STORM_SECONDS` in all. */

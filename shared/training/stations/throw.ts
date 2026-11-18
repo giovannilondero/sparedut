@@ -4,17 +4,9 @@
  * and mines are given back as soon as the last is used, so a miss never leaves the step undoable.
  */
 import { SAGRE_STATIONS } from "../../maps/sagre.ts"
-import { MAX_HP } from "../../sim/rules.ts"
-import { once, station, type Seen, type StationBot } from "../station.ts"
+import { blastHit, harmlessFoe, once, station, type Seen } from "../station.ts"
 
 const PLACE = SAGRE_STATIONS.throw
-
-/** A target: a Malandant that stands, or walks its route, and never fires. */
-const target = (route: StationBot["route"]): StationBot => ({ team: "malandanti", route, fires: false, hp: MAX_HP })
-
-/** Whether something of `kind` went off this tick and hurt someone other than the trainee, by the trainee's hand. */
-const blastHit = (seen: Seen, kind: "sgnape" | "mine") =>
-  seen.events.some((e) => e.t === "boom" && e.k === kind) && seen.events.some((e) => e.t === "hit" && e.a === seen.me.session && e.v !== seen.me.session)
 
 /**
  * Whether a mine went off this tick. Only the trainee plants mines in a training (the station's
@@ -27,7 +19,7 @@ const mineSetOff = (seen: Seen) => seen.events.some((e) => e.t === "boom" && e.k
 export const THROW_STATION = station({
   setup: {
     objective: "none",
-    bots: [...PLACE.bombTargets.map((at) => target([at])), target(PLACE.mineRoute)],
+    bots: [...PLACE.bombTargets.map((at) => harmlessFoe([at])), harmlessFoe(PLACE.mineRoute)],
     restock: true
   },
   steps: {

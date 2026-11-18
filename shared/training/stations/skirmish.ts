@@ -9,21 +9,13 @@
  */
 import { SAGRE } from "../../maps/sagre.ts"
 import { MAX_HP } from "../../sim/rules.ts"
-import { counted, station, type StationBot, type StepRule } from "../station.ts"
+import { counted, pointsSince, station, type StationBot, type StepRule } from "../station.ts"
 
 /** The Benandanti's points that win the skirmish: one a kill. */
 export const SKIRMISH_SCORE = 5
 
 /** A Malandant that fights, posted on one of its side's spawns. */
 const foe = (i: number): StationBot => ({ team: "malandanti", route: [SAGRE.spawns.malandanti[i].at], fires: true, hp: MAX_HP })
-
-/** Counts the Benandanti's points since the step began: `mark` is their score then. */
-const win: StepRule = {
-  control: "fire",
-  target: SKIRMISH_SCORE,
-  begin: (seen) => ({ count: 0, mark: seen.score.benandanti }),
-  advance: (seen, now) => ({ count: seen.score.benandanti - now.mark, mark: now.mark })
-}
 
 /** A step done by the client's report of `action`. */
 const reported = (action: "board" | "phrases"): StepRule => ({ ...counted(action, 1, (seen) => seen.reported), report: action })
@@ -33,7 +25,7 @@ export const SKIRMISH_STATION = station({
   setup: { objective: "none", bots: [foe(0), foe(1)] },
   steps: {
     /** Win the skirmish: the Benandanti score `SKIRMISH_SCORE`. */
-    win,
+    win: pointsSince("fire", SKIRMISH_SCORE),
     /** Open the scoreboard. */
     board: reported("board"),
     /** Send a quick phrase. */
