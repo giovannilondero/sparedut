@@ -96,6 +96,16 @@ export interface Choices {
   readonly password: string
 }
 
+/**
+ * Where focus lands when the menu goes from one screen to another: `"first"`, the new screen's first
+ * control (or its heading when it has none); a screen, the home screen's tile that opens it; null,
+ * where it is. The password prompt is a dialog that moves focus in and back by itself.
+ */
+export function focusOnScreen(from: Screen, to: Screen): "first" | Screen | null {
+  if (from === to || from === "password" || to === "password") return null
+  return to === "home" ? from : "first"
+}
+
 /** The screens a player cannot reach without a name: they start or join a match. */
 const NEED_NAME: ReadonlySet<Screen> = new Set(["create", "password"])
 

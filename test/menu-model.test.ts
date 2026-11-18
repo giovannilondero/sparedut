@@ -3,7 +3,7 @@
  * turns into, which fields apply and why a request is refused.
  */
 import { expect, test } from "bun:test"
-import { MenuModel, type Remembered } from "../client/menu-model.ts"
+import { focusOnScreen, MenuModel, type Remembered } from "../client/menu-model.ts"
 
 const remembered = (over: Partial<Remembered> = {}): Remembered => ({
   name: "Toni",
@@ -294,4 +294,17 @@ test("the prompt shows the room it is for when the list has it, and only the cod
   model.joinByCode()
   model.hostRefused("WXYZ", "passwordRequired")
   expect([model.passwordFor, model.promptRoom]).toEqual(["WXYZ", undefined])
+})
+
+test("a screen opens on its first control, and going back lands on the home screen's tile that opened it", () => {
+  for (const screen of ["create", "armarie", "settings", "vocabolari"] as const) {
+    expect(focusOnScreen("home", screen)).toBe("first")
+    expect(focusOnScreen(screen, "home")).toBe(screen)
+  }
+  // The password prompt is a dialog: it moves focus in and back by itself.
+  expect(focusOnScreen("home", "password")).toBeNull()
+  expect(focusOnScreen("password", "home")).toBeNull()
+  // Drawn again on the same screen (a language change): focus stays where it is.
+  expect(focusOnScreen("settings", "settings")).toBeNull()
+  expect(focusOnScreen("home", "home")).toBeNull()
 })

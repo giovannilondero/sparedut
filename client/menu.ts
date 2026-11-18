@@ -21,7 +21,7 @@ import type { GameAudio } from "./contracts.ts"
 import { esc } from "./hud.ts"
 import { onLangChange, setLang, t, type Lang } from "./i18n.ts"
 import { chooseLook, LOOK_IDS, LOOKS, type LookId } from "./looks.ts"
-import { MenuModel, SCREENS, type CreateOptions, type Outcome, type PasswordRefusal, type PromptProblem, type Refusal, type Screen } from "./menu-model.ts"
+import { focusOnScreen, MenuModel, SCREENS, type CreateOptions, type Outcome, type PasswordRefusal, type PromptProblem, type Refusal, type Screen } from "./menu-model.ts"
 import { oneTapRoom, type Settings } from "./settings.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -38,6 +38,14 @@ export interface MenuHandlers {
 
 type RadioGroup = HTMLElementTagNameMap["ui-radio-group"]
 type Select = HTMLElementTagNameMap["ui-select"]
+
+/** Each screen's first control, where focus lands when it opens; the vocabulary has none but its heading. */
+const FIRST_CONTROL: { readonly [S in Exclude<Screen, "home" | "password">]: () => void } = {
+  create: () => $<RadioGroup>("c-mode").api.focus(),
+  armarie: () => $("armarie").querySelector<RadioGroup>("ui-radio-group")?.api.focus(),
+  settings: () => $<HTMLElementTagNameMap["ui-slider"]>("s-sens").api.focus(),
+  vocabolari: () => $("vocab-title").focus()
+}
 
 /**
  * Fills a UI SDK radio group with one card per value: one Tab stop, the arrow keys inside, the radio
@@ -239,9 +247,10 @@ export class Menu {
     if (screen === "password") this.renderPrompt()
     // Opened from code: UI SDK moves focus to the field and, on closing, back to what had it before.
     prompt.open = screen === "password"
-    // Creation opens on its first choice, and going back lands on the button that opened it.
-    if (from !== screen && screen === "create") $<RadioGroup>("c-mode").api.focus()
-    else if (from === "create" && screen === "home") document.querySelector<HTMLElement>('#menu-home [data-go="create"]')?.focus()
+    // A screen opens on its first control, and going back lands on the tile that opened it.
+    const focus = focusOnScreen(from, screen)
+    if (focus === "first" && screen !== "home" && screen !== "password") FIRST_CONTROL[screen]()
+    else if (focus !== null && focus !== "first") document.querySelector<HTMLElement>(`#menu-home [data-go="${focus}"]`)?.focus()
   }
 
   // ---------------------------------------------------------------- home
