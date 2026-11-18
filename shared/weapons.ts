@@ -266,6 +266,11 @@ export const WEAPONS = {
 
 export const WEAPON_IDS = Object.keys(WEAPONS) as WeaponId[]
 
+/** A number key; the primaries share 1. */
+export type Slot = WeaponDef["slot"]
+/** The number keys in order, from the weapons' own slots. */
+export const SLOTS: readonly Slot[] = [...new Set(WEAPON_IDS.map((id) => WEAPONS[id].slot))].sort((a, b) => a - b)
+
 /** The primary weapon is chosen before respawning. */
 export type PrimaryId = "cramar" | "doplete" | "cjampanili" | "mulin" | "miedi" | "gjalinis"
 export const PRIMARIES = ["cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis"] as const satisfies readonly PrimaryId[]

@@ -12,8 +12,8 @@ import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, seatedBody, sprinting } from 
 import type { PhysicsWorld } from "../shared/physics.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
-import { outsideStorm, owned, RAISE_TICKS } from "../shared/sim/rules.ts"
-import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
+import { outsideStorm, owned, RAISE_TICKS, weaponInSlot } from "../shared/sim/rules.ts"
+import { WEAPONS, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
 import { Controls, freeTurretInReach, trackedIn } from "./controls.ts"
@@ -32,6 +32,7 @@ import "@ui-sdk/web/dialog"
 // UI SDK's select, for the host's bot skill: opens on a tap or a key (never on hover), as a sheet on a small touch screen.
 import "@ui-sdk/web/select"
 import { afterEscape, endFocus, focusOnOpen, type MatchMenu } from "./match-menus.ts"
+import { pickerEntries } from "./touch.ts"
 
 type DialogElement = HTMLElementTagNameMap["ui-dialog"]
 type SelectElement = HTMLElementTagNameMap["ui-select"]
@@ -674,18 +675,17 @@ export class Game {
     this.d.audio.play("switch", { volume: 0.6 })
   }
 
-  private selectSlot(slot: 1 | 2 | 3 | 4) {
+  private selectSlot(slot: Slot) {
     if (this.quickOpen) return
     const you = this.you()
-    if (!you) return
-    const id: WeaponId = slot === 1 ? you.arsenal.primary : slot === 2 ? "mandi" : slot === 3 ? "lanciafrico" : "mescul"
-    this.selectWeapon(id)
+    const id = you && weaponInSlot(you.arsenal, slot)
+    if (id) this.selectWeapon(id)
   }
 
   private cycleWeapon(dir: 1 | -1) {
     const you = this.you()
     if (!you) return
-    const order = ([you.arsenal.primary, "mandi", "lanciafrico", "mescul"] as WeaponId[]).filter((id) => owned(you.arsenal, id))
+    const order = pickerEntries(you.arsenal).map((e) => e.id)
     const i = order.indexOf(this.wanted)
     this.selectWeapon(order[(i + dir + order.length) % order.length])
   }

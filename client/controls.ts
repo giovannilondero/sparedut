@@ -8,7 +8,7 @@ import { BUTTON, type ButtonName } from "../shared/input.ts"
 import { turretRestSeat, type TurretSpot } from "../shared/map.ts"
 import type { Snapshot } from "../shared/protocol.ts"
 import type { ArsenalValue, TurretState } from "../shared/sim/schema.ts"
-import { TURRET, type WeaponId } from "../shared/weapons.ts"
+import { TURRET, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { pointerDevice, type Device } from "./device.ts"
 import { buttonBit, inCircle, inRect, NO_INSETS, pickerEntries, TOUCH_BUTTONS, touchLayout, type Insets, type TouchButton, type TouchLayout, type TouchView } from "./touch.ts"
 
@@ -109,7 +109,7 @@ export const freeTurretInReach = (spots: readonly TurretSpot[], turrets: readonl
 }
 
 export interface ControlsHandlers {
-  onSlot: (slot: 1 | 2 | 3 | 4) => void
+  onSlot: (slot: Slot) => void
   onLastWeapon: () => void
   onWheel: (dir: 1 | -1) => void
   onKey: (code: string, down: boolean) => void
