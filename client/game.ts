@@ -208,6 +208,7 @@ export class Game {
     this.wantedSeq = 0
     this.shownWeapon = null
     this.ownReload = null
+    this.sinceShot = Infinity
     this.clock = new MatchClock(() => performance.now())
     this.applySettings()
     this.updateRoster(room)
