@@ -31,18 +31,24 @@ import type { Settings } from "./settings.ts"
 import "@ui-sdk/web/dialog"
 // UI SDK's select, for the host's bot skill: opens on a tap or a key (never on hover), as a sheet on a small touch screen.
 import "@ui-sdk/web/select"
-import { afterEscape, endFocus, focusOnOpen, type MatchMenu } from "./match-menus.ts"
+import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, type MatchMenu } from "./match-menus.ts"
 import { pickerEntries } from "./touch.ts"
 
 type DialogElement = HTMLElementTagNameMap["ui-dialog"]
 type SelectElement = HTMLElementTagNameMap["ui-select"]
 
-/** Each in-match menu's dialog and the content the game draws into it. */
+/**
+ * Each in-match menu's dialog and the content the game draws into it: the menus the player opens,
+ * and the end screen, which the match opens and no Esc step leads to.
+ */
 const MENU_PARTS = {
   pause: ["pause-dialog", "pause"],
   loadout: ["loadout-dialog", "loadout"],
-  settings: ["settings-dialog", "settings-ingame"]
-} as const satisfies Record<Exclude<MatchMenu, "none">, readonly [string, string]>
+  settings: ["settings-dialog", "settings-ingame"],
+  end: ["end-dialog", "endscreen"]
+} as const satisfies Record<Exclude<MatchMenu, "none"> | "end", readonly [string, string]>
+/** The contents of the menus the player opens, for `closest`: built once. */
+const OPENED_CONTENT = MATCH_MENUS.map((m) => `#${MENU_PARTS[m][1]}`).join(", ")
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 const INTERP_TICKS = 6
@@ -273,7 +279,7 @@ export class Game {
     this.avatars.clear()
     this.hud.show(false)
     this.openOverlay("none")
-    $<DialogElement>("end-dialog").open = false
+    $<DialogElement>(MENU_PARTS.end[0]).open = false
     this.d.viewmodel.setVisible(false)
     if (document.pointerLockElement) document.exitPointerLock()
     this.controls.track(null)
@@ -443,7 +449,7 @@ export class Game {
       if (document.pointerLockElement) document.exitPointerLock()
       this.renderEnd(true)
     } else {
-      $<DialogElement>("end-dialog").open = false
+      $<DialogElement>(MENU_PARTS.end[0]).open = false
       if (tag === "Live" && this.overlay === "none") this.controls.lock()
     }
     if (this.overlay === "pause") this.renderPause()
@@ -781,7 +787,7 @@ export class Game {
     this.overlay = which
     if (which === "settings" && previous !== "settings") {
       // The same form as the main menu: same controls, saved and applied immediately.
-      this.drawMenu("settings-ingame", t().static.settings, `<div id="settings-slot" class="overlay-body"></div><div class="row overlay-actions"><button id="st-back">${t().static.back}</button></div>`)
+      this.drawMenu(MENU_PARTS.settings[1], t().static.settings, `<div id="settings-slot" class="overlay-body"></div><div class="row overlay-actions"><button id="st-back">${t().static.back}</button></div>`)
       $("settings-slot").append($("settings-form"))
       $("st-back").onclick = () => this.openOverlay("pause")
     } else if (which !== "settings") this.restoreSettings()
@@ -800,11 +806,11 @@ export class Game {
    */
   private showMenus(previous: MatchMenu) {
     const active = document.activeElement
-    for (const [menu, [dialog]] of Object.entries(MENU_PARTS)) {
-      if (menu !== this.overlay) $<DialogElement>(dialog).open = false
+    for (const menu of MATCH_MENUS) {
+      if (menu !== this.overlay) $<DialogElement>(MENU_PARTS[menu][0]).open = false
     }
     if (this.overlay === "none") {
-      if (active instanceof HTMLElement && active.closest("#pause, #loadout, #settings-ingame")) active.blur()
+      if (active instanceof HTMLElement && active.closest(OPENED_CONTENT)) active.blur()
       return
     }
     const [id, content] = MENU_PARTS[this.overlay]
@@ -844,7 +850,7 @@ export class Game {
 
   private renderLoadout() {
     const lo = t().loadout
-    this.drawMenu("loadout", lo.title, `<div class="overlay-body"><p class="muted">${lo.note}</p><div class="weapons" id="loadout-list"></div></div><div class="row overlay-actions"><button id="lo-close" class="primary">${lo.resume}</button></div>`)
+    this.drawMenu(MENU_PARTS.loadout[1], lo.title, `<div class="overlay-body"><p class="muted">${lo.note}</p><div class="weapons" id="loadout-list"></div></div><div class="row overlay-actions"><button id="lo-close" class="primary">${lo.resume}</button></div>`)
     this.d.menu.buildArmarie($("loadout-list"), (p) => {
       this.d.net.send({ t: "primary", p })
       // If I was holding the old primary, switch to the new one right away.
@@ -901,7 +907,7 @@ export class Game {
     const p = s.pause
     const ben = TEAM_INFO.benandanti.short
     const mal = TEAM_INFO.malandanti.short
-    this.drawMenu("pause", `${s.modes[room.mode].name} <small class="muted">· ${s.modes[room.mode].sub}</small>`, `
+    this.drawMenu(MENU_PARTS.pause[1], `${s.modes[room.mode].name} <small class="muted">· ${s.modes[room.mode].sub}</small>`, `
       <div class="overlay-body">
       ${
         // An Offline room has no code and no invite link: nobody else can come in.
@@ -991,7 +997,7 @@ export class Game {
     if (full) {
       const title = winner === "pari" ? en.draw : this.won(winner) ? en.win : en.lose
       const color = winner === "pari" ? "var(--gold)" : typeof winner === "object" ? (this.won(winner) ? "var(--gold)" : "#9fd0ff") : TEAM_INFO[winner].color
-      this.drawMenu("endscreen", title, `
+      this.drawMenu(MENU_PARTS.end[1], title, `
       <div class="overlay-body"><div id="e-results"></div><p class="muted end-restart" id="e-restart"></p></div>
       <div class="row overlay-actions"><button id="e-leave">${en.leave}</button><button id="e-again" class="primary"${host ? "" : " hidden"}>${en.again}</button></div>`, "end-title", color)
       $("e-leave").onclick = () => {
@@ -1030,7 +1036,7 @@ export class Game {
       </div>
       ${boardHtml(rows, this.me)}`
     $("e-restart").textContent = en.restartIn(Math.max(0, Math.ceil((s.phase.restarts - s.tick) / 60)))
-    if (full) this.openMenu("end-dialog", "endscreen", endFocus(host))
+    if (full) this.openMenu(...MENU_PARTS.end, endFocus(host))
   }
 
   // ---------------------------------------------------------------- fixed tick

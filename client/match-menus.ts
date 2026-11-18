@@ -3,8 +3,11 @@
  * when one opens. The game draws the menus; this decides the order between them.
  */
 
-/** The menu open over the match: the match menu, the loadout, the settings, or none. */
-export type MatchMenu = "none" | "pause" | "loadout" | "settings"
+/** The menus a player opens over the match: the match menu, the loadout, the settings. */
+export const MATCH_MENUS = ["pause", "loadout", "settings"] as const
+
+/** The menu open over the match, or none. */
+export type MatchMenu = "none" | (typeof MATCH_MENUS)[number]
 
 /** Esc closes one step: the settings go back to the match menu, the loadout to where it was opened from. */
 export function afterEscape(open: MatchMenu, loadoutFrom: "none" | "pause"): MatchMenu {
