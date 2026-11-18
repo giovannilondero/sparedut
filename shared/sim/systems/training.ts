@@ -10,11 +10,19 @@
 import { SAGRE_STATIONS } from "../../maps/sagre.ts"
 import { STATION_IDS, STATIONS, stepRule, stepsOf } from "../../training/index.ts"
 import type { Seen } from "../../training/station.ts"
+import { WEAPON_IDS } from "../../weapons.ts"
 import { freshArsenal, MAX_HP } from "../rules.ts"
-import { Arsenal, Controls, Game, Life, Motion, Objective, Out, Player, Tick, Training } from "../schema.ts"
+import { Arsenal, Controls, Game, Life, Motion, Objective, Out, Pickups, Player, Tick, Training, type ArsenalValue } from "../schema.ts"
 
 /** Where the trainee is after a station completes: at the next station's first step, or done. */
 type Next = { readonly _tag: "Step"; readonly station: number; readonly step: number; readonly count: number; readonly mark: number; readonly unlocked: number } | { readonly _tag: "Complete" }
+
+/** An arsenal with only what is in each magazine: no reserve, no bombs or mines (a station's `ammo: "loaded"`). */
+const onlyLoaded = (a: ArsenalValue): ArsenalValue => {
+  const ammo = { ...a.ammo }
+  for (const id of WEAPON_IDS) ammo[id] = { mag: ammo[id].mag, reserve: 0 }
+  return { ...a, ammo, bombs: 0, mines: 0 }
+}
 
 export const PlayTraining = Game.System(
   "Sparedut/PlayTraining",
@@ -30,7 +38,7 @@ export const PlayTraining = Game.System(
         }
       })
     },
-    resources: { tick: Game.System.readResource(Tick), objective: Game.System.writeResource(Objective) },
+    resources: { tick: Game.System.readResource(Tick), objective: Game.System.writeResource(Objective), pickups: Game.System.writeResource(Pickups) },
     events: { happened: Game.System.readEvent(Out), out: Game.System.writeEvent(Out) },
     machines: { training: Game.System.updateMachine(Training) },
     nextMachines: { training: Game.System.nextState(Training) }
@@ -79,7 +87,12 @@ export const PlayTraining = Game.System(
       const setup = STATIONS[id].setup
       resources.objective.set(setup.objective)
       const fresh = freshArsenal(data.arsenal.get(trainee).nextPrimary)
-      data.arsenal.set(trainee, setup.hold ? { ...fresh, current: setup.hold } : fresh)
+      const given = setup.ammo === "loaded" ? onlyLoaded(fresh) : fresh
+      data.arsenal.set(trainee, setup.hold ? { ...given, current: setup.hold } : given)
+      if (setup.pickups) {
+        const back = setup.pickups
+        resources.pickups.set(resources.pickups.get().map((p, i) => (back.includes(i) ? { _tag: "up" as const } : p)))
+      }
       data.life.update(trainee, { state: "Alive", data: (alive) => ({ hp: setup.hp ?? MAX_HP, armor: setup.armor ?? 0, shield: alive.shield }) })
       if (place) {
         const start = SAGRE_STATIONS[index].start
