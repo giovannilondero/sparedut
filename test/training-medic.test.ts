@@ -62,7 +62,7 @@ function atMedic() {
     const yaw = Math.atan2(-(WOUNDED[0] - b.x), -(WOUNDED[2] - b.z))
     return { weapon: "miedi", yaw, pitch: Math.atan2(WOUNDED[1] + 1.1 - (b.y + eyeHeight(b)), d), buttons: BUTTON.fire }
   }
-  return { ...h, me, you, snap, teammate, drive, heal }
+  return { ...h, me, you, auto, snap, teammate, drive, heal }
 }
 
 const steps = (events: GameEvent[]) => events.flatMap((e) => (e.t === "training" && e.a === "step" ? [e.step] : []))
@@ -135,8 +135,8 @@ describe("station 10: the medic", () => {
 
 describe("the automatic player", () => {
   test("completes station 10", () => {
-    const { me, play, you } = atMedic()
-    const trainee = new Trainee(you)
+    // The same automatic player that got here: a new one would start its inputs' numbers again, and the host drops them as old.
+    const { me, play, auto: trainee } = atMedic()
     const events: GameEvent[] = []
     for (let tick = 0; tick < 60 * 60; tick++) {
       for (const msg of trainee.think(me.last("snap"))) me.say(msg)
