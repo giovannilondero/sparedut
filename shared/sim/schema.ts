@@ -236,13 +236,16 @@ export const Doors = Descriptor.Resource<ReadonlyArray<number>>()("Sparedut/Door
 
 /**
  * A panel (one per `map.panels`): on the wall, being torn off by one player (`ticks` of "use" held
- * so far), or off the wall, leaving its gap, until the next match. Once off it is in its
- * carrier's arsenal (`ArsenalValue.power`), not here.
+ * so far), carried (by a player who has it in slot 3, `ArsenalValue.power`), lying where its
+ * carrier died, or broken. Off the wall, in any of the last three, its gap stays open until the
+ * next match. Carried and lying, it keeps its own health (`hp`).
  */
 export type PanelState =
   | { readonly _tag: "wall" }
   | { readonly _tag: "tearing"; readonly by: string; readonly ticks: number }
-  | { readonly _tag: "off" }
+  | { readonly _tag: "carried"; readonly by: string; readonly hp: number }
+  | { readonly _tag: "lying"; readonly x: number; readonly y: number; readonly z: number; readonly hp: number }
+  | { readonly _tag: "broken" }
 export const Panels = Descriptor.Resource<ReadonlyArray<PanelState>>()("Sparedut/Panels")
 
 /** A pickup: there, taken and coming back, or not on the map for the match (the Lanciafrico under single weapon). */
@@ -299,6 +302,12 @@ export interface DamageValue {
   readonly head: boolean
   /** Knockback (explosions). */
   readonly push: { readonly x: number; readonly y: number; readonly z: number } | null
+  /**
+   * Where the damage comes from, seen from above: the attacker's eye for shots and strikes, the
+   * blast for explosions; null when it comes from no point (a fall, the storm). The casot's panel
+   * blocks by it.
+   */
+  readonly from: { readonly x: number; readonly z: number } | null
 }
 export const Damage = Descriptor.Event<DamageValue>()("Sparedut/Damage")
 

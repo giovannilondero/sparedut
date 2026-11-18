@@ -1,6 +1,8 @@
 /**
  * The casot's panel at Lagune di Maran, driven by inputs: tearing it off, the tear cancelled, the
- * Lanciafrico's slot, the strike, the slowdown and the panel back on the wall in the next match.
+ * Lanciafrico's slot, the strike, the slowdown, the shield (what it blocks from the front and lets
+ * through from behind), its breaking, its fall when its carrier dies and who takes it from the
+ * ground, and the panel back on the wall, whole, in the next match.
  * Players stand at fixed posts (the way the training places its bots), so no test walks the map.
  */
 import { beforeAll, describe, expect, test } from "bun:test"
@@ -11,7 +13,7 @@ import { createPhysicsWorld, initPhysics, type PhysicsWorld } from "../shared/ph
 import type { GameEvent } from "../shared/sim/events.ts"
 import { createSim, type Sim } from "../shared/sim/index.ts"
 import { SHIELD_TICKS } from "../shared/sim/rules.ts"
-import { PANEL_TEAR_TICKS, WEAPONS, type PrimaryId } from "../shared/weapons.ts"
+import { PANEL_HP, PANEL_TEAR_TICKS, RAIBL_MINE, WEAPONS, type PrimaryId } from "../shared/weapons.ts"
 
 let maran: PhysicsWorld
 beforeAll(async () => {
@@ -84,7 +86,7 @@ describe("tearing off the panel", () => {
     expect(sim.view().panels[0].tag).toBe("tearing")
     const late = hold(sim, "a", 60, useHeld)
     expect(torn(late, "a")).toBe(true)
-    expect(sim.view().panels).toEqual([{ tag: "off" }])
+    expect(sim.view().panels).toEqual([{ tag: "carried", by: "a", hp: PANEL_HP }])
     const a = me(sim, "a").arsenal
     expect(a.power).toBe("panel")
     expect(a.current).toBe("panel")
@@ -243,27 +245,36 @@ describe("carrying the panel", () => {
     expect(withPanel).toBeLessThan(withPistol)
   })
 
-  test("the carrier keeps it until they die; then it is gone for the match", () => {
+  test("the carrier keeps it until they die; then it lies where they died and the wall stays open", () => {
+    // Shot from behind (the enemy in the casot's far corner, the carrier facing the wall): no block.
     const sim = match([
       { id: "a", at: inside(), yaw: FACING, hp: 30 },
       { id: "b", team: "malandanti", at: [CASOT.maxX - 2, LAND, CASOT.maxZ - 2], yaw: 0 }
     ])
     expect(torn(hold(sim, "a", PANEL_TEAR_TICKS + 5, useHeld), "a")).toBe(true)
     const events: GameEvent[] = []
+    let died = me(sim, "a").body
     for (let i = 0; i < 200 && !events.some((e) => e.t === "kill" && e.v === "a"); i++) {
-      const a = me(sim, "a").body
-      const b = me(sim, "b").body
+      died = me(sim, "a").body
       sim.input("a", command(sim, "a", { yaw: FACING }))
-      sim.input("b", command(sim, "b", { yaw: Math.atan2(-(a.x - b.x), -(a.z - b.z)), pitch: -0.05, buttons: BUTTON.fire }))
+      sim.input("b", command(sim, "b", { ...aimAt(sim, "b", "a"), buttons: BUTTON.fire }))
       events.push(...sim.step())
     }
     expect(events.some((e) => e.t === "kill" && e.v === "a")).toBe(true)
+    expect(events.some((e) => e.t === "panel" && e.a === "blocked")).toBe(false)
     sim.input("b", command(sim, "b", {}))
+    hold(sim, "a", 2, { yaw: FACING })
+    expect(me(sim, "a").alive).toBe(false)
+    expect(me(sim, "a").arsenal.power).toBeNull()
+    const lying = sim.view().panels[0]
+    if (lying.tag !== "lying") throw new Error(`the panel is ${lying.tag}`)
+    expect(lying.hp).toBe(PANEL_HP)
+    expect(Math.hypot(lying.at[0] - died.x, lying.at[2] - died.z)).toBeLessThan(0.5)
+    expect(lying.at[1]).toBeCloseTo(LAND, 1)
+    // Back at the post, where it fell: taken again, with nothing on the wall to tear.
     hold(sim, "a", 200, { yaw: FACING })
     expect(me(sim, "a").alive).toBe(true)
-    expect(me(sim, "a").arsenal.power).toBeNull()
-    expect(sim.view().panels).toEqual([{ tag: "off" }])
-    expect(torn(hold(sim, "a", PANEL_TEAR_TICKS + 30, useHeld), "a")).toBe(false)
+    expect(sim.view().panels[0].tag).toBe("carried")
   })
 
   test("the next match puts the panel back on the wall and takes it from its carrier", () => {
@@ -279,5 +290,266 @@ describe("carrying the panel", () => {
     expect(sim.view().panels).toEqual([{ tag: "wall" }])
     expect(me(sim, "a").arsenal.power).toBeNull()
     expect(torn(hold(sim, "a", PANEL_TEAR_TICKS + 5, useHeld), "a")).toBe(true)
+  })
+})
+
+/** Where the panel's carrier stands in the casot, clear of the pot and the step, to be hit from any side. */
+const SPOT = [44, 27] as const
+/** Yaw that faces from `from` towards `to`, seen from above (yaw 0 faces north, -z). */
+const yawTo = (from: { readonly x: number; readonly z: number }, to: { readonly x: number; readonly z: number }) => Math.atan2(-(to.x - from.x), -(to.z - from.z))
+/** A point `d` metres from the carrier's spot along `yaw` (yaw 0 is north). */
+const around = (yaw: number, d: number): V3 => [SPOT[0] - Math.sin(yaw) * d, LAND, SPOT[1] - Math.cos(yaw) * d]
+/** The look of `id` at the chest of `target`. */
+function aimAt(sim: Sim, id: string, target: string) {
+  const a = me(sim, id).body
+  const b = me(sim, target).body
+  return { yaw: yawTo(a, b), pitch: Math.atan2(b.y + 1 - (a.y + 1.6), Math.hypot(b.x - a.x, b.z - a.z)) }
+}
+const carried = (sim: Sim) => sim.view().panels[0]
+/** The host ends the match (back to the Muster) and starts the next one. */
+function nextMatch(sim: Sim) {
+  sim.start(true)
+  for (let i = 0; i < 10; i++) sim.step()
+  expect(sim.view().phase.tag).toBe("Muster")
+  sim.start(true)
+  for (let i = 0; i < SHIELD_TICKS + 5; i++) sim.step()
+  expect(sim.view().phase.tag).toBe("Live")
+}
+/**
+ * "a" tears the panel off, walks to `SPOT` and stands there looking along `yaw`, with the panel in
+ * hand (or `weapon`); `others` wait at their posts meanwhile.
+ */
+function carrying(others: Member[], yaw: number, weapon: "panel" | "mandi" = "panel") {
+  const sim = match([{ id: "a", at: inside(), yaw: FACING }, ...others])
+  expect(torn(hold(sim, "a", PANEL_TEAR_TICKS + 5, useHeld), "a")).toBe(true)
+  hold(sim, "a", 150, { to: SPOT })
+  hold(sim, "a", 40, { yaw, weapon })
+  expect(me(sim, "a").arsenal.current).toBe(weapon)
+  return sim
+}
+/** Every member sends `each(id)` for `ticks` ticks; returns the events. */
+function all(sim: Sim, ticks: number, each: (id: string) => Partial<PlayerInput>) {
+  const events: GameEvent[] = []
+  for (let i = 0; i < ticks; i++) {
+    for (const p of sim.view().players) sim.input(p.session, command(sim, p.session, each(p.session)))
+    events.push(...sim.step())
+  }
+  return events
+}
+
+type Attack = "shot" | "melee" | "explosion"
+/**
+ * An enemy hits the carrier once, from `side` (an angle from the carrier's look: 0 is straight
+ * ahead) with `attack`: a Cramar shot, a Mescul strike, or a Raibl mine dropped between them that
+ * goes off once armed. Returns how much the carrier and the panel each lost.
+ */
+function attackFrom(side: number, attack: Attack, weapon: "panel" | "mandi" = "panel") {
+  const look = 0.3
+  const d = attack === "shot" ? 3.5 : attack === "melee" ? 1.4 : 2.6
+  const sim = carrying([{ id: "b", team: "malandanti", at: around(look + side, d), yaw: look + side + Math.PI }], look, weapon)
+  const hp = me(sim, "a").hp
+  const panelHp = () => {
+    const p = carried(sim)
+    return p.tag === "carried" || p.tag === "lying" ? p.hp : 0
+  }
+  const still = { yaw: look, weapon }
+  const events: GameEvent[] = []
+  if (attack === "shot") events.push(...all(sim, 1, (id) => (id === "b" ? { ...aimAt(sim, "b", "a"), buttons: BUTTON.fire } : still)))
+  if (attack === "melee") {
+    all(sim, 30, (id) => (id === "b" ? { ...aimAt(sim, "b", "a"), weapon: "mescul" } : still))
+    events.push(...all(sim, 1, (id) => (id === "b" ? { ...aimAt(sim, "b", "a"), weapon: "mescul", buttons: BUTTON.fire } : still)))
+  }
+  if (attack === "explosion") {
+    events.push(...all(sim, 1, (id) => (id === "b" ? { ...aimAt(sim, "b", "a"), buttons: BUTTON.mine } : still)))
+    for (let i = 0; i < RAIBL_MINE.armTicks + 30 && !events.some((e) => e.t === "boom"); i++) events.push(...all(sim, 1, (id) => (id === "b" ? aimAt(sim, "b", "a") : still)))
+    expect(events.some((e) => e.t === "boom" && e.k === "mine")).toBe(true)
+  }
+  events.push(...all(sim, 2, (id) => (id === "b" ? aimAt(sim, "b", "a") : still)))
+  expect(events.some((e) => (e.t === "hit" && e.v === "a") || (e.t === "panel" && e.a === "blocked"))).toBe(true)
+  return { carrier: hp - me(sim, "a").hp, panel: PANEL_HP - panelHp() }
+}
+
+describe("the panel as a shield", () => {
+  test("a shot from the front takes health from the panel and none from its carrier", () => {
+    const sim = carrying([{ id: "b", team: "malandanti", at: around(0, 3.5), yaw: Math.PI }], 0)
+    const hp = me(sim, "a").hp
+    expect(carried(sim)).toEqual({ tag: "carried", by: "a", hp: PANEL_HP })
+    all(sim, 1, (id) => (id === "b" ? { ...aimAt(sim, "b", "a"), buttons: BUTTON.fire } : { yaw: 0 }))
+    all(sim, 2, (id) => (id === "b" ? aimAt(sim, "b", "a") : { yaw: 0 }))
+    expect(me(sim, "a").hp).toBe(hp)
+    expect(carried(sim)).toEqual({ tag: "carried", by: "a", hp: PANEL_HP - WEAPONS.cramar.damage })
+  })
+
+  test("the Motosee's teeth: from the front the panel takes them, from behind its carrier does", () => {
+    const cut = (side: number) => {
+      const look = 0.3
+      const sim = carrying([{ id: "b", team: "malandanti", primary: "motosee", at: around(look + side, 1.4), yaw: look + side + Math.PI }], look)
+      const hp = me(sim, "a").hp
+      all(sim, WEAPONS.motosee.spinTicks + 20, (id) => (id === "b" ? { ...aimAt(sim, "b", "a"), weapon: "motosee", buttons: BUTTON.fire } : { yaw: look, weapon: "panel" }))
+      const p = carried(sim)
+      // Cut down from behind, the carrier drops the panel with the health it had.
+      return { carrier: hp - me(sim, "a").hp, panel: PANEL_HP - (p.tag === "carried" || p.tag === "lying" ? p.hp : 0) }
+    }
+    const front = cut(0)
+    expect(front.carrier).toBe(0)
+    expect(front.panel).toBeGreaterThan(0)
+    const behind = cut(Math.PI)
+    expect(behind.carrier).toBeGreaterThan(0)
+    expect(behind.panel).toBe(0)
+  })
+
+  for (const attack of ["shot", "melee", "explosion"] as const) {
+    test(`${attack}: from the front, and a little to either side, the panel takes it all`, () => {
+      for (const side of [0, 0.6, -0.6]) {
+        const lost = attackFrom(side, attack)
+        expect(lost.carrier).toBe(0)
+        expect(lost.panel).toBeGreaterThan(0)
+      }
+    })
+
+    test(`${attack}: from behind or from the side the carrier is hurt and the panel is not`, () => {
+      for (const side of [Math.PI, Math.PI / 2, -Math.PI / 2, 2.4]) {
+        const lost = attackFrom(side, attack)
+        expect(lost.carrier).toBeGreaterThan(0)
+        expect(lost.panel).toBe(0)
+      }
+    })
+
+    test(`${attack}: with another weapon in hand the panel blocks nothing, even from the front`, () => {
+      const lost = attackFrom(0, attack, "mandi")
+      expect(lost.carrier).toBeGreaterThan(0)
+      expect(lost.panel).toBe(0)
+    })
+  }
+})
+
+describe("the panel breaks", () => {
+  test("at zero it breaks: its carrier no longer has it, is told, and is not hurt by what broke it", () => {
+    const sim = carrying([{ id: "b", team: "malandanti", at: around(0, 3.5), yaw: Math.PI }], 0)
+    const hp = me(sim, "a").hp
+    const events: GameEvent[] = []
+    for (let i = 0; i < 600 && !events.some((e) => e.t === "panel" && e.a === "broken"); i++) {
+      events.push(...all(sim, 1, (id) => (id === "b" ? { ...aimAt(sim, "b", "a"), buttons: BUTTON.fire } : { yaw: 0 })))
+    }
+    expect(events.filter((e) => e.t === "panel" && e.a === "broken")).toEqual([{ t: "panel", i: 0, s: "a", a: "broken" }])
+    // As many shots as 300 takes, all of them on the panel.
+    expect(events.filter((e) => e.t === "shot").length).toBe(Math.ceil(PANEL_HP / WEAPONS.cramar.damage))
+    expect(me(sim, "a").hp).toBe(hp)
+    expect(sim.view().panels).toEqual([{ tag: "broken" }])
+    // Slot 3 is free again (standing by the Lanciafrico, the carrier may already have taken it).
+    const a = me(sim, "a").arsenal
+    expect(a.power).not.toBe("panel")
+    expect(a.current).not.toBe("panel")
+  })
+
+  test("a broken panel does not come back in that match, not even after its carrier dies", () => {
+    const sim = carrying([{ id: "b", team: "malandanti", at: around(0, 3.5), yaw: Math.PI }], 0)
+    const events: GameEvent[] = []
+    // Broken, then the carrier shot down.
+    for (let i = 0; i < 900 && !events.some((e) => e.t === "kill" && e.v === "a"); i++) {
+      events.push(...all(sim, 1, (id) => (id === "b" ? { ...aimAt(sim, "b", "a"), buttons: BUTTON.fire } : { yaw: 0, weapon: me(sim, "a").arsenal.current })))
+    }
+    expect(events.some((e) => e.t === "panel" && e.a === "broken")).toBe(true)
+    expect(events.some((e) => e.t === "kill" && e.v === "a")).toBe(true)
+    all(sim, 240, (id) => (id === "a" ? useHeld : {}))
+    expect(me(sim, "a").alive).toBe(true)
+    expect(sim.view().panels).toEqual([{ tag: "broken" }])
+    expect(me(sim, "a").arsenal.power).toBeNull()
+  })
+
+  test("the next match puts a broken panel back on the wall, whole", () => {
+    const sim = carrying([{ id: "b", team: "malandanti", at: around(0, 3.5), yaw: Math.PI }], 0)
+    const events: GameEvent[] = []
+    for (let i = 0; i < 600 && !events.some((e) => e.t === "panel" && e.a === "broken"); i++) {
+      events.push(...all(sim, 1, (id) => (id === "b" ? { ...aimAt(sim, "b", "a"), buttons: BUTTON.fire } : { yaw: 0 })))
+    }
+    expect(sim.view().panels).toEqual([{ tag: "broken" }])
+    nextMatch(sim)
+    expect(sim.view().panels).toEqual([{ tag: "wall" }])
+    hold(sim, "a", 200, { to: [inside()[0], inside()[2]] })
+    expect(torn(hold(sim, "a", PANEL_TEAR_TICKS + 5, useHeld), "a")).toBe(true)
+    expect(carried(sim)).toEqual({ tag: "carried", by: "a", hp: PANEL_HP })
+  })
+
+  test("the starting value: 300", () => {
+    expect(PANEL_HP).toBe(300)
+  })
+})
+
+describe("the panel falls when its carrier dies", () => {
+  /** Where the panel is torn off and its carrier dies. */
+  const DEATH = inside()
+  /** The enemy, in the casot's north-east corner. */
+  const ENEMY: V3 = [49, LAND, 23]
+  /**
+   * "a" tears the panel off and faces the enemy, which shoots it on the panel for a while; then "a"
+   * turns its back and is shot down. `others` wait at their posts. Returns the sim two ticks after
+   * the death, with the panel's health just before it.
+   */
+  function fallen(others: Member[]) {
+    const sim = match([{ id: "a", at: DEATH, yaw: FACING, hp: 40 }, { id: "b", team: "malandanti", at: ENEMY, yaw: 0 }, ...others])
+    expect(torn(hold(sim, "a", PANEL_TEAR_TICKS + 5, useHeld), "a")).toBe(true)
+    const facing = (id: string) => (id === "b" ? { ...aimAt(sim, "b", "a"), buttons: BUTTON.fire } : id === "a" ? { ...aimAt(sim, "a", "b"), pitch: 0 } : {})
+    all(sim, 40, facing)
+    all(sim, 5, (id) => (id === "b" ? aimAt(sim, "b", "a") : id === "a" ? { ...aimAt(sim, "a", "b"), pitch: 0 } : {}))
+    const before = carried(sim)
+    if (before.tag !== "carried") throw new Error(`the panel is ${before.tag}`)
+    expect(before.hp).toBeLessThan(PANEL_HP)
+    const away = aimAt(sim, "a", "b").yaw + Math.PI
+    const events: GameEvent[] = []
+    for (let i = 0; i < 300 && !events.some((e) => e.t === "kill" && e.v === "a"); i++) events.push(...all(sim, 1, (id) => (id === "b" ? { ...aimAt(sim, "b", "a"), buttons: BUTTON.fire } : id === "a" ? { yaw: away } : {})))
+    expect(events.some((e) => e.t === "kill" && e.v === "a")).toBe(true)
+    all(sim, 2, () => ({}))
+    return { sim, hp: before.hp }
+  }
+  /** `id` walks onto the fallen panel and stays there a while; returns the events. */
+  const walkOver = (sim: Sim, id: string) => hold(sim, id, 90, { to: [DEATH[0], DEATH[2]] })
+
+  test("it lies where its carrier died, with the health it had", () => {
+    const { sim, hp } = fallen([])
+    const lying = carried(sim)
+    if (lying.tag !== "lying") throw new Error(`the panel is ${lying.tag}`)
+    expect(lying.hp).toBe(hp)
+    expect(Math.hypot(lying.at[0] - DEATH[0], lying.at[2] - DEATH[2])).toBeLessThan(0.6)
+    expect(me(sim, "a").arsenal.power).toBeNull()
+  })
+
+  test("the first player to walk over it with slot 3 free takes it, with that health, in hand", () => {
+    const { sim, hp } = fallen([{ id: "c", at: [43, LAND, 29], yaw: 0 }])
+    const events = walkOver(sim, "c")
+    expect(events.filter((e) => e.t === "panel" && e.a === "taken")).toEqual([{ t: "panel", i: 0, s: "c", a: "taken" }])
+    expect(carried(sim)).toEqual({ tag: "carried", by: "c", hp })
+    expect(me(sim, "c").arsenal.power).toBe("panel")
+    expect(me(sim, "c").arsenal.current).toBe("panel")
+  })
+
+  test("a player who has the Lanciafrico walks over it and leaves it", () => {
+    const LANCIAFRICO = MARAN.pickups.find((p) => p.kind === "lanciafrico")!.at
+    const { sim } = fallen([{ id: "d", at: [LANCIAFRICO[0], LAND, LANCIAFRICO[2]], yaw: 0 }])
+    expect(me(sim, "d").arsenal.power).toBe("lanciafrico")
+    const events = walkOver(sim, "d")
+    expect(Math.hypot(me(sim, "d").body.x - DEATH[0], me(sim, "d").body.z - DEATH[2])).toBeLessThan(0.5)
+    expect(events.some((e) => e.t === "panel" && e.a === "taken")).toBe(false)
+    expect(carried(sim).tag).toBe("lying")
+    expect(me(sim, "d").arsenal.power).toBe("lanciafrico")
+  })
+
+  test("the next match puts a fallen panel back on the wall, whole", () => {
+    const { sim } = fallen([])
+    expect(carried(sim).tag).toBe("lying")
+    nextMatch(sim)
+    expect(sim.view().panels).toEqual([{ tag: "wall" }])
+    hold(sim, "a", 200, { yaw: FACING })
+    expect(torn(hold(sim, "a", PANEL_TEAR_TICKS + 5, useHeld), "a")).toBe(true)
+    expect(carried(sim)).toEqual({ tag: "carried", by: "a", hp: PANEL_HP })
+  })
+
+  test("a bot walks over it and leaves it", () => {
+    const { sim } = fallen([{ id: "bot", at: [43, LAND, 29], yaw: 0, bot: true }])
+    const events = walkOver(sim, "bot")
+    expect(Math.hypot(me(sim, "bot").body.x - DEATH[0], me(sim, "bot").body.z - DEATH[2])).toBeLessThan(0.5)
+    expect(events.some((e) => e.t === "panel" && e.a === "taken")).toBe(false)
+    expect(carried(sim).tag).toBe("lying")
+    expect(me(sim, "bot").arsenal.power).toBeNull()
   })
 })

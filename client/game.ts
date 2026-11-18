@@ -12,7 +12,7 @@ import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, seatedBody, sprinting } from 
 import type { PhysicsWorld } from "../shared/physics.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
-import { outsideStorm, owned, RAISE_TICKS, speedScale, weaponInSlot } from "../shared/sim/rules.ts"
+import { outsideStorm, owned, panelOnWall, RAISE_TICKS, speedScale, weaponInSlot } from "../shared/sim/rules.ts"
 import { isTraining } from "../shared/training/index.ts"
 import { closedGates, viewedStation } from "../shared/training/gates.ts"
 import type { InterfaceAction } from "../shared/training/interface.ts"
@@ -20,7 +20,7 @@ import { UnavailableSteps } from "./training-unavailable.ts"
 import type { StationId } from "../shared/training/index.ts"
 import { FRESH_TRAINING, trainingProgressed } from "./settings.ts"
 import { entryChoice, listOnEntry, stationButtonId, stationEntries, stationListHtml } from "./training-menu.ts"
-import { usesAmmo, WEAPONS, type Slot, type WeaponId } from "../shared/weapons.ts"
+import { PANEL_HP, usesAmmo, WEAPONS, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { firstPerson } from "./firstperson.ts"
 import type { Avatar, Fx, GameAudio, P3, SoundName, TurretVisual, Viewmodel, WorldScene } from "./contracts.ts"
 import { Controls, trackedIn } from "./controls.ts"
@@ -489,7 +489,7 @@ export class Game {
     // Broken-down doors no longer stop predicted movement or shots.
     this.physics.setDoors(s.doors.map((hp) => hp > 0))
     // A panel torn off leaves its gap: predicted shots pass through it (bodies still cannot).
-    this.physics.setPanels(s.panels.map((p) => p.tag !== "off"))
+    this.physics.setPanels(s.panels.map(panelOnWall))
     // The training's closed ways stop predicted movement as they stop it on the host.
     const gates = this.physics.map.gates?.length ?? 0
     const at = viewedStation(s.training)
@@ -700,10 +700,26 @@ export class Game {
       case "panel": {
         const panel = this.physics.map.panels?.[e.i]
         if (!panel) return
-        const at: P3 = [(panel.min[0] + panel.max[0]) / 2, (panel.min[1] + panel.max[1]) / 2, (panel.min[2] + panel.max[2]) / 2]
-        fx.splinters(at, true)
-        audio.play("door_break", { at })
-        this.hud.announce(t().game.panelTorn(this.names.get(e.s) ?? "?"), t().game.panelSub)
+        if (e.a === "torn") {
+          const at: P3 = [(panel.min[0] + panel.max[0]) / 2, (panel.min[1] + panel.max[1]) / 2, (panel.min[2] + panel.max[2]) / 2]
+          fx.splinters(at, true)
+          audio.play("door_break", { at })
+          this.hud.announce(t().game.panelTorn(this.names.get(e.s) ?? "?"), t().game.panelSub)
+          return
+        }
+        // Taken from the ground, a blow it took, broken: at its carrier.
+        const at = this.posOf(e.s)
+        const mine = e.s === me
+        const where = mine || !at ? {} : { at }
+        if (e.a === "taken") {
+          audio.play("pickup_lanciafrico", where)
+          if (mine) this.hud.announce(t().game.panelTaken)
+        } else if (e.a === "blocked") audio.play("door_hit", where)
+        else {
+          if (at) fx.splinters(at, true)
+          audio.play("door_break", where)
+          if (mine) this.hud.announce(t().game.panelBroken, t().game.panelBrokenSub)
+        }
         return
       }
       case "bounce":
@@ -822,7 +838,7 @@ export class Game {
 
   /** The turret I'm using, or -1. */
   /**
-   * The panel holding "use" would tear off now, as the simulation decides it (`TearPanels`): on its
+   * The panel holding "use" would tear off now, as the simulation decides it (`PlayPanels`): on its
    * wall or being torn by me, faced from inside with slot 3 free. -1 when none.
    */
   private panelToTear(s: Snapshot, body: { readonly x: number; readonly y: number; readonly z: number }): number {
@@ -1892,7 +1908,8 @@ export class Game {
           }
         }),
         doors: s.doors.map((hp, i) => hp / (this.physics.map.doors[i]?.hp ?? 1)),
-        panels: s.panels.map((p) => (p.tag === "off" ? null : p.tag === "tearing" ? p.progress : 0)),
+        panels: s.panels.map((p) => (p.tag === "wall" ? 0 : p.tag === "tearing" ? p.progress : null)),
+        lyingPanels: s.panels.map((p) => (p.tag === "lying" ? p.at : null)),
         gates: this.gates,
         camera
       })
@@ -1921,6 +1938,9 @@ export class Game {
       // Facing the casot's panel: the control to hold, and how far my tear has got (the same decision as the touch "use" button).
       const tearing = s?.panels.find((p) => p.tag === "tearing" && p.by === this.me)
       this.hud.panel(this.controls.turretControl === "tear", tearing?.tag === "tearing" ? tearing.progress : 0, this.controls.device)
+      // Carrying it: how much it can still take.
+      const held = you.alive ? s?.panels.find((p) => p.tag === "carried" && p.by === this.me) : undefined
+      this.hud.panelHealth(held?.tag === "carried" ? held.hp / PANEL_HP : null)
       const speed = b ? Math.hypot(b.vx, b.vz) : 0
       const spread = aiming ? def.spread.aimed : speed > 1.5 || !b?.grounded ? def.spread.moving : def.spread.still
       const px = (Math.tan(spread) / Math.tan(((camera.fov / 2) * Math.PI) / 180)) * (innerHeight / 2)
