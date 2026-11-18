@@ -478,6 +478,14 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #hud.touch #mode-label { display: none; }
 #hud.touch #objective { flex-basis: 100%; margin: 0 0 2px; font-size: 11px; text-align: center; }
 #hud.touch #objective:empty { display: none; }
+/* Portrait: the score goes up beside the corner buttons, on their row (--row-*, from the layout); the objective keeps the column's first line. */
+#hud.touch.portrait #topbar { position: absolute; inset-block-end: calc(100% + var(--row-gap) + var(--row-h) * 0.1); inset-inline-end: 0; block-size: calc(var(--row-h) * 0.8); max-inline-size: var(--row-w);
+  flex-wrap: nowrap; align-items: center; }
+#hud.touch.portrait #topbar .score b { font-size: calc(var(--row-h) * 0.46); }
+#hud.touch.portrait #clock { font-size: calc(var(--row-h) * 0.36); }
+#hud.touch.portrait #objective { position: absolute; inset-block-start: calc(100% + var(--row-gap) + var(--row-h) * 0.1); inset-inline-end: calc(var(--free-w) / 2); transform: translateX(50%);
+  inline-size: max-content; max-inline-size: var(--free-w); margin: 0; padding: 2px 8px; border-radius: 8px; background: rgba(10, 8, 6, 0.72); }
+#hud.touch.portrait #hud-free:has(#objective:not(:empty)) { padding-block-start: 28px; }
 #hud.touch #banner { order: 1; max-inline-size: 100%; text-align: center; font-size: 12px; padding: 3px 10px; }
 /* The two newest kills, one line each, without the weapon. */
 #hud.touch #killfeed { order: 2; inline-size: 100%; align-items: center; gap: 2px; font-size: 11px; }

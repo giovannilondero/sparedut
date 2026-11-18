@@ -330,6 +330,11 @@ export class Hud {
     this.pageStyle("--free-w", `${f.width}px`)
     this.pageStyle("--free-h", `${f.height}px`)
     this.toggle("hud", "portrait", layout.portrait)
+    // The corner buttons' row, which the score shares in portrait: its height, its gap to the free area, the width left beside the buttons.
+    const { menu, phrases } = layout.buttons
+    this.style("hud", "--row-h", `${2 * menu.r}px`)
+    this.style("hud", "--row-gap", `${f.top - (menu.y + menu.r)}px`)
+    this.style("hud", "--row-w", `${f.left + f.width - (phrases.x + phrases.r) - (f.top - (menu.y + menu.r))}px`)
     // The vitals, from the free area's corner (they share its box).
     const v = layout.vitals
     this.style("vitals", "--x", `${v.left - f.left}px`)
