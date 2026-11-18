@@ -80,9 +80,9 @@
           <label class="field"><span data-t="botsLabel"></span><select id="c-bots"></select></label>
         </div>
         <div class="field"><span data-t="levelLabel"></span><div id="c-level" class="levels" role="radiogroup"></div></div>
-        <label class="field"><span data-t="reachLabel"></span><select id="c-reach"><option value="lan" data-t="reachLan"></option><option value="online" data-t="reachOnline"></option><option value="offline" data-t="reachOffline"></option></select></label>
+        <label class="field"><span data-t="reachLabel"></span><select id="c-reach"></select></label>
         <div class="grid2 needs-server">
-          <label class="field"><span data-t="accessLabel"></span><select id="c-access"><option value="open" data-t="accessOpen"></option><option value="password" data-t="accessPassword"></option></select></label>
+          <label class="field"><span data-t="accessLabel"></span><select id="c-access"></select></label>
           <label class="field" id="c-password-field" hidden><span data-t="passwordLabel"></span><input id="c-password" maxlength="32" autocomplete="off" spellcheck="false" /></label>
         </div>
         <p id="c-msg" class="form-msg" role="alert"></p>
@@ -204,7 +204,13 @@
       <div id="pause" class="hidden overlay"></div>
       <div id="settings-ingame" class="hidden overlay"></div>
       <div id="endscreen" class="hidden overlay"></div>
-      <div id="clickplay" class="hidden" data-t="clickplay"></div>
+      <div id="clickplay" class="hidden"><div class="for-mouse" data-t="clickplay"></div><div class="for-touch" data-t="tapplay"></div></div>
+
+      <!-- Touch controls (layout A): drawn where client/touch.ts places them; the canvas below takes the fingers. -->
+      <div id="touch" class="hidden" aria-hidden="true">
+        <div id="touch-stick"><i id="touch-knob"></i></div>
+        <div id="touch-fire"></div>
+      </div>
     </div>
 
     <div id="toast" class="hidden"></div>

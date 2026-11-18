@@ -8,6 +8,7 @@ import type { KillCause } from "../shared/sim/events.ts"
 import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { WARMUP_TICKS } from "../shared/sim/rules.ts"
 import { t } from "./i18n.ts"
+import type { TouchLayout, TouchView } from "./touch.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -249,8 +250,40 @@ export class Hud {
   }
 
 
-  clickToPlay(on: boolean) {
+  /** The prompt to start playing: "tap" where the main pointer is a finger, "click" elsewhere. */
+  clickToPlay(on: boolean, touch: boolean) {
     this.toggle("clickplay", "hidden", !on)
+    this.toggle("clickplay", "touch", touch)
+  }
+
+  /** The touch controls are shown only while touch is the active device and nothing covers the match. */
+  touchShown(on: boolean) {
+    this.toggle("touch", "hidden", !on)
+  }
+
+  /** Places the touch controls for the canvas's current size (on start and on every resize or rotation). */
+  placeTouch(layout: TouchLayout) {
+    const s = layout.stick
+    this.style("touch", "--stick-r", `${s.radius}px`)
+    this.style("touch", "--rest-x", `${s.rest.x}px`)
+    this.style("touch", "--rest-y", `${s.rest.y}px`)
+    this.style("touch", "--fire-x", `${layout.fire.x}px`)
+    this.style("touch", "--fire-y", `${layout.fire.y}px`)
+    this.style("touch", "--fire-r", `${layout.fire.r}px`)
+  }
+
+  /**
+   * Draws the stick where the thumb landed and the knob under it, and fire as held.
+   * Called on touch events only; it writes transforms and classes, never layout.
+   */
+  drawTouch(view: TouchView) {
+    const stick = $("touch-stick")
+    const knob = $("touch-knob")
+    const v = view.stick
+    stick.classList.toggle("held", v.held)
+    stick.style.transform = v.held ? `translate(${v.ox}px, ${v.oy}px)` : ""
+    knob.style.transform = v.held ? `translate(${v.kx - v.ox}px, ${v.ky - v.oy}px)` : ""
+    $("touch-fire").classList.toggle("held", view.fire)
   }
 }
 

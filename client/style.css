@@ -267,6 +267,26 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 
 #clickplay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; font-family: var(--serif); font-size: 30px; color: var(--gold); background: rgba(10, 8, 6, 0.7); padding: 18px 30px; border-radius: 14px; border: 1px solid var(--stone-line); }
 #clickplay small { display: block; font-size: 14px; color: var(--muted); font-family: var(--sans); }
+#clickplay.touch .for-mouse, #clickplay:not(.touch) .for-touch { display: none; }
+
+/*
+ * During a match a finger never zooms, scrolls, refreshes, selects or opens a callout. The canvas takes
+ * the fingers (the HUD lets them through); the match menus still scroll, without zooming.
+ */
+#view { touch-action: none; }
+html.in-match, html.in-match body { overscroll-behavior: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+html.in-match .overlay { touch-action: pan-x pan-y; overscroll-behavior: contain; }
+html.in-match input { user-select: text; -webkit-user-select: text; }
+
+/* Touch controls: positions come from client/touch.ts through custom properties; moving them is a transform only. */
+#touch { position: absolute; inset: 0; pointer-events: none; }
+#touch-stick { position: absolute; left: 0; top: 0; width: calc(var(--stick-r) * 2); height: calc(var(--stick-r) * 2); margin: calc(var(--stick-r) * -1) 0 0 calc(var(--stick-r) * -1);
+  border-radius: 50%; border: 2px solid rgba(243, 233, 210, 0.35); background: rgba(10, 8, 6, 0.18); transform: translate(var(--rest-x), var(--rest-y)); opacity: 0.45; }
+#touch-stick.held { opacity: 1; }
+#touch-knob { position: absolute; left: 50%; top: 50%; width: 46%; height: 46%; margin: -23% 0 0 -23%; border-radius: 50%; background: rgba(243, 233, 210, 0.55); box-shadow: 0 0 6px rgba(0, 0, 0, 0.5); }
+#touch-fire { position: absolute; left: var(--fire-x); top: var(--fire-y); width: calc(var(--fire-r) * 2); height: calc(var(--fire-r) * 2); transform: translate(-50%, -50%);
+  border-radius: 50%; border: 2px solid rgba(232, 182, 76, 0.75); background: radial-gradient(circle, rgba(232, 182, 76, 0.55) 0 22%, rgba(10, 8, 6, 0.3) 24%); }
+#touch-fire.held { background: radial-gradient(circle, rgba(232, 182, 76, 0.9) 0 26%, rgba(232, 182, 76, 0.25) 28%); }
 
 #toast { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); background: var(--stone); border: 1px solid var(--gold); padding: 10px 18px; border-radius: 10px; z-index: 10; animation: rise 0.2s; }
 
@@ -281,4 +301,4 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 #perf b { font-size: 16px; }
 #perf small { color: var(--muted); margin-top: 2px; }
 /* The create form: settings that only a room on the server has (access, password) hide for Offline. */
-#menu-create[data-reach="offline"] .needs-server { display: none; }
+#menu-create:not([data-access-applies]) .needs-server { display: none; }

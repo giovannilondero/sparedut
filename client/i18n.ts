@@ -16,12 +16,12 @@ export type Lang = "fur" | "it"
 type Fn<A extends unknown[] = [string]> = (...args: A) => string
 
 /** Static HTML texts: `data-t="key"` (innerHTML) and `data-t-ph="key"` (placeholder). */
-type StaticKey =
+export type StaticKey =
   | "title" | "kicker" | "sub" | "nameLabel" | "namePh" | "oneTap" | "oneTapSub" | "create" | "createSub" | "join" | "joinSub"
   | "roomsTitle" | "armarie" | "settings" | "vocab" | "minutesLabel" | "botsLabel" | "levelLabel" | "reachLabel" | "reachLan" | "reachOnline" | "reachOffline"
   | "ff" | "back" | "createGo" | "joinGo" | "armarieTitle" | "sens" | "fov" | "volume" | "music" | "quality" | "qLow" | "qMid"
   | "qHigh" | "autoRes" | "showInfo" | "invert" | "keys" | "vocabTitle" | "connecting" | "chatPh" | "deathTitle" | "deathHint"
-  | "clickplay" | "language" | "mapLabel" | "crouchMode" | "crouchHold" | "crouchToggle"
+  | "clickplay" | "tapplay" | "language" | "mapLabel" | "crouchMode" | "crouchHold" | "crouchToggle"
   | "accessLabel" | "accessOpen" | "accessPassword" | "passwordLabel" | "passwordTitle"
 
 export interface Strings {
@@ -321,6 +321,7 @@ const fur: Strings = {
     deathTitle: "Ti àn fat frico!",
     deathHint: "Frache <kbd>B</kbd> par cambiâ l'arme principâl",
     clickplay: "<div>Fâs clic par zuiâ</div><small>o frache un boton dal controller · Esc pal menù de partide</small>",
+    tapplay: "<div>Tocje par zuiâ</div><small>o frache un boton dal controller</small>",
     language: "Lenghe",
     mapLabel: "Mape"
   },
@@ -667,6 +668,7 @@ const it: Strings = {
     deathTitle: "Ti hanno fatto frico!",
     deathHint: "Premi <kbd>B</kbd> per cambiare arma principale",
     clickplay: "<div>Clicca per giocare</div><small>o premi un tasto del controller · Esc per il menu della partita</small>",
+    tapplay: "<div>Tocca per giocare</div><small>o premi un tasto del controller</small>",
     language: "Lingua",
     mapLabel: "Mappa"
   },

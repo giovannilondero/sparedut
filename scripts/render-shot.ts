@@ -55,4 +55,7 @@ try {
   console.log(out)
 } finally {
   child.kill()
+  await child.exited
+  // The profile is never reused: left behind, every run keeps about 100 MB of /tmp.
+  await Bun.$`rm -rf /tmp/render-shot-${port}`.quiet()
 }
