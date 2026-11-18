@@ -118,7 +118,7 @@ export interface Strings {
     readonly ffOn: string
     readonly minutes: Fn<[number]>
     readonly tag: { readonly primary: string; readonly power: string; readonly melee: string; readonly pistol: string }
-    readonly stat: { readonly damage: string; readonly rate: string; readonly range: string; readonly mag: string }
+    readonly stat: { readonly damage: string; readonly rate: string; readonly range: string; readonly mag: string; readonly health: string; readonly speed: string }
     readonly vocab: readonly (readonly [string, string])[]
     /** One line on who can see and join a room of that reach. */
     readonly reachSub: Record<Reach, string>
@@ -568,7 +568,7 @@ const fur: Strings = {
       melee: "Cuarp a cuarp · simpri cun te",
       pistol: "Pistole · simpri cun te"
     },
-    stat: { damage: "Dam", rate: "Cjadence", range: "Puartade", mag: "Cjamadôr" },
+    stat: { damage: "Dam", rate: "Cjadence", range: "Puartade", mag: "Cjamadôr", health: "Salût", speed: "Velocitât" },
     vocab: VOCAB,
     reachSub: {
       offline: "Dome tu cuintri i bot, in chest navigadôr",
@@ -604,7 +604,7 @@ const fur: Strings = {
     deathSelf: "Tu ti sês fat mâl di bessôl",
     respawnIn: (s) => `Si torne in pîts tra ${s}…`,
     shield: "✨ Protezût",
-    board: ["Non", "Ponts", "Copâts", "Muarts", "Ajûts", "Frics", "Serie", "Ping"],
+    board: ["Non", "Arme", "Ponts", "Copâts", "Muarts", "Ajûts", "Frics", "Serie", "Ping"],
     kill: {
       mescul: ["al à messedât come la polente", "al à mesculât", "al à dât une mesculade a"],
       mandi: ["al à saludât par simpri", "al à dit Mandi a", "al à fat la riverence a"],
@@ -992,7 +992,7 @@ const it: Strings = {
       melee: "Corpo a corpo · sempre con te",
       pistol: "Pistola · sempre con te"
     },
-    stat: { damage: "Danno", rate: "Cadenza", range: "Portata", mag: "Caricatore" },
+    stat: { damage: "Danno", rate: "Cadenza", range: "Portata", mag: "Caricatore", health: "Salute", speed: "Velocità" },
     vocab: VOCAB,
     reachSub: {
       offline: "Solo tu contro i bot, in questo browser",
@@ -1028,7 +1028,7 @@ const it: Strings = {
     deathSelf: "Ti sei fatto male da solo",
     respawnIn: (s) => `Si torna in piedi tra ${s}…`,
     shield: "✨ Protetto",
-    board: ["Nome", "Punti", "Uccisioni", "Morti", "Assist", "Catture", "Serie", "Ping"],
+    board: ["Nome", "Arma", "Punti", "Uccisioni", "Morti", "Assist", "Catture", "Serie", "Ping"],
     kill: {
       mescul: ["ha girato come la polenta", "ha rimestato", "ha dato una mestolata a"],
       mandi: ["ha salutato per sempre", "ha detto Mandi a", "ha fatto la riverenza a"],
