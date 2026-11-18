@@ -12,7 +12,7 @@ import { STATION_IDS } from "../shared/training/index.ts"
 import type { Device } from "./device.ts"
 import { t } from "./i18n.ts"
 import { menuControl, playPrompt, trainingPrompt, turretPrompt } from "./prompts.ts"
-import { stepMarksHtml } from "./training-panel.ts"
+import { announcesStep, NOT_SHOWN, stepMarksHtml, type PanelPlace } from "./training-panel.ts"
 import { buttonBit, TOUCH_BUTTONS, type Insets, type PickerEntry, type TouchLayout, type TouchView } from "./touch.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -24,6 +24,10 @@ export const fmtClock = (ticks: number) => {
   const s = Math.max(0, Math.ceil(ticks / 60))
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`
 }
+
+/** What the training panel shows, to write it again only when it changes. */
+type PanelShown = PanelPlace & { readonly strings: unknown; readonly count: number; readonly device: Device | null }
+const PANEL_BLANK: PanelShown = { ...NOT_SHOWN, strings: null, count: -1, device: null }
 
 export class Hud {
   private announceTimer = 0
@@ -77,17 +81,21 @@ export class Hud {
   }
 
   /** What the training panel last showed: it is written again only when one of these changes. */
-  private trainingShown: { strings: unknown; station: string; step: string | null; count: number; device: Device | null } = { strings: null, station: "", step: null, count: -1, device: null }
+  private trainingShown: PanelShown = PANEL_BLANK
   private trainingDoneTimer = 0
 
   /**
    * The training's panel: the station and its number out of the total, its steps as marks (done,
    * current, to do), the current step's instruction naming its control, and its count when it has
-   * one. Hidden outside a training.
+   * one. A step it was not showing arrives in the middle of the screen before it settles in its
+   * corner (`training-arrive` in style.css). Hidden outside a training, and the next one starts anew.
    */
   training(view: TrainingView | null, device: Device) {
     this.toggle("training", "hidden", view === null)
-    if (view === null) return
+    if (view === null) {
+      this.trainingShown = PANEL_BLANK
+      return
+    }
     const s = t()
     const station = view.tag === "station" ? view.station : ""
     const step = view.tag === "station" ? view.step : null
@@ -104,15 +112,21 @@ export class Hud {
     this.text("training-station", s.training.station(STATION_IDS.indexOf(view.station) + 1, STATION_IDS.length, s.training.stations[view.station]))
     this.html("training-steps", stepMarksHtml(view, s))
     this.html("training-step", trainingPrompt(s, view, device))
+    if (announcesStep(shown, this.trainingShown)) this.restart($("training"), "announce")
+  }
+
+  /** Plays an element's animation from its start, also while it is still playing. */
+  private restart(el: HTMLElement, cls: string) {
+    el.classList.remove(cls)
+    void el.offsetWidth
+    el.classList.add(cls)
   }
 
   /** The brief confirmation that a step was done. */
   trainingDone() {
     const el = $("training-done")
     el.textContent = `✓ ${t().training.stepDone}`
-    el.classList.remove("pop")
-    void el.offsetWidth
-    el.classList.add("pop")
+    this.restart(el, "pop")
     clearTimeout(this.trainingDoneTimer)
     this.trainingDoneTimer = window.setTimeout(() => (el.textContent = ""), 1600)
   }

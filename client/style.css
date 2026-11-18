@@ -235,6 +235,30 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 #training-done { color: var(--ben); font-weight: bold; }
 #training-done:empty { display: none; }
 #training-done.pop { animation: rise 0.3s ease-out; }
+/*
+ * A step to do arrives where the player is looking: large above the crosshair and edged in gold,
+ * then it glides to its corner (`Hud.training` sets `announce` when the step changes). While the
+ * game waits for the player to take the controls it waits there too, and arrives once they have.
+ * On touch the panel is already first in the free area. With reduced motion it does not travel: it
+ * fades out in the middle and in at its place.
+ */
+#training { --mid: translate(calc(50vw - 14px - 50%), calc(30vh - 14px - 50%)) scale(1.6); --call-back: rgba(10, 8, 6, 0.9); --call-glow: 0 0 28px color-mix(in oklch, var(--gold) 35%, transparent); }
+#hud:not(.touch) #training.announce { animation: training-arrive 3.8s; }
+#hud:not(.touch):has(#clickplay:not(.hidden)) #training.announce { animation: none; transform: var(--mid); border-color: var(--gold); background-color: var(--call-back); box-shadow: var(--call-glow); }
+@keyframes training-arrive {
+  0% { opacity: 0; transform: var(--mid) scale(1.12); animation-timing-function: ease-out; }
+  6% { opacity: 1; transform: var(--mid) scale(1); border-color: var(--gold); background-color: var(--call-back); box-shadow: var(--call-glow); }
+  82% { opacity: 1; transform: var(--mid) scale(1); border-color: var(--gold); background-color: var(--call-back); box-shadow: var(--call-glow); animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1); }
+}
+@keyframes training-arrive-still {
+  0% { opacity: 0; transform: var(--mid); }
+  6%, 82% { opacity: 1; transform: var(--mid); border-color: var(--gold); background-color: var(--call-back); }
+  90% { opacity: 0; transform: var(--mid); }
+  90.01% { opacity: 0; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #hud:not(.touch) #training.announce { animation-name: training-arrive-still; }
+}
 #banner { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); font-size: 14px; background: rgba(10, 8, 6, 0.7); padding: 6px 14px; border-radius: 8px; border: 1px solid var(--stone-line); }
 #banner:empty { display: none; }
 #banner .storm { color: #9fd0ff; animation: storm-pulse 0.8s ease-in-out infinite alternate; }
