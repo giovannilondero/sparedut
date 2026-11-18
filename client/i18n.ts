@@ -275,6 +275,10 @@ const WEAPON_NAMES = {
   mitraie: { name: "Mitraie de Postazion", short: "Mitraie" }
 } as const
 
+/** The labels on the touch "use" button, mounting and dismounting: the turret prompts on touch name them. */
+const FUR_TOUCH = { use: "Mitraie", leave: "Lasse" } as const
+const IT_TOUCH = { use: "Mitragliatrice", leave: "Lascia" } as const
+
 const fur: Strings = {
   static: {
     title: "Sparedût — Bataie tal Dom di Glemone",
@@ -520,14 +524,14 @@ const fur: Strings = {
       pad: "<div>Frache un boton par zuiâ</div><small>Options pal menù de partide</small>",
       touch: "<div>Tocje par zuiâ</div><small>o frache un boton dal controller</small>"
     },
-    turretUse: { keyboard: "<kbd>E</kbd> Mitraie", pad: "<kbd>⬇</kbd> Mitraie", touch: "Tocje <kbd>Mitraie</kbd>" },
+    turretUse: { keyboard: "<kbd>E</kbd> Mitraie", pad: "<kbd>⬇</kbd> Mitraie", touch: `Tocje <kbd>${FUR_TOUCH.use}</kbd>` },
     turretLeave: {
       keyboard: "<kbd>E</kbd> / <kbd>Spazi</kbd> lasse la mitraie",
       pad: "<kbd>⬇</kbd> / <kbd>✕</kbd> lasse la mitraie",
-      touch: "Tocje <kbd>Lasse</kbd> par lassâ la mitraie"
+      touch: `Tocje <kbd>${FUR_TOUCH.leave}</kbd> par lassâ la mitraie`
     },
-    touchUse: "Mitraie",
-    touchLeave: "Lasse",
+    touchUse: FUR_TOUCH.use,
+    touchLeave: FUR_TOUCH.leave,
     turretHeat: "Calôr",
     turretHot: "SCJALDADE!"
   },
@@ -873,14 +877,14 @@ const it: Strings = {
       pad: "<div>Premi un tasto per giocare</div><small>Options per il menu della partita</small>",
       touch: "<div>Tocca per giocare</div><small>o premi un tasto del controller</small>"
     },
-    turretUse: { keyboard: "<kbd>E</kbd> Mitragliatrice", pad: "<kbd>⬇</kbd> Mitragliatrice", touch: "Tocca <kbd>Mitraglia</kbd>" },
+    turretUse: { keyboard: "<kbd>E</kbd> Mitragliatrice", pad: "<kbd>⬇</kbd> Mitragliatrice", touch: `Tocca <kbd>${IT_TOUCH.use}</kbd>` },
     turretLeave: {
       keyboard: "<kbd>E</kbd> / <kbd>Spazio</kbd> lascia la mitragliatrice",
       pad: "<kbd>⬇</kbd> / <kbd>✕</kbd> lascia la mitragliatrice",
-      touch: "Tocca <kbd>Lascia</kbd> per lasciare la mitragliatrice"
+      touch: `Tocca <kbd>${IT_TOUCH.leave}</kbd> per lasciare la mitragliatrice`
     },
-    touchUse: "Mitraglia",
-    touchLeave: "Lascia",
+    touchUse: IT_TOUCH.use,
+    touchLeave: IT_TOUCH.leave,
     turretHeat: "Calore",
     turretHot: "SURRISCALDATA!"
   },
