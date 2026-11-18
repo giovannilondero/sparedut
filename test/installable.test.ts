@@ -2,6 +2,11 @@ import { expect, test } from "bun:test"
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { addsToHomeScreenByHand, keepStorage, runsInstalled } from "../client/installed.ts"
+import { deployOriginInPage, pageForDeploy } from "../scripts/deploy-origin.ts"
+import viteConfig from "../vite.config.ts"
+import { precacheOf } from "../client/offline-cache/precache.ts"
+import { builtFiles } from "../scripts/service-worker.ts"
+import { headersFor } from "../server/static-headers.ts"
 
 const PUBLIC = join(import.meta.dir, "../client/public")
 const html = readFileSync(join(import.meta.dir, "../client/index.html"), "utf8")
@@ -70,6 +75,80 @@ test("iOS finds its home screen icon, a 180 pixel PNG, and opens the game with n
   expect(pngSize(apple!)).toEqual([180, 180])
   expect(html).toContain('<meta name="apple-mobile-web-app-capable" content="yes" />')
   expect(html).toContain('<meta name="mobile-web-app-capable" content="yes" />')
+})
+
+/** The page as the build writes it, for a deploy on `domain` (`DEPLOY_DOMAIN`, or none). */
+const built = (domain?: string) => pageForDeploy(html, domain === undefined ? {} : { DEPLOY_DOMAIN: domain })
+/** The `content` of the `<meta>` whose `name` or `property` is `key`, in a page. */
+const meta = (page: string, key: string) => page.match(new RegExp(`<meta (?:name|property)="${key}" content="([^"]*)"`))?.[1]
+
+test("a shared link shows the game's title, a line about it and a large picture, in chats and on X", () => {
+  const page = built()
+  expect(meta(page, "description")).toBeTruthy()
+  expect(meta(page, "og:title")).toBe("Sparedût")
+  expect(meta(page, "og:description")).toBe(meta(page, "description"))
+  expect(meta(page, "og:type")).toBe("website")
+  expect(meta(page, "og:locale")).toBe("fur_IT")
+  expect(meta(page, "og:url")).toBe("https://sparedut.giovannilondero.dev/")
+  expect(meta(page, "og:image")).toBe("https://sparedut.giovannilondero.dev/showcase/link-preview.png")
+  expect(meta(page, "og:image:type")).toBe("image/png")
+  expect(meta(page, "og:image:width")).toBe("1200")
+  expect(meta(page, "og:image:height")).toBe("630")
+  expect(meta(page, "og:image:alt")).toBeTruthy()
+  expect(meta(page, "twitter:card")).toBe("summary_large_image")
+  expect(meta(page, "twitter:image")).toBe(meta(page, "og:image"))
+  expect(meta(page, "twitter:image:alt")).toBe(meta(page, "og:image:alt"))
+})
+
+/** Every absolute address written in a page. */
+const absolute = (page: string) => [...page.matchAll(/"([a-z][a-z0-9+.-]*:\/\/[^"]*)"/gi)].map((m) => m[1]!)
+
+test("every absolute address in the page is on the public game's domain, whichever build wrote it", () => {
+  const addresses = absolute(built())
+  expect(addresses.length).toBeGreaterThanOrEqual(3)
+  expect(addresses.filter((url) => !url.startsWith("https://sparedut.giovannilondero.dev/"))).toEqual([])
+  expect(built("")).toBe(built())
+})
+
+test("a deploy on another domain advertises its own address", () => {
+  const addresses = absolute(built("sparedut.example.com"))
+  expect(addresses.length).toBeGreaterThanOrEqual(3)
+  expect(addresses.filter((url) => !url.startsWith("https://sparedut.example.com/"))).toEqual([])
+  expect(meta(built("sparedut.example.com"), "og:image")).toBe("https://sparedut.example.com/showcase/link-preview.png")
+})
+
+test("the page is built with the deploy's address, in the dev server and in every build", () => {
+  const plugin = deployOriginInPage()
+  const transform = plugin.transformIndexHtml as (html: string) => string
+  const previous = process.env.DEPLOY_DOMAIN
+  try {
+    process.env.DEPLOY_DOMAIN = "sparedut.example.com"
+    expect(transform(html)).toBe(built("sparedut.example.com"))
+  } finally {
+    if (previous === undefined) delete process.env.DEPLOY_DOMAIN
+    else process.env.DEPLOY_DOMAIN = previous
+  }
+  expect(viteConfig.plugins?.flat().some((p) => p && typeof p === "object" && "name" in p && p.name === plugin.name)).toBe(true)
+  expect(built()).not.toContain("%DEPLOY_ORIGIN%")
+})
+
+/** The page's path for an address on the deploy's origin. */
+const pathOf = (url: string) => new URL(url).pathname
+
+test("the preview picture is a 1200 by 630 PNG that the build serves", () => {
+  const image = pathOf(meta(built(), "og:image")!)
+  expect(pngSize(image)).toEqual([1200, 630])
+})
+
+test("the preview picture is not downloaded when the game is installed", () => {
+  const { urls } = precacheOf(builtFiles(PUBLIC))
+  expect(urls).toContain("/manifest.webmanifest")
+  expect(urls).not.toContain(pathOf(meta(built(), "og:image")!))
+})
+
+test("the preview picture is served with the same security headers as the page", () => {
+  const headers = readFileSync(join(PUBLIC, "_headers"), "utf8")
+  expect(headersFor(headers, pathOf(meta(built(), "og:image")!))).toEqual(headersFor(headers, "/"))
 })
 
 /** A browser window: its display mode, whether the page is fullscreen through the Fullscreen API, and Safari's `navigator.standalone`. */

@@ -30,8 +30,11 @@ export interface Precache {
 /** The service worker's own file: the browser fetches it, it never comes from a cache. */
 export const WORKER_FILE = "sw.js"
 
-/** Never precached: the Vêr look's files (`VER_PREFIXES`), the server's headers, the worker, notes and source maps. */
-const left = (url: string) => isVerFile(url) || url === "/_headers" || url === `/${WORKER_FILE}` || /\.(md|map)$/.test(url) || url.endsWith("/.DS_Store")
+/** The pictures that show the game off, the link preview and the install screenshots (`scripts/showcase.ts`): never played with. */
+export const SHOWCASE_PREFIX = "/showcase/"
+
+/** Never precached: the Vêr look's files (`VER_PREFIXES`), the showcase pictures, the server's headers, the worker, notes and source maps. */
+const left = (url: string) => isVerFile(url) || url.startsWith(SHOWCASE_PREFIX) || url === "/_headers" || url === `/${WORKER_FILE}` || /\.(md|map)$/.test(url) || url.endsWith("/.DS_Store")
 
 /** The page is asked for as `/`: Cloudflare answers `/index.html` with a redirect, which a navigation can't take from a cache. */
 const urlOf = (path: string) => (path === "index.html" ? "/" : `/${path}`)

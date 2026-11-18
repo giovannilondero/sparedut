@@ -9,6 +9,7 @@
 import { expect, test } from "bun:test"
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
+import { deployOrigin } from "../scripts/deploy-origin.ts"
 import { readPrecache } from "../scripts/service-worker.ts"
 
 const DIST = join(import.meta.dir, "../dist")
@@ -72,4 +73,20 @@ test("the size cached at install", () => {
   const bytes = precache.urls.reduce((sum, url) => sum + statSync(fileOf(url)).size, 0)
   expect(bytes).toBe(precache.bytes)
   console.log(`precached at install: ${precache.urls.length} files, ${(bytes / 1e6).toFixed(2)} MB (build ${precache.version})`)
+})
+
+test("the built page carries the link preview, every absolute address on the build's domain, and its picture is not cached at install", () => {
+  const html = readFileSync(join(DIST, "index.html"), "utf8")
+  const meta = (key: string) => html.match(new RegExp(`<meta (?:name|property)="${key}" content="([^"]*)"`))?.[1]
+  const origin = deployOrigin(process.env)
+  for (const key of ["description", "og:title", "og:description", "og:type", "og:locale", "og:image:alt", "twitter:card", "twitter:image:alt"]) expect([key, meta(key)]).toEqual([key, expect.any(String)])
+  expect(meta("og:url")).toBe(`${origin}/`)
+  const addresses = [...html.matchAll(/"([a-z][a-z0-9+.-]*:\/\/[^"]*)"/gi)].map((m) => m[1]!)
+  expect(addresses.length).toBeGreaterThanOrEqual(3)
+  expect(addresses.filter((url) => !url.startsWith(`${origin}/`))).toEqual([])
+  const image = new URL(meta("og:image")!).pathname
+  const bytes = readFileSync(fileOf(image))
+  expect([bytes.readUInt32BE(16), bytes.readUInt32BE(20)]).toEqual([Number(meta("og:image:width")), Number(meta("og:image:height"))])
+  expect([meta("og:image:width"), meta("og:image:height")]).toEqual(["1200", "630"])
+  expect(listed.has(image)).toBe(false)
 })

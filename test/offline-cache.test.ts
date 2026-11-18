@@ -114,6 +114,12 @@ test("a file added to the build's root, such as a manifest or an icon, is precac
   expect(urls).toContain("/icons/192.png")
 })
 
+test("the pictures that show the game off, link preview and install screenshots, are not precached", () => {
+  const { urls } = precacheOf([...BUILD, { path: "showcase/link-preview.png", bytes: 900_000, hash: "h-og" }, { path: "showcase/narrow-match.png", bytes: 1_200_000, hash: "h-shot" }])
+  expect(urls.filter((url) => url.startsWith("/showcase/"))).toEqual([])
+  expect(precacheOf([...BUILD, { path: "showcase/link-preview.png", bytes: 900_000, hash: "h-og" }]).version).toBe(precacheOf(BUILD).version)
+})
+
 test("the same build has the same version, whatever order its files come in", () => {
   expect(precacheOf([...BUILD].reverse()).version).toBe(precacheOf(BUILD).version)
   expect(precacheOf(BUILD).version).toMatch(/^[0-9a-f]{12}$/)
