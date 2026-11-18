@@ -48,3 +48,22 @@ export function decideOpening(opening: Opening, situation: OpeningSituation): Op
   if (opening.kind === "shortcut") return { kind: "start", button: "one-tap" }
   return { kind: "join", code: opening.invite.code, password: opening.invite.password }
 }
+
+/**
+ * The installed game's launches (`launchQueue`, with `launch_handler` in the manifest) as openings,
+ * each answered once. The launch that opened the page arrives there too, first and on the page's
+ * own address: it was answered on load, so it is no opening here.
+ */
+export class Launches {
+  private first = true
+
+  /** `page`: the address the page was opened on (`location.href` at load). */
+  constructor(private readonly page: string) {}
+
+  opening(target: string): Opening {
+    const url = new URL(target)
+    const own = this.first && url.href === new URL(this.page).href
+    this.first = false
+    return own ? { kind: "none" } : readOpening(url.search, url.hash)
+  }
+}

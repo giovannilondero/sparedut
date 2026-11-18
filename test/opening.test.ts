@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { STRINGS } from "../client/i18n.ts"
-import { decideOpening, type OpeningAction, readOpening } from "../client/opening.ts"
+import { decideOpening, Launches, type OpeningAction, readOpening } from "../client/opening.ts"
 
 const MENU = { playing: false, named: true }
 
@@ -64,4 +64,27 @@ test("an invite's address is an invite even with the shortcut's marker: invites 
 
 test("another value of the marker is not the shortcut", () => {
   expect(readOpening("?shortcut=x", "")).toEqual({ kind: "none" })
+})
+
+test("the launch that opened the installed game was answered on load: it is not answered again", () => {
+  const launches = new Launches("https://sparedut.example/?shortcut=bots")
+  expect(launches.opening("https://sparedut.example/?shortcut=bots")).toEqual({ kind: "none" })
+})
+
+test("the shortcut used again while the game is open is the shortcut, each time", () => {
+  const launches = new Launches("https://sparedut.example/?shortcut=bots")
+  launches.opening("https://sparedut.example/?shortcut=bots")
+  expect(launches.opening("https://sparedut.example/?shortcut=bots")).toEqual({ kind: "shortcut" })
+  expect(launches.opening("https://sparedut.example/?shortcut=bots")).toEqual({ kind: "shortcut" })
+})
+
+test("an invite opened in the installed game while it is open is that invite", () => {
+  const launches = new Launches("https://sparedut.example/")
+  launches.opening("https://sparedut.example/")
+  expect(launches.opening("https://sparedut.example/?p=abcd#pw=Cjavedal")).toEqual({ kind: "invite", invite: { code: "ABCD", password: "Cjavedal" } })
+})
+
+test("a first launch on another address than the page's is a launch of its own", () => {
+  const launches = new Launches("https://sparedut.example/")
+  expect(launches.opening("https://sparedut.example/?shortcut=bots")).toEqual({ kind: "shortcut" })
 })

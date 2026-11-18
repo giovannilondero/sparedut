@@ -13,7 +13,7 @@ import { createFx } from "./fx.ts"
 import { isLocalHost } from "../shared/hosts.ts"
 import { Game } from "./game.ts"
 import { inviteLink } from "./invite.ts"
-import { decideOpening, type Opening, readOpening } from "./opening.ts"
+import { decideOpening, Launches, type Opening, readOpening } from "./opening.ts"
 import { t } from "./i18n.ts"
 import { createLook, lookFromUrl } from "./looks.ts"
 import { loadDetailed } from "./models/detailed.ts"
@@ -193,6 +193,13 @@ const persist = () => {
 let joining = ""
 /** The password of the room being created, joined or played, if it has one: it goes into the invite link. */
 let roomPassword: string | null = null
+/** The name the game server knows the player by: the one told on connecting, or since. */
+let toldName: string | null = null
+/** Tells the game server the player's name (`hello`), so that a room created or joined next shows it. */
+const sayHello = () => {
+  toldName = settings.name
+  net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
+}
 const sendJoin = (code: string, password?: string) => {
   joining = code
   roomPassword = password ?? null
@@ -218,7 +225,7 @@ const menu = new Menu(settings, audio, {
     game?.requestFullscreen()
     autostart = oneTap
     roomPassword = o.access.kind === "password" ? o.access.password : null
-    net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
+    sayHello()
     net.send({ t: "create", ...o, primary: settings.primary })
   },
   training: (start) => {
@@ -237,7 +244,7 @@ const menu = new Menu(settings, audio, {
   join: (code, password) => {
     if (!ensureOnline()) return
     game?.requestFullscreen()
-    net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
+    sayHello()
     sendJoin(code, password)
   },
   settingsChanged: persist,
@@ -375,7 +382,14 @@ function answerOpening(opening: Opening) {
   const action = decideOpening(opening, { playing: playing(), named: Boolean(settings.name) })
   switch (action.kind) {
     case "join":
+      if (!net.open) {
+        // As if the page had been opened on the invite: `connect` joins it once the game server is there.
+        history.replaceState(null, "", inviteLink("", action.code, action.password))
+        return
+      }
       menu.status(t().net.invite(action.code))
+      // A connection older than the name would join under the old one: the server learns the new one first.
+      if (toldName !== settings.name) sayHello()
       sendJoin(action.code, action.password ?? undefined)
       return
     case "start":
@@ -395,7 +409,9 @@ async function connect() {
   connecting = true
   menu.status(t().net.connecting)
   try {
-    await net.connect(settings.name || "Furlan")
+    const name = settings.name || "Furlan"
+    await net.connect(name)
+    toldName = name
     connecting = false
     menu.status(t().net.connected(settings.name || t().net.stranger))
     net.send({ t: "list" })
@@ -417,29 +433,19 @@ net.onClose = () => {
   menu.status(t().net.lostRetry)
   reconnect(2000)
 }
-// Opened from the installed game's shortcut: answered at once, then the marker leaves the address
-// so that nothing starts again on its own.
+// Each launch of the installed game is answered once. The one that opened the page is answered
+// here: the shortcut at once, then its marker leaves the address so that nothing starts again on
+// its own; an invite once the game server is connected (`connect`).
+const launches = new Launches(location.href)
 const opened = readOpening(location.search, location.hash)
 if (opened.kind === "shortcut") {
   forgetRoomAddress()
   answerOpening(opened)
 }
-// The installed game opened again while open (its icon, its shortcut, a captured invite) focuses
-// this window (`launch_handler` in the manifest) and the launch arrives here, the first launch
-// too: answering it twice is harmless, the first start makes a match in progress.
+// The installed game launched again while open (its icon, its shortcut, a captured invite) focuses
+// this window (`launch_handler` in the manifest) and the launch arrives here.
 ;(window as { launchQueue?: LaunchQueue }).launchQueue?.setConsumer(({ targetURL }) => {
-  if (!targetURL) return
-  const target = new URL(targetURL)
-  const opening = readOpening(target.search, target.hash)
-  if (opening.kind === "shortcut") answerOpening(opening)
-  else if (opening.kind === "invite" && !playing()) {
-    // As if the page had been opened on it: joined once the game server is connected.
-    history.replaceState(null, "", `${location.pathname}${target.search}${target.hash}`)
-    if (net.open) {
-      net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
-      answerOpening(opening)
-    }
-  }
+  if (targetURL) answerOpening(launches.opening(targetURL))
 })
 void connect()
 setInterval(() => net.open && !game?.active && net.send({ t: "list" }), 3000)
