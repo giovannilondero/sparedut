@@ -6,7 +6,8 @@ import type { Team } from "../shared/map.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type SnapSelf, type Snapshot } from "../shared/protocol.ts"
 import type { KillCause } from "../shared/sim/events.ts"
 import { usesAmmo, type WeaponId } from "../shared/weapons.ts"
-import { maxHp } from "../shared/sim/rules.ts"
+import { maxHp, owned } from "../shared/sim/rules.ts"
+import type { ArsenalValue } from "../shared/sim/schema.ts"
 import type { PhaseView, TrainingView } from "../shared/sim/view.ts"
 import { isTraining, STATION_IDS } from "../shared/training/index.ts"
 import type { Device } from "./device.ts"
@@ -136,7 +137,7 @@ export class Hud {
   }
 
   /** `turret`: I'm on the turret, the weapon in hand is the mitraie (infinite ammo). */
-  vitals(you: SnapSelf | null, slot: { owned: (id: WeaponId) => boolean }, localMag: number | null, turret = false) {
+  vitals(you: SnapSelf | null, localMag: number | null, turret = false) {
     if (!you) return
     const hp = Math.max(0, you.hp)
     // The bar and the ring are full at the class's health, whatever it is.
@@ -158,6 +159,8 @@ export class Hud {
     this.text("mag", mag)
     this.text("reserve", endless ? "" : String(ammo.reserve))
     this.toggleOn($("reserve").previousElementSibling!, "slash", "hidden", endless)
+    const shown = hudSlots(a)
+    this.toggle("bombs", "hidden", !shown.sidearms)
     this.text("bombs", `${t().bomb}: ${"🍶".repeat(a.bombs) || "—"} · ${t().mine}: ${"💣".repeat(a.mines) || "—"}`)
     // On touch the weapon's control carries the rounds and the name, the bomb and mine buttons how many are left.
     this.text("touch-weapon-name", t().weapons[this.inHand].name)
@@ -165,10 +168,7 @@ export class Hud {
     this.text("touch-reserve", endless ? "" : `/ ${ammo.reserve}`)
     this.data("touch-bomb", "n", String(a.bombs))
     this.data("touch-mine", "n", String(a.mines))
-    const slots: [string, WeaponId][] = [["1", a.primary], ["2", "mandi"], ["3", a.power ?? "lanciafrico"], ["4", "mescul"]]
-    this.html("slots", slots
-      .map(([k, id]) => `<span class="${id === a.current ? "on" : slot.owned(id) ? "" : "off"}">${k} ${t().weapons[id].short}</span>`)
-      .join(""))
+    this.html("slots", shown.slots.map((s) => `<span class="${SLOT_CLASS[s.state]}">${s.key} ${t().weapons[s.id].short}</span>`).join(""))
     const buffs: string[] = []
     if (a.sgnape > 0) buffs.push(`🍶 Sgnape ${Math.ceil(a.sgnape / 60)}s`)
     if (you.shield > 0) buffs.push(t().hud.shield)
@@ -506,6 +506,29 @@ export class Hud {
         .join("")
     }
   }
+}
+
+/** A weapon slot in the HUD's panel: its key, what is (or would be) in it, and whether it is in hand, carried or not had. */
+export interface HudSlot {
+  readonly key: string
+  readonly id: WeaponId
+  readonly state: "inHand" | "owned" | "missing"
+}
+
+const SLOT_CLASS = { inHand: "on", owned: "", missing: "off" } as const satisfies Record<HudSlot["state"], string>
+
+/**
+ * The HUD's weapon panel: the slots, and whether the bombs and mines are listed (`sidearms`). With
+ * the full kit, all four slots, the Lanciafrico greyed out until it is picked up. Under single
+ * weapon only what the player can have: the primary, the Mescul, and the casot's panel while it is
+ * carried; no pistol, no Lanciafrico, no bombs or mines.
+ */
+export function hudSlots(a: ArsenalValue): { readonly slots: readonly HudSlot[]; readonly sidearms: boolean } {
+  const full = a.kit === "full"
+  const slot = (key: string, id: WeaponId): HudSlot => ({ key, id, state: id === a.current ? "inHand" : owned(a, id) ? "owned" : "missing" })
+  const power = a.power ?? (full ? "lanciafrico" : null)
+  const slots = [slot("1", a.primary), ...(full ? [slot("2", "mandi")] : []), ...(power ? [slot("3", power)] : []), slot("4", "mescul")]
+  return { slots, sidearms: full }
 }
 
 /** Where a death is seen: the match's phase, the room's mode, and whether the player has been on the map, alive, in this match. */

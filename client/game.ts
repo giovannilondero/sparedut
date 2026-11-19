@@ -1980,7 +1980,7 @@ export class Game {
     audio.setListener([camera.position.x, camera.position.y, camera.position.z], c.yaw)
 
     if (you) {
-      this.hud.vitals(you, { owned: (id) => owned(you.arsenal, id) }, this.wanted === you.arsenal.current ? this.localMag : null, turret >= 0)
+      this.hud.vitals(you, this.wanted === you.arsenal.current ? this.localMag : null, turret >= 0)
       // At the turret: the heat. Near a free one: the key to mount it (the same decision as the touch "use" button).
       const gun = turret >= 0 ? s?.turrets[turret] ?? null : null
       this.hud.turret(gun ? { heat: gun.heat, jammed: gun.jammed } : null, this.controls.turretControl === "use", this.controls.device)
