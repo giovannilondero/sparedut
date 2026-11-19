@@ -22,7 +22,7 @@ import { Net } from "./net.ts"
 import { BrowserHostConnection } from "./offline.ts"
 import { registerServiceWorker } from "./offline-cache/register.ts"
 import { keepVerFilesOnceControlled, lookToShow, verState } from "./offline-cache/ver.ts"
-import { SelfUpdate } from "./offline-cache/self-update.ts"
+import { CheckOnReturn, SelfUpdate } from "./offline-cache/self-update.ts"
 import { loadNewVersion, watchNewVersion } from "./offline-cache/update.ts"
 import { addsToHomeScreenByHand, keepStorage, runsInstalled } from "./installed.ts"
 import { Link } from "./connection.ts"
@@ -169,6 +169,17 @@ const selfUpdate = new SelfUpdate({
   tell: (notice) => toast(t().tooOld[notice]),
   playing: () => playing()
 })
+/**
+ * An installed game brought to the front from its icon does not reload (`launch_handler:
+ * focus-existing`): coming back into view or back to the menu looks for a new version, quietly.
+ */
+const checkOnReturn = new CheckOnReturn({
+  registration,
+  visible: () => document.visibilityState === "visible",
+  playing: () => playing(),
+  now: () => Date.now()
+})
+document.addEventListener("visibilitychange", () => checkOnReturn.returned())
 browserHostConnection.onError = (error) => {
   console.error("The Offline room's host failed:", error)
   toast(t().net.offlineFailed)
@@ -313,6 +324,7 @@ function backToMenu() {
   menu.show(true)
   audio.menuMusic(true)
   selfUpdate.atMenu()
+  checkOnReturn.returned()
 }
 
 link.on((msg: ServerMessage) => {
