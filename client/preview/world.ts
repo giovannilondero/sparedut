@@ -157,7 +157,7 @@ const loop = (now: number) => {
   } else world.menuCamera(t, camera)
   camera.updateMatrixWorld()
   const frame: WorldFrame = {
-    pickups: PICKUPS.map((_, i) => (i + Math.floor(t / 3)) % 4 !== 0),
+    pickups: PICKUPS.map((_, i) => ((i + Math.floor(t / 3)) % 4 !== 0 ? "up" : "down")),
     flags: mode === "frico" ? { benandanti: { pos: FLAG_BASES.benandanti, state: "base" }, malandanti: { pos: [0, 2.1, 60], state: "carried" } } : null,
     hill: mode === "culine" ? { owner: Math.floor(t / 4) % 3 === 0 ? null : "malandanti", contested: Math.floor(t / 4) % 3 === 2 } : null,
     ...extras(t),
@@ -184,7 +184,7 @@ requestAnimationFrame(loop)
     camera.lookAt(c[3], c[4], c[5])
   } else world.menuCamera(t, camera)
   camera.updateMatrixWorld()
-  world.update(0.016, t, { pickups: PICKUPS.map(() => true), flags: mode === "frico" ? { benandanti: { pos: FLAG_BASES.benandanti, state: "base" }, malandanti: { pos: FLAG_BASES.malandanti, state: "base" } } : null, hill: mode === "culine" ? { owner: null, contested: false } : null, ...extras(t), camera })
+  world.update(0.016, t, { pickups: PICKUPS.map(() => "up"), flags: mode === "frico" ? { benandanti: { pos: FLAG_BASES.benandanti, state: "base" }, malandanti: { pos: FLAG_BASES.malandanti, state: "base" } } : null, hill: mode === "culine" ? { owner: null, contested: false } : null, ...extras(t), camera })
   look.render(scene, camera)
   const out = document.createElement("canvas")
   out.width = w

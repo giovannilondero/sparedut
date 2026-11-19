@@ -35,13 +35,15 @@ import {
   type ArsenalValue,
   type FlagState,
   type HillValue,
+  type PickupState,
   type ProjectileValue,
   type RulesValue,
   type StatsValue,
   type TurretState
 } from "./schema.ts"
 import type { Team } from "../map.ts"
-import type { Body } from "../movement.ts"
+import { sprinting, type Body } from "../movement.ts"
+import { pressed } from "../input.ts"
 import { PANEL_TEAR_TICKS } from "../weapons.ts"
 
 export interface PlayerView {
@@ -63,7 +65,12 @@ export interface PlayerView {
   /** Last applied input and the held buttons. */
   readonly seq: number
   readonly buttons: number
+  /** The trigger held with the weapon up: not while sprinting, when the weapon is lowered and nothing fires or revs. */
+  readonly firing: boolean
 }
+
+/** A pickup as it is seen: there, taken and coming back, or not on the map for the match (the Lanciafrico under single weapon). */
+export type PickupView = PickupState["_tag"]
 
 export type PhaseView =
   /** `starts`: the tick the countdown ends, null while none runs. */
@@ -123,7 +130,8 @@ export interface WorldView {
   readonly cart: CartView | null
   /** Only while the storm is in force and the match is live: the safe circle. */
   readonly storm: StormValue | null
-  readonly pickups: readonly boolean[]
+  /** One per `map.pickups`: there, taken and coming back, or not on the map for the match. */
+  readonly pickups: readonly PickupView[]
   /** One per `map.turrets`. */
   readonly turrets: ReadonlyArray<TurretState>
   /** Health of each breakable door (0 = broken down). */
@@ -213,7 +221,7 @@ export const ViewWorld = Game.Inspector(
       hill: resources.hill.get(),
       cart,
       storm,
-      pickups: resources.pickups.get().map((p) => p._tag === "up"),
+      pickups: resources.pickups.get().map((p) => p._tag),
       turrets: resources.turrets.get(),
       doors: resources.doors.get(),
       panels: resources.panels.get().map((p): PanelView => {
@@ -251,7 +259,8 @@ export const ViewWorld = Game.Inspector(
           arsenal: data.arsenal.get(m),
           stats: data.stats.get(m),
           seq: controls.input.seq,
-          buttons: controls.input.buttons
+          buttons: controls.input.buttons,
+          firing: pressed(controls.input, "fire") && !sprinting(controls.input, motion.body.crouch)
         }
       }),
       training

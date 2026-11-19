@@ -6,9 +6,10 @@ import type { Team } from "../shared/map.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type SnapSelf, type Snapshot } from "../shared/protocol.ts"
 import type { KillCause } from "../shared/sim/events.ts"
 import { usesAmmo, type WeaponId } from "../shared/weapons.ts"
-import { maxHp } from "../shared/sim/rules.ts"
-import type { TrainingView } from "../shared/sim/view.ts"
-import { STATION_IDS } from "../shared/training/index.ts"
+import { maxHp, owned } from "../shared/sim/rules.ts"
+import type { ArsenalValue } from "../shared/sim/schema.ts"
+import type { PhaseView, TrainingView } from "../shared/sim/view.ts"
+import { isTraining, STATION_IDS } from "../shared/training/index.ts"
 import type { Device } from "./device.ts"
 import { t } from "./i18n.ts"
 import type { MenuPrimary } from "./match-menus.ts"
@@ -33,8 +34,6 @@ const PANEL_BLANK: PanelShown = { ...NOT_SHOWN, strings: null, count: -1, device
 
 export class Hud {
   private announceTimer = 0
-  /** During an ongoing Tampieste the dead don't respawn: the death panel says so. */
-  spectating = false
   private chatTimer = 0
   /** Last value written per element and property: the DOM is touched only on change. */
   private written = new Map<string, string | boolean>()
@@ -138,7 +137,7 @@ export class Hud {
   }
 
   /** `turret`: I'm on the turret, the weapon in hand is the mitraie (infinite ammo). */
-  vitals(you: SnapSelf | null, slot: { owned: (id: WeaponId) => boolean }, localMag: number | null, turret = false) {
+  vitals(you: SnapSelf | null, localMag: number | null, turret = false) {
     if (!you) return
     const hp = Math.max(0, you.hp)
     // The bar and the ring are full at the class's health, whatever it is.
@@ -160,6 +159,8 @@ export class Hud {
     this.text("mag", mag)
     this.text("reserve", endless ? "" : String(ammo.reserve))
     this.toggleOn($("reserve").previousElementSibling!, "slash", "hidden", endless)
+    const shown = hudSlots(a)
+    this.toggle("bombs", "hidden", !shown.sidearms)
     this.text("bombs", `${t().bomb}: ${"🍶".repeat(a.bombs) || "—"} · ${t().mine}: ${"💣".repeat(a.mines) || "—"}`)
     // On touch the weapon's control carries the rounds and the name, the bomb and mine buttons how many are left.
     this.text("touch-weapon-name", t().weapons[this.inHand].name)
@@ -167,10 +168,7 @@ export class Hud {
     this.text("touch-reserve", endless ? "" : `/ ${ammo.reserve}`)
     this.data("touch-bomb", "n", String(a.bombs))
     this.data("touch-mine", "n", String(a.mines))
-    const slots: [string, WeaponId][] = [["1", a.primary], ["2", "mandi"], ["3", a.power ?? "lanciafrico"], ["4", "mescul"]]
-    this.html("slots", slots
-      .map(([k, id]) => `<span class="${id === a.current ? "on" : slot.owned(id) ? "" : "off"}">${k} ${t().weapons[id].short}</span>`)
-      .join(""))
+    this.html("slots", shown.slots.map((s) => `<span class="${SLOT_CLASS[s.state]}">${s.key} ${t().weapons[s.id].short}</span>`).join(""))
     const buffs: string[] = []
     if (a.sgnape > 0) buffs.push(`🍶 Sgnape ${Math.ceil(a.sgnape / 60)}s`)
     if (you.shield > 0) buffs.push(t().hud.shield)
@@ -345,14 +343,17 @@ export class Hud {
     if (text) this.announce(text, t().hud.streak(name, n))
   }
 
-  death(you: SnapSelf | null, names: Map<string, string>, seed: number) {
-    const dead = !!you && !you.alive
-    this.toggle("death", "hidden", !dead)
-    if (!dead || !you) return
+  death(you: SnapSelf | null, at: DeathAt, names: Map<string, string>, seed: number) {
+    const screen = deathScreen(you, at)
+    this.toggle("death", "hidden", screen.tag !== "dead")
+    this.toggle("next-match", "hidden", screen.tag !== "nextMatch")
+    if (screen.tag === "nextMatch") this.text("next-match", t().muster.nextMatch)
+    if (screen.tag !== "dead" || !you) return
+    this.toggle("death-hint", "hidden", !screen.armoury)
     const s = t().hud
     this.html("death-by", you.killer ? s.deathBy(esc(names.get(you.killer) ?? "?")) : s.deathSelf)
     this.text("death-line", pick(s.deathLines, seed))
-    this.text("death-timer", this.spectating ? s.spectate : you.respawn > 0 ? s.respawnIn(Math.ceil(you.respawn / 60)) : "…")
+    this.text("death-timer", screen.spectate ? s.spectate : you.respawn > 0 ? s.respawnIn(Math.ceil(you.respawn / 60)) : "…")
   }
 
   chat(name: string, team: Team | null, text: string) {
@@ -455,6 +456,7 @@ export class Hud {
   private drawnPressed = -1
   private drawnToggles = -1
   private drawnUse: TouchView["use"] | undefined = undefined
+  private drawnReload: boolean | undefined = undefined
   private drawnPicker: readonly PickerEntry[] | null | undefined = undefined
 
   /**
@@ -486,6 +488,10 @@ export class Hud {
       use.classList.toggle("hidden", !view.use)
       use.textContent = view.use === "dismount" ? t().hud.touchLeave : view.use === "tear" ? t().hud.touchTear : t().hud.touchUse
     }
+    if (view.reload !== this.drawnReload) {
+      this.drawnReload = view.reload
+      $("touch-reload").classList.toggle("hidden", !view.reload)
+    }
     if (view.picker !== this.drawnPicker) {
       this.drawnPicker = view.picker
       const picker = $("touch-picker")
@@ -502,6 +508,57 @@ export class Hud {
   }
 }
 
+/** A weapon slot in the HUD's panel: its key, what is (or would be) in it, and whether it is in hand, carried or not had. */
+export interface HudSlot {
+  readonly key: string
+  readonly id: WeaponId
+  readonly state: "inHand" | "owned" | "missing"
+}
+
+const SLOT_CLASS = { inHand: "on", owned: "", missing: "off" } as const satisfies Record<HudSlot["state"], string>
+
+/**
+ * The HUD's weapon panel: the slots, and whether the bombs and mines are listed (`sidearms`). With
+ * the full kit, all four slots, the Lanciafrico greyed out until it is picked up. Under single
+ * weapon only what the player can have: the primary, the Mescul, and the casot's panel while it is
+ * carried; no pistol, no Lanciafrico, no bombs or mines.
+ */
+export function hudSlots(a: ArsenalValue): { readonly slots: readonly HudSlot[]; readonly sidearms: boolean } {
+  const full = a.kit === "full"
+  const slot = (key: string, id: WeaponId): HudSlot => ({ key, id, state: id === a.current ? "inHand" : owned(a, id) ? "owned" : "missing" })
+  const power = a.power ?? (full ? "lanciafrico" : null)
+  const slots = [slot("1", a.primary), ...(full ? [slot("2", "mandi")] : []), ...(power ? [slot("3", power)] : []), slot("4", "mescul")]
+  return { slots, sidearms: full }
+}
+
+/** Where a death is seen: the match's phase, the room's mode, and whether the player has been on the map, alive, in this match. */
+export interface DeathAt {
+  readonly phase: PhaseView["tag"]
+  readonly mode: ModeId
+  readonly played: boolean
+}
+
+/**
+ * What the death screen shows. Nothing to somebody not on the map, alive, or in the Muster, nor to
+ * somebody who has not played this match yet (entered it, and about to come on, or entered during
+ * its results). `nextMatch`, instead of a death, to somebody who entered a Tampieste after its
+ * start: one life, so they play from the next match. Else the death: with the key that opens the
+ * armoury (`armoury`) only in a training, the one place the primary changes, for in a match it is
+ * fixed until the Muster; and in a live Tampieste, where the dead do not come back, that they
+ * watch until the end (`spectate`).
+ */
+export type DeathScreen =
+  | { readonly tag: "none" }
+  | { readonly tag: "nextMatch" }
+  | { readonly tag: "dead"; readonly armoury: boolean; readonly spectate: boolean }
+
+export function deathScreen(you: { readonly alive: boolean } | null, at: DeathAt): DeathScreen {
+  if (!you || you.alive || at.phase === "Muster") return { tag: "none" }
+  const oneLife = at.mode === "tampieste" && at.phase === "Live"
+  if (!at.played) return oneLife ? { tag: "nextMatch" } : { tag: "none" }
+  return { tag: "dead", armoury: isTraining(at.mode), spectate: oneLife }
+}
+
 export function boardHtml(rows: readonly BoardRow[], me: string) {
   return (["benandanti", "malandanti"] as const)
     .map((team) => {
@@ -512,7 +569,7 @@ export function boardHtml(rows: readonly BoardRow[], me: string) {
       ${list
         .map(
           (r) =>
-            `<tr class="${r.id === me ? "me" : ""}"><td>${esc(r.name)}${r.bot ? " 🤖" : ""}</td><td class="primary">${t().weapons[r.primary].name}</td><td>${r.score}</td><td>${r.kills}</td><td>${r.deaths}</td><td>${r.assists}</td><td>${r.caps}</td><td>${r.best}</td><td>${r.bot ? "—" : r.ping}</td></tr>`
+            `<tr class="${r.id === me ? "me" : ""}"><td>${esc(r.name)}${r.bot ? " 🤖" : ""}</td><td class="primary"><span class="long">${t().weapons[r.primary].name}</span><span class="short">${t().weapons[r.primary].short}</span></td><td>${r.score}</td><td>${r.kills}</td><td>${r.deaths}</td><td>${r.assists}</td><td>${r.caps}</td><td>${r.best}</td><td>${r.bot ? "—" : r.ping}</td></tr>`
         )
         .join("")}</table>`
     })

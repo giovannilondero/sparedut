@@ -286,7 +286,7 @@ export class BotBrain {
     const { flagBases: FLAG_BASES, hill: HILL, pickups: PICKUPS } = this.physics.map
     // Low health: a nearby frico.
     if (me.hp < 45) {
-      const frico = PICKUPS.map((p, i) => ({ p, i })).filter(({ p, i }) => p.kind === "frico" && world.pickups[i])
+      const frico = PICKUPS.map((p, i) => ({ p, i })).filter(({ p, i }) => p.kind === "frico" && world.pickups[i] === "up")
       const near = frico.sort((a, b) => dist2(a.p.at, me) - dist2(b.p.at, me))[0]
       if (near && dist2(near.p.at, me) < 40 * 40) return near.p.at
     }

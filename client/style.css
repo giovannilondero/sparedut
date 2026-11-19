@@ -338,6 +338,7 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 #death-line { font-family: var(--serif); font-style: italic; opacity: 0.85; margin-top: 6px; }
 #death-timer { font-size: 22px; margin-top: 8px; font-variant-numeric: tabular-nums; }
 .death-hint { font-size: 12px; opacity: 0.7; margin-top: 6px; }
+#next-match { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); text-align: center; background: rgba(10, 8, 6, 0.72); border: 1px solid var(--stone-line); border-radius: 14px; padding: 14px 26px; max-width: min(520px, 86vw); font-size: 17px; }
 
 #board, .overlay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(16, 13, 10, 0.94); border: 1px solid var(--stone-line); border-radius: 14px; padding: 18px 22px; min-width: min(860px, 92vw); max-height: 86vh; overflow: auto; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); }
 #board table, .overlay table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -346,6 +347,8 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 #board th:first-child, #board td:first-child, .overlay td:first-child, .overlay th:first-child { text-align: left; }
 /* Each player's primary, the name of a weapon: read with the name, not with the numbers. */
 #board .primary, .overlay .primary { text-align: left; }
+/* The primary by its short name only where the board is narrow (touch). */
+#board .primary .short, .overlay .primary .short { display: none; }
 #board tr.me td { color: var(--gold); }
 #board h3, .overlay h3 { font-family: var(--serif); margin: 10px 0 4px; font-size: 18px; }
 .overlay :is(h2, ui-dialog-title) { display: block; font-family: var(--serif); font-weight: 700; color: var(--gold); margin: 0 0 8px; font-size: clamp(22px, 1rem + 1.6vw, 28px); }
@@ -358,7 +361,7 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 .overlay .host-tools button { min-block-size: var(--tap); padding: 5px 9px; font-size: 13px; }
 /* The Muster stands in for the world: the HUD's readouts go, and a plain ground covers the canvas, which is not drawn. */
 html.in-muster #hud { background: var(--night); }
-html.in-muster #hud-free, html.in-muster #death, html.in-muster #board { visibility: hidden; }
+html.in-muster #hud-free, html.in-muster #death, html.in-muster #next-match, html.in-muster #board { visibility: hidden; }
 #muster .muster-countdown { font-family: var(--serif); font-size: clamp(20px, 3vw, 28px); color: var(--gold); text-align: center; }
 #muster .muster-countdown:empty { display: none; }
 #muster .ready-mark { color: var(--gold); font-weight: bold; }
@@ -641,14 +644,21 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #hud.touch #announce { inset-block-start: 24%; inline-size: 100%; white-space: normal; font-size: clamp(20px, 7cqi, 36px); }
 #hud.touch #death { inset-inline-start: calc(var(--free-l) + var(--free-w) / 2); inset-block-start: calc(var(--free-t) + var(--free-h) / 2); transform: translate(-50%, -50%);
   min-inline-size: 0; inline-size: min(360px, var(--free-w)); padding: 10px 14px; }
+#hud.touch #next-match { inset-inline-start: calc(var(--free-l) + var(--free-w) / 2); inset-block-start: calc(var(--free-t) + var(--free-h) / 2); transform: translate(-50%, -50%);
+  inline-size: min(360px, var(--free-w)); padding: 10px 14px; font-size: 15px; }
 #hud.touch .death-title { font-size: clamp(24px, calc(var(--free-w) * 0.08), 36px); }
 /* The death hint, the key legend: keys a touch player does not have. The armoury is in the match menu. */
 #hud.touch :is(.death-hint, .keys) { display: none; }
 #hud.touch #board { inset-inline-start: var(--free-l); inset-block-start: var(--free-t); transform: none; min-inline-size: 0; inline-size: var(--free-w); max-block-size: var(--free-h);
   padding: 8px 10px; pointer-events: auto; touch-action: pan-y; overscroll-behavior: contain; }
-#hud.touch #board table { font-size: clamp(10px, calc(var(--free-w) * 0.032), 14px); }
-#hud.touch #board :is(th, td) { padding: 3px 4px; letter-spacing: 0; }
-#hud.touch #board th { font-size: 0.8em; }
+/* Nine columns in the free area: the primary by its short name, the type sized to the width, one line per player where it fits. */
+#hud.touch #board table { font-size: clamp(9px, calc(var(--free-w) * 0.025), 14px); }
+#hud.touch #board :is(th, td) { padding: 3px 3px; letter-spacing: 0; white-space: nowrap; }
+/* Only a name too long for the narrowest board (portrait) goes on two lines. */
+#hud.touch #board td:first-child { white-space: normal; }
+#hud.touch #board .primary .long { display: none; }
+#hud.touch #board .primary .short { display: inline; }
+#hud.touch #board th { font-size: 0.72em; }
 #hud.touch #board h3 { font-size: 15px; }
 #hud.touch #quickchat.tap { inset-inline-start: var(--free-l); inset-block-start: var(--free-t); max-inline-size: var(--free-w); max-block-size: var(--free-h); }
 #hud.touch #clickplay { inline-size: max-content; max-inline-size: calc(100% - 32px); font-size: clamp(22px, 6vw, 30px); }

@@ -5,6 +5,7 @@
  */
 import type * as THREE from "three"
 import type { PickupKind, Team } from "../shared/map.ts"
+import type { PickupView } from "../shared/sim/view.ts"
 import type { ProjectileKind, WeaponId } from "../shared/weapons.ts"
 
 export type P3 = readonly [number, number, number]
@@ -22,8 +23,8 @@ export interface FlagVisual {
   readonly state: "base" | "carried" | "dropped"
 }
 export interface WorldFrame {
-  /** One per `PICKUPS` point, same order: true if it can be picked up. */
-  readonly pickups: readonly boolean[]
+  /** One per `PICKUPS` point, same order: there, taken and coming back (drawn see-through), or not on the map (not drawn). */
+  readonly pickups: readonly PickupView[]
   /** Only in "frico" mode. */
   readonly flags: Readonly<Record<Team, FlagVisual>> | null
   /** Only in "culine" mode. */

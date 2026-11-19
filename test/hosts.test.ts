@@ -10,6 +10,7 @@ import { initPhysics } from "../shared/physics.ts"
 import { harness } from "./harness.ts"
 import { FLAG_BIT, type Snapshot } from "../shared/protocol.ts"
 import { COUNTDOWN_TICKS } from "../shared/sim/rules.ts"
+import { BUTTON } from "../shared/input.ts"
 
 beforeAll(() => initPhysics())
 
@@ -248,6 +249,27 @@ for (const host of HOSTS) {
       expect(after.players.find((p) => p.id === you)?.w).toBe("doplete")
       expect(me.got.filter((m) => m.t === "room")).toHaveLength(rooms)
       expect(me.last("room")!.room.roster.find((r) => r.id === you)?.primary).toBe("doplete")
+    })
+
+    test("a player is shown firing while they hold the trigger with the weapon up, and not while sprinting, when it is lowered", () => {
+      const { connect, play } = harness(host.make)
+      const me = connect()
+      me.say({ ...create, bots: 0, primary: "motosee" })
+      const { you } = me.last("joined")!
+      me.say({ t: "start" })
+      play(60)
+      let seq = 0
+      const hold = (buttons: number) => {
+        for (let i = 0; i < 30; i++) {
+          me.say({ t: "input", i: { seq: ++seq, mx: 0, mz: 1, yaw: 0, pitch: 0, buttons, weapon: "motosee", view: me.last("snap")!.tick } })
+          play(1)
+        }
+        return me.last("snap")!.players.find((p) => p.id === you)!.f & FLAG_BIT.firing
+      }
+      expect(hold(BUTTON.fire)).toBe(FLAG_BIT.firing)
+      // Sprinting with the trigger held: the weapon is down, the Motosee does not rev, and nobody hears it rev.
+      expect(hold(BUTTON.fire | BUTTON.sprint)).toBe(0)
+      expect(hold(BUTTON.fire)).toBe(FLAG_BIT.firing)
     })
 
     test("a change of primary during the results is refused too, and the next Muster accepts it", () => {

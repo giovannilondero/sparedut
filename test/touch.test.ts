@@ -385,6 +385,8 @@ test("the layout is computed once per canvas size and shared by the input and th
 for (const b of ["jump", "reload", "bomb", "mine"] as const) {
   test(`the ${b} button is held while the finger is on it, and a quick tap still reaches the tick`, () => {
     const { c, finger, layout, tap } = phone()
+    // A player with a gun in hand: the reload button is there.
+    c.track(player())
     const at = layout().buttons[b]
     finger(5).down(at.x, at.y)
     expect(c.buttons() & BUTTON[b]).toBe(BUTTON[b])
@@ -606,6 +608,33 @@ test("the use button: absent away from turrets, mounts near a free one, dismount
   expect(c.turretControl).toBe(null)
   c.track(null)
   expect(view().use).toBe(null)
+})
+
+test("the reload button shows only with a weapon in hand that has something to reload", () => {
+  const { c, layout, tap, view } = phone()
+  const reload = layout().buttons.reload
+  c.track(player())
+  expect(view().reload).toBe(true)
+  tap(reload)
+  expect(c.buttons() & BUTTON.reload).toBe(BUTTON.reload)
+  // The Motosee, the Mescul and the casot's panel have nothing to reload; nor has the mitraie of a turret.
+  for (const current of ["motosee", "mescul", "panel"] as const) {
+    c.track(player({ arsenal: { ...freshArsenal("motosee"), current } }))
+    expect(view().reload).toBe(false)
+  }
+  c.track(player({ mounted: true }))
+  expect(view().reload).toBe(false)
+  c.track(player({ alive: false }))
+  expect(view().reload).toBe(false)
+  c.track(null)
+  expect(view().reload).toBe(false)
+})
+
+test("where the reload button is hidden, a touch there only looks", () => {
+  const { c, layout, tap } = phone()
+  c.track(player({ arsenal: freshArsenal("motosee") }))
+  tap(layout().buttons.reload)
+  expect(c.buttons() & BUTTON.reload).toBe(0)
 })
 
 test("the match menu, the scoreboard (a toggle) and the quick phrases go through the keyboard's and the controller's paths", () => {

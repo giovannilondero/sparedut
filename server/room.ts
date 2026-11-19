@@ -8,6 +8,7 @@ import { MAPS } from "../shared/maps/index.ts"
 import { createPhysicsWorld, type PhysicsWorld } from "../shared/physics.ts"
 import {
   FLAG_BIT,
+  PICKUP_CHAR,
   MAX_PLAYERS,
   SNAPSHOT_EVERY,
   type BoardRow,
@@ -470,7 +471,7 @@ export class Room {
         (p.body.crouch ? FLAG_BIT.crouch : 0) |
         (p.body.grounded ? FLAG_BIT.grounded : 0) |
         (p.shield > 0 ? FLAG_BIT.shield : 0) |
-        (p.buttons & 1 ? FLAG_BIT.firing : 0) |
+        (p.firing ? FLAG_BIT.firing : 0) |
         (p.buttons & 2 ? FLAG_BIT.aiming : 0) |
         (carriers.has(p.session) ? FLAG_BIT.carrier : 0) |
         (p.arsenal.sgnape > 0 ? FLAG_BIT.sgnape : 0),
@@ -490,7 +491,7 @@ export class Room {
       turrets: w.turrets.map((t) => ({ ...t, heat: r2(t.heat) })),
       doors: w.doors.map((d) => Math.ceil(d)),
       panels: w.panels.map((p) => (p.tag === "tearing" ? { ...p, progress: r2(p.progress) } : p)),
-      pickups: w.pickups.map((p) => (p ? "1" : "0")).join(""),
+      pickups: w.pickups.map((p) => PICKUP_CHAR[p]).join(""),
       proj: w.projectiles.map((p) => [p.kind, r2(p.x), r2(p.y), r2(p.z)] as const),
       players: others,
       training: w.training,
