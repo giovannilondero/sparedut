@@ -12,7 +12,8 @@ import { createAvatar, setDetailedWeapon } from "./avatars.ts"
 import { createFx } from "./fx.ts"
 import { isLocalHost } from "../shared/hosts.ts"
 import { Game } from "./game.ts"
-import { inviteLink, readInvite } from "./invite.ts"
+import { inviteLink } from "./invite.ts"
+import { decideOpening, Launches, type Opening, readOpening } from "./opening.ts"
 import { t } from "./i18n.ts"
 import { createLook, lookFromUrl } from "./looks.ts"
 import { loadDetailed } from "./models/detailed.ts"
@@ -21,7 +22,7 @@ import { Net } from "./net.ts"
 import { BrowserHostConnection } from "./offline.ts"
 import { registerServiceWorker } from "./offline-cache/register.ts"
 import { keepVerFilesOnceControlled, lookToShow, verState } from "./offline-cache/ver.ts"
-import { SelfUpdate } from "./offline-cache/self-update.ts"
+import { CheckOnReturn, SelfUpdate } from "./offline-cache/self-update.ts"
 import { loadNewVersion, watchNewVersion } from "./offline-cache/update.ts"
 import { addsToHomeScreenByHand, keepStorage, runsInstalled } from "./installed.ts"
 import { Link } from "./connection.ts"
@@ -166,8 +167,19 @@ const selfUpdate = new SelfUpdate({
   session: sessionStorage,
   reload: () => location.reload(),
   tell: (notice) => toast(t().tooOld[notice]),
-  playing: () => Boolean(game?.active) || offline()
+  playing: () => playing()
 })
+/**
+ * An installed game brought to the front from its icon does not reload (`launch_handler:
+ * focus-existing`): coming back into view or back to the menu looks for a new version, quietly.
+ */
+const checkOnReturn = new CheckOnReturn({
+  registration,
+  visible: () => document.visibilityState === "visible",
+  playing: () => playing(),
+  now: () => Date.now()
+})
+document.addEventListener("visibilitychange", () => checkOnReturn.returned())
 browserHostConnection.onError = (error) => {
   console.error("The Offline room's host failed:", error)
   toast(t().net.offlineFailed)
@@ -192,6 +204,13 @@ const persist = () => {
 let joining = ""
 /** The password of the room being created, joined or played, if it has one: it goes into the invite link. */
 let roomPassword: string | null = null
+/** The name the game server knows the player by: the one told on connecting, or since. */
+let toldName: string | null = null
+/** Tells the game server the player's name (`hello`), so that a room created or joined next shows it. */
+const sayHello = () => {
+  toldName = settings.name
+  net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
+}
 const sendJoin = (code: string, password?: string) => {
   joining = code
   roomPassword = password ?? null
@@ -217,7 +236,7 @@ const menu = new Menu(settings, audio, {
     game?.requestFullscreen()
     autostart = oneTap
     roomPassword = o.access.kind === "password" ? o.access.password : null
-    net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
+    sayHello()
     net.send({ t: "create", ...o, primary: settings.primary })
   },
   training: (start) => {
@@ -236,7 +255,7 @@ const menu = new Menu(settings, audio, {
   join: (code, password) => {
     if (!ensureOnline()) return
     game?.requestFullscreen()
-    net.send({ t: "hello", name: settings.name, version: PROTOCOL_VERSION })
+    sayHello()
     sendJoin(code, password)
   },
   settingsChanged: persist,
@@ -271,7 +290,7 @@ const physicsReady = initPhysics().then(() => {
     saveSettings: () => saveSettings(settings),
     onLeave: backToMenu,
     leaveForOneTap: () => {
-      afterLeft = () => menu.oneTap()
+      afterLeft = () => menu.press("one-tap")
       link.send({ t: "leave" })
       backToMenu()
     },
@@ -305,6 +324,7 @@ function backToMenu() {
   menu.show(true)
   audio.menuMusic(true)
   selfUpdate.atMenu()
+  checkOnReturn.returned()
 }
 
 link.on((msg: ServerMessage) => {
@@ -360,22 +380,55 @@ const reconnect = (ms: number) => {
   retry = window.setTimeout(connect, ms)
 }
 
+/** A match is in progress (an Offline room or the training counts). */
+function playing() {
+  return Boolean(game?.active) || offline()
+}
+
+/**
+ * Acts on how the page was opened (`client/opening.ts`): never over a match in progress. An
+ * invite joins through the game server, so only once it is connected; the shortcut starts an
+ * Offline room, so it does not wait for it.
+ */
+function answerOpening(opening: Opening) {
+  const action = decideOpening(opening, { playing: playing(), named: Boolean(settings.name) })
+  switch (action.kind) {
+    case "join":
+      if (!net.open) {
+        // As if the page had been opened on the invite: `connect` joins it once the game server is there.
+        history.replaceState(null, "", inviteLink("", action.code, action.password))
+        return
+      }
+      menu.status(t().net.invite(action.code))
+      // A connection older than the name would join under the old one: the server learns the new one first.
+      if (toldName !== settings.name) sayHello()
+      sendJoin(action.code, action.password ?? undefined)
+      return
+    case "start":
+      menu.press(action.button)
+      return
+    case "askName":
+      toast(action.message(t().net))
+      return
+    case "nothing":
+      return
+  }
+}
+
 async function connect() {
   clearTimeout(retry)
   if (connecting || net.open) return
   connecting = true
   menu.status(t().net.connecting)
   try {
-    await net.connect(settings.name || "Furlan")
+    const name = settings.name || "Furlan"
+    await net.connect(name)
+    toldName = name
     connecting = false
     menu.status(t().net.connected(settings.name || t().net.stranger))
     net.send({ t: "list" })
-    // An invite joins on its own only from the menu: never over a room in progress.
-    const invite = game?.active || offline() ? null : readInvite(location.search, location.hash)
-    if (invite && settings.name) {
-      menu.status(t().net.invite(invite.code))
-      sendJoin(invite.code, invite.password ?? undefined)
-    } else if (invite) toast(t().net.inviteNeedName(invite.code))
+    const opening = readOpening(location.search, location.hash)
+    if (opening.kind === "invite") answerOpening(opening)
   } catch {
     connecting = false
     menu.status(t().net.retry)
@@ -392,6 +445,20 @@ net.onClose = () => {
   menu.status(t().net.lostRetry)
   reconnect(2000)
 }
+// Each launch of the installed game is answered once. The one that opened the page is answered
+// here: the shortcut at once, then its marker leaves the address so that nothing starts again on
+// its own; an invite once the game server is connected (`connect`).
+const launches = new Launches(location.href)
+const opened = readOpening(location.search, location.hash)
+if (opened.kind === "shortcut") {
+  forgetRoomAddress()
+  answerOpening(opened)
+}
+// The installed game launched again while open (its icon, its shortcut, a captured invite) focuses
+// this window (`launch_handler` in the manifest) and the launch arrives here.
+;(window as { launchQueue?: LaunchQueue }).launchQueue?.setConsumer(({ targetURL }) => {
+  if (targetURL) answerOpening(launches.opening(targetURL))
+})
 void connect()
 setInterval(() => net.open && !game?.active && net.send({ t: "list" }), 3000)
 

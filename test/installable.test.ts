@@ -1,7 +1,14 @@
 import { expect, test } from "bun:test"
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+import { STRINGS } from "../client/i18n.ts"
 import { addsToHomeScreenByHand, keepStorage, runsInstalled } from "../client/installed.ts"
+import { deployOriginInPage, pageForDeploy } from "../scripts/deploy-origin.ts"
+import viteConfig from "../vite.config.ts"
+import { precacheOf } from "../client/offline-cache/precache.ts"
+import { builtFiles } from "../scripts/service-worker.ts"
+import { headersFor } from "../server/static-headers.ts"
+import { readOpening } from "../client/opening.ts"
 
 const PUBLIC = join(import.meta.dir, "../client/public")
 const html = readFileSync(join(import.meta.dir, "../client/index.html"), "utf8")
@@ -15,6 +22,9 @@ function pngSize(url: string): [number, number] | null {
   if (bytes.toString("latin1", 1, 4) !== "PNG") return null
   return [bytes.readUInt32BE(16), bytes.readUInt32BE(20)]
 }
+
+/** The width and height in a manifest's `sizes` (one size, `WxH`). */
+const declared = (sizes: string) => sizes.split("x").map(Number) as [number, number]
 
 interface Icon {
   src: string
@@ -41,6 +51,15 @@ test("the installed game is named, opens on the game, with no browser bars and i
   expect(manifest.orientation).toBe("any")
 })
 
+test("the install prompt introduces the game in Friulian, with the line a shared link shows", () => {
+  expect(manifest.lang).toBe("fur")
+  // The same line a shared link shows: the game says one thing about itself.
+  const page = html.match(/<meta name="description" content="([^"]+)"/)?.[1]
+  expect(page).toBeDefined()
+  expect(manifest.description).toBe(page)
+  expect(page!.length).toBeLessThanOrEqual(300)
+})
+
 test("the installed game keeps the page's theme colour", () => {
   const theme = html.match(/<meta name="theme-color" content="([^"]+)"/)?.[1]
   expect(theme).toBe("#14110f")
@@ -59,8 +78,7 @@ test("every icon of the manifest is a PNG of the size it declares", () => {
   expect(icons.length).toBeGreaterThan(0)
   for (const icon of icons) {
     expect(icon.type).toBe("image/png")
-    const [w, h] = icon.sizes.split("x").map(Number)
-    expect([icon.src, pngSize(icon.src)]).toEqual([icon.src, [w!, h!]])
+    expect([icon.src, pngSize(icon.src)]).toEqual([icon.src, declared(icon.sizes)])
   }
 })
 
@@ -70,6 +88,125 @@ test("iOS finds its home screen icon, a 180 pixel PNG, and opens the game with n
   expect(pngSize(apple!)).toEqual([180, 180])
   expect(html).toContain('<meta name="apple-mobile-web-app-capable" content="yes" />')
   expect(html).toContain('<meta name="mobile-web-app-capable" content="yes" />')
+})
+
+interface Screenshot {
+  src: string
+  sizes: string
+  type: string
+  form_factor?: string
+  label?: string
+}
+const screenshots = (manifest.screenshots ?? []) as Screenshot[]
+const ofForm = (form: string) => screenshots.filter((shot) => shot.form_factor === form)
+
+test("the install prompt shows phone and desktop screenshots, each with a Friulian caption", () => {
+  // A match and the menu, for each: on a phone (`narrow`, Android) and on a computer (`wide`, desktop).
+  expect(ofForm("narrow").length).toBeGreaterThanOrEqual(2)
+  expect(ofForm("wide").length).toBeGreaterThanOrEqual(2)
+  expect(screenshots.filter((shot) => shot.form_factor !== "narrow" && shot.form_factor !== "wide")).toEqual([])
+  expect(screenshots.filter((shot) => !shot.label?.trim())).toEqual([])
+  expect(new Set(screenshots.map((shot) => shot.label)).size).toBe(screenshots.length)
+})
+
+test("every screenshot is a PNG of the size it declares, within what Chrome shows", () => {
+  for (const shot of screenshots) {
+    expect(shot.type).toBe("image/png")
+    const [w, h] = declared(shot.sizes)
+    expect([shot.src, pngSize(shot.src)]).toEqual([shot.src, [w, h]])
+    // Chrome: each side from 320 to 3840 pixels, the long one at most 2.3 times the short one.
+    expect([shot.src, Math.min(w, h) >= 320, Math.max(w, h) <= 3840, Math.max(w, h) <= 2.3 * Math.min(w, h)]).toEqual([shot.src, true, true, true])
+  }
+})
+
+test("the screenshots of a form factor share one aspect ratio, as Chrome asks", () => {
+  for (const form of ["narrow", "wide"]) {
+    const ratios = new Set(ofForm(form).map((shot) => {
+      const [w, h] = declared(shot.sizes)
+      return (w / h).toFixed(3)
+    }))
+    expect([form, ratios.size]).toEqual([form, 1])
+  }
+})
+
+test("the screenshots are not downloaded when the game is installed", () => {
+  const { urls } = precacheOf(builtFiles(PUBLIC))
+  expect(screenshots.length).toBeGreaterThan(0)
+  expect(screenshots.map((shot) => shot.src).filter((src) => urls.includes(src))).toEqual([])
+})
+
+/** The page as the build writes it, for a deploy on `domain` (`DEPLOY_DOMAIN`, or none). */
+const built = (domain?: string) => pageForDeploy(html, domain === undefined ? {} : { DEPLOY_DOMAIN: domain })
+/** The `content` of the `<meta>` whose `name` or `property` is `key`, in a page. */
+const meta = (page: string, key: string) => page.match(new RegExp(`<meta (?:name|property)="${key}" content="([^"]*)"`))?.[1]
+
+test("a shared link shows the game's title, a line about it and a large picture, in chats and on X", () => {
+  const page = built()
+  expect(meta(page, "description")).toBeTruthy()
+  expect(meta(page, "og:title")).toBe("Sparedût")
+  expect(meta(page, "og:description")).toBe(meta(page, "description"))
+  expect(meta(page, "og:type")).toBe("website")
+  expect(meta(page, "og:locale")).toBe("fur_IT")
+  expect(meta(page, "og:url")).toBe("https://sparedut.giovannilondero.dev/")
+  expect(meta(page, "og:image")).toBe("https://sparedut.giovannilondero.dev/showcase/link-preview.png")
+  expect(meta(page, "og:image:type")).toBe("image/png")
+  expect(meta(page, "og:image:width")).toBe("1200")
+  expect(meta(page, "og:image:height")).toBe("630")
+  expect(meta(page, "og:image:alt")).toBeTruthy()
+  expect(meta(page, "twitter:card")).toBe("summary_large_image")
+  expect(meta(page, "twitter:image")).toBe(meta(page, "og:image"))
+  expect(meta(page, "twitter:image:alt")).toBe(meta(page, "og:image:alt"))
+})
+
+/** Every absolute address written in a page. */
+const absolute = (page: string) => [...page.matchAll(/"([a-z][a-z0-9+.-]*:\/\/[^"]*)"/gi)].map((m) => m[1]!)
+
+test("every absolute address in the page is on the public game's domain, whichever build wrote it", () => {
+  const addresses = absolute(built())
+  expect(addresses.length).toBeGreaterThanOrEqual(3)
+  expect(addresses.filter((url) => !url.startsWith("https://sparedut.giovannilondero.dev/"))).toEqual([])
+  expect(built("")).toBe(built())
+})
+
+test("a deploy on another domain advertises its own address", () => {
+  const addresses = absolute(built("sparedut.example.com"))
+  expect(addresses.length).toBeGreaterThanOrEqual(3)
+  expect(addresses.filter((url) => !url.startsWith("https://sparedut.example.com/"))).toEqual([])
+  expect(meta(built("sparedut.example.com"), "og:image")).toBe("https://sparedut.example.com/showcase/link-preview.png")
+})
+
+test("the page is built with the deploy's address, in the dev server and in every build", () => {
+  const plugin = deployOriginInPage()
+  const transform = plugin.transformIndexHtml as (html: string) => string
+  const previous = process.env.DEPLOY_DOMAIN
+  try {
+    process.env.DEPLOY_DOMAIN = "sparedut.example.com"
+    expect(transform(html)).toBe(built("sparedut.example.com"))
+  } finally {
+    if (previous === undefined) delete process.env.DEPLOY_DOMAIN
+    else process.env.DEPLOY_DOMAIN = previous
+  }
+  expect(viteConfig.plugins?.flat().some((p) => p && typeof p === "object" && "name" in p && p.name === plugin.name)).toBe(true)
+  expect(built()).not.toContain("%DEPLOY_ORIGIN%")
+})
+
+/** The page's path for an address on the deploy's origin. */
+const pathOf = (url: string) => new URL(url).pathname
+
+test("the preview picture is a 1200 by 630 PNG that the build serves", () => {
+  const image = pathOf(meta(built(), "og:image")!)
+  expect(pngSize(image)).toEqual([1200, 630])
+})
+
+test("the preview picture is not downloaded when the game is installed", () => {
+  const { urls } = precacheOf(builtFiles(PUBLIC))
+  expect(urls).toContain("/manifest.webmanifest")
+  expect(urls).not.toContain(pathOf(meta(built(), "og:image")!))
+})
+
+test("the preview picture is served with the same security headers as the page", () => {
+  const headers = readFileSync(join(PUBLIC, "_headers"), "utf8")
+  expect(headersFor(headers, pathOf(meta(built(), "og:image")!))).toEqual(headersFor(headers, "/"))
 })
 
 /** A browser window: its display mode, whether the page is fullscreen through the Fullscreen API, and Safari's `navigator.standalone`. */
@@ -143,4 +280,24 @@ test("only iPhone and iPad add the game to the home screen by hand, iPadOS's des
   expect(addsToHomeScreenByHand({ userAgent: mac, maxTouchPoints: 5 })).toBe(true)
   expect(addsToHomeScreenByHand({ userAgent: mac, maxTouchPoints: 0 })).toBe(false)
   expect(addsToHomeScreenByHand({ userAgent: android, maxTouchPoints: 5 })).toBe(false)
+})
+
+interface Shortcut {
+  name: string
+  short_name?: string
+  url: string
+  icons?: Icon[]
+}
+
+test("a long press on the installed game's icon offers the home screen's button, opening the game on the shortcut", () => {
+  const shortcuts = (manifest.shortcuts ?? []) as Shortcut[]
+  expect(shortcuts.map((shortcut) => shortcut.name)).toEqual([STRINGS.fur.static.oneTap])
+  const url = new URL(shortcuts[0]!.url, "https://sparedut.example")
+  expect(url.pathname).toBe("/")
+  expect(readOpening(url.search, url.hash)).toEqual({ kind: "shortcut" })
+  for (const icon of shortcuts[0]!.icons ?? []) expect(pngSize(icon.src)).toEqual(declared(icon.sizes))
+})
+
+test("opening the installed game again brings the open game to the front instead of a new window", () => {
+  expect(manifest.launch_handler).toEqual({ client_mode: "focus-existing" })
 })
