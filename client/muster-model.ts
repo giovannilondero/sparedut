@@ -266,7 +266,7 @@ export class MusterModel {
         }
     // The last pick while the room does not have it yet, then the room's: never the browser's alone.
     const picker = primaryPicker(room, this.pending ?? this.roomPrimary ?? this.own())
-    const humans = room.roster.filter((r) => !r.bot && r.onMap)
+    const humans = room.roster.filter((r) => !r.bot && r.place === "inMatch")
     const countdown = this.countdown
     const actions: MusterActions =
       screen.tag === "joining"

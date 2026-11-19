@@ -225,7 +225,7 @@ for (const host of HOSTS) {
       play(10)
       expect(me.last("snap")!.players).toHaveLength(before)
       expect(me.last("snap")!.you?.alive).toBe(true)
-      expect(me.last("room")!.room.roster.find((r) => r.id === you)?.onMap).toBe(true)
+      expect(me.last("room")!.room.roster.find((r) => r.id === you)?.place).toBe("inMatch")
     })
 
     test("the host's restart during a live match ends it and returns the room to the Muster", () => {
@@ -556,10 +556,10 @@ describe("joining a match already on, on the game server", () => {
 
   test("a member who joins a live match is in the roster, not on the map, and absent from the match's players", () => {
     const { host, late, you, entry, play } = live()
-    expect(entry()).toMatchObject({ primary: "miedi", onMap: false })
-    expect(entry(host)?.onMap).toBe(false)
+    expect(entry()).toMatchObject({ primary: "miedi", place: "waiting" })
+    expect(entry(host)?.place).toBe("waiting")
     // The others are on the map.
-    expect(late.last("room")!.room.roster.filter((r) => r.id !== you).every((r) => r.onMap)).toBe(true)
+    expect(late.last("room")!.room.roster.filter((r) => r.id !== you).every((r) => r.place === "inMatch")).toBe(true)
     // No time limit: a long wait, and still nothing of them in the match.
     play(60 * 60)
     const snaps = [...late.got, ...host.got].filter((m) => m.t === "snap")
@@ -575,10 +575,10 @@ describe("joining a match already on, on the game server", () => {
     play(30)
     late.say({ t: "team", team })
     late.say({ t: "primary", p: "mulin" })
-    expect(entry()).toMatchObject({ team, primary: "mulin", onMap: false })
+    expect(entry()).toMatchObject({ team, primary: "mulin", place: "waiting" })
     late.say({ t: "enter" })
-    expect(entry()?.onMap).toBe(true)
-    expect(entry(host)?.onMap).toBe(true)
+    expect(entry()?.place).toBe("inMatch")
+    expect(entry(host)?.place).toBe("inMatch")
     play(120)
     const snap = late.last("snap")!
     expect(snap.you?.alive).toBe(true)
@@ -716,7 +716,7 @@ describe("joining a match already on, on the game server", () => {
     // Entering during the results is still entering this match; they wait for the Muster instead.
     for (let s = 0; s < 20 && late.last("snap")?.phase.tag !== "Muster"; s++) play(60)
     expect(late.last("snap")!.phase.tag).toBe("Muster")
-    expect(entry()?.onMap).toBe(true)
+    expect(entry()?.place).toBe("inMatch")
     play(2)
     expect(late.last("snap")!.players.some((p) => p.id === you)).toBe(true)
     // Everybody ready: the host's start goes live at once, with no countdown to wait out.
@@ -732,7 +732,7 @@ describe("joining a match already on, on the game server", () => {
     host.say({ t: "start" })
     play(2)
     expect(late.last("snap")!.phase.tag).toBe("Muster")
-    expect(entry()?.onMap).toBe(true)
+    expect(entry()?.place).toBe("inMatch")
     late.say({ t: "ready", ready: true })
     host.say({ t: "start" })
     play(10)
@@ -742,7 +742,7 @@ describe("joining a match already on, on the game server", () => {
   test("in the Tampieste a member entering after the start does not spawn in that match", () => {
     const { late, you, entry, play } = live({ ...HOSTS_CREATE.online, mode: "tampieste" })
     late.say({ t: "enter" })
-    expect(entry()?.onMap).toBe(true)
+    expect(entry()?.place).toBe("inMatch")
     play(600)
     const snap = late.last("snap")!
     expect(snap.phase.tag).toBe("Live")

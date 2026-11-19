@@ -20,7 +20,7 @@ const member = (id: string, over: Partial<RosterEntry> = {}): RosterEntry => ({
   ready: false,
   bot: false,
   away: false,
-  onMap: true,
+  place: "inMatch",
   ...over
 })
 
@@ -237,7 +237,7 @@ test("an Offline room's Muster opens with start focused; elsewhere on the screen
 
 /** Mariute joined a match already on and has not entered it: a bot keeps her seat on the map. */
 const joined = (over: Partial<RoomInfo> = {}) =>
-  room({ phase: "Live", roster: room().roster.map((r) => (r.id === "mariute" ? { ...r, ready: false, onMap: false } : r)), ...over })
+  room({ phase: "Live", roster: room().roster.map((r) => (r.id === "mariute" ? { ...r, ready: false, place: "waiting" } : r)), ...over })
 
 test("joining a match already on: the score and the time left, and a confirm that enters it", () => {
   const model = muster("mariute", joined(), { tag: "Live", ends: 6000 })

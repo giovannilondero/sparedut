@@ -19,7 +19,8 @@ import {
   type Access,
   type Reached,
   type RoomAccess,
-  type Snapshot
+  type Snapshot,
+  type Place
 } from "../shared/protocol.ts"
 import { createSim, type GameEvent, type PostValue, type Sim, type WorldView } from "../shared/sim/index.ts"
 import { isTraining, TRAINING, type StationId } from "../shared/training/index.ts"
@@ -38,13 +39,6 @@ const STEPS_PER_TICK = 3
 /** Steps that can accumulate during lag, to be caught up afterwards. */
 const MAX_CREDIT = 12
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
-
-/**
- * Where a member is in the match. `waiting`: they joined while a match was on and have not entered
- * it: no body, no hits, no seat on a team for scoring, until their enter intent (or the Muster).
- * `inMatch`: one of the match's players, on the map whenever the match puts them there.
- */
-export type Place = "waiting" | "inMatch"
 
 export interface Member {
   readonly id: string
@@ -572,7 +566,7 @@ export class Room {
       minutes: this.settings.minutes,
       level: this.level,
       ff: this.settings.ff,
-      roster: [...this.members.values()].map((m) => ({ id: m.id, name: m.name, team: m.team, primary: this.primaryOf(m), ready: m.ready, bot: m.bot, away: false, onMap: m.place === "inMatch" }))
+      roster: [...this.members.values()].map((m) => ({ id: m.id, name: m.name, team: m.team, primary: this.primaryOf(m), ready: m.ready, bot: m.bot, away: false, place: m.place }))
     }
   }
 

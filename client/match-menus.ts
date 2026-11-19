@@ -97,7 +97,7 @@ export type MusterScreen = { readonly tag: "closed" } | { readonly tag: "muster"
 
 export function musterScreen(room: Pick<RoomInfo, "roster" | "mode">, me: string, phase: RoomInfo["phase"]): MusterScreen {
   if (phase === "Muster") return { tag: "muster" }
-  if (phase === "Live" && room.roster.find((r) => r.id === me)?.onMap === false) return { tag: "joining", nextMatch: room.mode === "tampieste" }
+  if (phase === "Live" && room.roster.find((r) => r.id === me)?.place === "waiting") return { tag: "joining", nextMatch: room.mode === "tampieste" }
   return { tag: "closed" }
 }
 

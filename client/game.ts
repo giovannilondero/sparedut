@@ -1257,8 +1257,8 @@ export class Game {
     }
     const team = document.getElementById("p-team")
     if (team) team.onclick = () => this.d.net.send({ t: "team", team: this.otherTeam() })
-    const loadout = document.getElementById("p-loadout")
-    if (loadout) loadout.onclick = () => this.openOverlay("loadout")
+    const armoury = document.getElementById("p-loadout")
+    if (armoury) armoury.onclick = () => this.openOverlay("loadout")
     $("p-leave").onclick = () => {
       this.d.net.send({ t: "leave" })
       this.d.onLeave()

@@ -32,9 +32,9 @@ test("the end screen starts on another match for the host, on leaving for everyo
 const room = (over: Partial<Pick<RoomInfo, "hostId" | "roster">> = {}): Pick<RoomInfo, "hostId" | "roster"> => ({
   hostId: "p1",
   roster: [
-    { id: "p1", name: "Toni", team: "benandanti", primary: "mulin", ready: false, bot: false, away: false, onMap: true },
-    { id: "bot-1", name: "Bepi", team: "malandanti", primary: "cramar", ready: true, bot: true, away: false, onMap: true },
-    { id: "p2", name: "Mariute", team: "malandanti", primary: "miedi", ready: false, bot: false, away: false, onMap: true }
+    { id: "p1", name: "Toni", team: "benandanti", primary: "mulin", ready: false, bot: false, away: false, place: "inMatch" },
+    { id: "bot-1", name: "Bepi", team: "malandanti", primary: "cramar", ready: true, bot: true, away: false, place: "inMatch" },
+    { id: "p2", name: "Mariute", team: "malandanti", primary: "miedi", ready: false, bot: false, away: false, place: "inMatch" }
   ],
   ...over
 })
@@ -63,7 +63,7 @@ test("the Muster's primary picker is free on the player's own primary, and locke
 })
 
 const waiting = (mode: "bataie" | "tampieste" = "bataie") => ({
-  ...room({ roster: room().roster.map((r) => (r.id === "p2" ? { ...r, onMap: false } : r)) }),
+  ...room({ roster: room().roster.map((r) => (r.id === "p2" ? { ...r, place: "waiting" } : r)) }),
   mode
 })
 
@@ -147,6 +147,6 @@ test("a bot button sends its team; one naming no team adds a bot to the side wit
   // One Benandant against two Malandants, the bot among them.
   expect(botMessage(room(), { delta: 1, team: null })).toEqual({ t: "bot", team: "benandanti", delta: 1 })
   expect(botMessage(room(), { delta: -1, team: null })).toEqual({ t: "bot", team: "malandanti", delta: -1 })
-  const more = room({ roster: [...room().roster, { id: "bot-2", name: "Nart", team: "benandanti", primary: "cramar", ready: true, bot: true, away: false, onMap: true }] })
+  const more = room({ roster: [...room().roster, { id: "bot-2", name: "Nart", team: "benandanti", primary: "cramar", ready: true, bot: true, away: false, place: "inMatch" }] })
   expect(botMessage(more, { delta: -1, team: null })).toEqual({ t: "bot", team: "benandanti", delta: -1 })
 })
