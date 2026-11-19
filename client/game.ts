@@ -508,7 +508,9 @@ export class Game {
 
     const prev = this.snap
     this.snap = s
-    this.muster.snapshot(s)
+    // The player's last pick, sent again while the room does not have it.
+    const pick = this.muster.snapshot(s)
+    if (pick) this.d.net.send(pick)
     // Broken-down doors no longer stop predicted movement or shots.
     this.physics.setDoors(s.doors.map((hp) => hp > 0))
     // A panel torn off leaves its gap: predicted shots pass through it (bodies still cannot).
@@ -1337,11 +1339,13 @@ export class Game {
     return `<span class="mu-stats">${bar(healthLabel, health, tile.bars.health)}${bar(speedLabel, speed, tile.bars.speed)}</span>`
   }
 
-  /** The primary the player enters with, large: its name, its line and its class. */
+  /** The primary the player enters with, large: its name, its line and its class; and its tile marked. */
   private drawMusterChosen(view: OpenMuster) {
     const chosen = view.picker.chosen
     if (chosen === this.musterChosen) return
     this.musterChosen = chosen
+    const group = document.querySelector<HTMLElementTagNameMap["ui-radio-group"]>("#m-picker ui-radio-group")
+    if (group && group.value !== chosen) group.value = chosen
     const s = t()
     const tile = view.picker.tiles.find((x) => x.primary === chosen)!
     $("m-chosen").innerHTML = `<span class="tag">${s.muster.primary}</span><b>${s.weapons[chosen].name}</b><span class="blurb">${s.weapons[chosen].blurb}</span>${this.classBarsHtml(tile)}`

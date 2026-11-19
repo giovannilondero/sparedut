@@ -119,10 +119,20 @@ const other = (team: Team): Team => (team === "benandanti" ? "malandanti" : "ben
 
 type Snap = Pick<Snapshot, "phase" | "tick" | "score" | "players">
 
+/**
+ * Ticks between two sends of a pick: the game server takes two commands a second, so the picks
+ * alone never use up its allowance.
+ */
+const PICK_GAP = 30
+
 export class MusterModel {
   private info: RoomInfo | null = null
   private snap: Snap | null = null
   private lines: MusterChatLine[] = []
+  /** The player's last pick while the room does not have it yet; null once it does. */
+  private pending: PrimaryId | null = null
+  /** The tick the last pick was sent at. */
+  private sentAt = -Infinity
 
   /** `me`: the player's id in the room; `own`: the primary the player chose last, remembered by the browser. */
   constructor(
@@ -130,14 +140,34 @@ export class MusterModel {
     private readonly own: () => PrimaryId
   ) {}
 
-  /** The room as its host sent it: on joining, and on every change. */
+  /** The room as its host sent it: on joining, and on every change. A pick the room now has is settled. */
   room(info: RoomInfo) {
     this.info = info
+    if (this.pending === this.roomPrimary) this.pending = null
   }
 
-  /** A snapshot of the match: its phase, the countdown, the score and who is alive. */
-  snapshot(snap: Snap) {
+  /**
+   * A snapshot of the match: its phase, the countdown, the score and who is alive. Returns the
+   * player's last pick to send again while the room does not have it (the game server may have
+   * dropped it, or it was held back by `PICK_GAP`), at most once every `PICK_GAP` ticks; nothing
+   * once the screen closes, where the room no longer takes a pick.
+   */
+  snapshot(snap: Snap): ClientMessage | null {
     this.snap = snap
+    if (this.view.tag === "closed") this.pending = null
+    return this.sendPending()
+  }
+
+  /** The primary the room has for the player. */
+  private get roomPrimary(): PrimaryId | null {
+    return this.info?.roster.find((r) => r.id === this.me)?.primary ?? null
+  }
+
+  private sendPending(): ClientMessage | null {
+    const tick = this.snap?.tick ?? 0
+    if (this.pending === null || this.info?.single || tick - this.sentAt < PICK_GAP) return null
+    this.sentAt = tick
+    return { t: "primary", p: this.pending }
   }
 
   /** The switch under the other team: to that team. Nothing in a mode with no teams, nor where the room would refuse it. */
@@ -158,10 +188,16 @@ export class MusterModel {
     return this.inMuster || teamSwitch(room.roster, from, to).tag !== "refused"
   }
 
-  /** A tile pressed: the player's new primary. Nothing under single weapon, whose picker is locked. */
+  /**
+   * A tile pressed: the player's new primary, shown as chosen at once. Sent now, or held back
+   * (null) when a pick went less than `PICK_GAP` ticks ago: then the next snapshots send only the
+   * last one. Nothing under single weapon, whose picker is locked.
+   */
   pick(primary: PrimaryId): ClientMessage | null {
     if (!this.info || this.info.single) return null
-    return { t: "primary", p: primary }
+    // Kept even when the room has it already: a pick sent before may still be on its way.
+    this.pending = primary
+    return this.sendPending()
   }
 
   private get host() {
@@ -232,7 +268,8 @@ export class MusterModel {
           benandanti: rows.filter((_, i) => room.roster[i].team === "benandanti"),
           malandanti: rows.filter((_, i) => room.roster[i].team === "malandanti")
         }
-    const picker = primaryPicker(room, this.own())
+    // The last pick while the room does not have it yet, then the room's: never the browser's alone.
+    const picker = primaryPicker(room, this.pending ?? this.roomPrimary ?? this.own())
     const humans = room.roster.filter((r) => !r.bot && r.onMap)
     const countdown = this.countdown
     const actions: MusterActions =

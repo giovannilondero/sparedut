@@ -2,10 +2,15 @@
  * The Muster screen's state, fed the room's messages the way the game feeds it, with no browser:
  * what each member sees and what their presses send.
  */
-import { expect, test } from "bun:test"
+import { beforeAll, expect, test } from "bun:test"
 import { MusterModel } from "../client/muster-model.ts"
+import { Hub } from "../server/hub.ts"
+import { initPhysics } from "../shared/physics.ts"
+import { PRIMARIES, type PrimaryId } from "../shared/weapons.ts"
 import type { RoomInfo, RosterEntry, Snapshot } from "../shared/protocol.ts"
-import type { PrimaryId } from "../shared/weapons.ts"
+import { harness } from "./harness.ts"
+
+beforeAll(() => initPhysics())
 
 const member = (id: string, over: Partial<RosterEntry> = {}): RosterEntry => ({
   id,
@@ -117,10 +122,74 @@ test("every primary is a tile with its class's health and speed, as numbers and 
   expect(tile(model, "mulin").bars.speed).toBeCloseTo(5 / 9)
 })
 
-test("the player's remembered primary is the one chosen, and a tile pressed sends the new one", () => {
+test("a tile pressed sends the new primary, and shows it as chosen at once", () => {
   const model = muster("mariute")
-  expect(open(model).picker).toMatchObject({ locked: false, chosen: "doplete" })
+  expect(open(model).picker).toMatchObject({ locked: false, chosen: "miedi" })
   expect(model.pick("mulin")).toEqual({ t: "primary", p: "mulin" })
+  expect(open(model).picker.chosen).toBe("mulin")
+})
+
+test("settled, the primary chosen is the one the room has for the player, not only the one the browser remembers", () => {
+  // Mariute's browser remembers the Doplete; the room has her with the Miedi.
+  expect(open(muster("mariute")).picker.chosen).toBe("miedi")
+})
+
+test("a burst of picks against the game server's limit on commands: the last one picked is the room's, and the one shown", () => {
+  const { connect, play } = harness((clock) => new Hub(clock))
+  const client = connect()
+  client.say({ t: "create", mode: "bataie", map: "glemone", minutes: 10, reach: "online", access: { kind: "open" }, bots: 2, level: "pari", ff: false, primary: "cramar" })
+  const { you } = client.last("joined")!
+  const model = new MusterModel(you, () => "cramar")
+  /** A frame of the game: the room's last messages to the model, and whatever it sends back to the room. */
+  const frame = () => {
+    model.room(client.last("room")!.room)
+    const send = model.snapshot(client.last("snap")!)
+    if (send) client.say(send)
+  }
+  play(2)
+  frame()
+  // Arrow keys held over the tiles: twelve picks in a moment, ending on the Mulin.
+  const picks = [...PRIMARIES, ...PRIMARIES].filter((p) => p !== "mulin").slice(0, 11)
+  for (const p of [...picks, "mulin" as const]) {
+    const send = model.pick(p)
+    if (send) client.say(send)
+    play(1)
+    frame()
+  }
+  for (let i = 0; i < 180; i++) {
+    play(1)
+    frame()
+  }
+  expect(client.last("room")!.room.roster.find((r) => r.id === you)?.primary).toBe("mulin")
+  expect(open(model).picker.chosen).toBe("mulin")
+})
+
+test("a pick the room did not take is sent again until the room has it, no more than twice a second", () => {
+  const model = muster("mariute")
+  const sent: unknown[] = []
+  expect(model.pick("mulin")).toEqual({ t: "primary", p: "mulin" })
+  // Lost on the way: the room still has the Miedi. Shown as chosen meanwhile, and sent again.
+  expect(open(model).picker.chosen).toBe("mulin")
+  for (let tick = 1; tick <= 60; tick++) {
+    const send = model.snapshot(snap({ tag: "Muster", starts: null }, tick))
+    if (send) sent.push([tick, send])
+  }
+  expect(sent).toEqual([[30, { t: "primary", p: "mulin" }], [60, { t: "primary", p: "mulin" }]])
+  // The room has it: nothing more is sent.
+  model.room(room({ roster: room().roster.map((r) => (r.id === "mariute" ? { ...r, primary: "mulin" } : r)) }))
+  for (let tick = 61; tick <= 200; tick++) expect(model.snapshot(snap({ tag: "Muster", starts: null }, tick))).toBeNull()
+  expect(open(model).picker.chosen).toBe("mulin")
+})
+
+test("a pick back to the room's primary while another is on its way is sent too, so that the other does not win", () => {
+  const model = muster("mariute")
+  expect(model.pick("mulin")).toEqual({ t: "primary", p: "mulin" })
+  expect(model.pick("miedi")).toBeNull()
+  expect(open(model).picker.chosen).toBe("miedi")
+  // The Mulin arrives: the room has it, and the Miedi goes after it.
+  model.room(room({ roster: room().roster.map((r) => (r.id === "mariute" ? { ...r, primary: "mulin" } : r)) }))
+  expect(open(model).picker.chosen).toBe("miedi")
+  expect(model.snapshot(snap({ tag: "Muster", starts: null }, 30))).toEqual({ t: "primary", p: "miedi" })
 })
 
 test("under single weapon the picker is locked on the host's choice and a press sends nothing", () => {
