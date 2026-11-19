@@ -456,6 +456,7 @@ export class Hud {
   private drawnPressed = -1
   private drawnToggles = -1
   private drawnUse: TouchView["use"] | undefined = undefined
+  private drawnReload: boolean | undefined = undefined
   private drawnPicker: readonly PickerEntry[] | null | undefined = undefined
 
   /**
@@ -486,6 +487,10 @@ export class Hud {
       const use = $("touch-use")
       use.classList.toggle("hidden", !view.use)
       use.textContent = view.use === "dismount" ? t().hud.touchLeave : view.use === "tear" ? t().hud.touchTear : t().hud.touchUse
+    }
+    if (view.reload !== this.drawnReload) {
+      this.drawnReload = view.reload
+      $("touch-reload").classList.toggle("hidden", !view.reload)
     }
     if (view.picker !== this.drawnPicker) {
       this.drawnPicker = view.picker

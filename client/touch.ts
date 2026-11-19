@@ -231,6 +231,8 @@ export interface TouchView {
   board: boolean
   /** What the "use" button does now (mount a turret, dismount, tear off the casot's panel), or null while it is hidden. */
   use: "use" | "dismount" | "tear" | null
+  /** Whether the reload button is shown: hidden with a weapon in hand that has nothing to reload, and on a turret. */
+  reload: boolean
   /** The weapon picker's entries while it is open. */
   picker: readonly PickerEntry[] | null
 }

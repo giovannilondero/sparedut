@@ -7,7 +7,7 @@
 import { BUTTON, type ButtonName } from "../shared/input.ts"
 import type { Snapshot } from "../shared/protocol.ts"
 import type { ArsenalValue } from "../shared/sim/schema.ts"
-import type { Slot, WeaponId } from "../shared/weapons.ts"
+import { usesAmmo, type Slot, type WeaponId } from "../shared/weapons.ts"
 import { pointerDevice, type Device } from "./device.ts"
 import { buttonBit, inCircle, inRect, NO_INSETS, pickerEntries, TOUCH_BUTTONS, touchLayout, type Insets, type TouchButton, type TouchLayout, type TouchView } from "./touch.ts"
 
@@ -162,7 +162,7 @@ export class Controls {
   /** Look, movement and fire go through (no menu open); the frame loop says so in `poll`. */
   private playing = true
   /** The touch controls as the HUD draws them, updated in place. */
-  readonly touchView: TouchView = { stick: { held: false, kx: 0, ky: 0 }, fire: false, pressed: 0, aim: false, crouch: false, board: false, use: null, picker: null }
+  readonly touchView: TouchView = { stick: { held: false, kx: 0, ky: 0 }, fire: false, pressed: 0, aim: false, crouch: false, board: false, use: null, reload: false, picker: null }
   /** The layout for the canvas's current size: computed once per size, read by the input and the HUD. */
   private layout: TouchLayout | null = null
   /** Where the canvas sat when the last finger landed: moves are measured from there. */
@@ -294,6 +294,12 @@ export class Controls {
     return p.mounted ? "dismount" : p.nearTurret ? "use" : p.nearPanel ? "tear" : null
   }
 
+  /** Whether the reload button is there: alive, on foot, with a weapon in hand that has rounds to reload (not the Motosee, the Mescul or the panel). */
+  get reloadShown(): boolean {
+    const p = this.tracked
+    return !!p?.alive && !p.mounted && !!p.arsenal && usesAmmo(p.arsenal.current)
+  }
+
   /**
    * A finger lands on the canvas. The first touch in a match makes touch the active device.
    * The finger keeps the control it landed on until it lifts: an entry of the open picker,
@@ -346,7 +352,7 @@ export class Controls {
       if (inRect(layout.weapon, x, y)) return "spent"
     }
     if (inCircle(layout.fire, x, y) || inCircle(layout.leftFire, x, y)) return "fire"
-    for (const b of TOUCH_BUTTONS) if (inCircle(layout.buttons[b], x, y) && (b !== "use" || this.turretControl)) return b
+    for (const b of TOUCH_BUTTONS) if (inCircle(layout.buttons[b], x, y) && (b !== "use" || this.turretControl) && (b !== "reload" || this.reloadShown)) return b
     if (inRect(layout.weapon, x, y)) return "weapon"
     const region = layout.stick.region
     if (!this.touchView.stick.held && inRect(region, x, y)) return "stick"
@@ -382,6 +388,7 @@ export class Controls {
     v.aim = this.touchHeld.has("aim")
     v.crouch = this.crouched
     v.use = this.turretControl
+    v.reload = this.reloadShown
     this.handlers.onTouch?.(v)
   }
 
@@ -501,7 +508,7 @@ export class Controls {
     // The touch aim toggle does not outlive a life either.
     if (!player || !player.alive || player.spawned) this.touchHeld.delete("aim")
     // The HUD learns what a snapshot changed only when something did.
-    if (this.crouched !== before || this.touchHeld.has("aim") !== aimed || this.turretControl !== v.use) this.redraw()
+    if (this.crouched !== before || this.touchHeld.has("aim") !== aimed || this.turretControl !== v.use || this.reloadShown !== v.reload) this.redraw()
   }
 
   /**
