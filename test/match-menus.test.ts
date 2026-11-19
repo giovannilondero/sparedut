@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { afterEscape, endFocus, focusOnOpen, menuPrimary, musterCountdown, musterFocus, musterScreen, musterTeams, nextFocus, primaryPicker, singleOf, singleValue, startsAtOnce } from "../client/match-menus.ts"
+import { afterEscape, botButtons, botMessage, endFocus, focusOnOpen, menuPrimary, musterCountdown, musterFocus, musterScreen, musterTeams, nextFocus, primaryPicker, singleOf, singleValue, startsAtOnce } from "../client/match-menus.ts"
 
 test("Esc closes the in-match menus one step at a time", () => {
   expect(afterEscape("pause", "none")).toBe("none")
@@ -147,4 +147,26 @@ test("the pad's d-pad moves focus to the nearest control in its direction", () =
 test("at the edge of the screen the d-pad leaves focus where it is", () => {
   expect(nextFocus(field[2], field, "right")).toBe(-1)
   expect(nextFocus(field[0], field, "up")).toBe(-1)
+})
+
+test("the host's bot buttons: a + and a − for each team, and in a mode with no teams one of each, naming no team", () => {
+  expect(botButtons({ mode: "bataie" })).toEqual([
+    { delta: 1, team: "benandanti" },
+    { delta: -1, team: "benandanti" },
+    { delta: 1, team: "malandanti" },
+    { delta: -1, team: "malandanti" }
+  ])
+  expect(botButtons({ mode: "tampieste" })).toEqual([
+    { delta: 1, team: null },
+    { delta: -1, team: null }
+  ])
+})
+
+test("a bot button sends its team; one naming no team adds a bot to the side with fewer members and removes the last bot added", () => {
+  expect(botMessage(room(), { delta: 1, team: "malandanti" })).toEqual({ t: "bot", team: "malandanti", delta: 1 })
+  // One Benandant against two Malandants, the bot among them.
+  expect(botMessage(room(), { delta: 1, team: null })).toEqual({ t: "bot", team: "benandanti", delta: 1 })
+  expect(botMessage(room(), { delta: -1, team: null })).toEqual({ t: "bot", team: "malandanti", delta: -1 })
+  const more = room({ roster: [...room().roster, { id: "bot-2", name: "Nart", team: "benandanti", primary: "cramar", ready: true, bot: true, away: false, onMap: true }] })
+  expect(botMessage(more, { delta: -1, team: null })).toEqual({ t: "bot", team: "benandanti", delta: -1 })
 })

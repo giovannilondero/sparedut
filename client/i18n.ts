@@ -236,9 +236,9 @@ export interface Strings {
     readonly primaryFixed: string
     /** The host tools' label. */
     readonly host: string
-    /** The host's buttons that add or remove a bot in a team (its short name). */
-    readonly addBot: Fn
-    readonly removeBot: Fn
+    /** The host's buttons that add or remove a bot in a team (its short name), or with no team named (null) in a mode with none. */
+    readonly addBot: Fn<[string | null]>
+    readonly removeBot: Fn<[string | null]>
     readonly level: string
     readonly switchTeam: Fn
     readonly leave: string
@@ -776,8 +776,8 @@ const fur: Strings = {
     primary: "La tô arme principâl",
     primaryFixed: "E reste chê par dute la partide: si le cambie te Adunade.",
     host: "Host:",
-    addBot: (team) => `+ bot ${team}`,
-    removeBot: (team) => `− bot ${team}`,
+    addBot: (team) => (team ? `+ bot ${team}` : "+ bot"),
+    removeBot: (team) => (team ? `− bot ${team}` : "− bot"),
     level: "Bravure",
     switchTeam: (team) => `Passe cui ${team}`,
     leave: "Va fûr · Mandi!"
@@ -1250,8 +1250,8 @@ const it: Strings = {
     primary: "La tua arma principale",
     primaryFixed: "Resta quella per tutta la partita: si cambia all'Adunata.",
     host: "Host:",
-    addBot: (team) => `+ bot ${team}`,
-    removeBot: (team) => `− bot ${team}`,
+    addBot: (team) => (team ? `+ bot ${team}` : "+ bot"),
+    removeBot: (team) => (team ? `− bot ${team}` : "− bot"),
     level: "Bravura",
     switchTeam: (team) => `Passa con i ${team}`,
     leave: "Esci · Mandi!"

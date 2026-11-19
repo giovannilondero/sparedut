@@ -41,7 +41,7 @@ import "@ui-sdk/web/dialog"
 import "@ui-sdk/web/select"
 import { takeAwayDeparted } from "./bodies.ts"
 import { alwaysChosen } from "./choice.ts"
-import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, menuPrimary, musterScreen, nextFocus, primaryPicker, singleValue, SINGLE_OFF, type MatchMenu, type MusterScreen, type PadDirection } from "./match-menus.ts"
+import { afterEscape, botButtons, botMessage, endFocus, focusOnOpen, MATCH_MENUS, menuPrimary, musterScreen, nextFocus, primaryPicker, singleValue, SINGLE_OFF, type BotButton, type MatchMenu, type MusterScreen, type PadDirection } from "./match-menus.ts"
 import { classFigures } from "./menu-model.ts"
 import { MusterModel, type MusterRow, type MusterView, type PrimaryTile } from "./muster-model.ts"
 import { pickerEntries } from "./touch.ts"
@@ -1190,12 +1190,11 @@ export class Game {
   private botToolsHtml(prefix: "p" | "m", room: RoomInfo) {
     const s = t()
     const p = s.pause
-    const ben = TEAM_INFO.benandanti.short
-    const mal = TEAM_INFO.malandanti.short
-    return `<div class="host-bots">
-          <button data-bot="benandanti:1">${p.addBot(ben)}</button><button data-bot="benandanti:-1">${p.removeBot(ben)}</button>
-          <button data-bot="malandanti:1">${p.addBot(mal)}</button><button data-bot="malandanti:-1">${p.removeBot(mal)}</button>
-        </div>
+    const button = (b: BotButton, i: number) => {
+      const team = b.team && TEAM_INFO[b.team].short
+      return `<button data-bot="${i}">${b.delta > 0 ? p.addBot(team) : p.removeBot(team)}</button>`
+    }
+    return `<div class="host-bots">${botButtons(room).map(button).join("")}</div>
         <ui-select id="${prefix}-level" class="host-level" presentation="auto" default-value="${room.level}">
           <ui-select-label>${p.level}</ui-select-label>
           <ui-select-trigger><button><ui-select-value></ui-select-value></button></ui-select-trigger>
@@ -1206,8 +1205,9 @@ export class Game {
   private bindBotTools(el: HTMLElement, prefix: "p" | "m") {
     for (const b of el.querySelectorAll<HTMLButtonElement>("[data-bot]")) {
       b.onclick = () => {
-        const [team, delta] = b.dataset.bot!.split(":")
-        this.d.net.send({ t: "bot", team: team as Team, delta: Number(delta) as 1 | -1 })
+        const room = this.room
+        const button = room && botButtons(room)[Number(b.dataset.bot)]
+        if (button) this.d.net.send(botMessage(room, button))
       }
     }
     // The room's update sets the value back from code ("imperative"): only the host's own choice is sent.
