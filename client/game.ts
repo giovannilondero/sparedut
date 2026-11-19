@@ -1969,8 +1969,7 @@ export class Game {
       // A step this device cannot perform: shown as such, then the host is told, and completes it.
       const unavailable = this.unavailableSteps.check(s.training, this.controls.device, performance.now())
       if (unavailable) this.d.net.send(unavailable)
-      // In the Muster nobody is on the map: nobody is dead either.
-      this.hud.death(s.phase.tag === "Muster" ? null : you, this.names, Math.floor(this.seed / 7))
+      this.hud.death(you, { phase: s.phase.tag, mode: mode ?? "bataie" }, this.names, Math.floor(this.seed / 7))
       if (s.phase.tag === "Over" && Math.floor(t) !== Math.floor(t - dt)) this.renderEnd()
     }
     fx.update(dt, camera)

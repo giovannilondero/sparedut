@@ -7,8 +7,8 @@ import { FLAG_BIT, type BoardRow, type RoomInfo, type SnapSelf, type Snapshot } 
 import type { KillCause } from "../shared/sim/events.ts"
 import { usesAmmo, type WeaponId } from "../shared/weapons.ts"
 import { maxHp } from "../shared/sim/rules.ts"
-import type { TrainingView } from "../shared/sim/view.ts"
-import { STATION_IDS } from "../shared/training/index.ts"
+import type { PhaseView, TrainingView } from "../shared/sim/view.ts"
+import { isTraining, STATION_IDS } from "../shared/training/index.ts"
 import type { Device } from "./device.ts"
 import { t } from "./i18n.ts"
 import type { MenuPrimary } from "./match-menus.ts"
@@ -345,10 +345,11 @@ export class Hud {
     if (text) this.announce(text, t().hud.streak(name, n))
   }
 
-  death(you: SnapSelf | null, names: Map<string, string>, seed: number) {
-    const dead = !!you && !you.alive
-    this.toggle("death", "hidden", !dead)
-    if (!dead || !you) return
+  death(you: SnapSelf | null, at: DeathAt, names: Map<string, string>, seed: number) {
+    const screen = deathScreen(you, at)
+    this.toggle("death", "hidden", screen.tag === "none")
+    if (screen.tag === "none" || !you) return
+    this.toggle("death-hint", "hidden", !screen.armoury)
     const s = t().hud
     this.html("death-by", you.killer ? s.deathBy(esc(names.get(you.killer) ?? "?")) : s.deathSelf)
     this.text("death-line", pick(s.deathLines, seed))
@@ -500,6 +501,24 @@ export class Hud {
         .join("")
     }
   }
+}
+
+/** Where a death is seen: the match's phase and the room's mode. */
+export interface DeathAt {
+  readonly phase: PhaseView["tag"]
+  readonly mode: ModeId
+}
+
+/**
+ * What the death screen shows: nothing (nobody on the map, alive, or in the Muster), or the death,
+ * with the key that opens the armoury (`armoury`) only in a training, the one place the primary
+ * changes: in a match it is fixed until the Muster.
+ */
+export type DeathScreen = { readonly tag: "none" } | { readonly tag: "dead"; readonly armoury: boolean }
+
+export function deathScreen(you: { readonly alive: boolean } | null, at: DeathAt): DeathScreen {
+  if (!you || you.alive || at.phase === "Muster") return { tag: "none" }
+  return { tag: "dead", armoury: isTraining(at.mode) }
 }
 
 export function boardHtml(rows: readonly BoardRow[], me: string) {
