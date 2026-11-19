@@ -861,7 +861,6 @@ export class Game {
     return this.snap?.you ?? null
   }
 
-  /** The turret I'm using, or -1. */
   /**
    * The panel holding "use" would tear off now, as the simulation decides it (`PlayPanels`): on its
    * wall or being torn by me, faced from inside with slot 3 free. -1 when none.
@@ -875,6 +874,7 @@ export class Game {
     })
   }
 
+  /** The turret I'm using, or -1. */
   private mounted() {
     return this.snap?.turrets.findIndex((t) => t.gunner === this.me) ?? -1
   }

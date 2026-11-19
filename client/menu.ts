@@ -566,17 +566,17 @@ export class Menu {
 
   // ---------------------------------------------------------------- armoury
 
-  /**
-   * The weapons: the primaries first, as one group of cards to choose from (UI SDK's radio group: one
-   * tab stop, arrow keys, the radio role), then the ones always carried or picked up, to read only.
-   * Drawn into the menu's armoury and, with `onPick`, into a training's.
-   */
   /** A primary chosen outside the armoury (the Muster's tiles): remembered for the next room, with the armoury's sound. */
   choosePrimary(primary: PrimaryId) {
     this.model.choosePrimary(primary)
     this.audio.play("switch")
   }
 
+  /**
+   * The weapons: the primaries first, as one group of cards to choose from (UI SDK's radio group: one
+   * tab stop, arrow keys, the radio role), then the ones always carried or picked up, to read only.
+   * Drawn into the menu's armoury and, with `onPick`, into a training's.
+   */
   buildArmarie(target: HTMLElement = $("armarie"), onPick?: (p: PrimaryId) => void) {
     const max = { damage: 110, rate: 10, range: 400, mag: 30 }
     const s = t()
