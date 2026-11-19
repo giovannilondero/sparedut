@@ -193,7 +193,7 @@ describe("the panel in the Lanciafrico's slot", () => {
     expect(Math.hypot(me(sim, "a").body.x - LANCIAFRICO[0], me(sim, "a").body.z - LANCIAFRICO[2])).toBeLessThan(0.5)
     expect(events.some((e) => e.t === "pick" && e.k === "lanciafrico")).toBe(false)
     expect(me(sim, "a").arsenal.power).toBe("panel")
-    expect(sim.view().pickups[MARAN.pickups.findIndex((p) => p.kind === "lanciafrico")]).toBe(true)
+    expect(sim.view().pickups[MARAN.pickups.findIndex((p) => p.kind === "lanciafrico")]).toBe("up")
   })
 })
 

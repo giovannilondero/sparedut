@@ -11,7 +11,7 @@ import type { Body } from "./movement.ts"
 import type { GameEvent } from "./sim/events.ts"
 import type { ArsenalValue, FlagState, HillValue, TurretState } from "./sim/schema.ts"
 import type { StormValue } from "./sim/rules.ts"
-import type { CartView, PanelView, PhaseView, TrainingView } from "./sim/view.ts"
+import type { CartView, PanelView, PhaseView, PickupView, TrainingView } from "./sim/view.ts"
 import { PRIMARIES, type PrimaryId, type ProjectileKind, type WeaponId } from "./weapons.ts"
 import { INTERFACE_ACTIONS } from "./training/interface.ts"
 import { isStepId, isStepOf, STATION_IDS, type StepId } from "./training/index.ts"
@@ -205,6 +205,12 @@ export interface SnapOther {
   readonly hp: number
 }
 
+/** A pickup's character in `Snapshot.pickups`. */
+export const PICKUP_CHAR = { up: "1", down: "0", absent: "-" } as const satisfies Record<PickupView, string>
+
+/** A snapshot's pickups, back to what each one is. */
+export const pickupsOf = (chars: string): PickupView[] => [...chars].map((c) => (c === PICKUP_CHAR.up ? "up" : c === PICKUP_CHAR.absent ? "absent" : "down"))
+
 export const FLAG_BIT = { alive: 1, crouch: 2, grounded: 4, shield: 8, firing: 16, aiming: 32, carrier: 64, sgnape: 128 } as const
 
 export interface SnapSelf {
@@ -228,7 +234,7 @@ export interface Snapshot {
   readonly score: Readonly<Record<Team, number>>
   readonly flags: Readonly<Record<Team, FlagState>>
   readonly hill: HillValue
-  /** "1" available, "0" pending, in `PICKUPS` order. */
+  /** In `PICKUPS` order, one character each (`PICKUP_CHAR`): there, taken and coming back, or not on the map for the match. */
   readonly pickups: string
   readonly proj: readonly (readonly [kind: ProjectileKind, x: number, y: number, z: number])[]
   /** Only in Spingi il Cjar. */

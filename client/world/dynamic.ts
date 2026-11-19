@@ -638,7 +638,9 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
         stormMat.uniforms.uTime.value = t
       }
       pickups.forEach((p, i) => {
-        const on = frame.pickups[i] ?? true
+        const state = frame.pickups[i] ?? "up"
+        const on = state === "up"
+        p.mesh.visible = state !== "absent"
         p.mesh.material = on ? pickMat : ghostMat
         p.mesh.position.y = p.y + Math.sin(t * 2 + p.phase) * 0.12
         p.mesh.rotation.y = t * 1.3 + p.phase

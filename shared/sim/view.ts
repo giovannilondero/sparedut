@@ -35,6 +35,7 @@ import {
   type ArsenalValue,
   type FlagState,
   type HillValue,
+  type PickupState,
   type ProjectileValue,
   type RulesValue,
   type StatsValue,
@@ -64,6 +65,9 @@ export interface PlayerView {
   readonly seq: number
   readonly buttons: number
 }
+
+/** A pickup as it is seen: there, taken and coming back, or not on the map for the match (the Lanciafrico under single weapon). */
+export type PickupView = PickupState["_tag"]
 
 export type PhaseView =
   /** `starts`: the tick the countdown ends, null while none runs. */
@@ -123,7 +127,8 @@ export interface WorldView {
   readonly cart: CartView | null
   /** Only while the storm is in force and the match is live: the safe circle. */
   readonly storm: StormValue | null
-  readonly pickups: readonly boolean[]
+  /** One per `map.pickups`: there, taken and coming back, or not on the map for the match. */
+  readonly pickups: readonly PickupView[]
   /** One per `map.turrets`. */
   readonly turrets: ReadonlyArray<TurretState>
   /** Health of each breakable door (0 = broken down). */
@@ -213,7 +218,7 @@ export const ViewWorld = Game.Inspector(
       hill: resources.hill.get(),
       cart,
       storm,
-      pickups: resources.pickups.get().map((p) => p._tag === "up"),
+      pickups: resources.pickups.get().map((p) => p._tag),
       turrets: resources.turrets.get(),
       doors: resources.doors.get(),
       panels: resources.panels.get().map((p): PanelView => {

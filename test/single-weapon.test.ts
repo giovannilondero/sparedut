@@ -81,12 +81,13 @@ for (const host of HOSTS) {
       const me = connect()
       me.say({ ...create, single: "gjalinis" })
       play(2)
+      // Not on the map ("-"), which is not taken and coming back ("0"): nothing is drawn there.
       const inMuster = me.last("snap")!.pickups
-      expect(inMuster[LAUNCHER]).toBe("0")
+      expect(inMuster[LAUNCHER]).toBe("-")
       me.say({ t: "start" })
       play(10)
       const live = me.last("snap")!.pickups
-      expect(live[LAUNCHER]).toBe("0")
+      expect(live[LAUNCHER]).toBe("-")
       expect([...live].filter((_, i) => i !== LAUNCHER).every((c) => c === "1")).toBe(true)
     })
 
@@ -217,7 +218,7 @@ describe("single weapon in the simulation", () => {
     expect(a.primary).toBe("cramar")
     expect(owned(a, "mandi")).toBe(true)
     expect(a).toMatchObject({ bombs: SGNAPE_BOMB.perLife, mines: RAIBL_MINE.perLife })
-    expect(sim.view().pickups[GLEMONE.pickups.findIndex((p) => p.kind === "lanciafrico")]).toBe(true)
+    expect(sim.view().pickups[GLEMONE.pickups.findIndex((p) => p.kind === "lanciafrico")]).toBe("up")
   })
 
   test("the Lanciafrico is not on the map, from the Muster to the next match", () => {
@@ -226,8 +227,8 @@ describe("single weapon in the simulation", () => {
     expect(launchers.length).toBeGreaterThan(0)
     const check = () => {
       const pickups = sim.view().pickups
-      expect(launchers.every((i) => !pickups[i])).toBe(true)
-      expect(pickups.filter((_, i) => !launchers.includes(i)).every(Boolean)).toBe(true)
+      expect(launchers.every((i) => pickups[i] === "absent")).toBe(true)
+      expect(pickups.filter((_, i) => !launchers.includes(i)).every((p) => p === "up")).toBe(true)
     }
     check()
     sim.start(true)

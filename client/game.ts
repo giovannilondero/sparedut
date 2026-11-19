@@ -10,7 +10,7 @@ import { facesPanel, freeTurretInReach, turretAim, turretSeat, type MapId, type 
 import { DISCO } from "../shared/maps/maran.ts"
 import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, seatedBody, sprinting } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
-import { FLAG_BIT, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
+import { FLAG_BIT, pickupsOf, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
 import { outsideStorm, owned, panelOnWall, RAISE_TICKS, speedScale, weaponInSlot } from "../shared/sim/rules.ts"
 import { isTraining } from "../shared/training/index.ts"
@@ -1937,7 +1937,7 @@ export class Game {
         return { pos: carrier ? [carrier.x, carrier.y + 2.1, carrier.z] : bases[team], state: "carried" }
       }
       world.update(dt, t, {
-        pickups: [...s.pickups].map((ch) => ch === "1"),
+        pickups: pickupsOf(s.pickups),
         // The markers of the objective in force only: the mode's in a room, the current step's in a training.
         flags: s.objective === "frico" ? { benandanti: flagPos("benandanti"), malandanti: flagPos("malandanti") } : null,
         hill: s.objective === "placute" ? { owner: s.hill.owner, contested: s.hill.contested } : null,
