@@ -300,7 +300,7 @@ function lanciafrico(): WeaponModel {
  * still in, splinters where it gave. Held by its right edge (the grip is the origin), the left
  * hand on the far edge, its face towards -z: a board carried in front like a shield.
  */
-export const PANEL_SIZE = { w: 1, h: 1 } as const
+const PANEL_SIZE = { w: 1, h: 1 } as const
 function panel(): WeaponModel {
   const root = new THREE.Group()
   const { w, h } = PANEL_SIZE

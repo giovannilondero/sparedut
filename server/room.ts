@@ -143,11 +143,6 @@ export class Room {
     return !this.training && this.world.phase.tag !== "Muster"
   }
 
-  /** A member who joined a match already on and has not entered it. False for anybody else, and for a stranger. */
-  hasNotEntered(id: string): boolean {
-    return this.members.get(id)?.place === "waiting"
-  }
-
   private get seated() {
     return [...this.members.values()].filter((m) => m.place === "inMatch").length
   }

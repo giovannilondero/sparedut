@@ -110,10 +110,9 @@ test("the Tampieste's Muster shows one list of members, and has no team to switc
 
 const tile = (model: MusterModel, primary: PrimaryId) => open(model).picker.tiles.find((t) => t.primary === primary)!
 
-test("every primary is a tile with its class's health and speed, as numbers and as bars to compare at a glance", () => {
+test("every primary is a tile with its class's health and speed as bars to compare at a glance", () => {
   const model = muster("mariute")
   expect(open(model).picker.tiles.map((t) => t.primary)).toEqual(["cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis", "motosee"])
-  expect(tile(model, "mulin")).toMatchObject({ health: 150, speed: 0.8 })
   // The bars run from half the lowest figure to the highest: the Mulin has the most health, the
   // Cjampanili the least; the Motosee is the quickest, the Mulin the slowest.
   expect(tile(model, "mulin").bars.health).toBe(1)

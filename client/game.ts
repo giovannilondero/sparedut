@@ -1105,9 +1105,7 @@ export class Game {
 
   private renderLoadout() {
     const lo = t().loadout
-    const picker = primaryPicker(this.room ?? { single: null }, this.d.settings.primary)
-    const note = picker._tag === "locked" ? t().muster.locked(t().weapons[picker.chosen].name) : lo.note
-    this.drawMenu(MENU_PARTS.loadout[1], lo.title, `<div class="overlay-body"><p class="muted">${esc(note)}</p><div class="weapons" id="loadout-list"></div></div><div class="row overlay-actions"><button id="lo-close" class="primary">${lo.resume}</button></div>`)
+    this.drawMenu(MENU_PARTS.loadout[1], lo.title, `<div class="overlay-body"><p class="muted">${esc(lo.note)}</p><div class="weapons" id="loadout-list"></div></div><div class="row overlay-actions"><button id="lo-close" class="primary">${lo.resume}</button></div>`)
     this.d.menu.buildArmarie($("loadout-list"), (p) => {
       this.d.net.send({ t: "primary", p })
       // If I was holding the old primary, switch to the new one right away.
@@ -1117,7 +1115,7 @@ export class Game {
         this.wanted = p
         this.wantedSeq = this.seq + 1
       }
-    }, picker)
+    })
     $("lo-close").onclick = () => {
       this.openOverlay("none")
       this.controls.lock()
@@ -1463,7 +1461,7 @@ export class Game {
           <section class="mu-chat" aria-labelledby="m-h-chat"><h3 id="m-h-chat">${m.chat}</h3><div class="mu-chat-log" id="m-chat-log" role="log"></div><input id="m-chat" maxlength="120" placeholder="${m.chatPlaceholder}" aria-label="${m.chat}" /></section>
         </aside>
       </div>
-      <div class="mu-foot">${foot}</div>`, "mu-title")
+      <div class="mu-foot">${foot}</div>`)
     const el = $(MENU_PARTS.muster[1])
     this.bindCopy("m", room)
     this.renderMusterChat()

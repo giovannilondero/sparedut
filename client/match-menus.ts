@@ -62,13 +62,6 @@ export interface MusterMember {
   readonly host: boolean
 }
 
-/** The Muster's two teams, from the room's roster: who is in each, in the roster's order, with their primary. */
-export function musterTeams(room: Pick<RoomInfo, "hostId" | "roster">): Record<Team, MusterMember[]> {
-  const teams: Record<Team, MusterMember[]> = { benandanti: [], malandanti: [] }
-  for (const r of room.roster) teams[r.team].push({ id: r.id, name: r.name, primary: r.primary, ready: r.ready, bot: r.bot, host: r.id === room.hostId })
-  return teams
-}
-
 /**
  * The primary picker of the Muster and the match's armoury: free, on the player's own primary, or
  * locked on the host's choice under single weapon, when nothing picked there is sent or remembered.

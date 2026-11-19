@@ -23,11 +23,9 @@ export type MusterSides =
   | { readonly tag: "teams"; readonly mine: Team; readonly canSwitch: boolean; readonly benandanti: readonly MusterRow[]; readonly malandanti: readonly MusterRow[] }
   | { readonly tag: "alone"; readonly members: readonly MusterRow[] }
 
-/** A primary's tile: its class's health and speed, and the same as bars from 0 to 1 to compare at a glance. */
+/** A primary's tile: its class's health and speed as bars from 0 to 1, to compare at a glance. */
 export interface PrimaryTile {
   readonly primary: PrimaryId
-  readonly health: number
-  readonly speed: number
   readonly bars: { readonly health: number; readonly speed: number }
 }
 
@@ -52,7 +50,7 @@ const speedBar = bar(PRIMARIES.map((p) => CLASSES[p].speed))
 
 const TILES: readonly PrimaryTile[] = PRIMARIES.map((primary) => {
   const { hp, speed } = CLASSES[primary]
-  return { primary, health: hp, speed, bars: { health: healthBar(hp), speed: speedBar(speed) } }
+  return { primary, bars: { health: healthBar(hp), speed: speedBar(speed) } }
 })
 
 /**
@@ -295,4 +293,3 @@ export class MusterModel {
   }
 }
 
-export type { ClientMessage }

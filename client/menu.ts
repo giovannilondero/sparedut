@@ -23,7 +23,6 @@ import { esc } from "./hud.ts"
 import { onLangChange, setLang, t, type Lang } from "./i18n.ts"
 import { chooseLook, LOOK_IDS, LOOKS, type LookId } from "./looks.ts"
 import { classFigures, focusOnScreen, MenuModel, SCREENS, type CreateOptions, type MenuButton, type Outcome, type PasswordRefusal, type PromptProblem, type Refusal, type Screen } from "./menu-model.ts"
-import type { PrimaryPicker } from "./match-menus.ts"
 import { oneTapRoom, type Settings } from "./settings.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
@@ -570,8 +569,7 @@ export class Menu {
   /**
    * The weapons: the primaries first, as one group of cards to choose from (UI SDK's radio group: one
    * tab stop, arrow keys, the radio role), then the ones always carried or picked up, to read only.
-   * Drawn into the menu's armoury and, with `onPick`, into a match's. A `locked` picker (single
-   * weapon) shows the host's choice and takes no pick: the player's own primary stays remembered.
+   * Drawn into the menu's armoury and, with `onPick`, into a training's.
    */
   /** A primary chosen outside the armoury (the Muster's tiles): remembered for the next room, with the armoury's sound. */
   choosePrimary(primary: PrimaryId) {
@@ -579,7 +577,7 @@ export class Menu {
     this.audio.play("switch")
   }
 
-  buildArmarie(target: HTMLElement = $("armarie"), onPick?: (p: PrimaryId) => void, picker: PrimaryPicker = { _tag: "free", chosen: this.settings.primary }) {
+  buildArmarie(target: HTMLElement = $("armarie"), onPick?: (p: PrimaryId) => void) {
     const max = { damage: 110, rate: 10, range: 400, mag: 30 }
     const s = t()
     const bar = (label: string, v: number) => `<span class="stat">${label}<i style="width:${Math.min(100, v * 100)}%"></i></span>`
@@ -602,11 +600,7 @@ export class Menu {
     ).join("")}</ui-radio-group>
       <ul class="weapon-cards carried">${carried.map((id) => `<li class="weapon">${card(id)}</li>`).join("")}</ul>`
     const group = target.querySelector<HTMLElementTagNameMap["ui-radio-group"]>("ui-radio-group")!
-    group.value = picker.chosen
-    if (picker._tag === "locked") {
-      for (const radio of group.querySelectorAll("ui-radio")) radio.toggleAttribute("disabled", true)
-      return
-    }
+    group.value = this.settings.primary
     // A primary is always chosen: a change to none is refused.
     group.addEventListener("valuechange", alwaysChosen((primary) => {
       this.model.choosePrimary(primary as PrimaryId)

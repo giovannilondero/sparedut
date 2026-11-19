@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
-import { afterEscape, botButtons, botMessage, endFocus, focusOnOpen, menuPrimary, musterCountdown, musterFocus, musterScreen, musterTeams, nextFocus, primaryPicker, singleOf, singleValue, startsAtOnce } from "../client/match-menus.ts"
+import { afterEscape, botButtons, botMessage, endFocus, focusOnOpen, menuPrimary, musterCountdown, musterFocus, musterScreen, nextFocus, primaryPicker, singleOf, singleValue, startsAtOnce } from "../client/match-menus.ts"
+import type { RoomInfo } from "../shared/protocol.ts"
 
 test("Esc closes the in-match menus one step at a time", () => {
   expect(afterEscape("pause", "none")).toBe("none")
@@ -28,7 +29,7 @@ test("the end screen starts on another match for the host, on leaving for everyo
   expect(endFocus(false)).toBe("e-leave")
 })
 
-const room = (over: Partial<Parameters<typeof musterTeams>[0]> = {}): Parameters<typeof musterTeams>[0] => ({
+const room = (over: Partial<Pick<RoomInfo, "hostId" | "roster">> = {}): Pick<RoomInfo, "hostId" | "roster"> => ({
   hostId: "p1",
   roster: [
     { id: "p1", name: "Toni", team: "benandanti", primary: "mulin", ready: false, bot: false, away: false, onMap: true },
@@ -36,21 +37,6 @@ const room = (over: Partial<Parameters<typeof musterTeams>[0]> = {}): Parameters
     { id: "p2", name: "Mariute", team: "malandanti", primary: "miedi", ready: false, bot: false, away: false, onMap: true }
   ],
   ...over
-})
-
-test("the Muster shows both teams, each member with their primary, from the room's roster", () => {
-  expect(musterTeams(room())).toEqual({
-    benandanti: [{ id: "p1", name: "Toni", primary: "mulin", ready: false, bot: false, host: true }],
-    malandanti: [
-      { id: "bot-1", name: "Bepi", primary: "cramar", ready: true, bot: true, host: false },
-      { id: "p2", name: "Mariute", primary: "miedi", ready: false, bot: false, host: false }
-    ]
-  })
-})
-
-test("a change of team or primary in the roster shows in the Muster", () => {
-  const moved = room({ roster: room().roster.map((r) => (r.id === "p2" ? { ...r, team: "benandanti", primary: "doplete" } : r)) })
-  expect(musterTeams(moved).benandanti.map((m) => [m.name, m.primary])).toEqual([["Toni", "mulin"], ["Mariute", "doplete"]])
 })
 
 test("an Offline room's Muster opens with start focused: one press begins the match", () => {
@@ -99,12 +85,6 @@ test("joining a Tampieste already on, the screen says they play from the next ma
 
 test("during the results the end screen shows, for a member who has not entered too", () => {
   expect(musterScreen(waiting(), "p2", "Over")).toEqual({ tag: "closed" })
-})
-
-test("a member's ready mark in the roster shows in the Muster, and so does taking it back", () => {
-  const ready = room({ roster: room().roster.map((r) => (r.id === "p2" ? { ...r, ready: true } : r)) })
-  expect(musterTeams(ready).malandanti.find((m) => m.id === "p2")?.ready).toBe(true)
-  expect(musterTeams(room()).malandanti.find((m) => m.id === "p2")?.ready).toBe(false)
 })
 
 test("the Muster's countdown in whole seconds left, and none while no countdown runs", () => {
