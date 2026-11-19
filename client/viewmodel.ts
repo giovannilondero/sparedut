@@ -42,7 +42,7 @@ const HOLD: Record<WeaponId, Hold> = {
 const SWITCH_DOWN = 0.16
 const SWITCH_UP = 0.22
 const SWING = 0.42
-/** The panel's strike: thrust forward and up, then back. */
+/** The panel's strike: drawn back to the right, swept across in an arc, then back. */
 const BASH = 0.5
 const TOSS = 0.6
 /** How far the sight stays below the line of sight when aiming (m). */
@@ -498,16 +498,18 @@ export function createViewmodel(worldCamera: THREE.PerspectiveCamera): Viewmodel
       A.pz -= bump(p, 0.2, 0.65) * 0.12
       if (p >= 1) swingT = -1
     }
-    // panel strike: shoved out from the chest, top edge first
+    // panel strike: drawn back to the right, then swept across to the left, edge first, in a rising arc
     if (bashT >= 0) {
       bashT += dt
       const p = bashT / BASH
-      const k = bump(p, 0.08, 0.7)
-      A.pz -= k * 0.3
-      A.py += k * 0.12
-      A.px -= k * 0.08
-      A.rx -= k * 0.25
-      A.ry += k * 0.2
+      const k = p < 0.22 ? -0.4 * ramp(p, 0, 0.22) : p < 0.55 ? -0.4 + 1.4 * ramp(p, 0.22, 0.55) : 1 - ramp(p, 0.55, 1)
+      const arc = bump(p, 0.2, 0.7)
+      A.px -= k * 0.42
+      A.ry += k * 0.75
+      A.rz -= k * 0.4
+      A.py += arc * 0.16
+      A.pz -= arc * 0.14
+      A.rx -= arc * 0.15
       if (p >= 1) bashT = -1
     }
 
