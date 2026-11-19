@@ -573,6 +573,12 @@ export class Menu {
    * Drawn into the menu's armoury and, with `onPick`, into a match's. A `locked` picker (single
    * weapon) shows the host's choice and takes no pick: the player's own primary stays remembered.
    */
+  /** A primary chosen outside the armoury (the Muster's tiles): remembered for the next room, with the armoury's sound. */
+  choosePrimary(primary: PrimaryId) {
+    this.model.choosePrimary(primary)
+    this.audio.play("switch")
+  }
+
   buildArmarie(target: HTMLElement = $("armarie"), onPick?: (p: PrimaryId) => void, picker: PrimaryPicker = { _tag: "free", chosen: this.settings.primary }) {
     const max = { damage: 110, rate: 10, range: 400, mag: 30 }
     const s = t()
