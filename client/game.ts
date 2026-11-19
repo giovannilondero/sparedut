@@ -265,7 +265,7 @@ export class Game {
       if (this.running && this.controls.device === "touch" && !(e.target as Element).closest?.(".overlay")) e.preventDefault()
     })
     d.renderer.domElement.addEventListener("click", () => {
-      if (this.running && this.overlay === "none" && !this.chatting) this.controls.lock()
+      if (this.running && this.overlay === "none" && !this.chatting && this.takesPointer) this.controls.lock()
     })
     document.addEventListener("pointerlockchange", () => {
       if (!this.running) return
@@ -483,6 +483,14 @@ export class Game {
   /** The Muster screen is open: nobody on the map in the Muster, and not this player while they choose before entering. */
   private get inMuster() {
     return this.musterView.tag !== "closed"
+  }
+
+  /**
+   * Whether the match takes the mouse: not on the Muster's screen nor on the results, which are
+   * screens to click on. A click on the scene around them must leave the pointer free.
+   */
+  private get takesPointer() {
+    return !this.inMuster && this.snap?.phase.tag !== "Over"
   }
 
   /** The Muster screen stands in for the world: the HUD's readouts go, and the world is not drawn (`render`). */
@@ -1027,7 +1035,7 @@ export class Game {
     const input = $<HTMLInputElement>("chat-input")
     input.blur()
     input.classList.add("hidden")
-    if (!this.controls.active) this.controls.lock()
+    if (!this.controls.active && this.takesPointer) this.controls.lock()
   }
 
   /** The settings form goes back into the main menu. */
