@@ -246,6 +246,11 @@ export class Room {
     this.goIfAllReady()
   }
 
+  /**
+   * A member changes team. In the Muster (and in a training) it is always taken, with no bot moved:
+   * the host balances the teams with the bot tools before starting. While a match is on the teams
+   * must not become unbalanced: if the other one is not smaller, a bot of it swaps, or the switch is refused.
+   */
   setTeam(id: string, team: Team) {
     const m = this.members.get(id)
     if (!m || m.team === team) return
@@ -254,8 +259,7 @@ export class Room {
       m.team = team
       return
     }
-    // Don't unbalance the teams: if the other one is larger, a bot swaps.
-    if (this.teamCount(team) >= this.teamCount(m.team)) {
+    if (this.matchOn && this.teamCount(team) >= this.teamCount(m.team)) {
       const swap = [...this.members.values()].find((o) => o.bot && o.team === team)
       if (!swap) return
       swap.team = m.team

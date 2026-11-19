@@ -96,6 +96,23 @@ for (const host of HOSTS) {
       expect(entered!.you?.arsenal.primary).toBe("doplete")
     })
 
+    test("in the Muster a member's team switch is always taken, and no bot changes team for it", () => {
+      const { connect } = harness(host.make)
+      const me = connect()
+      // One a side: the creator and a Malandant bot.
+      me.say({ ...create, bots: 1 })
+      const { you } = me.last("joined")!
+      const roster = () => me.last("room")!.room.roster
+      const bots = () => roster().filter((r) => r.bot).map((r) => [r.id, r.team])
+      const before = bots()
+      me.say({ t: "team", team: "malandanti" })
+      expect(roster().find((r) => r.id === you)?.team).toBe("malandanti")
+      expect(bots()).toEqual(before)
+      me.say({ t: "team", team: "benandanti" })
+      expect(roster().find((r) => r.id === you)?.team).toBe("benandanti")
+      expect(bots()).toEqual(before)
+    })
+
     test("ready is a member's own mark, set and taken back in the Muster, and shown in the roster", () => {
       const { connect } = harness(host.make)
       const me = connect()
@@ -449,6 +466,16 @@ describe("the Muster on the game server", () => {
     expect(other.last("snap")!.phase.tag).toBe("Muster")
     play(40)
     expect(other.last("snap")!.phase.tag).toBe("Live")
+  })
+
+  test("in the Muster two friends at one a side can swap sides, one after the other", () => {
+    const { host, other, otherId } = twoHumans({ ...HOSTS_CREATE.online, bots: 0 })
+    const hostId = host.last("joined")!.you
+    const teams = () => host.last("room")!.room.roster.map((r) => [r.id, r.team])
+    expect(teams()).toEqual([[hostId, "benandanti"], [otherId, "malandanti"]])
+    host.say({ t: "team", team: "malandanti" })
+    other.say({ t: "team", team: "benandanti" })
+    expect(teams()).toEqual([[hostId, "malandanti"], [otherId, "benandanti"]])
   })
 
   test("a member who joins sees everybody's team and primary in the roster", () => {
