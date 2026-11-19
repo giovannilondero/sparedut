@@ -338,6 +338,7 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 #death-line { font-family: var(--serif); font-style: italic; opacity: 0.85; margin-top: 6px; }
 #death-timer { font-size: 22px; margin-top: 8px; font-variant-numeric: tabular-nums; }
 .death-hint { font-size: 12px; opacity: 0.7; margin-top: 6px; }
+#next-match { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); text-align: center; background: rgba(10, 8, 6, 0.72); border: 1px solid var(--stone-line); border-radius: 14px; padding: 14px 26px; max-width: min(520px, 86vw); font-size: 17px; }
 
 #board, .overlay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(16, 13, 10, 0.94); border: 1px solid var(--stone-line); border-radius: 14px; padding: 18px 22px; min-width: min(860px, 92vw); max-height: 86vh; overflow: auto; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); }
 #board table, .overlay table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -358,7 +359,7 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 .overlay .host-tools button { min-block-size: var(--tap); padding: 5px 9px; font-size: 13px; }
 /* The Muster stands in for the world: the HUD's readouts go, and a plain ground covers the canvas, which is not drawn. */
 html.in-muster #hud { background: var(--night); }
-html.in-muster #hud-free, html.in-muster #death, html.in-muster #board { visibility: hidden; }
+html.in-muster #hud-free, html.in-muster #death, html.in-muster #next-match, html.in-muster #board { visibility: hidden; }
 #muster .muster-countdown { font-family: var(--serif); font-size: clamp(20px, 3vw, 28px); color: var(--gold); text-align: center; }
 #muster .muster-countdown:empty { display: none; }
 #muster .ready-mark { color: var(--gold); font-weight: bold; }
@@ -641,6 +642,8 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #hud.touch #announce { inset-block-start: 24%; inline-size: 100%; white-space: normal; font-size: clamp(20px, 7cqi, 36px); }
 #hud.touch #death { inset-inline-start: calc(var(--free-l) + var(--free-w) / 2); inset-block-start: calc(var(--free-t) + var(--free-h) / 2); transform: translate(-50%, -50%);
   min-inline-size: 0; inline-size: min(360px, var(--free-w)); padding: 10px 14px; }
+#hud.touch #next-match { inset-inline-start: calc(var(--free-l) + var(--free-w) / 2); inset-block-start: calc(var(--free-t) + var(--free-h) / 2); transform: translate(-50%, -50%);
+  inline-size: min(360px, var(--free-w)); padding: 10px 14px; font-size: 15px; }
 #hud.touch .death-title { font-size: clamp(24px, calc(var(--free-w) * 0.08), 36px); }
 /* The death hint, the key legend: keys a touch player does not have. The armoury is in the match menu. */
 #hud.touch :is(.death-hint, .keys) { display: none; }

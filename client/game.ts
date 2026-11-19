@@ -218,6 +218,8 @@ export class Game {
   private kickPitch = 0
   private seed = 1
   private lastPhase = ""
+  /** Been on the map, alive, since the room was last in its Muster: somebody who has not is not shown a death. */
+  private played = false
   private renderTick = 0
   /** Match time (s): reloads, prediction and the others' interpolation all read it. */
   private time = 0
@@ -312,6 +314,7 @@ export class Game {
     this.choosing = isTraining(room.mode) && listOnEntry(this.d.settings.training)
     this.entering = false
     this.lastPhase = ""
+    this.played = false
     this.musterHost = null
     this.musterDrawn = null
     this.musterMatch = ""
@@ -574,6 +577,7 @@ export class Game {
     // Joined a match already on: the Muster screen, to choose before entering.
     if (tag === "Live" && this.inMuster) this.renderMuster(true)
     if (tag === "Muster") {
+      this.played = false
       if (document.pointerLockElement) document.exitPointerLock()
       if (this.chatting) this.closeChat()
       this.toggleQuick(false)
@@ -1963,13 +1967,13 @@ export class Game {
       audio.disco(this.room?.map === "maran" ? DISCO : null, (s.doors[0] ?? 1) <= 0)
       fx.projectiles(s.proj)
       const outside = !!s.storm && !!you?.alive && !!b && outsideStorm(s.storm, b)
-      this.hud.spectating = mode === "tampieste" && s.phase.tag === "Live"
       this.hud.top(s, mode ?? "bataie", this.names, outside)
       this.hud.training(s.training, this.controls.device)
       // A step this device cannot perform: shown as such, then the host is told, and completes it.
       const unavailable = this.unavailableSteps.check(s.training, this.controls.device, performance.now())
       if (unavailable) this.d.net.send(unavailable)
-      this.hud.death(you, { phase: s.phase.tag, mode: mode ?? "bataie" }, this.names, Math.floor(this.seed / 7))
+      if (you?.alive) this.played = true
+      this.hud.death(you, { phase: s.phase.tag, mode: mode ?? "bataie", played: this.played }, this.names, Math.floor(this.seed / 7))
       if (s.phase.tag === "Over" && Math.floor(t) !== Math.floor(t - dt)) this.renderEnd()
     }
     fx.update(dt, camera)

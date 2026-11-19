@@ -33,8 +33,6 @@ const PANEL_BLANK: PanelShown = { ...NOT_SHOWN, strings: null, count: -1, device
 
 export class Hud {
   private announceTimer = 0
-  /** During an ongoing Tampieste the dead don't respawn: the death panel says so. */
-  spectating = false
   private chatTimer = 0
   /** Last value written per element and property: the DOM is touched only on change. */
   private written = new Map<string, string | boolean>()
@@ -347,13 +345,15 @@ export class Hud {
 
   death(you: SnapSelf | null, at: DeathAt, names: Map<string, string>, seed: number) {
     const screen = deathScreen(you, at)
-    this.toggle("death", "hidden", screen.tag === "none")
-    if (screen.tag === "none" || !you) return
+    this.toggle("death", "hidden", screen.tag !== "dead")
+    this.toggle("next-match", "hidden", screen.tag !== "nextMatch")
+    if (screen.tag === "nextMatch") this.text("next-match", t().muster.nextMatch)
+    if (screen.tag !== "dead" || !you) return
     this.toggle("death-hint", "hidden", !screen.armoury)
     const s = t().hud
     this.html("death-by", you.killer ? s.deathBy(esc(names.get(you.killer) ?? "?")) : s.deathSelf)
     this.text("death-line", pick(s.deathLines, seed))
-    this.text("death-timer", this.spectating ? s.spectate : you.respawn > 0 ? s.respawnIn(Math.ceil(you.respawn / 60)) : "…")
+    this.text("death-timer", screen.spectate ? s.spectate : you.respawn > 0 ? s.respawnIn(Math.ceil(you.respawn / 60)) : "…")
   }
 
   chat(name: string, team: Team | null, text: string) {
@@ -503,22 +503,32 @@ export class Hud {
   }
 }
 
-/** Where a death is seen: the match's phase and the room's mode. */
+/** Where a death is seen: the match's phase, the room's mode, and whether the player has been on the map, alive, in this match. */
 export interface DeathAt {
   readonly phase: PhaseView["tag"]
   readonly mode: ModeId
+  readonly played: boolean
 }
 
 /**
- * What the death screen shows: nothing (nobody on the map, alive, or in the Muster), or the death,
- * with the key that opens the armoury (`armoury`) only in a training, the one place the primary
- * changes: in a match it is fixed until the Muster.
+ * What the death screen shows. Nothing to somebody not on the map, alive, or in the Muster, nor to
+ * somebody who has not played this match yet (entered it, and about to come on, or entered during
+ * its results). `nextMatch`, instead of a death, to somebody who entered a Tampieste after its
+ * start: one life, so they play from the next match. Else the death: with the key that opens the
+ * armoury (`armoury`) only in a training, the one place the primary changes, for in a match it is
+ * fixed until the Muster; and in a live Tampieste, where the dead do not come back, that they
+ * watch until the end (`spectate`).
  */
-export type DeathScreen = { readonly tag: "none" } | { readonly tag: "dead"; readonly armoury: boolean }
+export type DeathScreen =
+  | { readonly tag: "none" }
+  | { readonly tag: "nextMatch" }
+  | { readonly tag: "dead"; readonly armoury: boolean; readonly spectate: boolean }
 
 export function deathScreen(you: { readonly alive: boolean } | null, at: DeathAt): DeathScreen {
   if (!you || you.alive || at.phase === "Muster") return { tag: "none" }
-  return { tag: "dead", armoury: isTraining(at.mode) }
+  const oneLife = at.mode === "tampieste" && at.phase === "Live"
+  if (!at.played) return oneLife ? { tag: "nextMatch" } : { tag: "none" }
+  return { tag: "dead", armoury: isTraining(at.mode), spectate: oneLife }
 }
 
 export function boardHtml(rows: readonly BoardRow[], me: string) {
