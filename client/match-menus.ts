@@ -118,3 +118,39 @@ export function musterCountdown(phase: PhaseView, tick: number): number | null {
  * human member is ready. Then the press that starts is the one that takes the pointer for the match.
  */
 export const startsAtOnce = (room: Pick<RoomInfo, "roster">, me: string): boolean => room.roster.every((r) => r.bot || r.id === me || r.ready)
+
+/** A control's box on the screen, as `getBoundingClientRect` gives it. */
+export interface Box {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+}
+
+/** A direction of the pad's d-pad. */
+export type PadDirection = "up" | "down" | "left" | "right"
+
+/**
+ * Where the d-pad moves focus in a menu the pad drives (the Muster): the index of the control
+ * nearest in that direction, the distance across it counting double so that a control in line is
+ * chosen over a nearer one off to the side; -1 when there is none.
+ */
+export function nextFocus(from: Box, boxes: readonly Box[], dir: PadDirection): number {
+  const centre = (b: Box) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 })
+  const at = centre(from)
+  const [along, sign] = dir === "up" ? (["y", -1] as const) : dir === "down" ? (["y", 1] as const) : dir === "left" ? (["x", -1] as const) : (["x", 1] as const)
+  const across = along === "x" ? "y" : "x"
+  let best = -1
+  let bestScore = Infinity
+  boxes.forEach((b, i) => {
+    const c = centre(b)
+    const ahead = (c[along] - at[along]) * sign
+    if (b === from || ahead <= 1) return
+    const score = ahead + 2 * Math.abs(c[across] - at[across])
+    if (score < bestScore) {
+      best = i
+      bestScore = score
+    }
+  })
+  return best
+}

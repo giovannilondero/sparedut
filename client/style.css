@@ -362,15 +362,178 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 /* The Muster stands in for the world: the HUD's readouts go, and a plain ground covers the canvas, which is not drawn. */
 html.in-muster #hud { background: var(--night); }
 html.in-muster #hud-free, html.in-muster #death, html.in-muster #next-match, html.in-muster #board { visibility: hidden; }
-#muster .muster-countdown { font-family: var(--serif); font-size: clamp(20px, 3vw, 28px); color: var(--gold); text-align: center; }
-#muster .muster-countdown:empty { display: none; }
-#muster .ready-mark { color: var(--gold); font-weight: bold; }
-#muster [aria-pressed="true"] { outline: 2px solid var(--gold); outline-offset: -2px; }
-#muster [aria-pressed="true"]::before { content: "✓ "; }
-#muster .muster-chat { max-block-size: 9rem; overflow-y: auto; font-size: 14px; padding: 4px 0; }
-#muster .muster-chat-input { inline-size: 100%; min-block-size: var(--tap); margin-block-start: 4px; }
-#muster .muster-match { font-family: var(--serif); font-size: 1.15rem; font-variant-numeric: tabular-nums; margin-block: 6px; }
-#muster .muster-note { color: var(--gold); margin-block: 4px; }
+/*
+ * The Muster ("the field"): the two teams on the flanks, the player's own choice between them, the
+ * chosen primary large and the others as tiles. It fills the safe area and stands in for the world.
+ * Upright phone: one scrolling column (the teams side by side, the choice, the host's tools and the
+ * chat) between the title and the actions under the thumb. A phone on its side: three columns that
+ * each scroll on their own, the actions under the right thumb. A desktop: Benandants | choice |
+ * Malandants, the actions under the choice, host and chat below them.
+ */
+#hud #muster.overlay {
+  --gap-block: clamp(6px, 2.5dvh, 24px);
+  --gap-inline: clamp(6px, 2vw, 28px);
+  inline-size: auto; max-inline-size: 1500px; block-size: auto;
+  display: grid; gap: 8px 14px; align-content: stretch;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "title leave" "head head" "body body" "foot foot";
+}
+#muster > ui-dialog-title { grid-area: title; margin: 0; align-self: center; }
+#muster .mu-head { grid-area: head; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; min-inline-size: 0; }
+#muster .mu-line { flex: 1 1 100%; font-size: 13px; }
+#muster .mu-leave { grid-area: leave; align-self: center; min-block-size: var(--tap); padding: 4px 12px; font-size: 13px; color: var(--muted); }
+#muster .pause-code { flex: 1 1 auto; gap: 4px 16px; }
+#muster .pause-code > div:first-child { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
+#muster .invite { font-size: clamp(22px, 1rem + 1.6vw, 36px); letter-spacing: 0.25em; line-height: 1; }
+#muster .pause-share { display: flex; flex-wrap: wrap-reverse; align-items: center; justify-content: end; gap: 2px 10px; }
+#muster .pause-share button { padding: 4px 10px; font-size: 13px; }
+#muster .pause-reach { margin: 0; }
+#muster .mu-joinnote { flex: 1 1 100%; margin: 0; font-size: 12px; }
+
+/* The body: one column that scrolls on an upright phone. */
+#muster .mu-body { grid-area: body; display: grid; gap: 14px; align-content: start; }
+#muster .mu-teams { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr)); gap: 10px 12px; align-items: start; }
+
+/* A team, or the Tampieste's one list. */
+.mu-team { min-inline-size: 0; }
+.mu-team header { display: flex; align-items: baseline; gap: 8px; border-block-end: 2px solid var(--team); padding-block-end: 3px; }
+.mu-team h3 { margin: 0; font: 700 18px/1.2 var(--serif); color: var(--team); }
+.mu-team.mine h3::after { content: " ●"; font-size: 0.55em; vertical-align: middle; }
+.mu-team ul { list-style: none; margin: 0; padding: 0; }
+.mu-all ul { columns: 12rem; column-gap: 14px; }
+.mu-member { break-inside: avoid; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name ready" "prim ready"; gap: 0 8px; padding: 4px 2px; border-block-end: 1px solid rgba(255, 255, 255, 0.05); font-size: 14px; }
+.mu-member.me { background: color-mix(in oklch, var(--gold) 12%, transparent); border-radius: 6px; padding-inline: 6px; }
+.mu-member.me .mu-name { color: var(--gold); }
+.mu-name { grid-area: name; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mu-you { font-style: normal; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8; }
+.mu-prim { grid-area: prim; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mu-ready { grid-area: ready; align-self: center; font-size: 13px; color: var(--muted); }
+.mu-ready.on { color: var(--ben); font-weight: 700; }
+.mu-switch { inline-size: 100%; margin-block-start: 8px; min-block-size: var(--tap); padding: 6px 8px; font-size: 13px; color: var(--team); border-color: color-mix(in oklch, var(--team) 60%, transparent); }
+.mu-switch[hidden] { display: none; }
+
+/* The choice: the chosen primary large, the tiles under it. */
+#muster .mu-mid { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 14px; background: var(--stone); border: 1px solid var(--stone-line); min-inline-size: 0; }
+.mu-chosen { display: grid; gap: 3px; }
+.mu-chosen .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+.mu-chosen > b { font: 700 clamp(22px, 1rem + 1.4vw, 30px)/1.1 var(--serif); color: var(--gold); }
+.mu-chosen .blurb { font-size: 13px; font-style: italic; opacity: 0.85; }
+.mu-chosen .mu-stats { margin-block-start: 4px; }
+.mu-chosen .mu-stat { font-size: 12px; }
+.mu-chosen .mu-stat i { block-size: 7px; }
+.mu-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 3px 14px; }
+/* A class figure: its name, a bar to compare at a glance, its number. */
+.mu-stat { display: grid; grid-template-columns: 5em minmax(1.5rem, 1fr) 3.2em; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.mu-stat i { block-size: 5px; border-radius: 3px; background: linear-gradient(90deg, var(--gold-deep), var(--gold)) 0 0 / calc(var(--v) * 100%) 100% no-repeat, rgba(255, 255, 255, 0.08); }
+.mu-stat > b { font: 600 12px/1 var(--sans); color: var(--ink); font-variant-numeric: tabular-nums; text-align: end; }
+.mu-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr)); gap: 6px; }
+.mu-tile { min-block-size: var(--tap); padding: 8px 10px; gap: 4px; }
+.mu-tile > b { font-size: 16px; line-height: 1.15; }
+.mu-tile .mu-stats { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+/* Locked under single weapon: the tiles read as out of reach and invite no press; the host's choice stays lit. */
+.mu-tiles.locked .mu-tile { cursor: not-allowed; opacity: 0.35; background: transparent; border-style: dashed; }
+.mu-tiles.locked .mu-tile[data-checked] { cursor: default; opacity: 1; border-style: solid; }
+.mu-tiles.locked .mu-tile:active { transform: none; }
+@media (hover: hover) and (pointer: fine) { .mu-tiles.locked .mu-tile:hover { background: transparent; border-color: var(--stone-line); } .mu-tiles.locked .mu-tile[data-checked]:hover { border-color: var(--gold); background: color-mix(in oklch, var(--gold) 16%, transparent); } }
+.mu-lock { margin: 0; padding: 8px 12px; border: 1px solid var(--gold); border-radius: 10px; background: color-mix(in oklch, var(--gold) 10%, transparent); font-weight: 600; font-size: 14px; }
+
+/* The host's tools and the chat. */
+#muster .mu-aside { display: grid; gap: 14px; align-content: start; min-inline-size: 0; }
+#muster .mu-host { margin: 0; }
+.mu-chat { display: flex; flex-direction: column; gap: 6px; min-block-size: 0; }
+.mu-chat h3 { margin: 0; }
+.mu-chat-log { max-block-size: 8rem; overflow-y: auto; overscroll-behavior: contain; font-size: 14px; line-height: 1.45; }
+.mu-chat-log:empty { display: none; }
+.mu-chat input { inline-size: 100%; min-block-size: var(--tap); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--stone-line); background: rgba(0, 0, 0, 0.35); color: var(--ink); }
+
+/* The actions: under the thumb, whatever is scrolled. */
+#muster .mu-foot { grid-area: foot; display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; padding-block-start: 8px; border-block-start: 1px solid var(--stone-line); }
+#muster .mu-foot > * { margin: 0; }
+#muster .mu-foot > button { min-block-size: max(var(--tap), 44px); }
+#muster .mu-foot [hidden] { display: none; }
+.mu-go { flex: 2 1 12rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; font-size: 16px; }
+.mu-go small { font-weight: 500; font-size: 12px; opacity: 0.8; }
+.mu-readybtn { flex: 1 1 8rem; font-weight: 600; }
+#muster .mu-readybtn[aria-pressed="true"] { border-color: var(--ben); color: var(--ben); background: color-mix(in oklch, var(--ben) 14%, transparent); }
+#muster .mu-readybtn[aria-pressed="true"]::before { content: "✓ "; }
+.mu-wait, .mu-note { flex: 1 1 100%; font-size: 13px; line-height: 1.4; align-self: center; }
+.mu-note { color: var(--gold); }
+.mu-countdown { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 6px 12px; border: 1px solid var(--gold); border-radius: 10px; background: color-mix(in oklch, var(--gold) 14%, transparent); }
+.mu-countdown b { font: 700 clamp(18px, 1rem + 1vw, 24px)/1.2 var(--serif); color: var(--gold); font-variant-numeric: tabular-nums; }
+.mu-countdown small { font-size: 12px; color: var(--muted); }
+
+/* The score and time of the match being joined. */
+.mu-live { flex: 1 1 100%; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; font: 18px/1.2 var(--serif); font-variant-numeric: tabular-nums; }
+.mu-live b { font-size: 26px; }
+.mu-live .muted { font: 13px var(--sans); }
+
+/* A phone on its side: three columns that scroll on their own; the actions under the right thumb. */
+@media (orientation: landscape) and (max-height: 34rem) {
+  #hud #muster.overlay {
+    gap: 6px 12px;
+    grid-template-columns: minmax(10rem, 0.75fr) minmax(0, 1.6fr) minmax(12rem, 0.95fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "title head head" "teams mid aside" "teams mid foot";
+  }
+  /* Leave sits at the end of the head's row, the head's text kept clear of it. */
+  #muster .mu-leave { grid-area: 1 / 3; }
+  #muster .mu-head { padding-inline-end: 9rem; }
+  #muster > ui-dialog-title { font-size: 20px; }
+  #muster .mu-head { flex-wrap: nowrap; }
+  #muster :is(.mu-line, .mu-head > .pause-reach) { flex: 0 1 auto; min-inline-size: 0; margin: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #muster .mu-joinnote { display: none; }
+  #muster .mu-live { flex: 0 1 auto; font-size: 15px; }
+  #muster .mu-live b { font-size: 20px; }
+  #muster .pause-share .pause-reach, #muster .pause-code > div:first-child > .muted { display: none; }
+  #muster .pause-code { flex-wrap: nowrap; }
+  #muster .pause-share button { white-space: nowrap; }
+  #muster .invite { font-size: 20px; letter-spacing: 0.18em; }
+  #muster .mu-leave { justify-self: end; }
+  #muster .mu-body { display: contents; }
+  #muster :is(.mu-teams, .mu-mid, .mu-aside) { min-block-size: 0; overflow-y: auto; overscroll-behavior: contain; }
+  #muster .mu-teams { grid-area: teams; grid-template-columns: minmax(0, 1fr); align-content: start; }
+  #muster .mu-mid { grid-area: mid; padding: 8px 10px; gap: 6px; }
+  #muster .mu-chosen .blurb, #muster .mu-chosen .tag, #muster .mu-chosen .mu-stats { display: none; }
+  #muster .mu-chosen > b { font-size: 20px; }
+  #muster .mu-tiles { grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr)); gap: 5px; }
+  #muster .mu-tile { padding: 4px 8px; gap: 2px; }
+  #muster .mu-tile > b { font-size: 14px; }
+  #muster .host-bots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #muster .mu-aside { grid-area: aside; }
+  #muster .mu-chat-log { max-block-size: 5.5rem; }
+  #muster .mu-foot { flex-direction: column; flex-wrap: nowrap; padding-block-start: 6px; }
+  #muster .mu-foot > button { flex: none; }
+  #muster .mu-countdown { flex: none; padding: 4px 10px; }
+  #muster .mu-countdown b { font-size: 15px; }
+  #muster .mu-countdown small { display: none; }
+  #muster .mu-wait { flex: none; font-size: 12px; }
+  #muster .mu-member { padding-block: 3px; }
+}
+
+/* A desktop: Benandants | choice | Malandants; the actions under the choice, host and chat below them. */
+@media (min-width: 60rem) and (min-height: 34.01rem) {
+  #hud #muster.overlay {
+    grid-template-columns: minmax(14rem, 1fr) minmax(0, 2.2fr) minmax(14rem, 1fr);
+    grid-template-rows: auto minmax(0, max-content) auto minmax(0, 1fr);
+    grid-template-areas: "title head leave" "ben mid mal" "ben foot mal" "ben aside mal";
+  }
+  #muster .mu-leave { justify-self: end; }
+  #muster :is(.mu-body, .mu-teams) { display: contents; }
+  #muster :is(.mu-benandanti, .mu-all) { grid-area: ben; }
+  #muster .mu-malandanti { grid-area: mal; }
+  #muster .mu-team { padding: 12px; border-radius: 14px; background: color-mix(in oklch, var(--night) 70%, transparent); border: 1px solid var(--stone-line); overflow-y: auto; overscroll-behavior: contain; }
+  #muster .mu-all ul { columns: auto; }
+  #muster .mu-mid { grid-area: mid; overflow-y: auto; }
+  #muster .mu-foot { border: 0; padding: 0; flex-wrap: nowrap; }
+  #muster .mu-countdown { flex: 3 1 18rem; }
+  #muster .mu-cancel { flex: 1 1 8rem; }
+  #muster .mu-wait { flex: 2 1 14rem; }
+  #muster .mu-aside { grid-area: aside; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); overflow-y: auto; }
+  /* With no teams, the one list on the left and the host and chat on the right. */
+  #hud #muster.overlay:has(.mu-all) { grid-template-areas: "title head leave" "ben mid mal" "ben foot mal" "ben . mal"; }
+  #muster:has(.mu-all) .mu-aside { grid-area: mal; grid-template-columns: minmax(0, 1fr); }
+}
 
 .end-title { display: block; font-family: var(--serif); font-size: clamp(36px, 5vw, 64px); text-align: center; margin: 0; }
 .awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 10px; margin: 14px 0; }

@@ -282,6 +282,20 @@ export interface Strings {
     readonly cancel: string
     /** The countdown: whole seconds left before the match. */
     readonly countdown: Fn<[number]>
+    /** Under the countdown: it is not too late to change. */
+    readonly countdownNote: string
+    /** How many human members are ready, of how many. */
+    readonly readyCount: Fn<[number, number]>
+    /** Beside a member who has not marked themselves ready. */
+    readonly choosing: string
+    /** Beside the player's own name. */
+    readonly you: string
+    /** The one list of a mode with no teams (the Tampieste). */
+    readonly members: string
+    /** Joining a match already on: the screen's title, the time left, and why there is no hurry. */
+    readonly joiningTitle: string
+    readonly left: Fn
+    readonly joinNote: string
   }
   readonly perf: { readonly snaps: string; readonly players: string; readonly corrections: string; readonly hide: string; readonly menu: string; readonly dynRes: string }
   readonly tips: readonly string[]
@@ -798,7 +812,15 @@ const fur: Strings = {
     nextMatch: "La Tampieste e je za scomençade: tu zuiarâs de prossime partide.",
     ready: "Pront",
     cancel: "Ferme la partence",
-    countdown: (s) => `La partide e partìs tra ${s} s`
+    countdown: (s) => `La partide e partìs tra ${s} s`,
+    countdownNote: "Si pues ancjemò cambiâ squadre e arme.",
+    readyCount: (r, n) => `${r} di ${n} pronts`,
+    choosing: "Al sta sielzint",
+    you: "tu",
+    members: "Zuiadôrs",
+    joiningTitle: "Partide in cors",
+    left: (clock) => `a mancjin ${clock}`,
+    joinNote: "Nissune presse: fin che no tu jentris no tu sês su la mape."
   },
   perf: { snaps: "istantanis", players: "zuiadôrs", corrections: "corezions", hide: "F3 par platâ", menu: "menù", dynRes: "ris. dinamiche" },
   tips: [
@@ -1264,7 +1286,15 @@ const it: Strings = {
     nextMatch: "La Tampieste è già cominciata: giocherai dalla prossima partita.",
     ready: "Pronto",
     cancel: "Ferma la partenza",
-    countdown: (s) => `La partita parte tra ${s} s`
+    countdown: (s) => `La partita parte tra ${s} s`,
+    countdownNote: "Si possono ancora cambiare squadra e arma.",
+    readyCount: (r, n) => `${r} su ${n} pronti`,
+    choosing: "Sta scegliendo",
+    you: "tu",
+    members: "Giocatori",
+    joiningTitle: "Partita in corso",
+    left: (clock) => `mancano ${clock}`,
+    joinNote: "Nessuna fretta: finché non entri non sei sulla mappa."
   },
   perf: { snaps: "istantanee", players: "giocatori", corrections: "correzioni", hide: "F3 per nascondere", menu: "menu", dynRes: "ris. dinamica" },
   tips: [

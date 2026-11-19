@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { afterEscape, endFocus, focusOnOpen, menuPrimary, musterCountdown, musterFocus, musterScreen, musterTeams, primaryPicker, singleOf, singleValue, startsAtOnce } from "../client/match-menus.ts"
+import { afterEscape, endFocus, focusOnOpen, menuPrimary, musterCountdown, musterFocus, musterScreen, musterTeams, nextFocus, primaryPicker, singleOf, singleValue, startsAtOnce } from "../client/match-menus.ts"
 
 test("Esc closes the in-match menus one step at a time", () => {
   expect(afterEscape("pause", "none")).toBe("none")
@@ -130,4 +130,21 @@ test("the match menu offers the armoury only in a training; in a match it shows 
   expect(menuPrimary({ ...room(), mode: "dutrine" }, "p1")).toEqual({ tag: "armoury" })
   // Somebody not in the roster gets nothing, never the armoury.
   expect(menuPrimary({ ...room(), mode: "bataie" }, "p9")).toEqual({ tag: "none" })
+})
+
+// A field of controls: start and ready side by side under three tiles in a row.
+const box = (x: number, y: number, w = 100, h = 40) => ({ x, y, width: w, height: h })
+const field = [box(0, 0), box(110, 0), box(220, 0), box(0, 60, 200), box(210, 60)]
+
+test("the pad's d-pad moves focus to the nearest control in its direction", () => {
+  expect(nextFocus(field[0], field, "right")).toBe(1)
+  expect(nextFocus(field[1], field, "left")).toBe(0)
+  // Down from the middle tile: the control under it, not the one nearest by distance alone.
+  expect(nextFocus(field[2], field, "down")).toBe(4)
+  expect(nextFocus(field[3], field, "up")).toBe(0)
+})
+
+test("at the edge of the screen the d-pad leaves focus where it is", () => {
+  expect(nextFocus(field[2], field, "right")).toBe(-1)
+  expect(nextFocus(field[0], field, "up")).toBe(-1)
 })

@@ -10,7 +10,7 @@ import { facesPanel, freeTurretInReach, turretAim, turretSeat, type MapId, type 
 import { DISCO } from "../shared/maps/maran.ts"
 import { DT, EYE_CROUCH, EYE_STAND, lookDir, MOVE, seatedBody, sprinting } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
-import { FLAG_BIT, pickupsOf, type BoardRow, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
+import { FLAG_BIT, pickupsOf, type BoardRow, type ClientMessage, type RoomInfo, type ServerMessage, type SnapOther, type Snapshot } from "../shared/protocol.ts"
 import type { GameEvent, Winner } from "../shared/sim/events.ts"
 import { outsideStorm, owned, panelOnWall, RAISE_TICKS, speedScale, weaponInSlot } from "../shared/sim/rules.ts"
 import { isTraining } from "../shared/training/index.ts"
@@ -41,7 +41,9 @@ import "@ui-sdk/web/dialog"
 import "@ui-sdk/web/select"
 import { takeAwayDeparted } from "./bodies.ts"
 import { alwaysChosen } from "./choice.ts"
-import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, menuPrimary, musterCountdown, musterFocus, musterScreen, musterTeams, primaryPicker, singleOf, singleValue, SINGLE_OFF, startsAtOnce, type MatchMenu, type MusterScreen } from "./match-menus.ts"
+import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, menuPrimary, musterScreen, nextFocus, primaryPicker, singleValue, SINGLE_OFF, type MatchMenu, type MusterScreen, type PadDirection } from "./match-menus.ts"
+import { classFigures } from "./menu-model.ts"
+import { MusterModel, type MusterRow, type MusterView, type PrimaryTile } from "./muster-model.ts"
 import { pickerEntries } from "./touch.ts"
 import { onViewportChange } from "./viewport.ts"
 
@@ -59,8 +61,12 @@ const MENU_PARTS = {
   end: ["end-dialog", "endscreen"],
   muster: ["muster-dialog", "muster"]
 } as const satisfies Record<Exclude<MatchMenu, "none"> | "end" | "muster", readonly [string, string]>
-/** The Muster's chat keeps this many of the last messages. */
-const MUSTER_CHAT_LINES = 30
+/** The d-pad's buttons, as the pad sends them (`controls.ts`), and the way each moves focus on the Muster's screen. */
+const PAD_DIRECTIONS: Readonly<Record<string, PadDirection>> = { Digit1: "up", KeyE: "down", Digit2: "left", Digit3: "right" }
+/** Both teams, in the order the Muster draws them. */
+const TEAMS = ["benandanti", "malandanti"] as const satisfies readonly Team[]
+/** The Muster's screen while it is open. */
+type OpenMuster = Exclude<MusterView, { tag: "closed" }>
 /** The contents of the menus the player opens, for `closest`: built once. */
 const OPENED_CONTENT = MATCH_MENUS.map((m) => `#${MENU_PARTS[m][1]}`).join(", ")
 
@@ -192,18 +198,20 @@ export class Game {
   private escapeInPopup = false
   /** Whether the match menu was last drawn for the host (its host tools), null before it is drawn. */
   private pauseHost: boolean | null = null
-  /** Whether the Muster was last drawn for the host (start and the host tools), null before it is drawn. */
-  private musterHost: boolean | null = null
-  /** The Muster screen last drawn (the Muster, or joining a match already on), null before it is drawn. */
-  private musterDrawn: string | null = null
+  /** The Muster screen's state, fed the room's messages: what its screen draws, and what its presses send. */
+  private muster = new MusterModel("", () => this.d.settings.primary)
+  /** The Muster's frame last drawn (the Muster or joining, for the host or a guest), null while it is not drawn. */
+  private musterFrame: string | null = null
   /** The single weapon the Muster's primary picker was last drawn for (null: off), undefined before it is drawn. */
   private musterSingle: PrimaryId | null | undefined = undefined
-  /** The match's score and time last written on the joining screen. */
-  private musterMatch = ""
+  /** The primary last drawn large in the Muster, null before it is drawn. */
+  private musterChosen: PrimaryId | null = null
+  /** The score and time last written on the joining screen. */
+  private musterLive = ""
+  /** The count of ready members last written. */
+  private musterCount = ""
   /** The countdown's seconds last drawn in the Muster (null: none running), undefined before it is drawn. */
   private musterLeft: number | null | undefined = undefined
-  /** The room's last chat messages, drawn in the Muster. */
-  private musterChat: string[] = []
   /** Where the armoury was opened from: Esc goes back there. */
   private loadoutFrom: "none" | "pause" = "none"
   /** When the browser released the pointer lock: the same Esc must not also close the pause menu. */
@@ -321,10 +329,9 @@ export class Game {
     this.entering = false
     this.lastPhase = ""
     this.played = false
-    this.musterHost = null
-    this.musterDrawn = null
-    this.musterMatch = ""
-    this.musterChat = []
+    this.muster = new MusterModel(me, () => this.d.settings.primary)
+    this.muster.room(room)
+    this.musterFrame = null
     this.clock = new MatchClock(() => performance.now())
     this.applySettings()
     this.updateRoster(room)
@@ -434,8 +441,7 @@ export class Game {
         return
       case "chat":
         this.hud.chat(msg.name, msg.team, msg.text)
-        this.musterChat.push(`<div>${msg.team ? `<b style="color:${TEAM_INFO[msg.team].color}">${esc(msg.name)}</b>` : `<b>${esc(msg.name)}</b>`}: ${esc(msg.text)}</div>`)
-        if (this.musterChat.length > MUSTER_CHAT_LINES) this.musterChat.shift()
+        this.muster.chat({ name: msg.name, team: msg.team, text: msg.text })
         if (this.inMuster) this.renderMusterChat()
         this.d.audio.play("chat", { volume: 0.5 })
         return
@@ -449,6 +455,7 @@ export class Game {
 
   private updateRoster(room: RoomInfo) {
     this.room = room
+    this.muster.room(room)
     for (const r of room.roster) {
       this.names.set(r.id, r.name)
       this.teams.set(r.id, r.team)
@@ -461,7 +468,7 @@ export class Game {
     if (this.overlay === "pause") this.renderPause()
     if (this.snap?.phase.tag === "Over") this.renderEnd()
     // Having entered a match already on closes the Muster screen; its roster changes redraw it.
-    const was = this.musterDrawn !== null
+    const was = this.musterFrame !== null
     this.syncMusterScreen()
     if (this.inMuster) this.renderMuster(!was)
   }
@@ -482,7 +489,7 @@ export class Game {
     document.documentElement.classList.toggle("in-muster", open)
     if (open) return
     $<DialogElement>(MENU_PARTS.muster[0]).open = false
-    this.musterDrawn = null
+    this.musterFrame = null
   }
 
   private onSnapshot(s: Snapshot) {
@@ -501,6 +508,7 @@ export class Game {
 
     const prev = this.snap
     this.snap = s
+    this.muster.snapshot(s)
     // Broken-down doors no longer stop predicted movement or shots.
     this.physics.setDoors(s.doors.map((hp) => hp > 0))
     // A panel torn off leaves its gap: predicted shots pass through it (bodies still cannot).
@@ -556,8 +564,7 @@ export class Game {
     }
     for (const e of s.ev) this.event(e)
     if (prev?.phase.tag !== s.phase.tag) this.phaseChanged(s)
-    if (this.musterView.tag === "joining") this.renderMusterMatch(s)
-    if (this.inMuster) this.drawCountdown(s)
+    if (this.inMuster) this.drawMusterTick()
     // Entered with progress: the station list, as soon as the trainee is there. Opening it pauses the training.
     if (this.choosing && you?.alive && s.training?.tag === "station") {
       this.choosing = false
@@ -903,6 +910,7 @@ export class Game {
 
   /** A key pressed or released. Says whether the press was the game's own, not also the browser's: Tab when it shows the scoreboard. */
   private key(code: string, down: boolean): boolean {
+    if (this.running && this.inMuster && down && this.controls.device === "pad") this.musterPad(code)
     // The Muster's screen takes the keys: its own controls, its own chat.
     if (!this.running || this.chatting || this.inMuster) return false
     if (code === "Tab") {
@@ -936,6 +944,32 @@ export class Game {
     // The armoury opens only where the primary can change: in a training.
     if (code === "KeyB" && this.room !== null && menuPrimary(this.room, this.me).tag === "armoury") this.openOverlay(this.overlay === "loadout" ? "none" : "loadout")
     return false
+  }
+
+  /**
+   * The pad on the Muster's screen, which the keyboard drives with Tab, the arrows and Enter: the
+   * d-pad moves focus to the nearest control in its direction, ✕ presses it. In an open list (the
+   * bot skill, single weapon) the d-pad moves through it, ✕ chooses and ◯ closes it, as their keys do.
+   */
+  private musterPad(code: string) {
+    const active = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const list = active?.closest<HTMLElement>(".select-list")
+    if (list) {
+      const key = { Digit1: "ArrowUp", KeyE: "ArrowDown", Space: "Enter", KeyC: "Escape" }[code]
+      if (key) active!.dispatchEvent(new KeyboardEvent("keydown", { key, code: key, bubbles: true, cancelable: true }))
+      return
+    }
+    if (code === "Space") {
+      active?.click()
+      return
+    }
+    const dir = PAD_DIRECTIONS[code]
+    if (!dir) return
+    const screen = $(MENU_PARTS.muster[1])
+    const controls = [...screen.querySelectorAll<HTMLElement>("button, input, ui-radio:not([disabled])")].filter((el) => !(el as HTMLButtonElement).disabled && el.getClientRects().length > 0)
+    if (!active || !screen.contains(active) || active === screen) return controls[0]?.focus()
+    const next = nextFocus(active.getBoundingClientRect(), controls.map((el) => el.getBoundingClientRect()), dir)
+    if (next >= 0) controls[next].focus()
   }
 
   /** Options on the gamepad: opens the match menu, or closes it (one step at a time, like Esc). */
@@ -1242,48 +1276,100 @@ export class Game {
   }
 
   /**
-   * The Muster's screen: drawn whole when the room enters it (or the host changes), else only its
-   * roster, team button and bot skill are redrawn on each room update, so focus stays.
+   * The Muster's screen, drawn from the Muster's model: whole when it opens or its frame changes
+   * (the Muster or joining a match already on, host or guest), else only what a room update
+   * changes (the members, the primary chosen, the ready marks, the host's selects), so focus stays.
    */
   private renderMuster(full = false) {
     const room = this.room
-    const view = this.musterView
+    const view = this.muster.view
     if (!room || view.tag === "closed") return
     const host = room.hostId === this.me
-    const drawn = JSON.stringify(view)
-    if (full || host !== this.musterHost || drawn !== this.musterDrawn) this.buildMuster(room, host, view)
-    const s = t()
-    const teams = musterTeams(room)
-    $("m-roster").innerHTML = (["benandanti", "malandanti"] as const)
-      .map(
-        (team) =>
-          `<ul><li style="color:${TEAM_INFO[team].color};font-family:var(--serif)"><b>${s.teams[team].name}</b></li>${teams[team]
-            .map((m) => `<li${m.id === this.me ? ' style="color:var(--gold)"' : ""}>${esc(m.name)}${m.bot ? " 🤖" : ""}${m.host ? " 👑" : ""} <span class="muted">· ${s.weapons[m.primary].name}</span>${!m.bot && m.ready ? ` <span class="ready-mark" role="img" aria-label="${s.muster.ready}" title="${s.muster.ready}">✓</span>` : ""}</li>`)
-            .join("")}</ul>`
-      )
-      .join("")
-    $("m-team").textContent = s.pause.switchTeam(s.teams[this.otherTeam()].name)
+    if (full || `${view.tag}|${host}` !== this.musterFrame) this.buildMuster(room, view, host)
+    this.drawMusterSides(view)
     // The host changed single weapon: the picker locks or unlocks for everybody.
-    if (room.single !== this.musterSingle) this.drawMusterPicker(room)
-    // Joining a match already on has no ready mark: the confirm is the member's own.
-    document.getElementById("m-ready")?.setAttribute("aria-pressed", String(this.readyMark()))
+    if (room.single !== this.musterSingle) this.drawMusterPicker(room, view)
+    this.drawMusterChosen(view)
+    this.drawMusterActions(view)
     if (host) this.syncLevel("m", room)
     const single = document.getElementById("m-single") as SelectElement | null
     if (single && single.value !== singleValue(room.single)) single.value = singleValue(room.single)
   }
 
-  /**
-   * The Muster's primary picker: free on the player's own primary, or locked on the host's single
-   * weapon, with the note saying so. Redrawn only when the setting changes, so that focus stays.
-   */
-  private drawMusterPicker(room: RoomInfo) {
+  /** What a snapshot changes on the Muster's screen: the countdown, or the score and time of the match being joined. */
+  private drawMusterTick() {
+    const view = this.muster.view
+    if (view.tag === "closed" || this.musterFrame === null) return
+    this.drawMusterActions(view)
+    this.drawMusterLive(view)
+  }
+
+  /** The teams' lists, or the one list of a mode with no teams; the switch only under the other team. */
+  private drawMusterSides(view: OpenMuster) {
     const s = t()
-    const picker = primaryPicker(room, this.d.settings.primary)
+    const marks = view.actions.tag === "muster"
+    const row = (m: MusterRow) => {
+      const mark = !marks ? "" : m.ready ? `<span class="mu-ready on" role="img" aria-label="${s.muster.ready}" title="${s.muster.ready}">✓</span>` : `<span class="mu-ready" role="img" aria-label="${s.muster.choosing}" title="${s.muster.choosing}">…</span>`
+      return `<li class="mu-member${m.me ? " me" : ""}${m.bot ? " bot" : ""}"><span class="mu-name">${esc(m.name)}${m.bot ? " 🤖" : ""}${m.host ? " 👑" : ""}${m.me ? ` <i class="mu-you">${s.muster.you}</i>` : ""}</span><span class="mu-prim">${s.weapons[m.primary].name}</span>${mark}</li>`
+    }
+    const list = (id: string, rows: readonly MusterRow[]) => {
+      const html = rows.map(row).join("")
+      const ul = $(`m-list-${id}`)
+      if (ul.innerHTML !== html) ul.innerHTML = html
+      $(`m-n-${id}`).textContent = String(rows.length)
+    }
+    const sides = view.sides
+    if (sides.tag === "alone") return list("all", sides.members)
+    const focused = document.activeElement
+    for (const team of TEAMS) {
+      list(team, sides[team])
+      $(`m-to-${team}`).hidden = team === sides.mine
+      $(`m-team-${team}`).classList.toggle("mine", team === sides.mine)
+    }
+    // The switch pressed is gone with the move: focus goes to the one that leads back.
+    if (focused instanceof HTMLElement && focused.hidden && focused.classList.contains("mu-switch")) $(`m-to-${TEAMS.find((team) => team !== sides.mine)}`).focus()
+  }
+
+  /** A primary's health and speed: the armoury's figures, each with a bar to compare at a glance. */
+  private classBarsHtml(tile: PrimaryTile) {
+    const [[healthLabel, health], [speedLabel, speed]] = classFigures(t(), tile.primary)
+    const bar = (label: string, value: string, v: number) => `<span class="mu-stat">${label}<i style="--v:${v.toFixed(3)}"></i><b>${value}</b></span>`
+    return `<span class="mu-stats">${bar(healthLabel, health, tile.bars.health)}${bar(speedLabel, speed, tile.bars.speed)}</span>`
+  }
+
+  /** The primary the player enters with, large: its name, its line and its class. */
+  private drawMusterChosen(view: OpenMuster) {
+    const chosen = view.picker.chosen
+    if (chosen === this.musterChosen) return
+    this.musterChosen = chosen
+    const s = t()
+    const tile = view.picker.tiles.find((x) => x.primary === chosen)!
+    $("m-chosen").innerHTML = `<span class="tag">${s.muster.primary}</span><b>${s.weapons[chosen].name}</b><span class="blurb">${s.weapons[chosen].blurb}</span>${this.classBarsHtml(tile)}`
+  }
+
+  /**
+   * The primary picker: a tile for each primary (one tab stop, arrow keys, the radio role). Under
+   * single weapon every tile is locked, the host's choice marked, with the note saying why; nothing
+   * picked there is sent or remembered. Redrawn only when the setting changes, so that focus stays.
+   */
+  private drawMusterPicker(room: RoomInfo, view: OpenMuster) {
+    const s = t()
+    const { locked, chosen, tiles } = view.picker
     this.musterSingle = room.single
-    $("m-picker").innerHTML = `${picker._tag === "locked" ? `<p class="muted" id="m-locked">${esc(s.muster.locked(s.weapons[picker.chosen].name))}</p>` : ""}<div class="weapons" id="muster-armarie"></div>`
-    // The primary the player enters with; the browser remembers it for the next room. Under single
-    // weapon the picker is locked on the host's choice, and the remembered primary stays.
-    this.d.menu.buildArmarie($("muster-armarie"), (primary) => this.d.net.send({ t: "primary", p: primary }), picker)
+    const tile = (x: PrimaryTile) =>
+      `<ui-radio class="weapon mu-tile" value="${x.primary}" aria-labelledby="m-tile-${x.primary}"${locked ? " disabled" : ""}><b id="m-tile-${x.primary}">${x.primary === chosen && locked ? "🔒 " : ""}${s.weapons[x.primary].name}</b>${this.classBarsHtml(x)}</ui-radio>`
+    $("m-picker").innerHTML = `${locked ? `<p class="mu-lock" id="m-locked">${esc(s.muster.locked(s.weapons[chosen].name))}</p>` : ""}<ui-radio-group class="mu-tiles${locked ? " locked" : ""}" aria-label="${s.muster.primary}"${locked ? ' aria-describedby="m-locked"' : ""}>${tiles.map(tile).join("")}</ui-radio-group>`
+    const group = $("m-picker").querySelector<HTMLElementTagNameMap["ui-radio-group"]>("ui-radio-group")!
+    group.value = chosen
+    if (locked) return
+    // A primary is always chosen: a change to none is refused. The browser remembers it for the next room.
+    group.addEventListener("valuechange", alwaysChosen((primary) => {
+      this.d.menu.choosePrimary(primary as PrimaryId)
+      const send = this.muster.pick(primary as PrimaryId)
+      if (send) this.d.net.send(send)
+      const now = this.muster.view
+      if (now.tag !== "closed") this.drawMusterChosen(now)
+    }))
   }
 
   /** The host's single weapon in the Muster, beside the bot tools: off, or one primary for everybody. */
@@ -1297,66 +1383,85 @@ export class Game {
         </ui-select>`
   }
 
-  /** My own ready mark, as the roster has it. */
-  private readyMark(): boolean {
-    return this.room?.roster.find((r) => r.id === this.me)?.ready ?? false
-  }
-
   /**
-   * The Muster's countdown, redrawn only when its whole seconds change; for the host, start while
-   * none runs and cancel while it does, focus following from one to the other.
+   * The actions under the thumb: the ready mark and how many are ready; the countdown, and for the
+   * host start while none runs and cancel while it does, focus following from one to the other.
+   * Each part is written only when it changes.
    */
-  private drawCountdown(s: Snapshot) {
-    const left = musterCountdown(s.phase, s.tick)
-    if (left === this.musterLeft) return
+  private drawMusterActions(view: OpenMuster) {
+    const a = view.actions
+    if (a.tag !== "muster") return
+    const m = t().muster
+    const count = a.readyCount ? m.readyCount(a.readyCount.ready, a.readyCount.of) : ""
+    if (count !== this.musterCount) {
+      this.musterCount = count
+      $("m-count").textContent = count
+      $("m-count").hidden = count === ""
+    }
+    const ready = $("m-ready")
+    if (ready.getAttribute("aria-pressed") !== String(a.ready)) ready.setAttribute("aria-pressed", String(a.ready))
+    if (a.countdown === this.musterLeft) return
     const was = this.musterLeft
-    this.musterLeft = left
-    const shown = document.getElementById("m-countdown")
-    if (shown) shown.textContent = left === null ? "" : t().muster.countdown(left)
-    if (was !== undefined && (was === null) === (left === null)) return
+    this.musterLeft = a.countdown
+    $("m-countdown").hidden = a.countdown === null
+    $("m-countdown-text").textContent = a.countdown === null ? "" : m.countdown(a.countdown)
+    if (was !== undefined && (was === null) === (a.countdown === null)) return
+    const wait = document.getElementById("m-wait")
+    if (wait) wait.hidden = a.countdown !== null
     const start = document.getElementById("m-start")
     const cancel = document.getElementById("m-cancel")
     if (!start || !cancel) return
     const focused = document.activeElement === start || document.activeElement === cancel
-    start.hidden = left !== null
-    cancel.hidden = left === null
-    if (focused) (left === null ? start : cancel).focus()
+    start.hidden = a.start !== "start"
+    cancel.hidden = a.start !== "cancel"
+    if (focused) (a.start === "start" ? start : cancel).focus()
   }
 
-  private buildMuster(room: RoomInfo, host: boolean, view: Exclude<MusterScreen, { tag: "closed" }>) {
+  private buildMuster(room: RoomInfo, view: OpenMuster, host: boolean) {
     const wasOpen = $<DialogElement>(MENU_PARTS.muster[0]).open
-    this.musterHost = host
-    this.musterDrawn = JSON.stringify(view)
-    this.musterMatch = ""
-    const joining = view.tag === "joining"
+    this.musterFrame = `${view.tag}|${host}`
+    this.musterSingle = undefined
+    this.musterChosen = null
+    this.musterLive = ""
+    this.musterLeft = undefined
+    this.musterCount = ""
     const s = t()
     const p = s.pause
     const m = s.muster
-    this.musterLeft = undefined
-    this.musterSingle = undefined
-    this.drawMenu(MENU_PARTS.muster[1], m.title, `
-      <div class="overlay-body">
-        <div id="m-countdown" class="muster-countdown" role="timer"></div>
-        <div class="muted pause-reach">${s.modes[room.mode].name} · ${s.maps[room.map].name} · ${s.menu.minutes(room.minutes)}</div>
-        ${this.roomCodeHtml("m", room)}
-        ${joining ? `<div class="muster-match" id="m-match" aria-live="off"></div>${view.nextMatch ? `<p class="muster-note">${m.nextMatch}</p>` : ""}` : ""}
-        <div class="roster" id="m-roster"></div>
-        ${host ? `<div class="host-tools"><span class="host-label">👑 ${p.host}</span>${this.botToolsHtml("m", room)}${joining ? "" : this.singleToolHtml(room)}</div>` : `<div class="muted host-only">${p.hostOnly}</div>`}
-        <h3>${m.primary}</h3>
-        <div id="m-picker"></div>
-        <h3>${m.chat}</h3>
-        <div class="muster-chat" id="m-chat-log" role="log"></div>
-        <input id="m-chat" class="muster-chat-input" maxlength="120" placeholder="${m.chatPlaceholder}" aria-label="${m.chat}" />
+    const joining = view.tag === "joining"
+    const team = (id: string, name: string, color: string, switchTo: string) =>
+      `<section class="mu-team mu-${id}" id="m-team-${id}" style="--team:${color}" aria-labelledby="m-h-${id}">
+        <header><h3 id="m-h-${id}">${name}</h3><span class="muted" id="m-n-${id}"></span></header>
+        <ul id="m-list-${id}"></ul>${switchTo}
+      </section>`
+    const sides =
+      view.sides.tag === "alone"
+        ? team("all", m.members, "var(--gold)", "")
+        : TEAMS.map((id) => team(id, s.teams[id].name, TEAM_INFO[id].color, `<button class="mu-switch" id="m-to-${id}" hidden>${p.switchTeam(s.teams[id].name)}</button>`)).join("")
+    const a = view.actions
+    const foot =
+      a.tag === "joining"
+        ? `${a.nextMatch ? `<p class="mu-note">${m.nextMatch}</p>` : ""}<button id="m-enter" class="primary mu-go">${m.enter}</button>`
+        : `<div class="mu-countdown" id="m-countdown" role="timer" hidden><b id="m-countdown-text"></b><small>${m.countdownNote}</small></div>
+          ${host ? `<button id="m-start" class="primary mu-go">${p.start}<small id="m-count"></small></button><button id="m-cancel" class="mu-go mu-cancel" hidden>${m.cancel}</button>` : `<p class="mu-wait muted" id="m-wait">${p.hostOnly} <span id="m-count"></span></p>`}
+          <button id="m-ready" class="mu-readybtn" aria-pressed="false">${m.ready}</button>`
+    this.drawMenu(MENU_PARTS.muster[1], joining ? m.joiningTitle : m.title, `
+      <div class="mu-head">
+        <div class="mu-line muted">${s.modes[room.mode].name} · ${s.maps[room.map].name} · ${s.menu.minutes(room.minutes)}</div>
+        ${joining ? `<div class="mu-live" id="m-match"></div><p class="mu-joinnote muted">${m.joinNote}</p>` : this.roomCodeHtml("m", room)}
       </div>
-      <div class="row overlay-actions">
-        ${joining ? `<button id="m-enter" class="primary">${m.enter}</button>` : host ? `<button id="m-start" class="primary">${p.start}</button><button id="m-cancel" hidden>${m.cancel}</button>` : ""}
-        ${joining ? "" : `<button id="m-ready" aria-pressed="false">${m.ready}</button>`}
-        <button id="m-team"></button>
-        <button id="m-leave">${p.leave}</button>
-      </div>`)
+      <button id="m-leave" class="mu-leave">${p.leave}</button>
+      <div class="mu-body overlay-body">
+        <div class="mu-teams">${sides}</div>
+        <section class="mu-mid" aria-label="${m.primary}"><div class="mu-chosen" id="m-chosen"></div><div id="m-picker"></div></section>
+        <aside class="mu-aside">
+          ${view.hostTools ? `<div class="host-tools mu-host"><span class="host-label">👑 ${p.host}</span>${this.botToolsHtml("m", room)}${view.hostTools.single ? this.singleToolHtml(room) : ""}</div>` : ""}
+          <section class="mu-chat" aria-labelledby="m-h-chat"><h3 id="m-h-chat">${m.chat}</h3><div class="mu-chat-log" id="m-chat-log" role="log"></div><input id="m-chat" maxlength="120" placeholder="${m.chatPlaceholder}" aria-label="${m.chat}" /></section>
+        </aside>
+      </div>
+      <div class="mu-foot">${foot}</div>`, "mu-title")
     const el = $(MENU_PARTS.muster[1])
     this.bindCopy("m", room)
-    this.drawMusterPicker(room)
     this.renderMusterChat()
     const chat = $<HTMLInputElement>("m-chat")
     chat.addEventListener("keydown", (e) => {
@@ -1367,59 +1472,62 @@ export class Game {
       if (text) this.d.net.send({ t: "chat", text })
       chat.value = ""
     })
-    $("m-team").onclick = () => this.d.net.send({ t: "team", team: this.otherTeam() })
-    const ready = document.getElementById("m-ready")
-    if (ready) ready.onclick = () => this.d.net.send({ t: "ready", ready: !this.readyMark() })
+    const send = (msg: ClientMessage | null) => {
+      if (msg) this.d.net.send(msg)
+    }
+    for (const b of el.querySelectorAll<HTMLButtonElement>(".mu-switch")) b.onclick = () => send(this.muster.switchTeam())
     $("m-leave").onclick = () => {
       this.d.net.send({ t: "leave" })
       this.d.onLeave()
     }
-    if (joining) {
+    if (a.tag === "joining") {
       $("m-enter").onclick = () => {
-        this.d.net.send({ t: "enter" })
+        send(this.muster.enter())
         // Still inside the press: the one moment the browser grants the pointer lock the match needs.
         this.controls.lock()
       }
-      if (this.snap) this.renderMusterMatch(this.snap)
-    }
+    } else $("m-ready").onclick = () => send(this.muster.toggleReady())
     if (host) this.bindBotTools(el, "m")
-    if (host && !joining) {
+    if (a.tag === "muster" && host) {
       $("m-start").onclick = () => {
-        this.d.net.send({ t: "start" })
+        const start = this.muster.start()
+        if (!start) return
+        this.d.net.send(start.send)
         // A start that goes live at once: still inside the press, the one moment the browser grants
         // the pointer lock the match needs. A countdown keeps the pointer free for the Muster.
-        if (this.room && startsAtOnce(this.room, this.me)) this.controls.lock()
+        if (start.live) this.controls.lock()
       }
-      $("m-cancel").onclick = () => this.d.net.send({ t: "cancel" })
+      $("m-cancel").onclick = () => send(this.muster.cancel())
+    }
+    if (view.hostTools?.single)
       // The room's update sets the value back from code ("imperative"): only the host's own choice is sent.
       $<SelectElement>("m-single").addEventListener("valuechange", alwaysChosen((value, reason) => {
-        if (reason !== "imperative") this.d.net.send({ t: "single", p: singleOf(value) })
+        if (reason !== "imperative") send(this.muster.setSingle(value))
       }))
-    }
-    if (!wasOpen) this.openMenu(...MENU_PARTS.muster, musterFocus({ host, reach: room.reach }))
+    this.drawMusterLive(view)
+    if (!wasOpen) this.openMenu(...MENU_PARTS.muster, view.focus)
   }
 
-  /** Joining a match already on: its score and the time left, written only when they change. */
-  private renderMusterMatch(snap: Snapshot) {
+  /** Joining a match already on: its score (or who still stands) and the time left, written only when they change. */
+  private drawMusterLive(view: OpenMuster) {
+    const live = view.live
     const el = document.getElementById("m-match")
-    const room = this.room
-    if (!el || !room || snap.phase.tag !== "Live") return
+    if (!live || !el) return
     const s = t()
-    const clock = fmtClock(snap.phase.ends - snap.tick)
-    const pct = room.mode === "cjar" ? "%" : ""
-    const text =
-      room.mode === "tampieste"
-        ? `${s.hud.alive(snap.players.filter((p) => p.f & FLAG_BIT.alive).length)} · ${clock}`
-        : `${s.teams.benandanti.name} ${snap.score.benandanti}${pct} – ${snap.score.malandanti} ${s.teams.malandanti.name} · ${clock}`
-    if (text === this.musterMatch) return
-    this.musterMatch = text
-    el.textContent = text
+    const left = `<span class="muted">${s.muster.left(fmtClock(live.left))}</span>`
+    const side = (team: Team, score: string) => `<span style="color:${TEAM_INFO[team].color}">${team === "benandanti" ? `${TEAM_INFO[team].short} <b>${score}</b>` : `<b>${score}</b> ${TEAM_INFO[team].short}`}</span>`
+    const pct = live.tag === "teams" && live.percent ? "%" : ""
+    const html = live.tag === "alone" ? `<span>${s.hud.alive(live.alive)}</span>${left}` : `${side("benandanti", `${live.benandanti}${pct}`)}${left}${side("malandanti", `${live.malandanti}${pct}`)}`
+    if (html === this.musterLive) return
+    this.musterLive = html
+    el.innerHTML = html
   }
 
   private renderMusterChat() {
     const log = document.getElementById("m-chat-log")
-    if (!log) return
-    log.innerHTML = this.musterChat.join("")
+    const view = this.muster.view
+    if (!log || view.tag === "closed") return
+    log.innerHTML = view.chat.map((c) => `<div>${c.team ? `<b style="color:${TEAM_INFO[c.team].color}">${esc(c.name)}</b>` : `<b>${esc(c.name)}</b>`}: ${esc(c.text)}</div>`).join("")
     log.scrollTop = log.scrollHeight
   }
 
