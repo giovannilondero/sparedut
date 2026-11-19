@@ -14,8 +14,11 @@ export const playPrompt = (s: Strings, device: Device): string => s.hud.play[dev
 
 export const turretPrompt = (s: Strings, device: Device, mounted: boolean): string => (mounted ? s.hud.turretLeave : s.hud.turretUse)[device]
 
-/** Facing the casot's panel: the control to hold to tear it off. */
-export const panelPrompt = (s: Strings, device: Device): string => s.hud.panelTear[device]
+/** Whether slot 3 is free to take the casot's panel, or taken by the Lanciafrico. */
+export type PanelSlot = "free" | "taken"
+
+/** Facing the casot's panel: the control to hold to tear it off, or, with slot 3 taken, what is in the way. */
+export const panelPrompt = (s: Strings, device: Device, slot: PanelSlot): string => (slot === "free" ? s.hud.panelTear[device] : s.hud.panelSlotTaken)
 
 /**
  * The control a training step names, as the active device shows it: a key or mouse button, a

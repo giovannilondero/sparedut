@@ -192,6 +192,8 @@ export interface Strings {
     /** The casot's panel: the active device's control to tear it off (held), and the touch button that does it. */
     readonly panelTear: Readonly<Record<Device, string>>
     readonly touchTear: string
+    /** Facing the panel with the Lanciafrico in slot 3: why it cannot be torn off. */
+    readonly panelSlotTaken: string
     readonly turretHeat: string
     readonly turretHot: string
   }
@@ -727,6 +729,7 @@ const fur: Strings = {
       touch: `Ten <kbd>${FUR_TOUCH.tear}</kbd> par gjavâ vie il panel`
     },
     touchTear: FUR_TOUCH.tear,
+    panelSlotTaken: `Cul ${WEAPON_NAMES.lanciafrico.name} intor no tu puedis gjavâ vie il panel`,
     turretHeat: "Calôr",
     turretHot: "SCJALDADE!"
   },
@@ -1189,6 +1192,7 @@ const it: Strings = {
       touch: `Tieni premuto <kbd>${IT_TOUCH.tear}</kbd> per strappare il pannello`
     },
     touchTear: IT_TOUCH.tear,
+    panelSlotTaken: `Con il ${WEAPON_NAMES.lanciafrico.name} addosso non puoi strappare il pannello`,
     turretHeat: "Calore",
     turretHot: "SURRISCALDATA!"
   },

@@ -222,6 +222,8 @@ export class Game {
   private wasAlive = false
   /** The predictor holds me in a turret's seat (the last snapshot had me alive on one). */
   private seated = false
+  /** Facing the casot's panel on its wall with slot 3 taken: holding "use" would tear nothing. */
+  private panelSlotTaken = false
   private shake = 0
   private aimBlend = 0
   private kickPitch = 0
@@ -549,11 +551,14 @@ export class Game {
       this.seated = you.alive && this.mounted() >= 0
       const mounted = this.mounted() >= 0
       const body = this.predictor.body
+      const panel = you.alive && body !== null && this.facesPanel(s, body)
+      const slotFree = you.arsenal.power === null
+      this.panelSlotTaken = panel && !slotFree && !mounted
       this.controls.track(
         trackedIn(s, this.me, {
           mounted,
           freeTurret: body !== null && freeTurretInReach(this.physics.map.turrets, s.turrets, body) >= 0,
-          panel: you.alive && body !== null && this.panelToTear(s, body) >= 0
+          panel: panel && slotFree
         })
       )
       // The server has already seen my last weapon switch and holds a different one: it
@@ -862,13 +867,12 @@ export class Game {
   }
 
   /**
-   * The panel holding "use" would tear off now, as the simulation decides it (`PlayPanels`): on its
-   * wall or being torn by me, faced from inside with slot 3 free. -1 when none.
+   * Whether I face a panel that is there to tear off, as the simulation decides it (`PlayPanels`):
+   * on its wall or being torn by me, faced from inside. Holding "use" tears it with slot 3 free.
    */
-  private panelToTear(s: Snapshot, body: { readonly x: number; readonly y: number; readonly z: number }): number {
+  private facesPanel(s: Snapshot, body: { readonly x: number; readonly y: number; readonly z: number }): boolean {
     const defs = this.physics.map.panels ?? []
-    if (defs.length === 0 || s.you?.arsenal.power !== null) return -1
-    return defs.findIndex((def, i) => {
+    return defs.some((def, i) => {
       const state = s.panels[i]
       return state !== undefined && (state.tag === "wall" || (state.tag === "tearing" && state.by === this.me)) && facesPanel(def, body, this.controls.yaw)
     })
@@ -2106,9 +2110,10 @@ export class Game {
       // At the turret: the heat. Near a free one: the key to mount it (the same decision as the touch "use" button).
       const gun = turret >= 0 ? s?.turrets[turret] ?? null : null
       this.hud.turret(gun ? { heat: gun.heat, jammed: gun.jammed } : null, this.controls.turretControl === "use", this.controls.device)
-      // Facing the casot's panel: the control to hold, and how far my tear has got (the same decision as the touch "use" button).
+      // Facing the casot's panel: the control to hold, and how far my tear has got (the same decision as the touch "use" button); or, with slot 3 taken, why it stays.
       const tearing = s?.panels.find((p) => p.tag === "tearing" && p.by === this.me)
-      this.hud.panel(this.controls.turretControl === "tear", tearing?.tag === "tearing" ? tearing.progress : 0, this.controls.device)
+      const slot = this.controls.turretControl === "tear" ? "free" : this.panelSlotTaken ? "taken" : null
+      this.hud.panel(slot, tearing?.tag === "tearing" ? tearing.progress : 0, this.controls.device)
       // Carrying it: how much it can still take.
       const held = you.alive ? s?.panels.find((p) => p.tag === "carried" && p.by === this.me) : undefined
       this.hud.panelHealth(held?.tag === "carried" ? held.hp / PANEL_HP : null)

@@ -14,7 +14,7 @@ import type { Device } from "./device.ts"
 import { t } from "./i18n.ts"
 import type { MenuPrimary } from "./match-menus.ts"
 import { classFigures } from "./menu-model.ts"
-import { panelPrompt, playPrompt, trainingPrompt, turretPrompt } from "./prompts.ts"
+import { panelPrompt, playPrompt, trainingPrompt, turretPrompt, type PanelSlot } from "./prompts.ts"
 import { announcesStep, NOT_SHOWN, stepMarksHtml, type PanelPlace } from "./training-panel.ts"
 import { buttonBit, TOUCH_BUTTONS, type Insets, type PickerEntry, type TouchLayout, type TouchView } from "./touch.ts"
 
@@ -189,13 +189,15 @@ export class Hud {
   }
 
   /**
-   * The casot's panel: facing it with slot 3 free, the control to hold to tear it off; while holding,
-   * how far the tear has got (0 to 1).
+   * The casot's panel, faced on its wall (`slot` null when it is not): with slot 3 free, the control
+   * to hold to tear it off and, while holding, how far the tear has got (0 to 1); with slot 3 taken,
+   * what is in the way.
    */
-  panel(prompt: boolean, progress: number, device: Device) {
-    this.toggle("panel-prompt", "hidden", !prompt)
-    if (!prompt) return
-    this.html("panel-label", panelPrompt(t(), device))
+  panel(slot: PanelSlot | null, progress: number, device: Device) {
+    this.toggle("panel-prompt", "hidden", slot === null)
+    if (slot === null) return
+    this.toggle("panel-prompt", "taken", slot === "taken")
+    this.html("panel-label", panelPrompt(t(), device, slot))
     this.style("panel-tear", "width", `${Math.round(progress * 100)}%`)
   }
 
