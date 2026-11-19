@@ -116,7 +116,12 @@ const walkCamera = (dt: number) => {
   return true
 }
 /** The cjar going back and forth along the track, the storm closing in. */
-const extras = (t: number): Pick<WorldFrame, "cart" | "storm" | "turrets" | "doors" | "gates"> => {
+/**
+ * `?panel=wall|off|lying` holds the casot's panel on its wall, torn off, or torn off and lying on the
+ * floor in front of its gap (fallen from a carrier); otherwise it shakes and comes away with the door.
+ */
+const panelAt = q.get("panel")
+const extras = (t: number): Pick<WorldFrame, "cart" | "storm" | "turrets" | "doors" | "gates" | "panels" | "lyingPanels"> => {
   const len = trackLength(map.track)
   const p = trackPoint(map.track, ((Math.sin(t * 0.05) + 1) / 2) * len)
   // the turrets turn and heat up, the doors break and come back
@@ -130,6 +135,8 @@ const extras = (t: number): Pick<WorldFrame, "cart" | "storm" | "turrets" | "doo
     doors: map.doors.map(() => Math.max(0, Math.cos(t * 0.2))),
     // the gates close and open with the doors
     gates: (map.gates ?? []).map(() => Math.cos(t * 0.2) > 0),
+    lyingPanels: (map.panels ?? []).map((d) => (panelAt === "lying" ? [(d.min[0] + d.max[0]) / 2 + d.inward[0] * 1.2, d.min[1] - 0.8, (d.min[2] + d.max[2]) / 2 + d.inward[2] * 1.2] : null)),
+    panels: (map.panels ?? []).map(() => (panelAt === "off" || panelAt === "lying" ? null : panelAt === "wall" ? 0 : Math.cos(t * 0.2) > 0 ? Math.max(0, Math.sin(t * 0.8)) : null)),
     cart: mode === "cjar" ? { at: p.at, yaw: p.yaw, contested: Math.floor(t / 5) % 3 === 2, pushers: 1 } : null,
     storm: mode === "tampieste" ? { x: map.hill.at[0], z: map.hill.at[2], radius: 10 + ((Math.cos(t * 0.1) + 1) / 2) * 80 } : null
   }
@@ -150,7 +157,7 @@ const loop = (now: number) => {
   } else world.menuCamera(t, camera)
   camera.updateMatrixWorld()
   const frame: WorldFrame = {
-    pickups: PICKUPS.map((_, i) => (i + Math.floor(t / 3)) % 4 !== 0),
+    pickups: PICKUPS.map((_, i) => ((i + Math.floor(t / 3)) % 4 !== 0 ? "up" : "down")),
     flags: mode === "frico" ? { benandanti: { pos: FLAG_BASES.benandanti, state: "base" }, malandanti: { pos: [0, 2.1, 60], state: "carried" } } : null,
     hill: mode === "culine" ? { owner: Math.floor(t / 4) % 3 === 0 ? null : "malandanti", contested: Math.floor(t / 4) % 3 === 2 } : null,
     ...extras(t),
@@ -177,7 +184,7 @@ requestAnimationFrame(loop)
     camera.lookAt(c[3], c[4], c[5])
   } else world.menuCamera(t, camera)
   camera.updateMatrixWorld()
-  world.update(0.016, t, { pickups: PICKUPS.map(() => true), flags: mode === "frico" ? { benandanti: { pos: FLAG_BASES.benandanti, state: "base" }, malandanti: { pos: FLAG_BASES.malandanti, state: "base" } } : null, hill: mode === "culine" ? { owner: null, contested: false } : null, ...extras(t), camera })
+  world.update(0.016, t, { pickups: PICKUPS.map(() => "up"), flags: mode === "frico" ? { benandanti: { pos: FLAG_BASES.benandanti, state: "base" }, malandanti: { pos: FLAG_BASES.malandanti, state: "base" } } : null, hill: mode === "culine" ? { owner: null, contested: false } : null, ...extras(t), camera })
   look.render(scene, camera)
   const out = document.createElement("canvas")
   out.width = w

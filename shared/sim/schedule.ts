@@ -14,6 +14,7 @@ import { Respawn } from "./systems/respawn.ts"
 import { StormDamage } from "./systems/storm.ts"
 import { PlayTraining } from "./systems/training.ts"
 import { MountTurrets } from "./systems/turrets.ts"
+import { PlayPanels } from "./systems/panels.ts"
 import { UseWeapons } from "./systems/weapons.ts"
 import { Game } from "./schema.ts"
 
@@ -27,6 +28,7 @@ export const simulate = Game.Schedule(
   MatchFlow,
   Respawn,
   MountTurrets,
+  PlayPanels,
   CloseGates,
   MovePlayers,
   UseWeapons,

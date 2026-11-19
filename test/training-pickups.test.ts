@@ -9,9 +9,10 @@ import { turretRestSeat } from "../shared/map.ts"
 import { SAGRE, SAGRE_STATIONS } from "../shared/maps/sagre.ts"
 import { initPhysics } from "../shared/physics.ts"
 import type { GameEvent } from "../shared/sim/events.ts"
-import { MAX_HP } from "../shared/sim/rules.ts"
+import { maxHp } from "../shared/sim/rules.ts"
 import { STATION_IDS, type StationId } from "../shared/training/index.ts"
-import { WEAPONS } from "../shared/weapons.ts"
+import { PICKUPS_HP } from "../shared/training/stations/pickups.ts"
+import { CLASSES, PRIMARIES, WEAPONS, type PrimaryId } from "../shared/weapons.ts"
 import { harness } from "./harness.ts"
 import { Trainee } from "./trainee/index.ts"
 import { alongTheStreet } from "./trainee/pickups.ts"
@@ -65,11 +66,41 @@ function reach(station: StationId, started = false) {
 
 const steps = (events: GameEvent[]) => events.flatMap((e) => (e.t === "training" && e.a === "step" ? [e.step] : []))
 
+/** A training begun at `station` by a player whose primary, and so class, is `primary`; played until they are alive there. */
+function begunAt(station: StationId, primary: PrimaryId) {
+  const h = harness(createBrowserHost)
+  const me = h.connect()
+  me.say({ t: "training", primary, from: station, unlocked: STATION_IDS.indexOf(station) + 1 })
+  for (let i = 0; i < 120 && !me.last("snap")?.you?.alive; i++) h.play(1)
+  return { ...h, me, you: () => me.last("snap")!.you! }
+}
+
+describe("a station's health and the class", () => {
+  test("station 8 fixes the player's health whatever their class, even after a change at the armoury", () => {
+    for (const primary of PRIMARIES) {
+      const { you } = begunAt("pickups", primary)
+      expect(you().hp).toBe(40)
+    }
+    // A change of primary, then the station again: its health still wins over the new class.
+    const { me, you, play } = begunAt("pickups", "cramar")
+    me.say({ t: "primary", p: "mulin" })
+    play(2)
+    me.say({ t: "goTo", station: "pickups" })
+    play(4)
+    expect(you().arsenal.primary).toBe("mulin")
+    expect(you().hp).toBe(PICKUPS_HP)
+  })
+
+  test("a station that does not fix it gives the class's full health", () => {
+    for (const primary of PRIMARIES) expect(begunAt("armoury", primary).you().hp).toBe(CLASSES[primary].hp)
+  })
+})
+
 describe("station 8: pickups", () => {
   test("the player arrives hurt, without armour and low on ammunition, with every pickup there", () => {
     const { snap } = reach("pickups")
     const you = snap().you!
-    expect(you.hp).toBeLessThan(MAX_HP)
+    expect(you.hp).toBeLessThan(maxHp(you.arsenal.primary))
     expect(you.armor).toBe(0)
     expect(you.arsenal.ammo.cramar.reserve).toBeLessThan(WEAPONS.cramar.reserve)
     expect(you.arsenal.bombs).toBe(0)
@@ -178,12 +209,12 @@ describe("station 9: the turret and the Lanciafrico", () => {
     drive(10, tap(BUTTON.use), (e) => e.some((x) => x.t === "turret" && x.a === "on"))
     drive(60 * 10, () => ({ yaw: TURRET.yaw, buttons: BUTTON.fire }), (e) => e.some((x) => x.t === "turret" && x.a === "hot"))
     drive(10, tap(BUTTON.use), (e) => e.some((x) => x.t === "turret" && x.a === "off"))
-    expect(snap().you!.arsenal.launcher).toBe(false)
+    expect(snap().you!.arsenal.power).toBeNull()
 
     const picked = walkTo(LANCIAFRICO)
     expect(picked).toContainEqual(expect.objectContaining({ t: "pick", k: "lanciafrico" }))
     expect(steps(picked)).toEqual(["pickLanciafrico"])
-    expect(snap().you!.arsenal).toMatchObject({ launcher: true, current: "lanciafrico" })
+    expect(snap().you!.arsenal).toMatchObject({ power: "lanciafrico", current: "lanciafrico" })
 
     // One press, one frico: it is not automatic.
     const fired = drive(60 * 3, (i) => ({ ...tap(BUTTON.fire)(i), weapon: "lanciafrico" }), (e) => e.some((x) => x.t === "training" && x.a === "station"))
@@ -238,12 +269,12 @@ describe("entering a station again", () => {
     const index = SAGRE_STATIONS.turret.lanciafrico
     const { me, snap, walkTo, drive } = reach("turret", true)
     walkTo(LANCIAFRICO)
-    expect(snap().you!.arsenal.launcher).toBe(true)
+    expect(snap().you!.arsenal.power).toBe("lanciafrico")
     expect(snap().pickups[index]).toBe("0")
     me.say({ t: "goTo", station: "turret" })
     drive(6, () => ({}))
     expect(snap().pickups[index]).toBe("1")
-    expect(snap().you!.arsenal.launcher).toBe(false)
+    expect(snap().you!.arsenal.power).toBeNull()
     expect(snap().training).toMatchObject({ station: "turret", step: "mount", count: 0 })
   })
 })

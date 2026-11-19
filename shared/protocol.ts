@@ -11,13 +11,13 @@ import type { Body } from "./movement.ts"
 import type { GameEvent } from "./sim/events.ts"
 import type { ArsenalValue, FlagState, HillValue, TurretState } from "./sim/schema.ts"
 import type { StormValue } from "./sim/rules.ts"
-import type { CartView, PhaseView, TrainingView } from "./sim/view.ts"
+import type { CartView, PanelView, PhaseView, PickupView, TrainingView } from "./sim/view.ts"
 import { PRIMARIES, type PrimaryId, type ProjectileKind, type WeaponId } from "./weapons.ts"
 import { INTERFACE_ACTIONS } from "./training/interface.ts"
 import { isStepId, isStepOf, STATION_IDS, type StepId } from "./training/index.ts"
 import { DEVICES } from "./devices.ts"
 
-export const PROTOCOL_VERSION = 14
+export const PROTOCOL_VERSION = 16
 export const MAX_PLAYERS = 16
 export const SNAPSHOT_EVERY = 2 // ticks: 30 snapshots per second
 /** The longest round trip a client reports, in milliseconds. */
@@ -82,7 +82,9 @@ const createRoom = {
   bots: z.number().int().min(0).max(MAX_BOTS),
   level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]),
   ff: z.boolean(),
-  primary: z.enum(PRIMARIES)
+  primary: z.enum(PRIMARIES),
+  /** Single weapon: the one primary every player carries, or null (also when absent) for off. */
+  single: z.enum(PRIMARIES).nullable().default(null)
 }
 
 export const ClientMessage = z.discriminatedUnion("t", [
@@ -120,6 +122,14 @@ export const ClientMessage = z.discriminatedUnion("t", [
   z.object({ t: z.literal("primary"), p: z.enum(PRIMARIES) }),
   z.object({ t: z.literal("chat"), text: visible(120) }),
   z.object({ t: z.literal("start") }),
+  /** A member who joined a match already on takes their seat in it, with the team and primary they chose. */
+  z.object({ t: z.literal("enter") }),
+  /** A member's own ready mark in the Muster, set or taken back. */
+  z.object({ t: z.literal("ready"), ready: z.boolean() }),
+  /** The host cancels the Muster's countdown. */
+  z.object({ t: z.literal("cancel") }),
+  /** The host sets single weapon in the Muster: one primary for everybody, or null for off. */
+  z.object({ t: z.literal("single"), p: z.enum(PRIMARIES).nullable() }),
   z.object({ t: z.literal("bot"), team, delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ t: z.literal("level"), level: z.enum(BOT_LEVEL_IDS as [BotLevel, ...BotLevel[]]) }),
   z.object({ t: z.literal("ping"), c: z.number(), rtt: z.number().min(0).max(RTT_MAX).optional() }),
@@ -138,12 +148,25 @@ export const ClientMessage = z.discriminatedUnion("t", [
 ])
 export type ClientMessage = z.infer<typeof ClientMessage>
 
+/**
+ * Where a member is in the match. `waiting`: they joined while a match was on and have not entered
+ * it: no body, no hits, no seat on a team for scoring, until their enter intent (or the Muster).
+ * `inMatch`: one of the match's players, on the map whenever the match puts them there; in the
+ * Muster everybody is, to enter the map together at the start.
+ */
+export type Place = "waiting" | "inMatch"
+
 export interface RosterEntry {
   readonly id: string
   readonly name: string
   readonly team: Team
+  /** The primary the member enters the next match with (the one in hand in a live match): the room's single weapon when it is on. */
+  readonly primary: PrimaryId
+  /** Marked ready in the Muster; a bot always is. */
+  readonly ready: boolean
   readonly bot: boolean
   readonly away: boolean
+  readonly place: Place
 }
 
 /** A room in the room list. Its access says whether it asks for a password, never the password itself. */
@@ -157,6 +180,8 @@ export type RoomSummary = Reached<Access> & {
   readonly bots: number
   readonly max: number
   readonly phase: PhaseView["tag"]
+  /** Single weapon: the one primary everybody carries, or null when it is off. */
+  readonly single: PrimaryId | null
 }
 
 export type RoomInfo = RoomSummary & {
@@ -184,6 +209,12 @@ export interface SnapOther {
   readonly hp: number
 }
 
+/** A pickup's character in `Snapshot.pickups`. */
+export const PICKUP_CHAR = { up: "1", down: "0", absent: "-" } as const satisfies Record<PickupView, string>
+
+/** A snapshot's pickups, back to what each one is. */
+export const pickupsOf = (chars: string): PickupView[] => [...chars].map((c) => (c === PICKUP_CHAR.up ? "up" : c === PICKUP_CHAR.absent ? "absent" : "down"))
+
 export const FLAG_BIT = { alive: 1, crouch: 2, grounded: 4, shield: 8, firing: 16, aiming: 32, carrier: 64, sgnape: 128 } as const
 
 export interface SnapSelf {
@@ -207,7 +238,7 @@ export interface Snapshot {
   readonly score: Readonly<Record<Team, number>>
   readonly flags: Readonly<Record<Team, FlagState>>
   readonly hill: HillValue
-  /** "1" available, "0" pending, in `PICKUPS` order. */
+  /** In `PICKUPS` order, one character each (`PICKUP_CHAR`): there, taken and coming back, or not on the map for the match. */
   readonly pickups: string
   readonly proj: readonly (readonly [kind: ProjectileKind, x: number, y: number, z: number])[]
   /** Only in Spingi il Cjar. */
@@ -218,6 +249,8 @@ export interface Snapshot {
   readonly turrets: ReadonlyArray<TurretState>
   /** Health of the breakable doors, in `map.doors` order (0 = broken down). */
   readonly doors: readonly number[]
+  /** The map's panels, in `map.panels` order: on the wall, being torn off, carried, lying on the ground, or broken. */
+  readonly panels: readonly PanelView[]
   readonly players: readonly SnapOther[]
   readonly you: SnapSelf | null
   /** Only in a training: where the trainee is in it. */
@@ -230,6 +263,8 @@ export interface BoardRow {
   readonly name: string
   readonly team: Team
   readonly bot: boolean
+  /** Their primary, and so their class. */
+  readonly primary: PrimaryId
   readonly kills: number
   readonly deaths: number
   readonly assists: number

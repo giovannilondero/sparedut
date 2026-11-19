@@ -113,6 +113,18 @@ test("Options, Share, d-pad and △ go through the same paths as the keys", () =
   expect(calls).toEqual(["pause", "Tab:down", "Tab:up", "Digit1:down", "slot1", "Digit1:up", "Digit2:down", "slot2", "Digit2:up", "KeyE:down", "KeyE:up", "wheel1"])
 })
 
+test("d-pad down kept down stays held as use, tick after tick: the hold that tears off the casot's panel", () => {
+  const { c } = make()
+  set(13, true)
+  for (let tick = 0; tick < 120; tick++) {
+    c.poll(1 / 60)
+    expect(c.buttons() & BUTTON.use).toBe(BUTTON.use)
+  }
+  set(13, false)
+  c.poll(1 / 60)
+  expect(c.buttons() & BUTTON.use).toBe(0)
+})
+
 test("with the menu open look and movement stop, Options still works", () => {
   const { c, calls } = make()
   pad.axes = [0, -1, 1, 0]

@@ -14,8 +14,8 @@ import { blastHit, counted, harmlessFoe, NOTHING_YET, station, type ControlId, t
 
 const PLACE = SAGRE_STATIONS.stalls
 
-/** A stall: one per primary that shoots. Its id is its weapon's. */
-export type StallId = Exclude<PrimaryId, "miedi">
+/** A stall: one per primary that shoots (not the Miedi's beam, nor the Motosee, which the training leaves out). Its id is its weapon's. */
+export type StallId = Exclude<PrimaryId, "miedi" | "motosee">
 
 /** Whose target each stall's weapon is meant for: the Mulin shares the Cjanon's moving bot. */
 export const STALL_SHOOTS_AT = {

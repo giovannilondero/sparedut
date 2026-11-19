@@ -5,6 +5,7 @@
  */
 import type * as THREE from "three"
 import type { PickupKind, Team } from "../shared/map.ts"
+import type { PickupView } from "../shared/sim/view.ts"
 import type { ProjectileKind, WeaponId } from "../shared/weapons.ts"
 
 export type P3 = readonly [number, number, number]
@@ -22,8 +23,8 @@ export interface FlagVisual {
   readonly state: "base" | "carried" | "dropped"
 }
 export interface WorldFrame {
-  /** One per `PICKUPS` point, same order: true if it can be picked up. */
-  readonly pickups: readonly boolean[]
+  /** One per `PICKUPS` point, same order: there, taken and coming back (drawn see-through), or not on the map (not drawn). */
+  readonly pickups: readonly PickupView[]
   /** Only in "frico" mode. */
   readonly flags: Readonly<Record<Team, FlagVisual>> | null
   /** Only in "culine" mode. */
@@ -36,6 +37,10 @@ export interface WorldFrame {
   readonly turrets: readonly TurretVisual[]
   /** Health of each breakable door, from 0 (broken) to 1 (intact). */
   readonly doors: readonly number[]
+  /** One per `map.panels`: how far it is torn off its wall, from 0 (at rest) to 1, or null once off (its gap open). */
+  readonly panels: readonly (number | null)[]
+  /** One per `map.panels`: where it lies on the ground, fallen from its carrier, or null. */
+  readonly lyingPanels: readonly (P3 | null)[]
   /** One per `map.gates`: true while the gate closes the way (the training's way to the next station). */
   readonly gates: readonly boolean[]
   readonly camera: THREE.PerspectiveCamera
@@ -221,4 +226,21 @@ export interface GameAudio {
    * muffled if the door is closed. `null` turns it off.
    */
   disco(at: P3 | null, open: boolean): void
+  /**
+   * Every Motosee in hand, every frame: each one's engine runs for as long as it is in this list,
+   * idling, revving and cutting as it says, and stops when it leaves it. Only the nearest are heard.
+   */
+  motosees(engines: readonly MotoseeEngine[]): void
+}
+
+/** A Motosee in someone's hand, as its engine sounds. */
+export interface MotoseeEngine {
+  /** Whose it is: the same id frame after frame keeps the same engine running. */
+  readonly id: string
+  /** Where it is; null for your own, heard in your hands. */
+  readonly at: P3 | null
+  /** How far the engine has been revved, 0 (idle) to 1 (full). */
+  readonly rev: number
+  /** Whether the chain is biting: full rev with the trigger held. */
+  readonly cutting: boolean
 }

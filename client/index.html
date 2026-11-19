@@ -173,6 +173,13 @@
                 <ui-select-content class="select-list create-list"></ui-select-content>
               </ui-select>
             </div>
+            <div class="field">
+              <ui-select id="c-single" class="create-select" presentation="auto">
+                <ui-select-label data-t="singleLabel"></ui-select-label>
+                <ui-select-trigger><button type="button"><ui-select-value></ui-select-value></button></ui-select-trigger>
+                <ui-select-content class="select-list create-list"></ui-select-content>
+              </ui-select>
+            </div>
             <div class="field create-wide"><span id="c-level-label" data-t="levelLabel"></span><ui-radio-group id="c-level" class="create-cards" aria-labelledby="c-level-label"></ui-radio-group></div>
             <div class="field create-wide"><span id="c-reach-label" data-t="reachLabel"></span><ui-radio-group id="c-reach" class="create-cards create-reaches" aria-labelledby="c-reach-label"></ui-radio-group></div>
             <div class="create-wide create-access" id="c-access-field">
@@ -248,6 +255,8 @@
       <!-- The HUD's panels. On a desktop the wrappers are invisible to layout; on touch they gather the panels in the area the controls leave free. -->
       <div id="hud-free">
       <div id="turret-prompt" class="hidden"></div>
+      <div id="panel-prompt" class="hidden"><span id="panel-label"></span><div class="bar"><i id="panel-tear"></i></div></div>
+      <div id="panel-hud" class="hidden"><span id="panel-hp-label"></span><div class="bar"><i id="panel-hp"></i></div></div>
       <div id="turret-hud" class="hidden"><span id="turret-label"></span><div class="bar"><i id="turret-heat"></i></div></div>
 
       <div id="topbar">
@@ -290,8 +299,9 @@
         <div id="death-by"></div>
         <div id="death-line"></div>
         <div id="death-timer"></div>
-        <div class="death-hint" data-t="deathHint"></div>
+        <div class="death-hint" id="death-hint" data-t="deathHint"></div>
       </div>
+      <div id="next-match" class="hidden"></div>
 
       <div id="board" class="hidden"></div>
       <!-- The in-match menus: UI SDK dialogs whose content opens in the top layer. client/game.ts draws them, opens
@@ -300,6 +310,8 @@
       <ui-dialog id="pause-dialog" class="match-dialog" modal="trap-focus" dismissible="false"><ui-dialog-content id="pause" class="overlay" final-focus="none" hidden><ui-dialog-title></ui-dialog-title><div class="overlay-main"></div></ui-dialog-content></ui-dialog>
       <ui-dialog id="settings-dialog" class="match-dialog" modal="trap-focus" dismissible="false"><ui-dialog-content id="settings-ingame" class="overlay" final-focus="none" hidden><ui-dialog-title></ui-dialog-title><div class="overlay-main"></div></ui-dialog-content></ui-dialog>
       <ui-dialog id="end-dialog" class="match-dialog" modal="trap-focus" dismissible="false"><ui-dialog-content id="endscreen" class="overlay" final-focus="none" hidden><ui-dialog-title></ui-dialog-title><div class="overlay-main"></div></ui-dialog-content></ui-dialog>
+      <!-- The Muster: the room before a match. The match opens it, like the end screen; no Esc step leads to it or out of it. -->
+      <ui-dialog id="muster-dialog" class="match-dialog" modal="trap-focus" dismissible="false"><ui-dialog-content id="muster" class="overlay" final-focus="none" hidden><ui-dialog-title></ui-dialog-title><div class="overlay-main"></div></ui-dialog-content></ui-dialog>
       <div id="clickplay" class="hidden"></div>
 
       <!-- Touch controls: drawn where client/touch.ts places them; the canvas below takes the fingers. No text chat on touch. -->

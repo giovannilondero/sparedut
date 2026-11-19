@@ -48,8 +48,7 @@ test("a LAN room with open access is created with the choices on the screen", ()
     kind: "send",
     request: {
       t: "create",
-      oneTap: false,
-      room: { mode: "bataie", map: "glemone", minutes: 10, bots: 4, level: "pari", ff: false, reach: "lan", access: { kind: "open" } }
+      room: { mode: "bataie", map: "glemone", minutes: 10, bots: 4, level: "pari", ff: false, single: null, reach: "lan", access: { kind: "open" } }
     }
   })
 })
@@ -200,12 +199,28 @@ test("a setting changed in the form is remembered at once; the value it already 
 })
 
 const room = (code: string, over: object = {}) =>
-  ({ code, host: "Toni", mode: "bataie", map: "glemone", players: 2, bots: 4, max: 16, phase: "Warmup", reach: "lan", access: "open", ...over }) as const
+  ({ code, host: "Toni", mode: "bataie", map: "glemone", players: 2, bots: 4, max: 16, phase: "Muster", single: null, reach: "lan", access: "open", ...over }) as const
 
 test("a code typed on the home screen joins its room, cleaned of spaces and case", () => {
   const { model } = menu()
   model.typeCode(" abcd ")
   expect(model.joinByCode()).toEqual({ kind: "send", request: { t: "join", code: "ABCD" } })
+})
+
+test("single weapon is off unless chosen, and any primary can be chosen and carried into the room", () => {
+  const { model, values } = menu()
+  expect(model.options.singles).toEqual([null, "cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis", "motosee"])
+  expect(model.choices.single).toBeNull()
+  expect(created(model.create())?.single).toBeNull()
+  for (const primary of ["miedi", "cjampanili"] as const) {
+    model.chooseSingle(primary)
+    expect(model.choices.single).toBe(primary)
+    expect(created(model.create())?.single).toBe(primary)
+  }
+  model.chooseSingle(null)
+  expect(created(model.create())?.single).toBeNull()
+  // The player's own primary is not the room's single weapon.
+  expect(values.primary).toBe("cramar")
 })
 
 test("a code that is not four letters sends nothing", () => {
@@ -253,11 +268,11 @@ test("joining is refused without a name, from the list as by code", () => {
   expect(model.joinByCode()).toEqual({ kind: "refused", reason: "needName" })
 })
 
-test("the one-tap match is an Offline room with the remembered values, started at once", () => {
+test("the one-tap match asks for an Offline room with the remembered values, and nothing more: no start of its own", () => {
   const { model } = menu({ lastMode: "frico", lastMap: "trincee", lastMinutes: 20, lastBots: 6, lastLevel: "plevan" })
   expect(model.oneTap()).toEqual({
     kind: "send",
-    request: { t: "create", oneTap: true, room: { mode: "frico", map: "trincee", minutes: 20, reach: "offline", bots: 6, level: "plevan", ff: false } }
+    request: { t: "create", room: { mode: "frico", map: "trincee", minutes: 20, reach: "offline", bots: 6, level: "plevan", ff: false, single: null } }
   })
 })
 
@@ -294,7 +309,8 @@ test("the choices are every mode, map, bot skill, reach and access the game defi
     reaches: ["lan", "online", "offline"],
     accesses: ["open", "password"],
     minutes: [5, 10, 15, 20],
-    bots: [0, 1, 2, 3, 4, 5, 6, 7]
+    bots: [0, 1, 2, 3, 4, 5, 6, 7],
+    singles: [null, "cramar", "doplete", "cjampanili", "mulin", "miedi", "gjalinis", "motosee"]
   })
 })
 
@@ -450,6 +466,6 @@ test("the icon's shortcut presses the home screen's own \"Zuie cuintri i bot\" b
   const { model } = menu({ lastMode: "frico", lastMap: "trincee", lastMinutes: 20, lastBots: 6, lastLevel: "plevan" })
   expect(model.press(action.button)).toEqual({
     kind: "send",
-    request: { t: "create", oneTap: true, room: { mode: "frico", map: "trincee", minutes: 20, reach: "offline", bots: 6, level: "plevan", ff: false } }
+    request: { t: "create", room: { mode: "frico", map: "trincee", minutes: 20, reach: "offline", bots: 6, level: "plevan", ff: false, single: null } }
   })
 })

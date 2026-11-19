@@ -54,16 +54,23 @@ L'installazione chiede HTTPS: da un indirizzo di rete locale in `http://` il gio
 
 ## Partite
 
-- **Zuie cuintri i bot**: una partita offline contro la CPU, subito e senza riscaldamento, con modalità, mappa, durata, bot e bravura dell'ultima partita creata (la prima volta quelli di partenza) e fuoco amico spento.
-- **Cree une partide**: modalità, mappa, durata, bot per squadra e bravura (Zovin, Pari di famee, Plevan), fuoco amico, e la **portata**:
+- **Zuie cuintri i bot**: una partita offline contro la CPU, con modalità, mappa, durata, bot e bravura dell'ultima partita creata (la prima volta quelli di partenza) e fuoco amico spento. Si ferma all'Adunata con *Fai partire la partita* già selezionato: un tasto e si gioca, con l'ultima arma principale usata.
+- **Cree une partide**: modalità, mappa, durata, bot per squadra e bravura (Zovin, Pari di famee, Plevan), fuoco amico, l'**arma unica**, e la **portata**:
   - *Offline*: la stanza gira nel browser di chi la crea (stesso codice di stanza e bot del server, in un worker), solo contro i bot. Funziona anche se il server non risponde; non ha codice né link d'invito, non è in nessuna lista e si perde ricaricando la pagina.
   - *LAN*: compare nella lista di chi è sulla stessa rete (stesso IP pubblico visto dal server; se il server gira in LAN, tutti gli IP privati contano come stessa rete); da altre reti non si entra nemmeno col codice.
   - *Online*: compare nella lista di tutti.
 - Le stanze LAN e Online hanno anche un **accesso**: *Aperto*, oppure *Con password* (lucchetto nella lista: chi entra la deve scrivere, e dopo cinque password sbagliate aspetta dieci secondi).
   Ogni stanza sul server è in lista per chi la può raggiungere; si entra anche col codice di 4 lettere o col link `?p=CODICE` (il link porta con sé la password, se c'è).
   Senza server si gioca solo offline: LAN e Online restano bloccate finché non risponde.
-- Chi crea è l'host: dal menu di partita (`Esc`) fa partire la partita, aggiunge o toglie bot, cambia la bravura.
+- Chi crea è l'host: all'Adunata fa partire la partita, aggiunge o toglie bot, cambia la bravura e l'arma unica; dal menu di partita (`Esc`) aggiunge o toglie bot, cambia la bravura, o chiude la partita e torna all'Adunata.
   Se una partita è piena di bot, una persona che entra prende il posto di un bot.
+
+### L'Adunata
+
+Prima di ogni partita la stanza non mostra la mappa ma l'**Adunata**: le due squadre, chi c'è e con che arma, la chat.
+Ognuno sceglie la squadra e l'arma principale e si segna pronto. L'host fa partire la partita: dieci secondi di conto alla rovescia,
+in cui si può ancora cambiare (l'host lo può annullare; se sono tutti pronti si salta), poi si entra tutti insieme. Se l'host esce, il conto alla rovescia si ferma.
+Finita la partita, visti i risultati, si torna all'Adunata. Chi entra a partita in corso vede la stessa schermata e non è sulla mappa finché non conferma.
 
 ### Modalità
 
@@ -90,6 +97,9 @@ Nella Laguna il **capanno di osservazione** ha la porta chiusa: si sfonda a peda
 Dentro c'è la discoteca (palla a specchi, luci, pavimento che cambia colore a tempo, musica che da fuori si sente attutita),
 i fenicotteri che ballano, uno disteso per terra con la testa sullo scalino (tranquilli: dorme, è solo ubriaco), la pentola
 della birra e il Lanciafrico per chi entra per primo. Una partita nuova rimette la porta.
+Dentro, il **pannello** del muro si strappa tenendo premuto `E` per un paio di secondi: chi lo tiene in mano para quello che arriva da davanti
+(colpi, botte ed esplosioni) finché non si rompe, colpisce forte ed è più lento; alla torretta o con un'altra arma in mano non para niente.
+Non si porta insieme al Lanciafrico. Cade dove muore chi lo porta e lo prende il primo che ci passa sopra. Il buco nel muro resta per tutta la partita: ci si spara attraverso ma non si passa.
 
 ### Armeria
 
@@ -101,11 +111,28 @@ della birra e il Lanciafrico per chi entra per primo. Una partita nuova rimette 
 | Il Mulin | mitragliatrice a canne rotanti: prima deve girare, poi spara a raffica; pesante (principale) |
 | Cassele dal Miedi | il medico: getto a corto raggio che cura i compagni e scotta i nemici; chi la porta cura piano sé e i compagni vicini (principale) |
 | Cjanon des Gjalinis | cannone da braccio che spara galline: volano, puntano da sole il nemico più vicino davanti e gli scoppiano addosso in una nuvola di piume che per un paio di secondi copre la vista (principale) |
+| Motosee | motosega: si tiene premuto e, dopo una sgasata, taglia chi è davanti a un braccio di distanza; niente munizioni, sfonda le porte in un attimo e si sente da lontano anche al minimo (principale) |
 | La Mandi | pistola, sempre con te |
 | Mescul de Polente | corpo a corpo, sempre con te |
 | Lanciafrico | arma potente da raccogliere in Via Bini: forme di frico che rimbalzano e scoppiano |
+| Panel dal Casot | nella Laguna, l'asse da strappare dal muro del capanno: para quello che arriva da davanti finché regge, colpisce forte e rallenta (vedi sotto) |
 | Bombe di Sgnape | granate (`G`), due per vita |
 | Mine di Raibl | mine (`F`), due per vita: si piantano a terra, si armano in un secondo e saltano quando passa un nemico |
+
+L'arma principale è la **classe**: decide la salute e la velocità di chi la porta, e il Miedi cura. Tutte le classi hanno la stessa pistola, il mescul, due bombe e due mine.
+Si sceglie all'Adunata (o entrando a partita in corso) e per tutta la partita non si cambia: solo nella Dutrine sì, alla bancarella dell'armeria.
+
+| Principale | Salute | Velocità |
+|---|---|---|
+| Mitra dal Cramâr | 100 | 1,00 |
+| Dopiete di Pre Checo | 110 | 1,05 |
+| Il Cjampanili | 75 | 0,95 |
+| Il Mulin | 150 | 0,80 |
+| Cassele dal Miedi | 90 | 1,05 |
+| Cjanon des Gjalinis | 100 | 0,95 |
+| Motosee | 125 | 1,12 |
+
+Con l'**arma unica**, scelta dall'host alla creazione o all'Adunata, tutti hanno la stessa principale e il mescul, nient'altro: niente pistola, bombe, mine né Lanciafrico.
 
 **Torrette**: ogni mappa ne ha due, una per parte, con la *Mitraie de Postazion*. Ci si mette dietro e si preme `E`:
 si resta fermi, l'arma gira solo dentro il suo arco, colpi infiniti, veloci e precisi. Ma scalda: dopo circa tre secondi
@@ -118,12 +145,12 @@ I **cjars di fen** (carri di fieno) lanciano sul ballatoio del campanile e sulla
 
 `WASD` muoversi · mouse mirare · clic sinistro sparare · destro mirare · `Spazio` saltare · `Ctrl`/`C` accucciarsi · `Shift` correre (con l'arma abbassata: non si spara) ·
 `R` ricaricare · `1-4` armi · `Q` arma precedente · rotella cambia arma · `G` bomba di sgnape · `F` mina di Raibl · `E` torretta · `Tab` classifica ·
-`Invio`/`T` chat · `V` frasi rapide (Mandi!, Orpo!, …) · `B` armeria · `Esc` menu di partita.
+`Invio`/`T` chat · `V` frasi rapide (Mandi!, Orpo!, …) · `B` armeria (nella Dutrine) · `Esc` menu di partita.
 
 **Controller** (DualShock, o ogni pad che il browser riconosce con la mappatura standard; basta premere un tasto in partita):
 stick sinistro muoversi (analogico) · stick destro guardare · `R2` sparare · `L2` mirare · `✕` saltare · `◯` accucciarsi ·
 `L3` correre (finché si va avanti) · `▢` ricaricare · `△` arma dopo · croce armi (su principale, sinistra pistola, destra lanciafrico, giù torretta) ·
-`R3` mescul · `L1` bomba · `R1` mina · `Share` classifica · `Touchpad` armeria · `Options` menu di partita. Il pad vibra quando spari e quando ti colpiscono.
+`R3` mescul · `L1` bomba · `R1` mina · `Share` classifica · `Touchpad` armeria (nella Dutrine) · `Options` menu di partita. Il pad vibra quando spari e quando ti colpiscono.
 I menu fuori dalla partita si usano ancora col mouse.
 
 ## La Dutrine
@@ -131,7 +158,7 @@ I menu fuori dalla partita si usano ancora col mouse.
 La **Dutrine** è l'allenamento: un giocatore solo, sempre offline (anche senza server), sulla sua piccola mappa, la **Sagre dal Frico**:
 una sagra di paese con le stazioni come bancarelle in fila lungo la strada e, in fondo, una piazzetta per le modalità e la scaramuccia.
 Si apre dalla schermata iniziale (*Impare a zuiâ*) e serve un nome, come per ogni stanza. Si gioca da Benandante, senza fuoco amico,
-senza riscaldamento, orologio né punteggio limite: finisce quando l'ultimo passo è fatto.
+senza Adunata, orologio né punteggio limite: finisce quando l'ultimo passo è fatto.
 La prima volta si parte dalla stazione 1; poi, entrando, si apre prima l'elenco delle stazioni (a gioco fermo),
 con quella da cui continuare già scelta; a Dutrine finita una volta sono tutte segnate come fatte e si sceglie liberamente.
 

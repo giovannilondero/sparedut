@@ -83,10 +83,14 @@ const PAUSE = "const pause = (ms) => new Promise((done) => setTimeout(done, ms))
 
 /**
  * The home screen's one-tap match against the bots, a while into it, as a player sees it once
- * playing: no match menu open, no hint to click (the mouse is locked by then). `then` runs last.
+ * playing: the one-tap stops on the Muster, whose start (alone with the bots, it goes live at once)
+ * is pressed as soon as it shows; then no match menu open, no hint to click (the mouse is locked
+ * by then). `then` runs last.
  */
 const match = (then = "") => `(async () => { ${PAUSE}
-  document.querySelector('[data-go="one-tap"]').click(); await pause(14000);
+  document.querySelector('[data-go="one-tap"]').click();
+  for (let i = 0; i < 200 && !document.getElementById('m-start')?.checkVisibility(); i++) await pause(100);
+  document.getElementById('m-start').click(); await pause(12000);
   if (document.getElementById('p-resume')?.checkVisibility()) { document.getElementById('p-resume').click(); await pause(500); }
   document.head.insertAdjacentHTML('beforeend', '<style>#clickplay { display: none !important }</style>');
   ${then} })()`

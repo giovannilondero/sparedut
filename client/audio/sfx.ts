@@ -3,7 +3,7 @@
  * Some have several variants (steps, shots) so they don't sound like a machine-gunned sample.
  */
 import type { SoundName } from "../contracts.ts"
-import { buffer, click, drive, echo, mode, normalize, reverb, rng, trim, voice, type Rnd } from "./dsp.ts"
+import { buffer, click, drive, echo, mode, normalize, reverb, rng, SR, trim, voice, type Rnd } from "./dsp.ts"
 import { accordion, brass, clarinet, melody, oomPahPah, type Chord, type Note } from "./instruments.ts"
 
 type Recipe = (r: Rnd) => Float32Array
@@ -658,4 +658,53 @@ export function renderSound(name: SoundName): Float32Array[] {
   let seed = 7
   for (let i = 0; i < name.length; i++) seed = (seed * 31 + name.charCodeAt(i)) | 0
   return Array.from({ length: n }, (_, i) => recipe(rng(seed + i * 977)))
+}
+
+// --- the Motosee's engine ------------------------------------------------------------------
+
+/** Seconds of each Motosee loop: the engine's firing and the chain's teeth repeat a whole number of times in it. */
+const LOOP = 1
+/** Folds the `fade` seconds after the loop back over its start, so that the end runs into the start without a click. */
+function loopable(b: Float32Array, fade: number): Float32Array {
+  const n = Math.round(LOOP * SR)
+  const x = Math.round(fade * SR)
+  const out = b.slice(0, n)
+  for (let i = 0; i < x; i++) out[i] = b[i] * (i / x) + b[n + i] * (1 - i / x)
+  return out
+}
+
+/**
+ * The Motosee's two loops, one second each, played on repeat for as long as a carrier has it in
+ * hand. `engine`: the two-stroke at idle, 46 firings a second, uneven as a small engine is;
+ * played faster it becomes the rev and the scream. `cut`: the chain's teeth biting, a gritty
+ * grind with the engine bogging under it, laid over the engine while it cuts.
+ */
+export function renderMotosee(): { readonly engine: Float32Array; readonly cut: Float32Array } {
+  const r = rng(8484)
+  const tail = 0.12
+  const engine = buffer(LOOP + tail + 0.05)
+  const firings = 46
+  for (let i = 0; i < firings + Math.ceil(tail * firings); i++) {
+    const at = (i * LOOP) / firings + (r() - 0.5) * 0.002
+    // a small engine skips: every so often a weaker firing
+    const k = i % firings
+    const strength = k % 7 === 3 ? 0.45 : k % 11 === 5 ? 0.7 : 0.85 + r() * 0.15
+    voice(engine, { at, dur: 0.03, wave: "noise", lp: 1600, amp: 0.9 * strength, a: 0.0008, d: 0.005, rnd: r })
+    voice(engine, { at, dur: 0.04, wave: "sin", f: exp(160, 70, 0.006), amp: 0.8 * strength, a: 0.0006, d: 0.008 })
+    voice(engine, { at, dur: 0.012, wave: "sqr", f: 330, amp: 0.18 * strength, a: 0.0004, d: 0.003, lp: 2600 })
+  }
+  // the clatter of the piston and the hiss of the intake under the firings
+  voice(engine, { dur: LOOP + tail, wave: "saw", f: firings * 2, amp: 0.12, a: 0, lp: 900 })
+  voice(engine, { dur: LOOP + tail, wave: "noise", bp: 3200, q: 0.8, amp: 0.08, a: 0, rnd: r })
+  drive(engine, 1.8)
+
+  const cut = buffer(LOOP + tail + 0.05)
+  // the teeth: a rasp chopped 140 times a second, wandering as the wood (or worse) gives
+  const teeth = 140
+  voice(cut, { dur: LOOP + tail, wave: "noise", bp: t => 2300 + 500 * Math.sin(t * Math.PI * 2 * 3), q: 1.3, amp: t => 0.7 * (0.55 + 0.45 * Math.abs(Math.sin(t * Math.PI * teeth))) * (0.8 + 0.2 * Math.sin(t * Math.PI * 2 * 5)), a: 0, rnd: r })
+  voice(cut, { dur: LOOP + tail, wave: "noise", hp: 5000, amp: 0.18, a: 0, rnd: r })
+  // the engine bogging under the load: a low growl
+  voice(cut, { dur: LOOP + tail, wave: "saw", f: t => 105 + 6 * Math.sin(t * Math.PI * 2 * 2), amp: 0.4, a: 0, lp: 700 })
+  drive(cut, 2.4)
+  return { engine: normalize(loopable(engine, tail), 0.85), cut: normalize(loopable(cut, tail), 0.8) }
 }

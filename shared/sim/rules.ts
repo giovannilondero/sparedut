@@ -2,11 +2,11 @@
  * Pure simulation rules: loadout, respawn, damage, who is whose enemy,
  * the storm.
  */
+import { Ops } from "@typeonce/ritmo"
 import type { MapDef, Spawn, Team } from "../map.ts"
-import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../weapons.ts"
-import type { Ammo, ArsenalValue, CartValue, FlagState, HillValue, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
+import { CLASSES, PANEL_ARC, RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS, type PrimaryId, type Slot, type WeaponId } from "../weapons.ts"
+import type { Ammo, ArsenalValue, CartValue, FlagState, HillValue, Kit, PanelState, PickupState, RulesValue, StatsValue, StormCourseValue, TurretState } from "./schema.ts"
 
-export const MAX_HP = 100
 export const MAX_ARMOR = 100
 export const RESPAWN_TICKS = 180
 /** After sprinting the weapon comes back up in this many ticks (server and client prediction). */
@@ -14,16 +14,24 @@ export const RAISE_TICKS = 12
 export const SHIELD_TICKS = 90
 export const SGNAPE_TICKS = 600
 export const SGNAPE_SPEED = 1.3
+/** Carrying the frico slows you down. */
+export const CARRIER_SPEED = 0.9
+
+/** A class's maximum health: what its player spawns with, and where every heal stops. */
+export const maxHp = (primary: PrimaryId) => CLASSES[primary].hp
+
+/** Health that a change of primary leaves: no more than the new class's maximum. */
+export const hpFor = (primary: PrimaryId, hp: number) => Math.min(hp, maxHp(primary))
 export const ASSIST_WINDOW_TICKS = 600
 export const OVER_TICKS = 15 * 60
-/** Warmup ends on its own 30 s after creation; the host can start earlier. */
-export const WARMUP_TICKS = 30 * 60
+/** The Muster's countdown, from the host's start to the match going live. */
+export const COUNTDOWN_TICKS = 10 * 60
 export const FLAG_RETURN_TICKS = 30 * 60
 
 export const otherTeam = (team: Team): Team => (team === "benandanti" ? "malandanti" : "benandanti")
 
 /** The Tampieste has no teams: free-for-all. */
-export const everyoneAlone = (rules: RulesValue) => rules.mode === "tampieste"
+export const everyoneAlone = (rules: Pick<RulesValue, "mode">) => rules.mode === "tampieste"
 
 /** Teammates: they heal each other (same team, outside the Tampieste). */
 export const allied = (rules: RulesValue, a: Team, b: Team) => !everyoneAlone(rules) && a === b
@@ -99,17 +107,25 @@ export function freshAmmo(): Record<WeaponId, Ammo> {
   return out
 }
 
-export function freshArsenal(primary: PrimaryId): ArsenalValue {
+/** What the room's rules give a player to carry: everything, or under single weapon only its primary and the Mescul. */
+export const kitOf = (rules: Pick<RulesValue, "single">): Kit => (rules.single ? "single" : "full")
+
+/** The primary a player spawns with: the room's single weapon when it is on, else their own. */
+export const primaryOf = (rules: Pick<RulesValue, "single">, own: PrimaryId): PrimaryId => rules.single ?? own
+
+export function freshArsenal(primary: PrimaryId, kit: Kit = "full"): ArsenalValue {
+  const full = kit === "full"
   return {
+    kit,
     current: primary,
     primary,
     nextPrimary: primary,
-    launcher: false,
+    power: null,
     ammo: freshAmmo(),
     action: { _tag: "switch", ticks: 20 },
-    bombs: SGNAPE_BOMB.perLife,
+    bombs: full ? SGNAPE_BOMB.perLife : 0,
     bombCooldown: 0,
-    mines: RAIBL_MINE.perLife,
+    mines: full ? RAIBL_MINE.perLife : 0,
     mineCooldown: 0,
     spin: 0,
     sgnape: 0
@@ -118,9 +134,37 @@ export function freshArsenal(primary: PrimaryId): ArsenalValue {
 
 export const NO_STATS: StatsValue = { kills: 0, deaths: 0, assists: 0, caps: 0, score: 0, damage: 0, headshots: 0, streak: 0, best: 0 }
 
-/** The weapons the player can hold right now (the mitraie isn't held: you use the turret). */
-export const owned = (a: ArsenalValue, id: WeaponId) =>
-  id === "mescul" || id === "mandi" || id === a.primary || (id === "lanciafrico" && a.launcher)
+/**
+ * The weapons the player can hold right now (the mitraie isn't held: you use the turret). Under
+ * single weapon (`kit` "single") no pistol; what is in slot 3 (the panel) stays.
+ */
+export const owned = (a: Pick<ArsenalValue, "kit" | "primary" | "power">, id: WeaponId) =>
+  id === "mescul" || id === a.primary || id === a.power || (id === "mandi" && a.kit === "full")
+
+/**
+ * An ammunition pickup taken: every weapon owned back to its full reserve, and with a full kit the
+ * bombs and mines too. Null when there is nothing to fill: the pickup stays for someone else.
+ */
+export function restock(a: ArsenalValue): ArsenalValue | null {
+  const sidearms = a.kit === "full"
+  const full = WEAPON_IDS.every((id) => !owned(a, id) || a.ammo[id].reserve >= WEAPONS[id].reserve) && (!sidearms || (a.bombs >= SGNAPE_BOMB.perLife && a.mines >= RAIBL_MINE.perLife))
+  if (full) return null
+  const ammo = { ...a.ammo }
+  for (const id of WEAPON_IDS) ammo[id] = { mag: ammo[id].mag, reserve: Math.max(ammo[id].reserve, WEAPONS[id].reserve) }
+  return sidearms ? { ...a, ammo, bombs: Math.max(a.bombs, SGNAPE_BOMB.perLife), mines: Math.max(a.mines, RAIBL_MINE.perLife) } : { ...a, ammo }
+}
+
+/** The map's pickups as a match starts them: all there, but the Lanciafrico is not on the map under single weapon. */
+export const freshPickups = (map: MapDef, rules: Pick<RulesValue, "single">): PickupState[] =>
+  map.pickups.map((p): PickupState => (rules.single && p.kind === "lanciafrico" ? { _tag: "absent" } : { _tag: "up" }))
+
+/**
+ * How fast a player moves, as a multiple of the walk: the class's base speed, times the multiplier
+ * of the weapon in hand (`requested`, if they own it; else the one they hold), times the sgnape and
+ * carrying the frico. The simulation and the client's prediction both move with it.
+ */
+export const speedScale = (a: Pick<ArsenalValue, "kit" | "primary" | "current" | "power" | "sgnape">, requested: WeaponId, carrier: boolean) =>
+  CLASSES[a.primary].speed * WEAPONS[owned(a, requested) ? requested : a.current].moveScale * (a.sgnape > 0 ? SGNAPE_SPEED : 1) * (carrier ? CARRIER_SPEED : 1)
 
 /** The weapon a number key selects: the one in that slot the player owns (in slot 1, the primary), or null. */
 export const weaponInSlot = (a: ArsenalValue, slot: Slot): WeaponId | null => WEAPON_IDS.find((id) => WEAPONS[id].slot === slot && owned(a, id)) ?? null
@@ -137,9 +181,33 @@ export const currentStation = (training: { readonly _tag: "Off" | "Complete" } |
 /** Cool, free turrets and intact doors: how they are at match start. */
 export const freshTurrets = (map: MapDef): TurretState[] => map.turrets.map(() => ({ gunner: null, heat: 0, jammed: false, cooldown: 0 }))
 export const freshDoors = (map: MapDef): number[] => map.doors.map((d) => d.hp)
+/** Every panel on its wall: how they are at match start. */
+export const freshPanels = (map: MapDef): PanelState[] => (map.panels ?? []).map(() => ({ _tag: "wall" }))
+/** Whether a panel still closes its wall (on it, or being torn off): the physics and the client's prediction follow it. */
+export const panelOnWall = (state: { readonly _tag: PanelState["_tag"] } | { readonly tag: PanelState["_tag"] }) => {
+  const tag = "_tag" in state ? state._tag : state.tag
+  return tag === "wall" || tag === "tearing"
+}
+
+const PANEL_ARC_COS = Ops.cos(PANEL_ARC / 2)
+/**
+ * Whether damage coming from `from` reaches a body standing at `at` and looking along `yaw` from
+ * within the panel's frontal arc (`PANEL_ARC`), seen from above. Damage from no point, or from
+ * the body's own place, is never in front of it.
+ */
+export const fromTheFront = (at: { readonly x: number; readonly z: number }, yaw: number, from: { readonly x: number; readonly z: number } | null): boolean => {
+  if (from === null) return false
+  const dx = from.x - at.x
+  const dz = from.z - at.z
+  const d = Math.sqrt(dx * dx + dz * dz)
+  if (d < 0.05) return false
+  return (-Ops.sin(yaw) * dx + -Ops.cos(yaw) * dz) / d >= PANEL_ARC_COS
+}
 
 /** Breakable doors take more from kicks (the mescul) than from pellets. */
 export const DOOR_MELEE_SCALE = 1.6
+/** And from the Motosee's teeth, so that a door falls in about a second of cutting. Starting value. */
+export const DOOR_CUT_SCALE = 1.2
 
 /** The turret `session` is using, if any. */
 export const turretOf = (turrets: ReadonlyArray<TurretState>, session: string): number => turrets.findIndex((t) => t.gunner === session)

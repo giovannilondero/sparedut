@@ -6,9 +6,9 @@ import { BUTTON, IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
 import type { Team, V3 } from "../shared/map.ts"
 import { eyeHeight } from "../shared/movement.ts"
 import type { PhysicsWorld } from "../shared/physics.ts"
-import { allied, outsideStorm } from "../shared/sim/rules.ts"
+import { allied, outsideStorm, owned } from "../shared/sim/rules.ts"
 import type { PlayerView, WorldView } from "../shared/sim/view.ts"
-import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
+import { usesAmmo, WEAPONS, type WeaponId } from "../shared/weapons.ts"
 import { nearestNode, route, type NavGraph } from "./nav.ts"
 
 const SKILL = {
@@ -16,6 +16,14 @@ const SKILL = {
   pari: { reaction: 18, aimSpeed: 6, error: 0.045, sight: 80, burst: 0.8 },
   plevan: { reaction: 8, aimSpeed: 11, error: 0.018, sight: 140, burst: 1 }
 } as const satisfies Record<BotLevel, unknown>
+
+/**
+ * A bot with the Motosee (held melee) runs at its enemy: within this distance it holds the trigger,
+ * so that the rev is done by the time it is within reach. Starting value.
+ */
+const REV_FROM = 6
+/** And it keeps the trigger held this many ticks after losing its enemy, so that a rev is not dropped between two targets. */
+const REV_HOLD = 30
 
 const wrap = (a: number) => {
   while (a > Math.PI) a -= 2 * Math.PI
@@ -37,6 +45,7 @@ export class BotBrain {
   private seq = 0
   private tick = 0
   private fireHeld = false
+  private revHold = 0
   private role: "attack" | "defend"
   private roam = 0
 
@@ -58,6 +67,7 @@ export class BotBrain {
       this.path = []
       this.target = null
       this.seen = 0
+      this.revHold = 0
       if (me) this.yaw = me.yaw
       return { ...IDLE_INPUT, seq: ++this.seq, yaw: this.yaw, weapon: me?.arsenal.nextPrimary ?? "cramar", view: world.tick }
     }
@@ -83,11 +93,15 @@ export class BotBrain {
     }
 
     // Weapon: the lanciafrico if there is one, the double-barrel only up close, otherwise the primary.
+    // The Motosee needs no ammunition and is itself the weapon up close.
     const a = me.arsenal
+    const cutter = WEAPONS[a.primary].mode === "held"
     let weapon: WeaponId = a.primary
-    if (a.launcher && a.ammo.lanciafrico.mag + a.ammo.lanciafrico.reserve > 0) weapon = "lanciafrico"
-    else if (a.ammo[a.primary].mag + a.ammo[a.primary].reserve === 0) weapon = "mandi"
-    if (enemy && enemyDist < 2.2) weapon = "mescul"
+    if (a.power === "lanciafrico" && a.ammo.lanciafrico.mag + a.ammo.lanciafrico.reserve > 0 && !(cutter && enemy && enemyDist < REV_FROM * 2)) weapon = "lanciafrico"
+    else if (usesAmmo(a.primary) && a.ammo[a.primary].mag + a.ammo[a.primary].reserve === 0) weapon = owned(a, "mandi") ? "mandi" : "mescul"
+    if (enemy && enemyDist < 2.2 && !cutter) weapon = "mescul"
+    // With the Motosee in hand, the enemy in sight is where to go: by the graph, so that one on another floor is reached.
+    const chasing = weapon !== "lanciafrico" && WEAPONS[weapon].mode === "held" && enemy !== null && this.seen >= skill.reaction
 
     let buttons = 0
     let mx = 0
@@ -110,7 +124,11 @@ export class BotBrain {
     if (!enemy && a.mines > 0 && this.level !== "zovin" && (this.tick + this.roam) % 900 === 0) buttons |= BUTTON.mine
 
     // Where to go.
-    const goal: V3 = patient ? [patient.body.x, patient.body.y, patient.body.z] : this.chooseGoal(world, me)
+    const goal: V3 = patient
+      ? [patient.body.x, patient.body.y, patient.body.z]
+      : chasing && enemy
+        ? [enemy.body.x, enemy.body.y, enemy.body.z]
+        : this.chooseGoal(world, me)
     const goalMoved = !this.goal || Math.hypot(this.goal[0] - goal[0], this.goal[2] - goal[2]) > 6
     if (goalMoved || this.path.length === 0) {
       this.goal = goal
@@ -145,8 +163,8 @@ export class BotBrain {
       const tolerance = 0.05 + 0.5 / Math.max(4, enemyDist)
       const def = WEAPONS[weapon]
       const inRange = def.mode === "projectile" ? enemyDist > 5 : def.mode === "melee" ? enemyDist < def.range : enemyDist < def.range * 0.9
-      // Keep the Mulin spinning while the enemy is in sight.
-      if (def.spinTicks > 0 && enemyDist < def.range) buttons |= BUTTON.fire
+      // Keep the Mulin spinning while the enemy is in sight; the Motosee revs as it closes in, and keeps cutting.
+      if (def.spinTicks > 0 && enemyDist < (def.mode === "held" ? REV_FROM : def.range)) buttons |= BUTTON.fire
       if (yawErr < tolerance && inRange) {
         if (def.spinTicks > 0 || def.mode === "beam") buttons |= BUTTON.fire
         else if (def.mode === "auto") buttons |= Math.sin(this.tick * 0.05 + this.roam) < skill.burst * 2 - 1 ? BUTTON.fire : 0
@@ -174,6 +192,21 @@ export class BotBrain {
         mz = (dx * fx + dz * fz) / d
         mx = (dx * -fz + dz * fx) / d + this.strafe * 0.3
       }
+      if (chasing) {
+        // No standing off: along the path to the enemy, then straight at them, with no strafing once close.
+        const at = waypoint ?? [enemy.body.x, enemy.body.y, enemy.body.z]
+        const dx = at[0] - me.body.x
+        const dz = at[2] - me.body.z
+        const d = Math.hypot(dx, dz) || 1
+        const fx = -Math.sin(this.yaw)
+        const fz = -Math.cos(this.yaw)
+        // Close means on the same floor: one right overhead is reached by the stairs.
+        const close = enemyDist < REV_FROM && Math.abs(enemy.body.y - me.body.y) < 1.5
+        mz = close ? (enemyDist > def.range * 0.6 ? 1 : 0) : (dx * fx + dz * fz) / d
+        mx = close ? 0 : (dx * -fz + dz * fx) / d
+        // Far off it sprints; the sprint lowers the blade, so it stops in time to rev.
+        if (enemyDist > REV_FROM * 2 && mz > 0.7) buttons |= BUTTON.sprint
+      }
       // Move relative to the enemy: the path resumes afterwards.
       if (this.level !== "zovin" && (this.tick + this.roam) % 140 === 0) buttons |= BUTTON.jump
       if (a.bombs > 0 && enemyDist > 9 && enemyDist < 22 && this.level !== "zovin" && (this.tick + this.roam) % 420 === 0) buttons |= BUTTON.bomb
@@ -197,6 +230,15 @@ export class BotBrain {
       const ammo = a.ammo[a.current]
       if (WEAPONS[a.current].magazine > 0 && ammo.mag < WEAPONS[a.current].magazine * 0.5 && ammo.reserve > 0) buttons |= BUTTON.reload
     }
+
+    // The Motosee: a rev begun is held through, even between one enemy and the next.
+    if (WEAPONS[weapon].mode === "held") {
+      if (buttons & BUTTON.fire) this.revHold = REV_HOLD
+      else if (this.revHold > 0) {
+        this.revHold--
+        buttons = (buttons | BUTTON.fire) & ~BUTTON.sprint
+      }
+    } else this.revHold = 0
 
     // Stuck? Jump and recompute.
     const moved = Math.hypot(me.body.x - this.lastPos.x, me.body.z - this.lastPos.z)
@@ -244,7 +286,7 @@ export class BotBrain {
     const { flagBases: FLAG_BASES, hill: HILL, pickups: PICKUPS } = this.physics.map
     // Low health: a nearby frico.
     if (me.hp < 45) {
-      const frico = PICKUPS.map((p, i) => ({ p, i })).filter(({ p, i }) => p.kind === "frico" && world.pickups[i])
+      const frico = PICKUPS.map((p, i) => ({ p, i })).filter(({ p, i }) => p.kind === "frico" && world.pickups[i] === "up")
       const near = frico.sort((a, b) => dist2(a.p.at, me) - dist2(b.p.at, me))[0]
       if (near && dist2(near.p.at, me) < 40 * 40) return near.p.at
     }

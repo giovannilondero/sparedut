@@ -22,14 +22,14 @@ import type { GameAudio } from "./contracts.ts"
 import { esc } from "./hud.ts"
 import { onLangChange, setLang, t, type Lang } from "./i18n.ts"
 import { chooseLook, LOOK_IDS, LOOKS, type LookId } from "./looks.ts"
-import { focusOnScreen, MenuModel, SCREENS, type CreateOptions, type MenuButton, type Outcome, type PasswordRefusal, type PromptProblem, type Refusal, type Screen } from "./menu-model.ts"
+import { classFigures, focusOnScreen, MenuModel, SCREENS, type CreateOptions, type MenuButton, type Outcome, type PasswordRefusal, type PromptProblem, type Refusal, type Screen } from "./menu-model.ts"
 import { oneTapRoom, type Settings } from "./settings.ts"
+import { singleOf, singleValue } from "./match-menus.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 
 export interface MenuHandlers {
-  /** `oneTap`: the home screen's button, whose match starts at once, without warm-up. */
-  readonly create: (o: CreateOptions, oneTap?: boolean) => void
+  readonly create: (o: CreateOptions) => void
   /** `password` only once the player typed one (from the prompt or an invite link). */
   readonly join: (code: string, password?: string) => void
   /** The training: always Offline, nothing to choose; `start` from the saved progress. */
@@ -93,12 +93,12 @@ const SCREEN_ELEMENT = {
   vocabolari: "menu-vocabolari"
 } as const satisfies Record<Screen, string>
 
-/** A room in the list: reach chip, lock, host, mode and map, players out of seats. A button when it can be chosen. */
+/** A room in the list: reach chip, lock, host, mode, map and phase (Muster or match), players out of seats. A button when it can be chosen. */
 function roomRow(r: RoomSummary, selectable: boolean, asButton: boolean): string {
   const s = t()
   const lock = r.reach !== "offline" && r.access === "password" ? `<i class="lock" role="img" aria-label="${s.menu.passwordRoom}" title="${s.menu.passwordRoom}">🔒</i>` : ""
   const inner = `<span class="room-tags"><i class="chip ${r.reach}">${s.menu.reach[r.reach]}</i>${lock}</span>
-    <span class="room-what"><b>${esc(r.host)}</b><small>${s.modes[r.mode].name} · ${s.maps[r.map].name}</small></span>
+    <span class="room-what"><b>${esc(r.host)}</b><small>${s.modes[r.mode].name} · ${s.maps[r.map].name}${r.single ? ` · ${s.menu.single(s.weapons[r.single].name)}` : ""} · ${s.menu.phase[r.phase]}</small></span>
     <span class="room-seats"><b>${r.players}/${r.max}</b><small>${selectable ? r.code : s.menu.full}</small></span>`
   if (!asButton) return `<li><div class="room">${inner}</div></li>`
   return `<li><button class="room${selectable ? "" : " full"}" data-code="${r.code}"${selectable ? "" : " disabled"}>${inner}</button></li>`
@@ -221,7 +221,7 @@ export class Menu {
   private apply(o: Outcome) {
     if (o.kind === "send") {
       const r = o.request
-      if (r.t === "create") this.handlers.create(r.room, r.oneTap)
+      if (r.t === "create") this.handlers.create(r.room)
       else if (r.t === "training") this.handlers.training(r.start)
       else if (r.t === "join") this.handlers.join(r.code, r.password)
       // The installable game's requests: the install prompt, the new version.
@@ -492,6 +492,10 @@ export class Menu {
       }))
     number("c-minutes", (n) => this.model.chooseMinutes(n))
     number("c-bots", (n) => this.model.chooseBots(n))
+    $<Select>("c-single").addEventListener("valuechange", alwaysChosen((value) => {
+      this.model.chooseSingle(singleOf(value))
+      this.renderChoices()
+    }))
     const ff = $<HTMLInputElement>("c-ff")
     ff.addEventListener("change", () => {
       this.model.chooseFriendlyFire(ff.checked)
@@ -531,6 +535,11 @@ export class Menu {
     cardTexts($("c-access"), options.accesses, (v) => [accessLabel(v), ""])
     selectItems($("c-minutes"), options.minutes, s.menu.minutes, choices.minutes)
     selectItems($("c-bots"), options.bots, (n) => (n === 0 ? s.menu.botsNone : String(n)), choices.bots)
+    const single = $<Select>("c-single")
+    single.querySelector("ui-select-content")!.innerHTML = options.singles
+      .map((p) => `<ui-select-item value="${singleValue(p)}">${p ? s.weapons[p].name : s.menu.singleOff}</ui-select-item>`)
+      .join("")
+    single.value = singleValue(choices.single)
     this.renderChoices()
   }
 
@@ -545,7 +554,8 @@ export class Menu {
       s.levels[choices.level].name,
       s.menu.reach[choices.reach],
       ...(fields.access ? [accessLabel(choices.access)] : []),
-      ...(choices.ff ? [s.menu.ffOn] : [])
+      ...(choices.ff ? [s.menu.ffOn] : []),
+      ...(choices.single ? [s.menu.single(s.weapons[choices.single].name)] : [])
     ].join(" · ")
     $("c-access-field").hidden = !fields.access
     $("c-password-field").hidden = !fields.password
@@ -554,10 +564,16 @@ export class Menu {
 
   // ---------------------------------------------------------------- armoury
 
+  /** A primary chosen outside the armoury (the Muster's tiles): remembered for the next room, with the armoury's sound. */
+  choosePrimary(primary: PrimaryId) {
+    this.model.choosePrimary(primary)
+    this.audio.play("switch")
+  }
+
   /**
    * The weapons: the primaries first, as one group of cards to choose from (UI SDK's radio group: one
    * tab stop, arrow keys, the radio role), then the ones always carried or picked up, to read only.
-   * Drawn into the menu's armoury and, with `onPick`, into a match's.
+   * Drawn into the menu's armoury and, with `onPick`, into a training's.
    */
   buildArmarie(target: HTMLElement = $("armarie"), onPick?: (p: PrimaryId) => void) {
     const max = { damage: 110, rate: 10, range: 400, mag: 30 }
@@ -569,9 +585,11 @@ export class Menu {
       const w = WEAPONS[id]
       const text = s.weapons[id]
       const rate = 60 / w.cooldownTicks
-      const tag = isPrimary(id) ? s.menu.tag.primary : id === "lanciafrico" ? s.menu.tag.power : id === "mescul" ? s.menu.tag.melee : s.menu.tag.pistol
+      const tag = isPrimary(id) ? s.menu.tag.primary : w.slot === 3 ? s.menu.tag.power : id === "mescul" ? s.menu.tag.melee : s.menu.tag.pistol
+      // A primary is a class: its health and speed come first.
+      const figures = isPrimary(id) ? classFigures(s, id as PrimaryId).map(([label, value]) => `<span class="stat figure">${label}<b>${value}</b></span>`).join("") : ""
       return `<span class="tag">${w.slot} · ${tag}</span><b id="${target.id}-${id}">${text.name}</b><span class="blurb" id="${target.id}-${id}-blurb">${text.blurb}</span>
-        <span class="stats">${bar(s.menu.stat.damage, (w.damage * w.pellets) / max.damage)}${bar(s.menu.stat.rate, rate / max.rate)}${bar(s.menu.stat.range, (w.range || 120) / max.range)}${bar(s.menu.stat.mag, Math.max(w.magazine, 1) / max.mag)}</span>`
+        <span class="stats">${figures}${bar(s.menu.stat.damage, (w.damage * w.pellets) / max.damage)}${bar(s.menu.stat.rate, rate / max.rate)}${bar(s.menu.stat.range, (w.range || 120) / max.range)}${bar(s.menu.stat.mag, Math.max(w.magazine, 1) / max.mag)}</span>`
     }
     // The mitraie can't be carried: it stays on the turrets.
     const carried = WEAPON_IDS.filter((id) => id !== "mitraie" && !isPrimary(id))

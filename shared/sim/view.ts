@@ -30,17 +30,21 @@ import {
   Tick,
   Turrets,
   Doors,
+  Panels,
   Training,
   type ArsenalValue,
   type FlagState,
   type HillValue,
+  type PickupState,
   type ProjectileValue,
   type RulesValue,
   type StatsValue,
   type TurretState
 } from "./schema.ts"
 import type { Team } from "../map.ts"
-import type { Body } from "../movement.ts"
+import { sprinting, type Body } from "../movement.ts"
+import { pressed } from "../input.ts"
+import { PANEL_TEAR_TICKS } from "../weapons.ts"
 
 export interface PlayerView {
   readonly session: string
@@ -61,12 +65,29 @@ export interface PlayerView {
   /** Last applied input and the held buttons. */
   readonly seq: number
   readonly buttons: number
+  /** The trigger held with the weapon up: not while sprinting, when the weapon is lowered and nothing fires or revs. */
+  readonly firing: boolean
 }
 
+/** A pickup as it is seen: there, taken and coming back, or not on the map for the match (the Lanciafrico under single weapon). */
+export type PickupView = PickupState["_tag"]
+
 export type PhaseView =
-  | { readonly tag: "Warmup" }
+  /** `starts`: the tick the countdown ends, null while none runs. */
+  | { readonly tag: "Muster"; readonly starts: number | null }
   | { readonly tag: "Live"; readonly ends: number }
   | { readonly tag: "Over"; readonly winner: Winner; readonly restarts: number }
+
+/**
+ * A panel (`map.panels`): on its wall, being torn off (by whom, from 0 to 1), carried (by whom, with
+ * its health), lying on the ground (where, with its health), or broken. Off the wall its gap is open.
+ */
+export type PanelView =
+  | { readonly tag: "wall" }
+  | { readonly tag: "tearing"; readonly by: string; readonly progress: number }
+  | { readonly tag: "carried"; readonly by: string; readonly hp: number }
+  | { readonly tag: "lying"; readonly at: V3; readonly hp: number }
+  | { readonly tag: "broken" }
 
 /** The cjar (Spingi il Cjar): where it is, how far it has gone, who is pushing it. */
 export interface CartView {
@@ -109,11 +130,14 @@ export interface WorldView {
   readonly cart: CartView | null
   /** Only while the storm is in force and the match is live: the safe circle. */
   readonly storm: StormValue | null
-  readonly pickups: readonly boolean[]
+  /** One per `map.pickups`: there, taken and coming back, or not on the map for the match. */
+  readonly pickups: readonly PickupView[]
   /** One per `map.turrets`. */
   readonly turrets: ReadonlyArray<TurretState>
   /** Health of each breakable door (0 = broken down). */
   readonly doors: readonly number[]
+  /** One per `map.panels`. */
+  readonly panels: readonly PanelView[]
   readonly projectiles: readonly ProjectileValue[]
   readonly players: readonly PlayerView[]
   /** Only in a training. */
@@ -148,7 +172,8 @@ export const ViewWorld = Game.Inspector(
       stormCourse: Game.System.readResource(StormCourse),
       pickups: Game.System.readResource(Pickups),
       turrets: Game.System.readResource(Turrets),
-      doors: Game.System.readResource(Doors)
+      doors: Game.System.readResource(Doors),
+      panels: Game.System.readResource(Panels)
     },
     machines: { match: Game.System.machine(Match), training: Game.System.machine(Training) }
   },
@@ -175,7 +200,7 @@ export const ViewWorld = Game.Inspector(
     const phase: PhaseView =
       match._tag === "Live" ? { tag: "Live", ends: match.ends }
       : match._tag === "Over" ? { tag: "Over", winner: match.winner, restarts: match.restarts }
-      : { tag: "Warmup" }
+      : { tag: "Muster", starts: match.starts }
     const progress = machines.training.get()
     let training: TrainingView | null = null
     if (progress._tag === "Complete") training = { tag: "complete" }
@@ -196,9 +221,21 @@ export const ViewWorld = Game.Inspector(
       hill: resources.hill.get(),
       cart,
       storm,
-      pickups: resources.pickups.get().map((p) => p._tag === "up"),
+      pickups: resources.pickups.get().map((p) => p._tag),
       turrets: resources.turrets.get(),
       doors: resources.doors.get(),
+      panels: resources.panels.get().map((p): PanelView => {
+        switch (p._tag) {
+          case "tearing":
+            return { tag: "tearing", by: p.by, progress: Math.min(1, p.ticks / PANEL_TEAR_TICKS) }
+          case "carried":
+            return { tag: "carried", by: p.by, hp: p.hp }
+          case "lying":
+            return { tag: "lying", at: [p.x, p.y, p.z], hp: p.hp }
+          default:
+            return { tag: p._tag }
+        }
+      }),
       projectiles: queries.projectiles.each().map((m) => queries.projectiles.data.projectile.get(m)),
       players: queries.players.each().map((m) => {
         const life = data.life.get(m)
@@ -222,7 +259,8 @@ export const ViewWorld = Game.Inspector(
           arsenal: data.arsenal.get(m),
           stats: data.stats.get(m),
           seq: controls.input.seq,
-          buttons: controls.input.buttons
+          buttons: controls.input.buttons,
+          firing: pressed(controls.input, "fire") && !sprinting(controls.input, motion.body.crouch)
         }
       }),
       training

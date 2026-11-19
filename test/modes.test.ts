@@ -5,7 +5,7 @@ import { GLEMONE } from "../shared/maps/glemone.ts"
 import { createPhysicsWorld, initPhysics, type PhysicsWorld } from "../shared/physics.ts"
 import type { GameEvent } from "../shared/sim/events.ts"
 import { createSim, type Sim } from "../shared/sim/index.ts"
-import { CART, MAX_HP, RAISE_TICKS, SHIELD_TICKS } from "../shared/sim/rules.ts"
+import { CART, maxHp, RAISE_TICKS, SHIELD_TICKS } from "../shared/sim/rules.ts"
 import type { ModeId, ObjectiveId, RoomModeId } from "../shared/folklore.ts"
 import { WEAPONS, type PrimaryId } from "../shared/weapons.ts"
 
@@ -19,7 +19,7 @@ beforeAll(async () => {
 function match(mode: ModeId, players: [id: string, team: "benandanti" | "malandanti", primary: PrimaryId][], o: { minutes?: number; ff?: boolean } = {}) {
   const sim = createSim({ mode, minutes: o.minutes ?? 5, seed: 11, physics, friendlyFire: o.ff ?? false })
   for (const [id, team, primary] of players) sim.join(id, id, team, false, primary)
-  sim.start()
+  sim.start(true)
   for (let i = 0; i < SHIELD_TICKS + 5; i++) sim.step()
   return sim
 }
@@ -112,7 +112,7 @@ describe("weapons", () => {
     }
     const hurt = me(sim, "feri")
     expect(hurt.alive).toBe(true)
-    expect(hurt.hp).toBeLessThan(MAX_HP - 20)
+    expect(hurt.hp).toBeLessThan(maxHp("cramar") - 20)
     // The medic goes next to the wounded one (passive).
     const target = hurt.body
     const medRoute = fromSagrato(sim, "medi", target.x, target.z)

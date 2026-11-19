@@ -8,14 +8,13 @@
  * have already raised the score: the step counts the Benandanti's points from when it began.
  */
 import { SAGRE } from "../../maps/sagre.ts"
-import { MAX_HP } from "../../sim/rules.ts"
-import { counted, pointsSince, station, type StationBot, type StepRule } from "../station.ts"
+import { counted, pointsSince, station, STATION_BOT_HP, type StationBot, type StepRule } from "../station.ts"
 
 /** The Benandanti's points that win the skirmish: one a kill. */
 export const SKIRMISH_SCORE = 5
 
 /** A Malandant that fights, posted on one of its side's spawns. */
-const foe = (i: number): StationBot => ({ team: "malandanti", route: [SAGRE.spawns.malandanti[i].at], fires: true, hp: MAX_HP })
+const foe = (i: number): StationBot => ({ team: "malandanti", route: [SAGRE.spawns.malandanti[i].at], fires: true, hp: STATION_BOT_HP })
 
 /** A step done by the client's report of `action`, after the win: the foes stand down while the player tries the keys. */
 const reported = (action: "board" | "phrases" | "chat"): StepRule => ({ ...counted(action, 1, (seen) => seen.reported), report: action, foes: "standDown" })

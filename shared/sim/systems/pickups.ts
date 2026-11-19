@@ -1,11 +1,12 @@
 /**
- * Pickups: frico (health), gubane (armor), sgnape (speed), munizions, lanciafrico.
+ * Pickups: frico (health), gubane (armor), sgnape (speed), munizions, lanciafrico (not for
+ * whoever carries the casot's panel: they share slot 3).
  */
 import type { PickupKind } from "../../map.ts"
 import { MAPS } from "../../maps/index.ts"
-import { RAIBL_MINE, SGNAPE_BOMB, WEAPON_IDS, WEAPONS } from "../../weapons.ts"
-import { MAX_ARMOR, MAX_HP, SGNAPE_TICKS } from "../rules.ts"
-import { Arsenal, Game, Life, Match, Motion, Out, Pickups, Player, Rules, type ArsenalValue } from "../schema.ts"
+import { WEAPONS } from "../../weapons.ts"
+import { MAX_ARMOR, maxHp, restock, SGNAPE_TICKS } from "../rules.ts"
+import { Arsenal, Game, Life, Match, Motion, Out, Pickups, Player, Rules } from "../schema.ts"
 
 export const RESPAWN_OF = {
   frico: 20 * 60,
@@ -14,8 +15,6 @@ export const RESPAWN_OF = {
   munizions: 15 * 60,
   lanciafrico: 45 * 60
 } as const satisfies Record<PickupKind, number>
-
-const ammoFull = (a: ArsenalValue) => WEAPON_IDS.every((id) => !(id === a.primary || id === "mandi" || (id === "lanciafrico" && a.launcher)) || a.ammo[id].reserve >= WEAPONS[id].reserve)
 
 export const CollectPickups = Game.System(
   "Sparedut/CollectPickups",
@@ -31,7 +30,7 @@ export const CollectPickups = Game.System(
   },
   ({ queries, resources, events, machines }) => {
     const { data } = queries.players
-    if (machines.match.get()._tag === "Over") return
+    if (machines.match.get()._tag !== "Live") return
     const states = resources.pickups.get()
     const next = states.map((s) => (s._tag === "down" ? (s.ticks <= 1 ? { _tag: "up" as const } : { _tag: "down" as const, ticks: s.ticks - 1 }) : s))
     const players = queries.players.each()
@@ -48,8 +47,8 @@ export const CollectPickups = Game.System(
         let used = true
         switch (spot.kind) {
           case "frico":
-            if (life.hp >= MAX_HP) used = false
-            else data.life.update(m, { state: "Alive", data: (l) => ({ hp: Math.min(MAX_HP, l.hp + 40), armor: l.armor, shield: l.shield }) })
+            if (life.hp >= maxHp(a.primary)) used = false
+            else data.life.update(m, { state: "Alive", data: (l) => ({ hp: Math.min(maxHp(a.primary), l.hp + 40), armor: l.armor, shield: l.shield }) })
             break
           case "gubane":
             if (life.armor >= MAX_ARMOR) used = false
@@ -59,19 +58,20 @@ export const CollectPickups = Game.System(
             data.arsenal.set(m, { ...a, sgnape: SGNAPE_TICKS })
             break
           case "munizions": {
-            if (ammoFull(a) && a.bombs >= SGNAPE_BOMB.perLife && a.mines >= RAIBL_MINE.perLife) {
-              used = false
-              break
-            }
-            const ammo = { ...a.ammo }
-            for (const id of WEAPON_IDS) ammo[id] = { mag: ammo[id].mag, reserve: Math.max(ammo[id].reserve, WEAPONS[id].reserve) }
-            data.arsenal.set(m, { ...a, ammo, bombs: Math.max(a.bombs, SGNAPE_BOMB.perLife), mines: Math.max(a.mines, RAIBL_MINE.perLife) })
+            const restocked = restock(a)
+            if (restocked) data.arsenal.set(m, restocked)
+            else used = false
             break
           }
           case "lanciafrico":
+            // Slot 3 holds one thing: whoever carries the panel leaves the Lanciafrico where it is.
+            if (a.power === "panel") {
+              used = false
+              break
+            }
             data.arsenal.set(m, {
               ...a,
-              launcher: true,
+              power: "lanciafrico",
               current: "lanciafrico",
               action: { _tag: "switch", ticks: 20 },
               ammo: { ...a.ammo, lanciafrico: { mag: WEAPONS.lanciafrico.magazine, reserve: WEAPONS.lanciafrico.reserve } }

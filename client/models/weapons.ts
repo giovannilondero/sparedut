@@ -4,6 +4,7 @@
  * the group with the moving parts; avatars use a copy baked with vertex colours.
  */
 import * as THREE from "three"
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
 import type { WeaponId } from "../../shared/weapons.ts"
 import { Baker, burlapTex, copperTex, engravedTex, fricoTex, put, std, towerTex, woodTex } from "./kit.ts"
 import { gjaline } from "./props.ts"
@@ -25,6 +26,8 @@ export interface WeaponModel {
     readonly spinner?: THREE.Object3D
     /** The Cjanon des Gjalinis' loading lid, hinged towards the shooter: it opens around x. */
     readonly lid?: THREE.Object3D
+    /** The Motosee's chain, which runs along its bar. */
+    readonly chain?: THREE.Object3D
   }
   /** Where the left hand goes (weapon space), null for one-handed weapons. */
   readonly left: THREE.Vector3 | null
@@ -57,7 +60,8 @@ const M = {
   black: () => std("w-black", { color: 0x0b0b0c, roughness: 1 }),
   shell: () => std("w-shell", { color: 0xb02a2a, roughness: 0.6 }),
   cinnamon: () => std("w-cinn", { color: 0x7a3f1d, roughness: 0.9 }),
-  rope: () => std("w-rope", { color: 0xb59a6a, roughness: 1 })
+  rope: () => std("w-rope", { color: 0xb59a6a, roughness: 1 }),
+  orange: () => std("w-orange", { color: 0xd8601c, roughness: 0.5 })
 }
 
 const B = (w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d)
@@ -291,6 +295,39 @@ function lanciafrico(): WeaponModel {
   return { root, muzzle, parts: { frico }, left: new THREE.Vector3(0, 0.0, -0.2), sightH: 0.165 }
 }
 
+/** The panel's width and height (m). */
+const PANEL_SIZE = { w: 1, h: 1 } as const
+
+/**
+ * The casot's panel, torn off its wall: four weathered planks on two battens and a brace, the nails
+ * still in, splinters where it gave. Held by its right edge (the grip is the origin), the left
+ * hand on the far edge, its face towards -z: a board carried in front like a shield.
+ */
+function panel(): WeaponModel {
+  const root = new THREE.Group()
+  const { w, h } = PANEL_SIZE
+  const x0 = 0.08 - w
+  const n = 4
+  const pw = w / n
+  const y0 = -0.55
+  for (let i = 0; i < n; i++) {
+    // the planks are not all as long: they broke off the sill and lintel where they would
+    const cut = [0.02, 0.06, 0.0, 0.04][i]
+    put(root, B(pw - 0.012, h - cut, 0.028), i % 2 ? M.darkWood() : M.wood(), x0 + pw * (i + 0.5), y0 + (h - cut) / 2 + (i % 2) * cut, 0)
+  }
+  // battens and brace behind, towards whoever holds it
+  for (const y of [0.25, -0.33]) put(root, B(w - 0.06, 0.08, 0.026), M.darkWood(), x0 + w / 2, y, 0.027)
+  put(root, B(0.07, Math.hypot(w - 0.16, 0.5), 0.024), M.darkWood(), x0 + w / 2, -0.04, 0.03, 0, 0, Math.atan2(w - 0.16, 0.5))
+  // the nails through the planks into the battens
+  for (const y of [0.25, -0.33]) for (const x of [0.12, 0.62]) put(root, C(0.007, 0.007, 0.01, 6), M.darkSteel(), x0 + x + (y > 0 ? 0 : 0.25), y, -0.018, Math.PI / 2)
+  // splinters where it was torn from the wall
+  for (const [x, a] of [[0.2, 0.3], [0.55, -0.25], [0.8, 0.15]] as const) put(root, B(0.02, 0.07, 0.008), M.beech(), x0 + x, y0 - 0.02, 0, 0, 0, a)
+  // a strap of rope to hold it by
+  put(root, T(0.045, 0.008, Math.PI, 10), M.rope(), 0.02, 0, 0.05, 0, Math.PI / 2, 0)
+  const muzzle = marker(root, x0 + w / 2, 0, -0.04)
+  return { root, muzzle, parts: {}, left: new THREE.Vector3(x0 + 0.08, -0.05, 0.05), sightH: 0.1 }
+}
+
 /** The Mulin: six barrels around an axis, behind them the mill's millstone and the crank. */
 function mulin(): WeaponModel {
   const root = new THREE.Group()
@@ -406,6 +443,72 @@ function gjalinis(): WeaponModel {
   return { root, muzzle, parts: { frico, lid }, left: null, sightH: 0.17 }
 }
 
+/** The Motosee's bar: from behind the clutch cover to the nose, and the chain's pitch along it. */
+const SAW = { x: 0.035, y: 0.025, z0: -0.27, z1: -0.7, h: 0.064, pitch: 0.024 }
+/** How far the Motosee's chain runs before it looks the same again: a cutter every other link. */
+export const CHAIN_PERIOD = SAW.pitch * 2
+
+/**
+ * The Motosee, a chainsaw borrowed from a woodshed in Cjargne: the orange engine housing with its
+ * cooling fins and pull cord, the black wrap handle over the top for the left hand and the
+ * chain brake in front of it, the rear handle under the right hand, and the bar forward with
+ * the chain around it. A few wood chips are still caught in it. The origin is the rear grip.
+ * The chain's teeth are a part of their own (`chain`): they run along the bar while it cuts.
+ */
+function motosee(): WeaponModel {
+  const root = new THREE.Group()
+  const orange = M.orange()
+  // the rear handle under the right hand, the throttle and the loop up to the engine
+  put(root, B(0.032, 0.036, 0.13), M.black(), 0, 0, 0.0)
+  put(root, B(0.012, 0.02, 0.03), M.darkSteel(), 0, -0.024, -0.02)
+  put(root, B(0.03, 0.026, 0.1), M.black(), 0, 0.11, 0.02)
+  put(root, B(0.03, 0.12, 0.024), M.black(), 0, 0.055, 0.075)
+  // the engine housing: crankcase, cylinder cover with its fins, the fuel tank under the rear
+  put(root, B(0.12, 0.12, 0.2), orange, 0, 0.05, -0.16)
+  put(root, B(0.1, 0.05, 0.14), orange, 0, 0.13, -0.15)
+  put(root, mergeGeometries(Array.from({ length: 5 }, (_, i) => B(0.104, 0.006, 0.12).translate(0, 0.112 + i * 0.012, 0)))!, M.darkSteel(), 0, 0, -0.15)
+  put(root, B(0.11, 0.04, 0.08), M.darkSteel(), 0, 0.0, -0.05)
+  put(root, C(0.014, 0.014, 0.016, 10), M.black(), -0.03, 0.03, -0.03, 0, 0, Math.PI / 2)
+  // the starter cover on the left, its pull cord and handle
+  put(root, C(0.05, 0.05, 0.02, 18), M.darkSteel(), -0.068, 0.06, -0.15, 0, 0, Math.PI / 2)
+  put(root, B(0.012, 0.018, 0.05), M.black(), -0.082, 0.1, -0.12)
+  // the exhaust and the clutch cover on the right, where the bar comes out
+  put(root, B(0.03, 0.04, 0.05), M.steel(), 0.045, 0.02, -0.255)
+  put(root, B(0.03, 0.08, 0.1), orange, 0.06, 0.03, -0.2)
+  put(root, C(0.008, 0.008, 0.012, 8), M.steel(), 0.078, 0.03, -0.22, 0, 0, Math.PI / 2)
+  // the wrap handle for the left hand, over the top and down the left side, and the chain brake
+  put(root, B(0.016, 0.016, 0.03), M.black(), 0.05, 0.2, -0.2)
+  put(root, B(0.12, 0.016, 0.016), M.black(), -0.01, 0.21, -0.2)
+  put(root, B(0.016, 0.2, 0.016), M.black(), -0.07, 0.11, -0.2)
+  put(root, B(0.13, 0.11, 0.008), M.black(), 0, 0.17, -0.245, -0.25)
+  // the bar, its rivets, and the nose sprocket
+  const { x, y, z0, z1, h, pitch } = SAW
+  put(root, B(0.008, h, z0 - z1), M.steel(), x, y, (z0 + z1) / 2)
+  put(root, C(h / 2, h / 2, 0.008, 16), M.steel(), x, y, z1, 0, 0, Math.PI / 2)
+  for (const z of [-0.33, -0.36]) put(root, C(0.006, 0.006, 0.01, 8), M.darkSteel(), x, y, z, 0, 0, Math.PI / 2)
+  // the chain: links and cutting teeth along both edges, one mesh, pulled along by `chain` while it cuts
+  const chain = group(root, x, y, 0)
+  const links: THREE.BufferGeometry[] = []
+  const teeth: THREE.BufferGeometry[] = []
+  const n = Math.floor((z0 - z1) / pitch)
+  for (let i = 0; i <= n; i++) {
+    const z = z0 - i * pitch
+    for (const side of [1, -1]) {
+      links.push(B(0.012, 0.008, pitch * 0.8).translate(0, side * (h / 2 + 0.003), z))
+      // a cutter every other link, raised and sharp
+      if (i % 2 === 0) teeth.push(B(0.014, 0.008, 0.01).translate(0, side * (h / 2 + 0.009), z + 0.004))
+    }
+  }
+  put(chain, mergeGeometries(links)!, M.darkSteel())
+  put(chain, mergeGeometries(teeth)!, M.silver())
+  put(root, T(h / 2 + 0.004, 0.005, Math.PI, 12), M.darkSteel(), x, y, z1, 0, Math.PI / 2, Math.PI / 2)
+  // wood chips from the woodshed still stuck in the guard
+  for (const [cx, cy, cz, a] of [[0.05, 0.065, -0.27, 0.4], [0.03, 0.075, -0.29, -0.6], [0.055, -0.01, -0.28, 1.2]])
+    put(root, B(0.016, 0.004, 0.01), M.beech(), cx, cy, cz, a, a * 2, 0)
+  const muzzle = marker(root, x, y, z1 - h / 2)
+  return { root, muzzle, parts: { chain }, left: new THREE.Vector3(-0.01, 0.21, -0.2), sightH: 0 }
+}
+
 /**
  * The turret's mitraie in first person: perforated water jacket, receiver and the two
  * spade grips with a thumb trigger. The origin is the right-hand grip.
@@ -438,7 +541,7 @@ function mitraie(): WeaponModel {
   return { root, muzzle, parts: {}, left: new THREE.Vector3(-0.18, 0, 0.06), sightH: 0.14 }
 }
 
-const BUILDERS: Record<WeaponId, () => WeaponModel> = { mescul, mandi, cramar, doplete, cjampanili, mulin, miedi, gjalinis, lanciafrico, mitraie }
+const BUILDERS: Record<WeaponId, () => WeaponModel> = { mescul, mandi, cramar, doplete, cjampanili, mulin, miedi, gjalinis, lanciafrico, panel, mitraie, motosee }
 
 export const buildWeapon = (id: WeaponId): WeaponModel => BUILDERS[id]()
 

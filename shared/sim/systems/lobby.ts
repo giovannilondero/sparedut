@@ -3,7 +3,7 @@
  */
 import { IDLE_INPUT } from "../../input.ts"
 import { MAPS } from "../../maps/index.ts"
-import { freshArsenal, NO_STATS } from "../rules.ts"
+import { freshArsenal, hpFor, kitOf, NO_STATS, primaryOf } from "../rules.ts"
 import {
   Arsenal,
   Attackers,
@@ -47,13 +47,15 @@ export const HandleJoin = Game.System(
       if (present.has(j.session)) continue
       present.add(j.session)
       const spot = j.post ?? spawns[j.team][0]
+      const rules = resources.rules.get()
       const components = [
         [Player, { session: j.session, name: j.name, bot: j.bot }],
         [TeamOf, j.team],
         [Motion, { body: { x: spot.at[0], y: spot.at[1], z: spot.at[2], vx: 0, vy: 0, vz: 0, grounded: true, crouch: false }, yaw: spot.yaw, pitch: 0 }],
         [Controls, { input: { ...IDLE_INPUT, yaw: spot.yaw }, previous: 0, pressed: 0, steps: [], switchTo: null, starved: 0 }],
         [Life, { _tag: "Dead", respawn: 30, killer: null }],
-        [Arsenal, freshArsenal(j.primary)],
+        // The player's own primary stays as the next one, for when single weapon is off.
+        [Arsenal, { ...freshArsenal(primaryOf(rules, j.primary), kitOf(rules)), nextPrimary: j.primary }],
         [Stats, NO_STATS],
         [Attackers, []]
       ] as const
@@ -83,12 +85,14 @@ export const HandleTeamChanges = Game.System(
   "Sparedut/HandleTeamChanges",
   {
     queries: { members: Members },
+    resources: { rules: Game.System.readResource(Rules) },
     events: { team: Game.System.readEvent(ChangeTeam), primary: Game.System.readEvent(ChangePrimary) }
   },
-  ({ queries, events }) => {
+  ({ queries, resources, events }) => {
     const { data } = queries.members
     const teams = new Map(events.team.all().map((e) => [e.session, e.team]))
-    const primaries = new Map(events.primary.all().map((e) => [e.session, e.primary]))
+    // Under single weapon nobody changes primary.
+    const primaries = new Map(resources.rules.get().single ? [] : events.primary.all().map((e) => [e.session, e.primary]))
     if (teams.size === 0 && primaries.size === 0) return
     for (const m of queries.members.each()) {
       const session = data.player.get(m).session
@@ -102,8 +106,11 @@ export const HandleTeamChanges = Game.System(
       const primary = primaries.get(session)
       // The new primary arrives immediately; if you were holding the old one, you switch to the new one.
       // Each weapon keeps its own ammo: switching back and forth reloads nothing.
-      if (primary)
-        data.arsenal.update(m, (a) =>
+      if (!primary) continue
+      // A new class: health above its maximum comes down to it.
+      const life = data.life.get(m)
+      if (life._tag === "Alive") data.life.update(m, { state: "Alive", data: (l) => ({ hp: hpFor(primary, l.hp), armor: l.armor, shield: l.shield }) })
+      data.arsenal.update(m, (a) =>
           a.primary === primary
             ? { ...a, nextPrimary: primary }
             : {

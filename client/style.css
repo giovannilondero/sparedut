@@ -133,6 +133,7 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr)); gap: 3px 14px; }
 .stat { display: grid; grid-template-columns: 5.5em 1fr; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
 .stat i { display: block; height: 5px; border-radius: 3px; background: linear-gradient(90deg, var(--gold-deep), var(--gold)); }
+.stat.figure b { font: 600 12px/1 var(--sans); color: var(--ink); font-variant-numeric: tabular-nums; }
 
 /* Words in rows, not in balanced columns: scrolling down a phone reads every column at once, never back up to the next one. */
 .vocab { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr)); gap: 8px 28px; font-size: 15px; line-height: 1.5; }
@@ -313,6 +314,14 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 @keyframes plumis { 0%, 55% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes plumi-fall { 0% { transform: translate(-50%, -50%) rotate(var(--r)); } 100% { transform: translate(-50%, 140%) rotate(calc(var(--r) + 120deg)); } }
 #turret-prompt { position: absolute; top: 60%; left: 50%; transform: translateX(-50%); font-family: var(--serif); color: var(--ink); background: var(--stone); border: 1px solid var(--stone-line); padding: 4px 12px; border-radius: 8px; font-size: 15px; }
+#panel-prompt { position: absolute; top: 60%; left: 50%; transform: translateX(-50%); min-width: 220px; text-align: center; font-family: var(--serif); color: var(--ink); background: var(--stone); border: 1px solid var(--stone-line); padding: 4px 12px 6px; border-radius: 8px; font-size: 15px; }
+#panel-prompt .bar { height: 6px; margin-top: 4px; background: rgba(0, 0, 0, 0.35); border-radius: 3px; overflow: hidden; }
+#panel-prompt.taken .bar { display: none; }
+#panel-prompt .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #c9a26b, #8a5a32); }
+#panel-hud { position: absolute; left: 50%; bottom: 76px; transform: translateX(-50%); width: 220px; text-align: center; font-family: var(--serif); color: var(--ink); background: var(--stone); border: 1px solid var(--stone-line); padding: 4px 12px 6px; border-radius: 10px; font-size: 14px; }
+#panel-hud .bar { height: 7px; margin-top: 4px; background: rgba(0, 0, 0, 0.35); border-radius: 4px; overflow: hidden; }
+#panel-hud .bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #c9a26b, #8a5a32); transition: width 0.1s linear; }
+#panel-hud.low .bar i { background: linear-gradient(90deg, #ff8a30, #b4321e); }
 #turret-hud { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); width: 260px; text-align: center; font-family: var(--serif); color: var(--ink); background: var(--stone); border: 1px solid var(--stone-line); padding: 6px 12px; border-radius: 10px; }
 #turret-hud .bar { height: 8px; margin-top: 4px; background: rgba(0, 0, 0, 0.35); border-radius: 4px; overflow: hidden; }
 #turret-hud .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #f0c060, #ff6a20); transition: width 0.1s linear; }
@@ -330,12 +339,17 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 #death-line { font-family: var(--serif); font-style: italic; opacity: 0.85; margin-top: 6px; }
 #death-timer { font-size: 22px; margin-top: 8px; font-variant-numeric: tabular-nums; }
 .death-hint { font-size: 12px; opacity: 0.7; margin-top: 6px; }
+#next-match { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); text-align: center; background: rgba(10, 8, 6, 0.72); border: 1px solid var(--stone-line); border-radius: 14px; padding: 14px 26px; max-width: min(520px, 86vw); font-size: 17px; }
 
 #board, .overlay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(16, 13, 10, 0.94); border: 1px solid var(--stone-line); border-radius: 14px; padding: 18px 22px; min-width: min(860px, 92vw); max-height: 86vh; overflow: auto; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); }
 #board table, .overlay table { width: 100%; border-collapse: collapse; font-size: 14px; }
 #board th, .overlay th { text-align: right; font-weight: 500; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; padding: 4px 8px; }
 #board td, .overlay td { text-align: right; padding: 4px 8px; font-variant-numeric: tabular-nums; border-top: 1px solid rgba(255, 255, 255, 0.05); }
 #board th:first-child, #board td:first-child, .overlay td:first-child, .overlay th:first-child { text-align: left; }
+/* Each player's primary, the name of a weapon: read with the name, not with the numbers. */
+#board .primary, .overlay .primary { text-align: left; }
+/* The primary by its short name only where the board is narrow (touch). */
+#board .primary .short, .overlay .primary .short { display: none; }
 #board tr.me td { color: var(--gold); }
 #board h3, .overlay h3 { font-family: var(--serif); margin: 10px 0 4px; font-size: 18px; }
 .overlay :is(h2, ui-dialog-title) { display: block; font-family: var(--serif); font-weight: 700; color: var(--gold); margin: 0 0 8px; font-size: clamp(22px, 1rem + 1.6vw, 28px); }
@@ -346,6 +360,181 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 .overlay .roster li { padding: 3px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
 .overlay .host-tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 8px; font-size: 13px; }
 .overlay .host-tools button { min-block-size: var(--tap); padding: 5px 9px; font-size: 13px; }
+/* The Muster stands in for the world: the HUD's readouts go, and a plain ground covers the canvas, which is not drawn. */
+html.in-muster #hud { background: var(--night); }
+html.in-muster #hud-free, html.in-muster #death, html.in-muster #next-match, html.in-muster #board { visibility: hidden; }
+/*
+ * The Muster ("the field"): the two teams on the flanks, the player's own choice between them, the
+ * chosen primary large and the others as tiles. It fills the safe area and stands in for the world.
+ * Upright phone: one scrolling column (the teams side by side, the choice, the host's tools and the
+ * chat) between the title and the actions under the thumb. A phone on its side: three columns that
+ * each scroll on their own, the actions under the right thumb. A desktop: Benandants | choice |
+ * Malandants, the actions under the choice, host and chat below them.
+ */
+#hud #muster.overlay {
+  --gap-block: clamp(6px, 2.5dvh, 24px);
+  --gap-inline: clamp(6px, 2vw, 28px);
+  inline-size: auto; max-inline-size: 1500px; block-size: auto;
+  display: grid; gap: 8px 14px; align-content: stretch;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "title leave" "head head" "body body" "foot foot";
+}
+#muster > ui-dialog-title { grid-area: title; margin: 0; align-self: center; }
+#muster .mu-head { grid-area: head; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; min-inline-size: 0; }
+#muster .mu-line { flex: 1 1 100%; font-size: 13px; }
+#muster .mu-leave { grid-area: leave; align-self: center; min-block-size: var(--tap); padding: 4px 12px; font-size: 13px; color: var(--muted); }
+#muster .pause-code { flex: 1 1 auto; gap: 4px 16px; }
+#muster .pause-code > div:first-child { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
+#muster .invite { font-size: clamp(22px, 1rem + 1.6vw, 36px); letter-spacing: 0.25em; line-height: 1; }
+#muster .pause-share { display: flex; flex-wrap: wrap-reverse; align-items: center; justify-content: end; gap: 2px 10px; }
+#muster .pause-share button { padding: 4px 10px; font-size: 13px; }
+#muster .pause-reach { margin: 0; }
+#muster .mu-joinnote { flex: 1 1 100%; margin: 0; font-size: 12px; }
+
+/* The body: one column that scrolls on an upright phone. */
+#muster .mu-body { grid-area: body; display: grid; gap: 14px; align-content: start; }
+#muster .mu-teams { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr)); gap: 10px 12px; align-items: start; }
+
+/* A team, or the Tampieste's one list. */
+.mu-team { min-inline-size: 0; }
+.mu-team header { display: flex; align-items: baseline; gap: 8px; border-block-end: 2px solid var(--team); padding-block-end: 3px; }
+.mu-team h3 { margin: 0; font: 700 18px/1.2 var(--serif); color: var(--team); }
+.mu-team.mine h3::after { content: " ●"; font-size: 0.55em; vertical-align: middle; }
+.mu-team ul { list-style: none; margin: 0; padding: 0; }
+.mu-all ul { columns: 12rem; column-gap: 14px; }
+.mu-member { break-inside: avoid; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name ready" "prim ready"; gap: 0 8px; padding: 4px 2px; border-block-end: 1px solid rgba(255, 255, 255, 0.05); font-size: 14px; }
+.mu-member.me { background: color-mix(in oklch, var(--gold) 12%, transparent); border-radius: 6px; padding-inline: 6px; }
+.mu-member.me .mu-name { color: var(--gold); }
+.mu-name { grid-area: name; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mu-you { font-style: normal; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8; }
+.mu-prim { grid-area: prim; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mu-ready { grid-area: ready; align-self: center; font-size: 13px; color: var(--muted); }
+.mu-ready.on { color: var(--ben); font-weight: 700; }
+.mu-switch { inline-size: 100%; margin-block-start: 8px; min-block-size: var(--tap); padding: 6px 8px; font-size: 13px; color: var(--team); border-color: color-mix(in oklch, var(--team) 60%, transparent); }
+.mu-switch[hidden] { display: none; }
+
+/* The choice: the chosen primary large, the tiles under it. */
+#muster .mu-mid { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 14px; background: var(--stone); border: 1px solid var(--stone-line); min-inline-size: 0; }
+.mu-chosen { display: grid; gap: 3px; }
+.mu-chosen .tag { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+.mu-chosen > b { font: 700 clamp(22px, 1rem + 1.4vw, 30px)/1.1 var(--serif); color: var(--gold); }
+.mu-chosen .blurb { font-size: 13px; font-style: italic; opacity: 0.85; }
+.mu-chosen .mu-stats { margin-block-start: 4px; }
+.mu-chosen .mu-stat { font-size: 12px; }
+.mu-chosen .mu-stat i { block-size: 7px; }
+.mu-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 3px 14px; }
+/* A class figure: its name, a bar to compare at a glance, its number. */
+.mu-stat { display: grid; grid-template-columns: 5em minmax(1.5rem, 1fr) 3.2em; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.mu-stat i { block-size: 5px; border-radius: 3px; background: linear-gradient(90deg, var(--gold-deep), var(--gold)) 0 0 / calc(var(--v) * 100%) 100% no-repeat, rgba(255, 255, 255, 0.08); }
+.mu-stat > b { font: 600 12px/1 var(--sans); color: var(--ink); font-variant-numeric: tabular-nums; text-align: end; }
+.mu-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr)); gap: 6px; }
+.mu-tile { min-block-size: var(--tap); padding: 8px 10px; gap: 4px; }
+.mu-tile > b { font-size: 16px; line-height: 1.15; }
+.mu-tile .mu-stats { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+/* Locked under single weapon: the tiles read as out of reach and invite no press; the host's choice stays lit. */
+.mu-tiles.locked .mu-tile { cursor: not-allowed; opacity: 0.35; background: transparent; border-style: dashed; }
+.mu-tiles.locked .mu-tile[data-checked] { cursor: default; opacity: 1; border-style: solid; }
+.mu-tiles.locked .mu-tile:active { transform: none; }
+@media (hover: hover) and (pointer: fine) { .mu-tiles.locked .mu-tile:hover { background: transparent; border-color: var(--stone-line); } .mu-tiles.locked .mu-tile[data-checked]:hover { border-color: var(--gold); background: color-mix(in oklch, var(--gold) 16%, transparent); } }
+.mu-lock { margin: 0; padding: 8px 12px; border: 1px solid var(--gold); border-radius: 10px; background: color-mix(in oklch, var(--gold) 10%, transparent); font-weight: 600; font-size: 14px; }
+
+/* The host's tools and the chat. */
+#muster .mu-aside { display: grid; gap: 14px; align-content: start; min-inline-size: 0; }
+#muster .mu-host { margin: 0; }
+.mu-chat { display: flex; flex-direction: column; gap: 6px; min-block-size: 0; }
+.mu-chat h3 { margin: 0; }
+.mu-chat-log { max-block-size: 8rem; overflow-y: auto; overscroll-behavior: contain; font-size: 14px; line-height: 1.45; }
+.mu-chat-log:empty { display: none; }
+.mu-chat input { inline-size: 100%; min-block-size: var(--tap); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--stone-line); background: rgba(0, 0, 0, 0.35); color: var(--ink); }
+
+/* The actions: under the thumb, whatever is scrolled. */
+#muster .mu-foot { grid-area: foot; display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; padding-block-start: 8px; border-block-start: 1px solid var(--stone-line); }
+#muster .mu-foot > * { margin: 0; }
+#muster .mu-foot > button { min-block-size: max(var(--tap), 44px); }
+#muster .mu-foot [hidden] { display: none; }
+.mu-go { flex: 2 1 12rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; font-size: 16px; }
+.mu-go small { font-weight: 500; font-size: 12px; opacity: 0.8; }
+.mu-readybtn { flex: 1 1 8rem; font-weight: 600; }
+#muster .mu-readybtn[aria-pressed="true"] { border-color: var(--ben); color: var(--ben); background: color-mix(in oklch, var(--ben) 14%, transparent); }
+#muster .mu-readybtn[aria-pressed="true"]::before { content: "✓ "; }
+.mu-wait, .mu-note { flex: 1 1 100%; font-size: 13px; line-height: 1.4; align-self: center; }
+.mu-note { color: var(--gold); }
+.mu-countdown { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 6px 12px; border: 1px solid var(--gold); border-radius: 10px; background: color-mix(in oklch, var(--gold) 14%, transparent); }
+.mu-countdown b { font: 700 clamp(18px, 1rem + 1vw, 24px)/1.2 var(--serif); color: var(--gold); font-variant-numeric: tabular-nums; }
+.mu-countdown small { font-size: 12px; color: var(--muted); }
+
+/* The score and time of the match being joined. */
+.mu-live { flex: 1 1 100%; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; font: 18px/1.2 var(--serif); font-variant-numeric: tabular-nums; }
+.mu-live b { font-size: 26px; }
+.mu-live .muted { font: 13px var(--sans); }
+
+/* A phone on its side: three columns that scroll on their own; the actions under the right thumb. */
+@media (orientation: landscape) and (max-height: 34rem) {
+  #hud #muster.overlay {
+    gap: 6px 12px;
+    grid-template-columns: minmax(10rem, 0.75fr) minmax(0, 1.6fr) minmax(12rem, 0.95fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "title head head" "teams mid aside" "teams mid foot";
+  }
+  /* Leave sits at the end of the head's row, the head's text kept clear of it. */
+  #muster .mu-leave { grid-area: 1 / 3; }
+  #muster .mu-head { padding-inline-end: 9rem; }
+  #muster > ui-dialog-title { font-size: 20px; }
+  #muster .mu-head { flex-wrap: nowrap; }
+  #muster :is(.mu-line, .mu-head > .pause-reach) { flex: 0 1 auto; min-inline-size: 0; margin: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #muster .mu-joinnote { display: none; }
+  #muster .mu-live { flex: 0 1 auto; font-size: 15px; }
+  #muster .mu-live b { font-size: 20px; }
+  #muster .pause-share .pause-reach, #muster .pause-code > div:first-child > .muted { display: none; }
+  #muster .pause-code { flex-wrap: nowrap; }
+  #muster .pause-share button { white-space: nowrap; }
+  #muster .invite { font-size: 20px; letter-spacing: 0.18em; }
+  #muster .mu-leave { justify-self: end; }
+  #muster .mu-body { display: contents; }
+  #muster :is(.mu-teams, .mu-mid, .mu-aside) { min-block-size: 0; overflow-y: auto; overscroll-behavior: contain; }
+  #muster .mu-teams { grid-area: teams; grid-template-columns: minmax(0, 1fr); align-content: start; }
+  #muster .mu-mid { grid-area: mid; padding: 8px 10px; gap: 6px; }
+  #muster .mu-chosen .blurb, #muster .mu-chosen .tag, #muster .mu-chosen .mu-stats { display: none; }
+  #muster .mu-chosen > b { font-size: 20px; }
+  #muster .mu-tiles { grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr)); gap: 5px; }
+  #muster .mu-tile { padding: 4px 8px; gap: 2px; }
+  #muster .mu-tile > b { font-size: 14px; }
+  #muster .host-bots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #muster .mu-aside { grid-area: aside; }
+  #muster .mu-chat-log { max-block-size: 5.5rem; }
+  #muster .mu-foot { flex-direction: column; flex-wrap: nowrap; padding-block-start: 6px; }
+  #muster .mu-foot > button { flex: none; }
+  #muster .mu-countdown { flex: none; padding: 4px 10px; }
+  #muster .mu-countdown b { font-size: 15px; }
+  #muster .mu-countdown small { display: none; }
+  #muster .mu-wait { flex: none; font-size: 12px; }
+  #muster .mu-member { padding-block: 3px; }
+}
+
+/* A desktop: Benandants | choice | Malandants; the actions under the choice, host and chat below them. */
+@media (min-width: 60rem) and (min-height: 34.01rem) {
+  #hud #muster.overlay {
+    grid-template-columns: minmax(14rem, 1fr) minmax(0, 2.2fr) minmax(14rem, 1fr);
+    grid-template-rows: auto minmax(0, max-content) auto minmax(0, 1fr);
+    grid-template-areas: "title head leave" "ben mid mal" "ben foot mal" "ben aside mal";
+  }
+  #muster .mu-leave { justify-self: end; }
+  #muster :is(.mu-body, .mu-teams) { display: contents; }
+  #muster :is(.mu-benandanti, .mu-all) { grid-area: ben; }
+  #muster .mu-malandanti { grid-area: mal; }
+  #muster .mu-team { padding: 12px; border-radius: 14px; background: color-mix(in oklch, var(--night) 70%, transparent); border: 1px solid var(--stone-line); overflow-y: auto; overscroll-behavior: contain; }
+  #muster .mu-all ul { columns: auto; }
+  #muster .mu-mid { grid-area: mid; overflow-y: auto; }
+  #muster .mu-foot { border: 0; padding: 0; flex-wrap: nowrap; }
+  #muster .mu-countdown { flex: 3 1 18rem; }
+  #muster .mu-cancel { flex: 1 1 8rem; }
+  #muster .mu-wait { flex: 2 1 14rem; }
+  #muster .mu-aside { grid-area: aside; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); overflow-y: auto; }
+  /* With no teams, the one list on the left and the host and chat on the right. */
+  #hud #muster.overlay:has(.mu-all) { grid-template-areas: "title head leave" "ben mid mal" "ben foot mal" "ben . mal"; }
+  #muster:has(.mu-all) .mu-aside { grid-area: mal; grid-template-columns: minmax(0, 1fr); }
+}
 
 .end-title { display: block; font-family: var(--serif); font-size: clamp(36px, 5vw, 64px); text-align: center; margin: 0; }
 .awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 10px; margin: 14px 0; }
@@ -411,7 +600,7 @@ html[data-device="touch"] :is(#menu, #hud .overlay) kbd, html[data-device="touch
   /* A wide, short menu (a phone on its side): the roster and the host tools side by side, so the host's controls show without scrolling. */
   @container overlay (inline-size > 40rem) {
     #pause .overlay-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 0 16px; }
-    #pause .overlay-body > :is(.pause-reach, .pause-code) { grid-column: 1 / -1; }
+    #pause .overlay-body > :is(.pause-reach, .pause-code, .pause-primary) { grid-column: 1 / -1; }
     #pause .overlay-body > :is(.host-tools, .host-only) { margin-block-start: 10px; }
     /* The four bot buttons on one row, so the bot skill stays in view too. */
     #pause .host-bots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -443,6 +632,12 @@ html[data-device="touch"] :is(#menu, #hud .overlay) kbd, html[data-device="touch
 .pause-share { text-align: end; }
 .pause-share button { min-block-size: var(--tap); }
 .pause-reach { font-size: 12px; margin-block-start: 4px; }
+/* The player's primary in the match menu: read-only, fixed until the Muster. */
+.pause-primary { margin-block-start: 10px; font-size: 12px; }
+.pause-primary:empty { display: none; }
+.pause-primary-name { font: 600 16px/1.3 var(--serif); color: var(--ink); }
+.pause-primary-figures { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.pause-primary p { margin: 4px 0 0; }
 .overlay .invite { font-size: clamp(32px, 1rem + 3vw, 44px); }
 .host-only { margin-block-start: 8px; }
 .host-label { white-space: nowrap; }
@@ -547,7 +742,7 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #hud-free, #hud-status { display: contents; }
 #hud.touch #hud-free { position: absolute; inset-inline-start: var(--free-l); inset-block-start: var(--free-t); inline-size: var(--free-w); block-size: var(--free-h);
   display: flex; flex-direction: column; align-items: center; gap: 4px; }
-#hud.touch :is(#turret-prompt, #turret-hud, #topbar, #killfeed, #banner, #chat, #training) { position: static; inset: auto; transform: none; }
+#hud.touch :is(#turret-prompt, #panel-prompt, #panel-hud, #turret-hud, #topbar, #killfeed, #banner, #chat, #training) { position: static; inset: auto; transform: none; }
 /* The score on one line: the two numbers in their team's colour around the clock. The objective, when the mode has one, on a line under it. */
 #hud.touch #topbar { order: 0; max-inline-size: 100%; flex-wrap: wrap; align-items: baseline; justify-content: center; column-gap: 10px; padding: 2px 12px;
   border-radius: 12px; border: 1px solid var(--stone-line); background: rgba(10, 8, 6, 0.72); }
@@ -580,8 +775,11 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #hud.touch #chat-log div { max-inline-size: 100%; padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #hud.touch #chat-log div:nth-last-child(n + 3) { display: none; }
 #hud.touch #turret-prompt { order: 4; font-size: 13px; }
+#hud.touch #panel-prompt { order: 4; font-size: 13px; min-width: 0; }
 #hud.touch #turret-hud { order: 5; inline-size: min(260px, 100%); padding: 3px 10px; display: flex; align-items: center; gap: 8px; font-size: 13px; }
 #hud.touch #turret-hud .bar { flex: 1; margin: 0; }
+#hud.touch #panel-hud { order: 6; inline-size: min(220px, 100%); padding: 3px 10px; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+#hud.touch #panel-hud .bar { flex: 1; margin: 0; }
 /*
  * The training's panel on touch: first in the free area, as wide as it allows, never down to the
  * crosshair (the screen's middle). A training has no score: the empty score bar is not drawn.
@@ -610,14 +808,21 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
 #hud.touch #announce { inset-block-start: 24%; inline-size: 100%; white-space: normal; font-size: clamp(20px, 7cqi, 36px); }
 #hud.touch #death { inset-inline-start: calc(var(--free-l) + var(--free-w) / 2); inset-block-start: calc(var(--free-t) + var(--free-h) / 2); transform: translate(-50%, -50%);
   min-inline-size: 0; inline-size: min(360px, var(--free-w)); padding: 10px 14px; }
+#hud.touch #next-match { inset-inline-start: calc(var(--free-l) + var(--free-w) / 2); inset-block-start: calc(var(--free-t) + var(--free-h) / 2); transform: translate(-50%, -50%);
+  inline-size: min(360px, var(--free-w)); padding: 10px 14px; font-size: 15px; }
 #hud.touch .death-title { font-size: clamp(24px, calc(var(--free-w) * 0.08), 36px); }
 /* The death hint, the key legend: keys a touch player does not have. The armoury is in the match menu. */
 #hud.touch :is(.death-hint, .keys) { display: none; }
 #hud.touch #board { inset-inline-start: var(--free-l); inset-block-start: var(--free-t); transform: none; min-inline-size: 0; inline-size: var(--free-w); max-block-size: var(--free-h);
   padding: 8px 10px; pointer-events: auto; touch-action: pan-y; overscroll-behavior: contain; }
-#hud.touch #board table { font-size: clamp(10px, calc(var(--free-w) * 0.032), 14px); }
-#hud.touch #board :is(th, td) { padding: 3px 4px; letter-spacing: 0; }
-#hud.touch #board th { font-size: 0.8em; }
+/* Nine columns in the free area: the primary by its short name, the type sized to the width, one line per player where it fits. */
+#hud.touch #board table { font-size: clamp(9px, calc(var(--free-w) * 0.025), 14px); }
+#hud.touch #board :is(th, td) { padding: 3px 3px; letter-spacing: 0; white-space: nowrap; }
+/* Only a name too long for the narrowest board (portrait) goes on two lines. */
+#hud.touch #board td:first-child { white-space: normal; }
+#hud.touch #board .primary .long { display: none; }
+#hud.touch #board .primary .short { display: inline; }
+#hud.touch #board th { font-size: 0.72em; }
 #hud.touch #board h3 { font-size: 15px; }
 #hud.touch #quickchat.tap { inset-inline-start: var(--free-l); inset-block-start: var(--free-t); max-inline-size: var(--free-w); max-block-size: var(--free-h); }
 #hud.touch #clickplay { inline-size: max-content; max-inline-size: calc(100% - 32px); font-size: clamp(22px, 6vw, 30px); }

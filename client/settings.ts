@@ -150,6 +150,7 @@ export function oneTapRoom(s: Pick<Settings, "lastMode" | "lastMap" | "lastMinut
     // The button promises bots: a room last made without them falls back to the default.
     bots: s.lastBots || DEFAULTS.lastBots,
     level: s.lastLevel,
-    ff: false
+    ff: false,
+    single: null
   }
 }

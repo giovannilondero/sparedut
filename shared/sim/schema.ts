@@ -12,7 +12,7 @@ import type { MapId, Team, V3 } from "../map.ts"
 import type { Body } from "../movement.ts"
 import type { PhysicsWorld } from "../physics.ts"
 import type { ModeId, ObjectiveId } from "../folklore.ts"
-import type { PrimaryId, ProjectileKind, WeaponId } from "../weapons.ts"
+import type { PowerId, PrimaryId, ProjectileKind, WeaponId } from "../weapons.ts"
 import type { InterfaceAction } from "../training/interface.ts"
 import type { StationId, StepId } from "../training/index.ts"
 import type { Device } from "../devices.ts"
@@ -100,12 +100,21 @@ export interface Ammo {
   readonly reserve: number
 }
 
+/**
+ * What a player carries besides the primary and the Mescul: `full`, the pistol, the bombs, the mines
+ * and room for the Lanciafrico; `single` (a single-weapon room), nothing else. Set at each spawn
+ * from the room's rules (`kitOf`).
+ */
+export type Kit = "full" | "single"
+
 export interface ArsenalValue {
+  readonly kit: Kit
   readonly current: WeaponId
   readonly primary: PrimaryId
-  /** The primary weapon chosen for the next respawn. */
+  /** The player's own primary, for the next respawn. Under single weapon the room's is carried instead, and this is kept for when it is off. */
   readonly nextPrimary: PrimaryId
-  readonly launcher: boolean
+  /** What is carried in slot 3: the Lanciafrico or the casot's panel, never both; null when nothing. */
+  readonly power: PowerId | null
   readonly ammo: Readonly<Record<WeaponId, Ammo>>
   readonly action: WeaponAction
   readonly bombs: number
@@ -160,6 +169,8 @@ export interface RulesValue {
   readonly scoreLimit: number
   readonly timeLimitTicks: number
   readonly friendlyFire: boolean
+  /** Single weapon: off (null), or the one primary every player carries, with the Mescul and nothing else. */
+  readonly single: PrimaryId | null
 }
 export const Rules = Descriptor.Resource<RulesValue>()("Sparedut/Rules")
 /** The objective in force: the objective systems read this, never the mode. A regular room derives it from its mode. */
@@ -223,7 +234,22 @@ export const Turrets = Descriptor.Resource<ReadonlyArray<TurretState>>()("Spared
 /** Health of the breakable doors (one per `map.doors`): 0 means broken down. */
 export const Doors = Descriptor.Resource<ReadonlyArray<number>>()("Sparedut/Doors")
 
-export type PickupState = { readonly _tag: "up" } | { readonly _tag: "down"; readonly ticks: number }
+/**
+ * A panel (one per `map.panels`): on the wall, being torn off by one player (`ticks` of "use" held
+ * so far), carried (by a player who has it in slot 3, `ArsenalValue.power`), lying where its
+ * carrier died, or broken. Off the wall, in any of the last three, its gap stays open until the
+ * next match. Carried and lying, it keeps its own health (`hp`).
+ */
+export type PanelState =
+  | { readonly _tag: "wall" }
+  | { readonly _tag: "tearing"; readonly by: string; readonly ticks: number }
+  | { readonly _tag: "carried"; readonly by: string; readonly hp: number }
+  | { readonly _tag: "lying"; readonly x: number; readonly y: number; readonly z: number; readonly hp: number }
+  | { readonly _tag: "broken" }
+export const Panels = Descriptor.Resource<ReadonlyArray<PanelState>>()("Sparedut/Panels")
+
+/** A pickup: there, taken and coming back, or not on the map for the match (the Lanciafrico under single weapon). */
+export type PickupState = { readonly _tag: "up" } | { readonly _tag: "down"; readonly ticks: number } | { readonly _tag: "absent" }
 /** One per `PICKUPS` point, in the same order. */
 export const Pickups = Descriptor.Resource<ReadonlyArray<PickupState>>()("Sparedut/Pickups")
 
@@ -254,8 +280,15 @@ export const Leave = Descriptor.Event<{ readonly session: string }>()("Sparedut/
 export const InputArrived = Descriptor.Event<{ readonly session: string; readonly input: PlayerInput }>()("Sparedut/InputArrived")
 export const ChangeTeam = Descriptor.Event<{ readonly session: string; readonly team: Team }>()("Sparedut/ChangeTeam")
 export const ChangePrimary = Descriptor.Event<{ readonly session: string; readonly primary: PrimaryId }>()("Sparedut/ChangePrimary")
-/** The host starts (or restarts) the match. */
-export const StartMatch = Descriptor.Event<{}>()("Sparedut/StartMatch")
+/**
+ * The host's start. In the Muster it begins the countdown (again from the beginning, if one is
+ * running) or, `now`, the match at once; during a match it sends the room back to the Muster.
+ */
+export const StartMatch = Descriptor.Event<{ readonly now: boolean }>()("Sparedut/StartMatch")
+/** The host cancels the Muster's countdown. */
+export const CancelCountdown = Descriptor.Event<{}>()("Sparedut/CancelCountdown")
+/** The host sets single weapon (null: off). Taken only in the Muster: the rules change there, never during a match. */
+export const SetSingle = Descriptor.Event<{ readonly single: PrimaryId | null }>()("Sparedut/SetSingle")
 /** From the host, only in a training: the client's report of an interface step (`shared/training/interface.ts`). */
 export const ReportInterface = Descriptor.Event<{ readonly session: string; readonly action: InterfaceAction }>()("Sparedut/ReportInterface")
 /** From the host, only in a training: the client says its active device has no control for this step (`shared/training/controls.ts`). */
@@ -271,6 +304,12 @@ export interface DamageValue {
   readonly head: boolean
   /** Knockback (explosions). */
   readonly push: { readonly x: number; readonly y: number; readonly z: number } | null
+  /**
+   * Where the damage comes from, seen from above: the attacker's eye for shots and strikes, the
+   * blast for explosions; null when it comes from no point (a fall, the storm). The casot's panel
+   * blocks by it.
+   */
+  readonly from: { readonly x: number; readonly z: number } | null
 }
 export const Damage = Descriptor.Event<DamageValue>()("Sparedut/Damage")
 
@@ -293,22 +332,26 @@ export const Game = Schema.bind(
   Schema.fragment({
     components: { Player, TeamOf, Post, Motion, Controls, Life, Arsenal, Stats, Attackers, Projectile },
     requires: [Schema.requires(Player, TeamOf, Motion, Controls, Life, Arsenal, Stats, Attackers)],
-    resources: { Rules, Objective, Tick, Score, Flags, Hill, Cart, StormCourse, Pickups, Turrets, Doors, History, Rng },
-    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, ReportInterface, GoToStation, StepUnavailable, Damage, Heal, DoorHit, Out }
+    resources: { Rules, Objective, Tick, Score, Flags, Hill, Cart, StormCourse, Pickups, Turrets, Doors, Panels, History, Rng },
+    events: { Join, Leave, InputArrived, ChangeTeam, ChangePrimary, StartMatch, CancelCountdown, SetSingle, ReportInterface, GoToStation, StepUnavailable, Damage, Heal, DoorHit, Out }
   }),
   Root
 )
 
-/** The match: warmup, live (until tick `ends`), over. */
+/**
+ * The match: the Muster (nobody on the map, until the host starts), live (until tick `ends`),
+ * over (the results, until tick `restarts`, then the Muster again).
+ */
 export const Match = Game.StateMachine("Sparedut/Match", {
-  Warmup: {},
+  /** `starts`: the tick the countdown ends and the match goes live; null while no countdown runs. */
+  Muster: z.object({ starts: z.number().int().nullable() }),
   Live: z.object({ ends: z.number().int() }),
   /** The winner: a team, nobody, or (La Tampieste) the last one standing. */
   Over: z.object({
     winner: z.union([z.enum(["benandanti", "malandanti", "pari"]), z.object({ player: z.string(), name: z.string() })]),
     restarts: z.number().int()
   })
-})
+}, { transitions: { Muster: ["Live"], Live: ["Over", "Muster"], Over: ["Muster"] } })
 
 /** Where an arrival puts the trainee: see `Training.Arriving`. */
 export const ARRIVAL_PLACES = ["walked", "facingStart", "keepingLook"] as const

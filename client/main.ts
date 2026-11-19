@@ -218,12 +218,11 @@ const sendJoin = (code: string, password?: string) => {
 }
 
 const menu = new Menu(settings, audio, {
-  create: (o, oneTap = false) => {
+  create: (o) => {
     if (o.reach === "offline") {
       // Still inside the tap that asks for the match: the only moment the browser grants fullscreen.
       game?.requestFullscreen()
       // The room lives in this page: the game server need not be reachable.
-      autostart = oneTap
       roomPassword = null
       // An invite still in the address must not pull the player out when the server comes back.
       forgetRoomAddress()
@@ -234,7 +233,6 @@ const menu = new Menu(settings, audio, {
     }
     if (!ensureOnline()) return
     game?.requestFullscreen()
-    autostart = oneTap
     roomPassword = o.access.kind === "password" ? o.access.password : null
     sayHello()
     net.send({ t: "create", ...o, primary: settings.primary })
@@ -242,7 +240,6 @@ const menu = new Menu(settings, audio, {
   training: (start) => {
     // Like an Offline room: in this page, with or without the game server, entered from the tap.
     game?.requestFullscreen()
-    autostart = false
     roomPassword = null
     forgetRoomAddress()
     link.use(browserHostConnection)
@@ -269,8 +266,6 @@ if (shownLook.fellBack) toast(t().net.verOffline)
 let publicUrl: string | null = null
 const inviteBase = () => `${publicUrl && isLocalHost(location.hostname) ? publicUrl : location.origin}${location.pathname}`
 
-/** The home screen's one-tap match against the bots starts right away, without warm-up. */
-let autostart = false
 /** What to do once the room is left (its `left` message): a match asked for while leaving waits for it. */
 let afterLeft: (() => void) | null = null
 const physicsReady = initPhysics().then(() => {
@@ -346,9 +341,8 @@ link.on((msg: ServerMessage) => {
         audio.menuMusic(false)
         // An Offline room has no code to share.
         if (msg.room.reach !== "offline") history.replaceState(null, "", inviteLink("", msg.room.code, roomPassword))
+        // Every room opens on its Muster, the one-tap match's too: nothing starts the match but the host.
         game!.start(msg.room, msg.you)
-        if (autostart && msg.room.hostId === msg.you) link.send({ t: "start" })
-        autostart = false
       })
       return
     case "left":
@@ -484,7 +478,7 @@ const loop = (now: number) => {
     game?.menuFrame()
     world.menuCamera(time, camera)
     camera.updateMatrixWorld()
-    world.update(dt, time, { pickups: [], flags: null, hill: null, cart: null, storm: null, turrets: [], doors: [], gates: [], camera })
+    world.update(dt, time, { pickups: [], flags: null, hill: null, cart: null, storm: null, turrets: [], doors: [], panels: [], lyingPanels: [], gates: [], camera })
     fx.update(dt, camera)
     renderer.info.reset()
     look.render(scene, camera)

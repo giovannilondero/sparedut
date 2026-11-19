@@ -5,13 +5,16 @@ import { MODES, pick, TEAM_INFO, type ModeId } from "../shared/folklore.ts"
 import type { Team } from "../shared/map.ts"
 import { FLAG_BIT, type BoardRow, type RoomInfo, type SnapSelf, type Snapshot } from "../shared/protocol.ts"
 import type { KillCause } from "../shared/sim/events.ts"
-import { WEAPONS, type WeaponId } from "../shared/weapons.ts"
-import { WARMUP_TICKS } from "../shared/sim/rules.ts"
-import type { TrainingView } from "../shared/sim/view.ts"
-import { STATION_IDS } from "../shared/training/index.ts"
+import { usesAmmo, type WeaponId } from "../shared/weapons.ts"
+import { maxHp, owned } from "../shared/sim/rules.ts"
+import type { ArsenalValue } from "../shared/sim/schema.ts"
+import type { PhaseView, TrainingView } from "../shared/sim/view.ts"
+import { isTraining, STATION_IDS } from "../shared/training/index.ts"
 import type { Device } from "./device.ts"
 import { t } from "./i18n.ts"
-import { menuControl, playPrompt, trainingPrompt, turretPrompt } from "./prompts.ts"
+import type { MenuPrimary } from "./match-menus.ts"
+import { classFigures } from "./menu-model.ts"
+import { panelPrompt, playPrompt, trainingPrompt, turretPrompt, type PanelSlot } from "./prompts.ts"
 import { announcesStep, NOT_SHOWN, stepMarksHtml, type PanelPlace } from "./training-panel.ts"
 import { buttonBit, TOUCH_BUTTONS, type Insets, type PickerEntry, type TouchLayout, type TouchView } from "./touch.ts"
 
@@ -31,8 +34,6 @@ const PANEL_BLANK: PanelShown = { ...NOT_SHOWN, strings: null, count: -1, device
 
 export class Hud {
   private announceTimer = 0
-  /** During an ongoing Tampieste the dead don't respawn: the death panel says so. */
-  spectating = false
   private chatTimer = 0
   /** Last value written per element and property: the DOM is touched only on change. */
   private written = new Map<string, string | boolean>()
@@ -136,20 +137,21 @@ export class Hud {
   }
 
   /** `turret`: I'm on the turret, the weapon in hand is the mitraie (infinite ammo). */
-  vitals(you: SnapSelf | null, slot: { owned: (id: WeaponId) => boolean }, localMag: number | null, turret = false) {
+  vitals(you: SnapSelf | null, localMag: number | null, turret = false) {
     if (!you) return
     const hp = Math.max(0, you.hp)
+    // The bar and the ring are full at the class's health, whatever it is.
+    const share = Math.min(100, Math.round((hp / maxHp(you.arsenal.primary)) * 100))
     this.text("hp", String(hp))
-    this.style("hp-bar", "width", `${hp}%`)
-    this.toggleOn($("hp").parentElement!, "hp-low", "low", hp < 30 && you.alive)
+    this.style("hp-bar", "width", `${share}%`)
+    this.toggleOn($("hp").parentElement!, "hp-low", "low", share < 30 && you.alive)
     this.text("armor", String(you.armor))
     this.style("armor-bar", "width", `${you.armor}%`)
     // The touch HUD draws the two as rings around their icons.
-    this.style("vitals", "--hp", String(hp))
+    this.style("vitals", "--hp", String(share))
     this.style("vitals", "--armor", String(you.armor))
     const a = you.arsenal
-    const def = WEAPONS[a.current]
-    const endless = def.mode === "melee" || turret
+    const endless = !usesAmmo(a.current) || turret
     this.inHand = turret ? "mitraie" : a.current
     this.text("weapon-name", t().weapons[this.inHand].name)
     const ammo = a.ammo[a.current]
@@ -157,6 +159,8 @@ export class Hud {
     this.text("mag", mag)
     this.text("reserve", endless ? "" : String(ammo.reserve))
     this.toggleOn($("reserve").previousElementSibling!, "slash", "hidden", endless)
+    const shown = hudSlots(a)
+    this.toggle("bombs", "hidden", !shown.sidearms)
     this.text("bombs", `${t().bomb}: ${"🍶".repeat(a.bombs) || "—"} · ${t().mine}: ${"💣".repeat(a.mines) || "—"}`)
     // On touch the weapon's control carries the rounds and the name, the bomb and mine buttons how many are left.
     this.text("touch-weapon-name", t().weapons[this.inHand].name)
@@ -164,10 +168,7 @@ export class Hud {
     this.text("touch-reserve", endless ? "" : `/ ${ammo.reserve}`)
     this.data("touch-bomb", "n", String(a.bombs))
     this.data("touch-mine", "n", String(a.mines))
-    const slots: [string, WeaponId][] = [["1", a.primary], ["2", "mandi"], ["3", "lanciafrico"], ["4", "mescul"]]
-    this.html("slots", slots
-      .map(([k, id]) => `<span class="${id === a.current ? "on" : slot.owned(id) ? "" : "off"}">${k} ${t().weapons[id].short}</span>`)
-      .join(""))
+    this.html("slots", shown.slots.map((s) => `<span class="${SLOT_CLASS[s.state]}">${s.key} ${t().weapons[s.id].short}</span>`).join(""))
     const buffs: string[] = []
     if (a.sgnape > 0) buffs.push(`🍶 Sgnape ${Math.ceil(a.sgnape / 60)}s`)
     if (you.shield > 0) buffs.push(t().hud.shield)
@@ -185,6 +186,28 @@ export class Hud {
     this.toggle("turret-hud", "jammed", gun.jammed)
     this.toggle("turret-hud", "warm", gun.heat > 0.7)
     this.text("turret-label", gun.jammed ? t().hud.turretHot : t().hud.turretHeat)
+  }
+
+  /**
+   * The casot's panel, faced on its wall (`slot` null when it is not): with slot 3 free, the control
+   * to hold to tear it off and, while holding, how far the tear has got (0 to 1); with slot 3 taken,
+   * what is in the way.
+   */
+  panel(slot: PanelSlot | null, progress: number, device: Device) {
+    this.toggle("panel-prompt", "hidden", slot === null)
+    if (slot === null) return
+    this.toggle("panel-prompt", "taken", slot === "taken")
+    this.html("panel-label", panelPrompt(t(), device, slot))
+    this.style("panel-tear", "width", `${Math.round(progress * 100)}%`)
+  }
+
+  /** Carrying the casot's panel: how much it can still take, from 1 (whole) down; null when not carrying it. */
+  panelHealth(left: number | null) {
+    this.toggle("panel-hud", "hidden", left === null)
+    if (left === null) return
+    this.text("panel-hp-label", t().weapons.panel.name)
+    this.style("panel-hp", "width", `${Math.round(left * 100)}%`)
+    this.toggle("panel-hud", "low", left < 0.3)
   }
 
   /** Feathers in the eyes (the gjaline): vision is covered for `seconds` and then slowly clears. */
@@ -233,7 +256,7 @@ export class Hud {
   }
 
   /** `outside`: I'm alive and outside the Tampieste circle. `device`: the active one, whose controls the banner names. */
-  top(snap: Snapshot, mode: ModeId, names: Map<string, string>, device: Device, outside = false) {
+  top(snap: Snapshot, mode: ModeId, names: Map<string, string>, outside = false) {
     const s = t()
     if (snap.training) {
       // A training has no score and no clock: its panel says where the trainee is.
@@ -256,13 +279,10 @@ export class Hud {
     this.text("score-ben", alone ? "" : mode === "cjar" ? `${snap.score.benandanti}%` : String(snap.score.benandanti))
     this.text("score-mal", alone ? "" : String(snap.score.malandanti))
     const phase = snap.phase
-    this.text("clock", phase.tag === "Live" ? fmtClock(phase.ends - snap.tick) : phase.tag === "Warmup" ? fmtClock(WARMUP_TICKS - snap.tick) : s.hud.over)
+    this.text("clock", phase.tag === "Live" ? fmtClock(phase.ends - snap.tick) : phase.tag === "Over" ? s.hud.over : "")
     this.text("mode-label", alone ? `${s.modes[mode].name} · ${s.modes[mode].sub}` : s.hud.modeLabel(s.modes[mode].name, MODES[mode].scoreLimit))
     this.html("objective", this.objectiveLine(snap, names))
-    this.html(
-      "banner",
-      phase.tag === "Warmup" ? s.hud.warmup(fmtClock(WARMUP_TICKS - snap.tick), menuControl(device)) : outside ? `<b class="storm">${s.hud.stormOutside}</b>` : ""
-    )
+    this.html("banner", outside ? `<b class="storm">${s.hud.stormOutside}</b>` : "")
   }
 
   /** The state of the objective in force (`snap.objective`), and nothing for any other: in a regular room it is its mode's, in a training the current step's. */
@@ -325,14 +345,17 @@ export class Hud {
     if (text) this.announce(text, t().hud.streak(name, n))
   }
 
-  death(you: SnapSelf | null, names: Map<string, string>, seed: number) {
-    const dead = !!you && !you.alive
-    this.toggle("death", "hidden", !dead)
-    if (!dead || !you) return
+  death(you: SnapSelf | null, at: DeathAt, names: Map<string, string>, seed: number) {
+    const screen = deathScreen(you, at)
+    this.toggle("death", "hidden", screen.tag !== "dead")
+    this.toggle("next-match", "hidden", screen.tag !== "nextMatch")
+    if (screen.tag === "nextMatch") this.text("next-match", t().muster.nextMatch)
+    if (screen.tag !== "dead" || !you) return
+    this.toggle("death-hint", "hidden", !screen.armoury)
     const s = t().hud
     this.html("death-by", you.killer ? s.deathBy(esc(names.get(you.killer) ?? "?")) : s.deathSelf)
     this.text("death-line", pick(s.deathLines, seed))
-    this.text("death-timer", this.spectating ? s.spectate : you.respawn > 0 ? s.respawnIn(Math.ceil(you.respawn / 60)) : "…")
+    this.text("death-timer", screen.spectate ? s.spectate : you.respawn > 0 ? s.respawnIn(Math.ceil(you.respawn / 60)) : "…")
   }
 
   chat(name: string, team: Team | null, text: string) {
@@ -435,6 +458,7 @@ export class Hud {
   private drawnPressed = -1
   private drawnToggles = -1
   private drawnUse: TouchView["use"] | undefined = undefined
+  private drawnReload: boolean | undefined = undefined
   private drawnPicker: readonly PickerEntry[] | null | undefined = undefined
 
   /**
@@ -464,7 +488,11 @@ export class Hud {
       this.drawnUse = view.use
       const use = $("touch-use")
       use.classList.toggle("hidden", !view.use)
-      use.textContent = view.use === "dismount" ? t().hud.touchLeave : t().hud.touchUse
+      use.textContent = view.use === "dismount" ? t().hud.touchLeave : view.use === "tear" ? t().hud.touchTear : t().hud.touchUse
+    }
+    if (view.reload !== this.drawnReload) {
+      this.drawnReload = view.reload
+      $("touch-reload").classList.toggle("hidden", !view.reload)
     }
     if (view.picker !== this.drawnPicker) {
       this.drawnPicker = view.picker
@@ -482,17 +510,68 @@ export class Hud {
   }
 }
 
+/** A weapon slot in the HUD's panel: its key, what is (or would be) in it, and whether it is in hand, carried or not had. */
+export interface HudSlot {
+  readonly key: string
+  readonly id: WeaponId
+  readonly state: "inHand" | "owned" | "missing"
+}
+
+const SLOT_CLASS = { inHand: "on", owned: "", missing: "off" } as const satisfies Record<HudSlot["state"], string>
+
+/**
+ * The HUD's weapon panel: the slots, and whether the bombs and mines are listed (`sidearms`). With
+ * the full kit, all four slots, the Lanciafrico greyed out until it is picked up. Under single
+ * weapon only what the player can have: the primary, the Mescul, and the casot's panel while it is
+ * carried; no pistol, no Lanciafrico, no bombs or mines.
+ */
+export function hudSlots(a: ArsenalValue): { readonly slots: readonly HudSlot[]; readonly sidearms: boolean } {
+  const full = a.kit === "full"
+  const slot = (key: string, id: WeaponId): HudSlot => ({ key, id, state: id === a.current ? "inHand" : owned(a, id) ? "owned" : "missing" })
+  const power = a.power ?? (full ? "lanciafrico" : null)
+  const slots = [slot("1", a.primary), ...(full ? [slot("2", "mandi")] : []), ...(power ? [slot("3", power)] : []), slot("4", "mescul")]
+  return { slots, sidearms: full }
+}
+
+/** Where a death is seen: the match's phase, the room's mode, and whether the player has been on the map, alive, in this match. */
+export interface DeathAt {
+  readonly phase: PhaseView["tag"]
+  readonly mode: ModeId
+  readonly played: boolean
+}
+
+/**
+ * What the death screen shows. Nothing to somebody not on the map, alive, or in the Muster, nor to
+ * somebody who has not played this match yet (entered it, and about to come on, or entered during
+ * its results). `nextMatch`, instead of a death, to somebody who entered a Tampieste after its
+ * start: one life, so they play from the next match. Else the death: with the key that opens the
+ * armoury (`armoury`) only in a training, the one place the primary changes, for in a match it is
+ * fixed until the Muster; and in a live Tampieste, where the dead do not come back, that they
+ * watch until the end (`spectate`).
+ */
+export type DeathScreen =
+  | { readonly tag: "none" }
+  | { readonly tag: "nextMatch" }
+  | { readonly tag: "dead"; readonly armoury: boolean; readonly spectate: boolean }
+
+export function deathScreen(you: { readonly alive: boolean } | null, at: DeathAt): DeathScreen {
+  if (!you || you.alive || at.phase === "Muster") return { tag: "none" }
+  const oneLife = at.mode === "tampieste" && at.phase === "Live"
+  if (!at.played) return oneLife ? { tag: "nextMatch" } : { tag: "none" }
+  return { tag: "dead", armoury: isTraining(at.mode), spectate: oneLife }
+}
+
 export function boardHtml(rows: readonly BoardRow[], me: string) {
   return (["benandanti", "malandanti"] as const)
     .map((team) => {
       const list = rows.filter((r) => r.team === team).sort((a, b) => b.score - a.score)
       const info = t().teams[team]
       return `<h3 style="color:${TEAM_INFO[team].color}">${info.name} <small style="color:var(--muted);font-size:13px">· ${info.motto}</small></h3>
-      <table><tr>${t().hud.board.map((h) => `<th>${h}</th>`).join("")}</tr>
+      <table><tr>${t().hud.board.map((h, i) => (i === 1 ? `<th class="primary">${h}</th>` : `<th>${h}</th>`)).join("")}</tr>
       ${list
         .map(
           (r) =>
-            `<tr class="${r.id === me ? "me" : ""}"><td>${esc(r.name)}${r.bot ? " 🤖" : ""}</td><td>${r.score}</td><td>${r.kills}</td><td>${r.deaths}</td><td>${r.assists}</td><td>${r.caps}</td><td>${r.best}</td><td>${r.bot ? "—" : r.ping}</td></tr>`
+            `<tr class="${r.id === me ? "me" : ""}"><td>${esc(r.name)}${r.bot ? " 🤖" : ""}</td><td class="primary"><span class="long">${t().weapons[r.primary].name}</span><span class="short">${t().weapons[r.primary].short}</span></td><td>${r.score}</td><td>${r.kills}</td><td>${r.deaths}</td><td>${r.assists}</td><td>${r.caps}</td><td>${r.best}</td><td>${r.bot ? "—" : r.ping}</td></tr>`
         )
         .join("")}</table>`
     })
@@ -509,6 +588,14 @@ export function rosterHtml(room: RoomInfo, me: string) {
           .join("")}</ul>`
     )
     .join("")
+}
+
+/** The match menu's primary: read-only in a match, with its class and where it is changed. */
+export function primaryHtml(shown: MenuPrimary) {
+  if (shown.tag !== "fixed") return ""
+  const s = t()
+  const figures = classFigures(s, shown.primary).map(([label, value]) => `<span class="stat figure">${label}<b>${value}</b></span>`).join("")
+  return `<div class="muted">${s.pause.primary}</div><div class="pause-primary-name">${s.weapons[shown.primary].name}</div><div class="pause-primary-figures">${figures}</div><p class="muted">${s.pause.primaryFixed}</p>`
 }
 
 export { esc }

@@ -205,9 +205,20 @@ resize()
 
 const clock = new THREE.Clock()
 let t = 0
+// frames per second over half a second, for `scripts/render-fps.ts`
+let frames = 0
+let fpsT = performance.now()
+let fps = 0
 function frame() {
   const dt = Math.min(clock.getDelta(), 0.05) * force.timeScale
   t += dt
+  frames++
+  const now = performance.now()
+  if (now - fpsT > 500) {
+    fps = (frames * 1000) / (now - fpsT)
+    frames = 0
+    fpsT = now
+  }
   renderer.info.reset()
 
   for (const a of actors) {
@@ -315,6 +326,7 @@ function frame() {
     vm.camera.updateProjectionMatrix()
     fpCam.updateMatrixWorld()
     style.render(scene, fpCam, fixedCam ? null : vm)
+    info.textContent = `fps ${fps.toFixed(0)}  weapon: ${WEAPON_IDS[wIndex]}`
     requestAnimationFrame(frame)
     return
   }
@@ -338,7 +350,7 @@ function frame() {
   renderer.render(vm.scene, vm.camera)
   renderer.setScissorTest(false)
 
-  info.textContent = `weapon: ${WEAPON_IDS[wIndex]}   [1-6 weapon, F fire, R reload, G bomb, E explosion, P ${auto ? "pause" : "resume"} cycle]\ndraw calls: ${renderer.info.render.calls}`
+  info.textContent = `fps ${fps.toFixed(0)}  weapon: ${WEAPON_IDS[wIndex]}   [1-6 weapon, F fire, R reload, G bomb, E explosion, P ${auto ? "pause" : "resume"} cycle]\ndraw calls: ${renderer.info.render.calls}`
   requestAnimationFrame(frame)
 }
 renderer.info.autoReset = false

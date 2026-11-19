@@ -1,11 +1,11 @@
 /**
  * The moving parts: pickups, frico flags, the culine (hill) circle,
  * the cjar on its track (Spingi il Cjar), the storm wall (La Tampieste),
- * the mitraie turrets that turn and heat up, the doors to break down.
+ * the mitraie turrets that turn and heat up, the doors to break down, the casot's panel to tear off.
  */
 import * as THREE from "three"
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js"
-import { TEAMS, type MapDef, type PickupKind, type Team } from "../../shared/map.ts"
+import { TEAMS, type MapDef, type PanelDef, type PickupKind, type Team } from "../../shared/map.ts"
 import { TURRET } from "../../shared/weapons.ts"
 import type { WorldFrame } from "../contracts.ts"
 
@@ -263,6 +263,47 @@ function doorModel(min: readonly number[], max: readonly number[]) {
   return g
 }
 
+/**
+ * A panel in its wall (the size of its block): weathered planks with battens on the inward side.
+ * `board` is what comes away; `gap` is what stays once it has: splintered plank ends on the sill
+ * and under the lintel, shown only then.
+ */
+function panelModel(p: PanelDef) {
+  const g = new THREE.Group()
+  const w = Math.abs(p.max[0] - p.min[0]) * Math.abs(p.inward[2]) + Math.abs(p.max[2] - p.min[2]) * Math.abs(p.inward[0])
+  const h = p.max[1] - p.min[1]
+  const d = 0.06
+  const plank = new THREE.MeshLambertMaterial({ color: "#86603c" })
+  const dark = new THREE.MeshLambertMaterial({ color: "#5c3f26" })
+  const board = new THREE.Group()
+  const n = 4
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w / n - 0.012, h - 0.01, d), i % 2 ? dark : plank)
+    m.position.x = -w / 2 + (w * (i + 0.5)) / n
+    board.add(m)
+  }
+  for (const y of [-h * 0.3, h * 0.3]) {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w - 0.06, 0.08, 0.03), dark)
+    b.position.set(0, y, d / 2 + 0.015)
+    board.add(b)
+  }
+  g.add(board)
+  const gap = new THREE.Group()
+  for (let i = 0; i < 7; i++) {
+    const top = i % 2 === 0
+    const s = new THREE.Mesh(new THREE.BoxGeometry(0.05 + (i % 3) * 0.03, 0.05 + ((i * 7) % 5) * 0.025, 0.04), i % 3 ? plank : dark)
+    s.position.set(-w / 2 + 0.07 + (i * (w - 0.14)) / 6, top ? h / 2 - 0.03 : -h / 2 + 0.03, 0)
+    s.rotation.z = ((i * 37) % 9 - 4) * 0.06
+    gap.add(s)
+  }
+  gap.visible = false
+  g.add(gap)
+  g.position.set((p.min[0] + p.max[0]) / 2, (p.min[1] + p.max[1]) / 2, (p.min[2] + p.max[2]) / 2)
+  // the board's face looks out of the wall, its battens into the room
+  g.rotation.y = Math.atan2(p.inward[0], p.inward[2])
+  return { g, board, gap }
+}
+
 export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | null, map: MapDef) {
   const { pickups: PICKUPS, hill: HILL, track: TRACK } = map
   // --- turrets and doors ---
@@ -276,6 +317,16 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
     const g = doorModel(d.min, d.max)
     scene.add(g)
     return { g, rest: g.position.clone() }
+  })
+  const panels = (map.panels ?? []).map((p) => {
+    const m = panelModel(p)
+    scene.add(m.g)
+    // the same board lying flat on the ground, where its carrier fell
+    const loose = panelModel(p).g
+    loose.rotation.set(-Math.PI / 2, 0, 0.4)
+    loose.visible = false
+    scene.add(loose)
+    return { ...m, loose }
   })
   // The training's gates: drawn only while they close the way. Open is how a plain map's physics starts.
   const gates = (map.gates ?? []).map((g) => {
@@ -552,6 +603,20 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
         d.g.rotation.set(hurt * 0.05, hurt * 0.12, hurt * 0.04)
         d.g.position.set(d.rest.x, d.rest.y - hurt * 0.04, d.rest.z)
       })
+      for (let i = 0; i < panels.length; i++) {
+        // null is "off", its gap open; a panel the frame does not mention is on its wall
+        const tear = i < frame.panels.length ? frame.panels[i] : 0
+        const p = panels[i]
+        p.board.visible = tear !== null
+        p.gap.visible = tear === null
+        // while being torn off it shakes and leans into the room, more as the tear goes on
+        const k = tear ?? 0
+        p.board.rotation.set(Math.sin(t * 31) * 0.03 * k, 0, Math.sin(t * 23) * 0.02 * k)
+        p.board.position.z = 0.06 * k
+        const lying = frame.lyingPanels[i] ?? null
+        p.loose.visible = lying !== null
+        if (lying) p.loose.position.set(lying[0], lying[1] + 0.04, lying[2])
+      }
       for (let i = 0; i < gates.length; i++) gates[i].visible = frame.gates[i] ?? false
       const c = frame.cart
       cart.visible = trail.m.visible = !!c
@@ -573,7 +638,9 @@ export function createDynamic(scene: THREE.Object3D, envMap: THREE.Texture | nul
         stormMat.uniforms.uTime.value = t
       }
       pickups.forEach((p, i) => {
-        const on = frame.pickups[i] ?? true
+        const state = frame.pickups[i] ?? "up"
+        const on = state === "up"
+        p.mesh.visible = state !== "absent"
         p.mesh.material = on ? pickMat : ghostMat
         p.mesh.position.y = p.y + Math.sin(t * 2 + p.phase) * 0.12
         p.mesh.rotation.y = t * 1.3 + p.phase
