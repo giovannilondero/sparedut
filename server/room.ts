@@ -237,6 +237,8 @@ export class Room {
     this.stationBots.delete(id)
     if (!this.arriving.delete(id) && m.place === "inMatch") this.sim.leave(id)
     if (this.hostId === id) {
+      // No countdown runs without the host who started it: the next one starts their own.
+      this.cancelCountdown()
       const next = this.humans[0]
       if (next) {
         this.hostId = next.id

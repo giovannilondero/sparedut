@@ -508,6 +508,22 @@ describe("the Muster on the game server", () => {
     expect(other.last("snap")!.you?.alive).toBe(true)
   })
 
+  test("the host leaving during the countdown cancels it: the room stays in the Muster under the new host until they start", () => {
+    const { play, host, other, otherId } = twoHumans()
+    host.say({ t: "start" })
+    play(60)
+    host.say({ t: "leave" })
+    expect(other.last("room")!.room.hostId).toBe(otherId)
+    play(2)
+    expect(other.last("snap")!.phase).toEqual({ tag: "Muster", starts: null })
+    play(COUNTDOWN_TICKS * 2)
+    expect(other.last("snap")!.phase).toEqual({ tag: "Muster", starts: null })
+    // The only human left, the new host's own start goes live at once.
+    other.say({ t: "start" })
+    play(2)
+    expect(other.last("snap")!.phase.tag).toBe("Live")
+  })
+
   test("the room list shows the Muster as a room's phase, then the match", () => {
     const { connect, play } = harness(HOSTS[0].make)
     const host = connect()
