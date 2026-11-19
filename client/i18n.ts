@@ -313,10 +313,10 @@ const KEYS_FUR = [
   ["F", "mine di Raibl"],
   ["Tab", "classifiche"],
   ["Invio", "chat · <kbd>V</kbd> frasis sveltis"],
-  ["B", "armarie"],
+  ["B", "armarie (te Dutrine)"],
   ["Esc", "menù de partide · indaûr"],
   ["F3", "prestazions"],
-  ["🎮 DualShock", "stick çamp môf · stick dret cjale · <kbd>R2</kbd> spare · <kbd>L2</kbd> mire · <kbd>✕</kbd> salte · <kbd>◯</kbd> sbassiti · <kbd>L3</kbd> cor · <kbd>▢</kbd> torne a cjamâ · <kbd>△</kbd> arme dopo · crôs armis · <kbd>R3</kbd> mescul · <kbd>L1</kbd> bombe · <kbd>R1</kbd> mine · <kbd>Share</kbd> classifiche · <kbd>Touchpad</kbd> armarie · <kbd>Options</kbd> menù"]
+  ["🎮 DualShock", "stick çamp môf · stick dret cjale · <kbd>R2</kbd> spare · <kbd>L2</kbd> mire · <kbd>✕</kbd> salte · <kbd>◯</kbd> sbassiti · <kbd>L3</kbd> cor · <kbd>▢</kbd> torne a cjamâ · <kbd>△</kbd> arme dopo · crôs armis · <kbd>R3</kbd> mescul · <kbd>L1</kbd> bombe · <kbd>R1</kbd> mine · <kbd>Share</kbd> classifiche · <kbd>Touchpad</kbd> armarie (te Dutrine) · <kbd>Options</kbd> menù"]
 ]
 
 const KEYS_IT = [
@@ -331,10 +331,10 @@ const KEYS_IT = [
   ["F", "mina di Raibl"],
   ["Tab", "classifica"],
   ["Invio", "chat · <kbd>V</kbd> frasi rapide"],
-  ["B", "armeria"],
+  ["B", "armeria (nella Dutrine)"],
   ["Esc", "menu partita · indietro"],
   ["F3", "prestazioni"],
-  ["🎮 DualShock", "stick sinistro muoviti · stick destro guarda · <kbd>R2</kbd> spara · <kbd>L2</kbd> mira · <kbd>✕</kbd> salta · <kbd>◯</kbd> accucciati · <kbd>L3</kbd> corri · <kbd>▢</kbd> ricarica · <kbd>△</kbd> arma dopo · croce armi · <kbd>R3</kbd> mescul · <kbd>L1</kbd> bomba · <kbd>R1</kbd> mina · <kbd>Share</kbd> classifica · <kbd>Touchpad</kbd> armeria · <kbd>Options</kbd> menu"]
+  ["🎮 DualShock", "stick sinistro muoviti · stick destro guarda · <kbd>R2</kbd> spara · <kbd>L2</kbd> mira · <kbd>✕</kbd> salta · <kbd>◯</kbd> accucciati · <kbd>L3</kbd> corri · <kbd>▢</kbd> ricarica · <kbd>△</kbd> arma dopo · croce armi · <kbd>R3</kbd> mescul · <kbd>L1</kbd> bomba · <kbd>R1</kbd> mina · <kbd>Share</kbd> classifica · <kbd>Touchpad</kbd> armeria (nella Dutrine) · <kbd>Options</kbd> menu"]
 ]
 
 const keysHtml = (rows: string[][]) => rows.map(([k, d]) => `<div><kbd>${k}</kbd> ${d}</div>`).join("")
