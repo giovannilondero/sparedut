@@ -466,6 +466,6 @@ test("the icon's shortcut presses the home screen's own \"Zuie cuintri i bot\" b
   const { model } = menu({ lastMode: "frico", lastMap: "trincee", lastMinutes: 20, lastBots: 6, lastLevel: "plevan" })
   expect(model.press(action.button)).toEqual({
     kind: "send",
-    request: { t: "create", oneTap: true, room: { mode: "frico", map: "trincee", minutes: 20, reach: "offline", bots: 6, level: "plevan", ff: false } }
+    request: { t: "create", room: { mode: "frico", map: "trincee", minutes: 20, reach: "offline", bots: 6, level: "plevan", ff: false, single: null } }
   })
 })
