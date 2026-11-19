@@ -191,6 +191,26 @@ test("a pick back to the room's primary while another is on its way is sent too,
   expect(model.snapshot(snap({ tag: "Muster", starts: null }, 30))).toEqual({ t: "primary", p: "miedi" })
 })
 
+test("a room message about somebody else, arriving before a pick on its way lands, does not make the last pick forgotten", () => {
+  const model = muster("mariute")
+  expect(model.pick("mulin")).toEqual({ t: "primary", p: "mulin" })
+  expect(model.pick("miedi")).toBeNull()
+  // Toni marks himself ready: the room's message still has Mariute with the Miedi, the Mulin not there yet.
+  model.room(room({ roster: room().roster.map((r) => (r.id === "toni" ? { ...r, ready: true } : r)) }))
+  // Then the Mulin lands. The last pick was the Miedi: it goes after it.
+  model.room(room({ roster: room().roster.map((r) => (r.id === "mariute" ? { ...r, primary: "mulin" } : r)) }))
+  expect(open(model).picker.chosen).toBe("miedi")
+  expect(model.snapshot(snap({ tag: "Muster", starts: null }, 30))).toEqual({ t: "primary", p: "miedi" })
+})
+
+test("a pick is not held back by a send from before the room's ticks started again", () => {
+  const model = muster("mariute")
+  model.snapshot(snap({ tag: "Muster", starts: null }, 5000))
+  expect(model.pick("mulin")).toEqual({ t: "primary", p: "mulin" })
+  // A new match's world counts from zero again, and the room still has the Miedi: the pick goes again at once.
+  expect(model.snapshot(snap({ tag: "Muster", starts: null }, 3))).toEqual({ t: "primary", p: "mulin" })
+})
+
 test("under single weapon the picker is locked on the host's choice and a press sends nothing", () => {
   const model = muster("mariute", room({ single: "cjampanili" }))
   expect(open(model).picker).toMatchObject({ locked: true, chosen: "cjampanili" })
