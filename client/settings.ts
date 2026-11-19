@@ -73,7 +73,11 @@ export const TRAINING_INVITATIONS = ["open", "dismissed", "started"] as const
 export type TrainingInvitation = (typeof TRAINING_INVITATIONS)[number]
 const TrainingInvitationSchema = z.enum(TRAINING_INVITATIONS)
 
-const KEY = "sparedut.settings"
+/**
+ * Where the settings are kept in `localStorage`. `client/public/boot.js` reads it too, written out:
+ * it runs before the bundle as a plain script and cannot import it.
+ */
+export const SETTINGS_KEY = "sparedut.settings"
 const DEFAULTS: Settings = {
   name: "",
   lang: "fur",
@@ -99,7 +103,7 @@ const DEFAULTS: Settings = {
 
 export function loadSettings(): Settings {
   try {
-    const saved: Partial<Settings> = JSON.parse(localStorage.getItem(KEY) ?? "{}")
+    const saved: Partial<Settings> = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}")
     const s: Settings = { ...DEFAULTS, ...saved }
     // A value saved by an old version (or a removed map) falls back to the default.
     if (!ROOM_MAP_IDS.includes(s.lastMap)) s.lastMap = DEFAULTS.lastMap
@@ -130,7 +134,7 @@ export function trainingProgressed(p: TrainingProgress, e: GameEvent): TrainingP
 }
 
 export function saveSettings(s: Settings) {
-  localStorage.setItem(KEY, JSON.stringify(s))
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s))
 }
 
 /**

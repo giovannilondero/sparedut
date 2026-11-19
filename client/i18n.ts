@@ -135,6 +135,8 @@ export interface Strings {
     readonly stranger: string
     readonly invite: Fn
     readonly inviteNeedName: Fn
+    /** The installed game's shortcut, "Zuie cuintri i bot", used with no name: nothing starts. */
+    readonly shortcutNeedName: string
     readonly retry: string
     readonly down: string
     readonly lost: string
@@ -618,6 +620,7 @@ const fur: Strings = {
     stranger: "forest",
     invite: (code) => `Invît a la partide ${code}…`,
     inviteNeedName: (code) => `Scrîf il to non e jentre cul codiç ${code}`,
+    shortcutNeedName: "Scrîf il to non e frache «Zuie cuintri i bot»",
     retry: "Server no rivât. O torni a provâ…",
     down: "Il server nol rispuint. Isal impiât? (pnpm dev)",
     lost: "Conession pierdude. Mandi!",
@@ -1071,6 +1074,7 @@ const it: Strings = {
     stranger: "forestiero",
     invite: (code) => `Invito alla partita ${code}…`,
     inviteNeedName: (code) => `Scrivi il tuo nome ed entra col codice ${code}`,
+    shortcutNeedName: "Scrivi il tuo nome e tocca «Gioca contro i bot»",
     retry: "Server non raggiunto. Riprovo…",
     down: "Il server non risponde. È acceso? (pnpm dev)",
     lost: "Connessione persa. Mandi!",

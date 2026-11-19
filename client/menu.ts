@@ -22,7 +22,7 @@ import type { GameAudio } from "./contracts.ts"
 import { esc } from "./hud.ts"
 import { onLangChange, setLang, t, type Lang } from "./i18n.ts"
 import { chooseLook, LOOK_IDS, LOOKS, type LookId } from "./looks.ts"
-import { classFigures, focusOnScreen, MenuModel, SCREENS, type CreateOptions, type Outcome, type PasswordRefusal, type PromptProblem, type Refusal, type Screen } from "./menu-model.ts"
+import { classFigures, focusOnScreen, MenuModel, SCREENS, type CreateOptions, type MenuButton, type Outcome, type PasswordRefusal, type PromptProblem, type Refusal, type Screen } from "./menu-model.ts"
 import type { PrimaryPicker } from "./match-menus.ts"
 import { oneTapRoom, type Settings } from "./settings.ts"
 
@@ -118,10 +118,7 @@ export class Menu {
       el.addEventListener("click", () => {
         audio.unlock()
         audio.play("ui_click")
-        const go = el.dataset.go!
-        if (go === "one-tap") this.apply(this.model.oneTap())
-        else if (go === "training") this.apply(this.model.training())
-        else this.go(go as Screen)
+        this.press(el.dataset.go as MenuButton)
       })
     }
     for (const el of document.querySelectorAll<HTMLButtonElement>("[data-lang]")) {
@@ -215,9 +212,12 @@ export class Menu {
     this.apply(this.model.go(screen))
   }
 
-  /** The home screen's one-tap match, asked for from outside it: the training's completion screen. */
-  oneTap() {
-    this.apply(this.model.oneTap())
+  /**
+   * A `data-go` button pressed: by the player, or from outside the menu for them (the training's
+   * completion screen and the installed game's shortcut press the home screen's one-tap button).
+   */
+  press(button: MenuButton) {
+    this.apply(this.model.press(button))
   }
 
   /** Acts on the model's answer: sends the request, shows why it was refused, or draws the new screen. */

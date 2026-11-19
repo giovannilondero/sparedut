@@ -32,6 +32,7 @@ import type { Connection } from "./connection.ts"
 import { inviteLink } from "./invite.ts"
 import { requestFullscreen } from "./fullscreen.ts"
 import { MatchClock } from "./match-clock.ts"
+import { ScreenWake, type WakeLocker } from "./screen-wake.ts"
 import { Predictor } from "./predict.ts"
 import type { Settings } from "./settings.ts"
 // UI SDK's dialog holds each in-match menu: focus moved in and kept inside. The game's own Esc steps close them.
@@ -226,6 +227,8 @@ export class Game {
   /** Stands still while an Offline match is paused: on resume, the pause never happened. */
   private clock = new MatchClock(() => performance.now())
   private running = false
+  /** The screen held awake while the match is on (`screen-wake.ts`): on every device, where the browser lets it. */
+  private readonly wake = new ScreenWake((navigator as { wakeLock?: WakeLocker }).wakeLock)
   private readonly blobGeo = new THREE.CircleGeometry(0.42, 20).rotateX(-Math.PI / 2)
   private readonly blobMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false })
   private readonly deathCam = new THREE.Vector3()
@@ -281,7 +284,10 @@ export class Game {
       if (e.key === "Escape") this.closeChat()
     })
     d.net.on((msg) => this.running && this.message(msg))
-    document.addEventListener("visibilitychange", () => this.syncPause())
+    document.addEventListener("visibilitychange", () => {
+      this.syncPause()
+      this.syncWake()
+    })
     // Before UI SDK's own listener closes the list: an Esc that finds the bot-skill list open is the list's.
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") this.escapeInPopup = document.querySelector("#hud ui-select-content[data-open]") !== null
@@ -1010,6 +1016,7 @@ export class Game {
     }
     this.showMenus(previous, focus)
     this.syncPause()
+    this.syncWake()
   }
 
   /**
@@ -1092,6 +1099,11 @@ export class Game {
     else this.clock.resume()
     // Leaving the match is no resume: the room is already gone.
     if (this.running) this.d.net.send({ t: "pause", paused })
+  }
+
+  /** Holds the screen awake during the match; the browser dropped the lock on hiding, so coming back takes it again. */
+  private syncWake() {
+    this.wake.sync({ inMatch: this.running, inMatchMenu: this.overlay !== "none", visible: !document.hidden })
   }
 
   /** The match menu: drawn whole when it opens (or the host changes), else only what a room or phase update changes, so focus and the open skill list stay. */

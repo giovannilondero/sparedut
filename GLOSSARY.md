@@ -40,6 +40,18 @@ A room setting that gives every player the same primary, chosen by the host, and
 _Italian_: Arma unica
 _Avoid_: Single-weapon mode, modalità arma singola, weapon lock
 
+### On a device
+
+**Installed game**:
+The game added to a device's home screen and opened from its icon, without the browser's bars, rather than from a browser tab.
+_Italian_: App installata
+_Avoid_: PWA, web app, native app
+
+**No network**:
+The device has no connection at all. The game still opens once it has been opened online, and only Offline rooms and the training can be played. It is a state of the device, not a reach.
+_Italian_: Senza rete
+_Avoid_: Offline (when meaning the device's connection)
+
 ### Training
 
 **Training**:

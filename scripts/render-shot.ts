@@ -8,54 +8,87 @@
  * `SIZE=390x844` emulates a viewport of that size (a headless window cannot be narrower than
  * 500 px, so a phone needs it); below 1000 px wide it is a mobile one. `SCALE=2` sets the
  * device pixel ratio.
+ *
+ * `shoot` is the same from another script (`scripts/showcase.ts`).
  */
-export {}
 
-const [url, out, wait = "6", script] = process.argv.slice(2)
-if (!url || !out) throw new Error("usage: bun scripts/render-shot.ts <url> <out.png> [seconds] [js]")
-const browser = process.env.BROWSER ?? "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
-const port = 9300 + Math.floor(Math.random() * 500)
-const child = Bun.spawn([browser, "--headless=new", "--mute-audio", "--use-angle=metal", "--enable-gpu", "--hide-scrollbars", "--window-size=1280,720", `--remote-debugging-port=${port}`, `--user-data-dir=/tmp/render-shot-${port}`, url], { stdout: "ignore", stderr: "ignore" })
-try {
-  let socket: WebSocket | null = null
-  for (let i = 0; i < 50 && !socket; i++) {
-    await Bun.sleep(200)
-    const tabs = await fetch(`http://127.0.0.1:${port}/json`).then((r) => r.json() as Promise<{ type: string; url: string; webSocketDebuggerUrl: string }[]>, () => [])
-    const tab = tabs.find((t) => t.type === "page" && t.url.startsWith("http"))
-    if (tab) socket = new WebSocket(tab.webSocketDebuggerUrl)
+export interface Shot {
+  /** The page: `http(s)://` or `file://`. */
+  readonly url: string
+  /** The PNG written. */
+  readonly out: string
+  /** Seconds the page runs before the shot. */
+  readonly wait?: number
+  /** Run in the page before its own scripts, from the first load (settings in `localStorage`…). */
+  readonly setup?: string
+  /** Run in the page after the wait; the shot follows 1.5 s later. */
+  readonly script?: string
+  /** The emulated viewport, `[width, height]`; below 1000 px wide it is a mobile one. */
+  readonly size?: readonly [number, number]
+  /** The device pixel ratio, with `size`. */
+  readonly scale?: number
+  /** Emulate a touch screen (a phone's touch controls), with `size`. */
+  readonly touch?: boolean
+}
+
+export async function shoot({ url, out, wait = 6, setup, script, size, scale = 1, touch = false }: Shot): Promise<string> {
+  const browser = process.env.BROWSER ?? "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
+  const port = 9300 + Math.floor(Math.random() * 500)
+  const child = Bun.spawn([browser, "--headless=new", "--mute-audio", "--use-angle=metal", "--enable-gpu", "--hide-scrollbars", "--allow-file-access-from-files", "--window-size=1280,720", `--remote-debugging-port=${port}`, `--user-data-dir=/tmp/render-shot-${port}`, url], { stdout: "ignore", stderr: "ignore" })
+  try {
+    let socket: WebSocket | null = null
+    for (let i = 0; i < 50 && !socket; i++) {
+      await Bun.sleep(200)
+      const tabs = await fetch(`http://127.0.0.1:${port}/json`).then((r) => r.json() as Promise<{ type: string; url: string; webSocketDebuggerUrl: string }[]>, () => [])
+      const tab = tabs.find((t) => t.type === "page" && /^(https?|file):/.test(t.url))
+      if (tab) socket = new WebSocket(tab.webSocketDebuggerUrl)
+    }
+    if (!socket) throw new Error(`the browser did not open ${url}`)
+    const ws = socket
+    await new Promise((resolve) => (ws.onopen = resolve))
+    let next = 1
+    const call = (method: string, params: object = {}) =>
+      new Promise<Record<string, any>>((resolve) => {
+        const id = next++
+        const on = (e: MessageEvent) => {
+          const m = JSON.parse(String(e.data))
+          if (m.id !== id) return
+          ws.removeEventListener("message", on)
+          resolve(m.result ?? {})
+        }
+        ws.addEventListener("message", on)
+        ws.send(JSON.stringify({ id, method, params }))
+      })
+    if (size) {
+      const [width, height] = size
+      await call("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: scale, mobile: width < 1000 })
+      if (touch) await call("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 })
+    }
+    if (setup) {
+      await call("Page.enable")
+      await call("Page.addScriptToEvaluateOnNewDocument", { source: setup })
+    }
+    // The page loaded before the device was emulated and the setup added: loaded again, it has both from the start (a phone's coarse pointer, its viewport).
+    if (size || setup) await call("Page.reload")
+    await Bun.sleep(wait * 1000)
+    if (script) {
+      await call("Runtime.evaluate", { expression: script, awaitPromise: true })
+      await Bun.sleep(1500)
+    }
+    const shot = await call("Page.captureScreenshot", { format: "png" })
+    await Bun.write(out, Buffer.from(shot.data, "base64"))
+    return out
+  } finally {
+    child.kill()
+    await child.exited
+    // The profile is never reused: left behind, every run keeps about 100 MB of /tmp.
+    await Bun.$`rm -rf /tmp/render-shot-${port}`.quiet()
   }
-  if (!socket) throw new Error(`the browser did not open ${url}`)
-  const ws = socket
-  await new Promise((resolve) => (ws.onopen = resolve))
-  let next = 1
-  const call = (method: string, params: object = {}) =>
-    new Promise<Record<string, any>>((resolve) => {
-      const id = next++
-      const on = (e: MessageEvent) => {
-        const m = JSON.parse(String(e.data))
-        if (m.id !== id) return
-        ws.removeEventListener("message", on)
-        resolve(m.result ?? {})
-      }
-      ws.addEventListener("message", on)
-      ws.send(JSON.stringify({ id, method, params }))
-    })
+}
+
+if (import.meta.main) {
+  const [url, out, wait = "6", script] = process.argv.slice(2)
+  if (!url || !out) throw new Error("usage: bun scripts/render-shot.ts <url> <out.png> [seconds] [js]")
   const size = process.env.SIZE?.match(/^(\d+)x(\d+)$/)
-  if (size) {
-    const [width, height] = [Number(size[1]), Number(size[2])]
-    await call("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: Number(process.env.SCALE ?? 1), mobile: width < 1000 })
-  }
-  await Bun.sleep(Number(wait) * 1000)
-  if (script) {
-    await call("Runtime.evaluate", { expression: script })
-    await Bun.sleep(1500)
-  }
-  const shot = await call("Page.captureScreenshot", { format: "png" })
-  await Bun.write(out, Buffer.from(shot.data, "base64"))
-  console.log(out)
-} finally {
-  child.kill()
-  await child.exited
-  // The profile is never reused: left behind, every run keeps about 100 MB of /tmp.
-  await Bun.$`rm -rf /tmp/render-shot-${port}`.quiet()
+  console.log(await shoot({ url, out, wait: Number(wait), script, size: size ? [Number(size[1]), Number(size[2])] : undefined, scale: Number(process.env.SCALE ?? 1) }))
 }
