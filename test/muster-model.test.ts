@@ -65,6 +65,7 @@ test("the room's roster shows as two teams, each member with their primary, read
   expect(view.sides).toEqual({
     tag: "teams",
     mine: "malandanti",
+    canSwitch: true,
     benandanti: [{ id: "toni", name: "Toni", primary: "mulin", ready: false, bot: false, host: true, me: false }],
     malandanti: [
       { id: "bot-1", name: "Pieri", primary: "cramar", ready: true, bot: true, host: false, me: false },
@@ -183,6 +184,22 @@ test("joining a match already on: the score and the time left, and a confirm tha
   // Entered: on the map, and the screen closes.
   model.room(room({ phase: "Live" }))
   expect(model.view.tag).toBe("closed")
+})
+
+test("joining a match already on, the switch is offered only where the room would take it", () => {
+  const bepi = member("bepi", { name: "Bepi" })
+  // Two a side counting Mariute, and no bot among the Benandanti to swap: the move would unbalance them.
+  const even = muster("mariute", joined({ roster: [...joined().roster, bepi] }), { tag: "Live", ends: 6000 })
+  expect(open(even).sides).toMatchObject({ tag: "teams", mine: "malandanti", canSwitch: false })
+  expect(even.switchTeam()).toBeNull()
+  // One against two: to the smaller side, taken.
+  const uneven = muster("mariute", joined(), { tag: "Live", ends: 6000 })
+  expect(open(uneven).sides).toMatchObject({ canSwitch: true })
+  expect(uneven.switchTeam()).toEqual({ t: "team", team: "benandanti" })
+  // In the Muster the same teams can always be rearranged.
+  const mustered = muster("mariute", room({ roster: [...room().roster, bepi] }))
+  expect(open(mustered).sides).toMatchObject({ canSwitch: true })
+  expect(mustered.switchTeam()).toEqual({ t: "team", team: "benandanti" })
 })
 
 test("joining a Tampieste already on: who is still standing instead of a score, and play from the next match", () => {

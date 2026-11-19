@@ -1323,11 +1323,11 @@ export class Game {
     const focused = document.activeElement
     for (const team of TEAMS) {
       list(team, sides[team])
-      $(`m-to-${team}`).hidden = team === sides.mine
+      $(`m-to-${team}`).hidden = team === sides.mine || !sides.canSwitch
       $(`m-team-${team}`).classList.toggle("mine", team === sides.mine)
     }
-    // The switch pressed is gone with the move: focus goes to the one that leads back.
-    if (focused instanceof HTMLElement && focused.hidden && focused.classList.contains("mu-switch")) $(`m-to-${TEAMS.find((team) => team !== sides.mine)}`).focus()
+    // The switch pressed is gone with the move: focus goes to the one that leads back, if it is offered.
+    if (focused instanceof HTMLElement && focused.hidden && focused.classList.contains("mu-switch") && sides.canSwitch) $(`m-to-${TEAMS.find((team) => team !== sides.mine)}`).focus()
   }
 
   /** A primary's health and speed: the armoury's figures, each with a bar to compare at a glance. */

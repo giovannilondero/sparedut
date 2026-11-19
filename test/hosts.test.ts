@@ -571,6 +571,59 @@ describe("joining a match already on, on the game server", () => {
     expect(late.last("board")!.rows.find((r) => r.id === you)?.team).toBe(team)
   })
 
+  test("members who have not entered cannot unbalance the teams: two joiners asking for the same side leave them even", () => {
+    const h = harness(HOSTS[0].make)
+    const host = h.connect()
+    // Three a side.
+    host.say({ ...HOSTS_CREATE.online, bots: 3 })
+    host.say({ t: "start" })
+    h.play(60)
+    const code = host.last("joined")!.room.code
+    const joiners = [h.connect("10.0.0.1"), h.connect("10.0.0.2")]
+    for (const c of joiners) {
+      c.say(join(code))
+      c.say({ t: "team", team: "malandanti" })
+    }
+    for (const c of joiners) c.say({ t: "enter" })
+    h.play(120)
+    const rows = host.last("board")!.rows
+    const count = (team: string) => rows.filter((r) => r.team === team).length
+    expect(rows).toHaveLength(8)
+    expect(count("benandanti")).toBe(4)
+    expect(count("malandanti")).toBe(4)
+  })
+
+  test("while a match is on, a switch onto the larger team with no bot on it to swap is refused, for a member on the map and one who has not entered", () => {
+    const h = harness(HOSTS[0].make)
+    const host = h.connect()
+    host.say({ ...HOSTS_CREATE.online, bots: 0 })
+    const hostId = host.last("joined")!.you
+    const code = host.last("joined")!.room.code
+    const friend = h.connect("10.0.0.1")
+    friend.say(join(code))
+    host.say({ t: "start" })
+    friend.say({ t: "ready", ready: true })
+    h.play(10)
+    expect(host.last("snap")!.phase.tag).toBe("Live")
+    const team = (id: string) => host.last("room")!.room.roster.find((r) => r.id === id)?.team
+    const first = h.connect("10.0.0.2")
+    first.say(join(code))
+    const firstId = first.last("joined")!.you
+    // Seated on the smaller side, the Benandanti; the Malandanti, smaller after it, take it.
+    expect(team(firstId)).toBe("benandanti")
+    first.say({ t: "team", team: "malandanti" })
+    expect(team(firstId)).toBe("malandanti")
+    const second = h.connect("10.0.0.3")
+    second.say(join(code))
+    const secondId = second.last("joined")!.you
+    expect(team(secondId)).toBe("benandanti")
+    // Two a side counting those who have not entered: neither the second joiner nor the host can make it one against three.
+    second.say({ t: "team", team: "malandanti" })
+    expect(team(secondId)).toBe("benandanti")
+    host.say({ t: "team", team: "malandanti" })
+    expect(team(hostId)).toBe("benandanti")
+  })
+
   test("a change of primary by a member who has not entered is accepted, and refused once they are on the map", () => {
     const { late, you, entry, play } = live()
     late.say({ t: "primary", p: "cjampanili" })

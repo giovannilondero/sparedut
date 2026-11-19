@@ -23,6 +23,7 @@ import {
 } from "../shared/protocol.ts"
 import { createSim, type GameEvent, type PostValue, type Sim, type WorldView } from "../shared/sim/index.ts"
 import { isTraining, TRAINING, type StationId } from "../shared/training/index.ts"
+import { teamSwitch } from "../shared/teams.ts"
 import { STATION_BOT_PRIMARY, type StationBot } from "../shared/training/station.ts"
 import type { TrainingStart } from "../shared/training/start.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
@@ -248,25 +249,24 @@ export class Room {
 
   /**
    * A member changes team. In the Muster (and in a training) it is always taken, with no bot moved:
-   * the host balances the teams with the bot tools before starting. While a match is on the teams
-   * must not become unbalanced: if the other one is not smaller, a bot of it swaps, or the switch is refused.
+   * the host balances the teams with the bot tools before starting. While a match is on, for a
+   * member on the map and one who has not entered alike, the balance rule of `teamSwitch` holds.
    */
   setTeam(id: string, team: Team) {
     const m = this.members.get(id)
     if (!m || m.team === team) return
-    // Not on a team for scoring yet: the side they will enter on, with nobody to swap.
-    if (m.place === "waiting") {
-      m.team = team
-      return
-    }
-    if (this.matchOn && this.teamCount(team) >= this.teamCount(m.team)) {
-      const swap = [...this.members.values()].find((o) => o.bot && o.team === team)
-      if (!swap) return
-      swap.team = m.team
-      this.sim.team(swap.id, m.team)
+    if (this.matchOn) {
+      const rule = teamSwitch([...this.members.values()], m.team, team)
+      if (rule.tag === "refused") return
+      if (rule.tag === "swap") {
+        const bot = this.members.get(rule.bot)!
+        bot.team = m.team
+        this.sim.team(bot.id, m.team)
+      }
     }
     m.team = team
-    this.sim.team(id, team)
+    // Not on a team for scoring yet: the side they will enter on.
+    if (m.place === "inMatch") this.sim.team(id, team)
   }
 
   /** The primary a member enters a match with: the room's single weapon when it is on, else their own. */

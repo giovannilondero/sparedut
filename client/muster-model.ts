@@ -6,6 +6,7 @@
  * draws the view and forwards the presses.
  */
 import type { Team } from "../shared/map.ts"
+import { teamSwitch } from "../shared/teams.ts"
 import { FLAG_BIT, type ClientMessage, type RoomInfo, type Snapshot } from "../shared/protocol.ts"
 import { CLASSES, PRIMARIES, type PrimaryId } from "../shared/weapons.ts"
 import { musterCountdown, musterFocus, musterScreen, primaryPicker, singleOf, startsAtOnce, type MusterMember } from "./match-menus.ts"
@@ -13,9 +14,13 @@ import { musterCountdown, musterFocus, musterScreen, primaryPicker, singleOf, st
 /** A member as the Muster lists them, marked when it is the player. */
 export type MusterRow = MusterMember & { readonly me: boolean }
 
-/** The members: two teams, the player's own named; or one list in a mode with no teams (the Tampieste). */
+/**
+ * The members: two teams, the player's own named, and whether the switch to the other is offered
+ * (always in the Muster; joining a match already on, only where the room would take it); or one
+ * list in a mode with no teams (the Tampieste).
+ */
 export type MusterSides =
-  | { readonly tag: "teams"; readonly mine: Team; readonly benandanti: readonly MusterRow[]; readonly malandanti: readonly MusterRow[] }
+  | { readonly tag: "teams"; readonly mine: Team; readonly canSwitch: boolean; readonly benandanti: readonly MusterRow[]; readonly malandanti: readonly MusterRow[] }
   | { readonly tag: "alone"; readonly members: readonly MusterRow[] }
 
 /** A primary's tile: its class's health and speed, and the same as bars from 0 to 1 to compare at a glance. */
@@ -110,6 +115,8 @@ const live = (room: RoomInfo, snap: Snap, left: number): MusterLive =>
     ? { tag: "alone", alive: snap.players.filter((p) => p.f & FLAG_BIT.alive).length, left }
     : { tag: "teams", benandanti: snap.score.benandanti, malandanti: snap.score.malandanti, percent: room.mode === "cjar", left }
 
+const other = (team: Team): Team => (team === "benandanti" ? "malandanti" : "benandanti")
+
 type Snap = Pick<Snapshot, "phase" | "tick" | "score" | "players">
 
 export class MusterModel {
@@ -133,12 +140,22 @@ export class MusterModel {
     this.snap = snap
   }
 
-  /** The switch under the other team: to that team. Nothing in a mode with no teams. */
+  /** The switch under the other team: to that team. Nothing in a mode with no teams, nor where the room would refuse it. */
   switchTeam(): ClientMessage | null {
     const room = this.info
     if (!room || alone(room.mode)) return null
-    const mine = room.roster.find((r) => r.id === this.me)?.team
-    return { t: "team", team: mine === "benandanti" ? "malandanti" : "benandanti" }
+    const mine = this.mine(room)
+    const to = other(mine)
+    return this.canSwitch(room, mine, to) ? { t: "team", team: to } : null
+  }
+
+  private mine(room: RoomInfo): Team {
+    return room.roster.find((r) => r.id === this.me)?.team ?? "benandanti"
+  }
+
+  /** In the Muster a switch is always taken; while a match is on, the room's balance rule decides. */
+  private canSwitch(room: RoomInfo, from: Team, to: Team) {
+    return this.inMuster || teamSwitch(room.roster, from, to).tag !== "refused"
   }
 
   /** A tile pressed: the player's new primary. Nothing under single weapon, whose picker is locked. */
@@ -210,7 +227,8 @@ export class MusterModel {
       ? { tag: "alone", members: rows }
       : {
           tag: "teams",
-          mine: room.roster.find((r) => r.id === this.me)?.team ?? "benandanti",
+          mine: this.mine(room),
+          canSwitch: this.canSwitch(room, this.mine(room), other(this.mine(room))),
           benandanti: rows.filter((_, i) => room.roster[i].team === "benandanti"),
           malandanti: rows.filter((_, i) => room.roster[i].team === "malandanti")
         }
