@@ -471,7 +471,7 @@ export class Room {
         (p.body.crouch ? FLAG_BIT.crouch : 0) |
         (p.body.grounded ? FLAG_BIT.grounded : 0) |
         (p.shield > 0 ? FLAG_BIT.shield : 0) |
-        (p.buttons & 1 ? FLAG_BIT.firing : 0) |
+        (p.firing ? FLAG_BIT.firing : 0) |
         (p.buttons & 2 ? FLAG_BIT.aiming : 0) |
         (carriers.has(p.session) ? FLAG_BIT.carrier : 0) |
         (p.arsenal.sgnape > 0 ? FLAG_BIT.sgnape : 0),

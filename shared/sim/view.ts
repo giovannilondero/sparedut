@@ -42,7 +42,8 @@ import {
   type TurretState
 } from "./schema.ts"
 import type { Team } from "../map.ts"
-import type { Body } from "../movement.ts"
+import { sprinting, type Body } from "../movement.ts"
+import { pressed } from "../input.ts"
 import { PANEL_TEAR_TICKS } from "../weapons.ts"
 
 export interface PlayerView {
@@ -64,6 +65,8 @@ export interface PlayerView {
   /** Last applied input and the held buttons. */
   readonly seq: number
   readonly buttons: number
+  /** The trigger held with the weapon up: not while sprinting, when the weapon is lowered and nothing fires or revs. */
+  readonly firing: boolean
 }
 
 /** A pickup as it is seen: there, taken and coming back, or not on the map for the match (the Lanciafrico under single weapon). */
@@ -256,7 +259,8 @@ export const ViewWorld = Game.Inspector(
           arsenal: data.arsenal.get(m),
           stats: data.stats.get(m),
           seq: controls.input.seq,
-          buttons: controls.input.buttons
+          buttons: controls.input.buttons,
+          firing: pressed(controls.input, "fire") && !sprinting(controls.input, motion.body.crouch)
         }
       }),
       training
