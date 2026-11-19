@@ -19,10 +19,12 @@ import {
   type Access,
   type Reached,
   type RoomAccess,
-  type Snapshot
+  type Snapshot,
+  type Place
 } from "../shared/protocol.ts"
 import { createSim, type GameEvent, type PostValue, type Sim, type WorldView } from "../shared/sim/index.ts"
 import { isTraining, TRAINING, type StationId } from "../shared/training/index.ts"
+import { teamSwitch } from "../shared/teams.ts"
 import { STATION_BOT_PRIMARY, type StationBot } from "../shared/training/station.ts"
 import type { TrainingStart } from "../shared/training/start.ts"
 import type { PrimaryId } from "../shared/weapons.ts"
@@ -37,13 +39,6 @@ const STEPS_PER_TICK = 3
 /** Steps that can accumulate during lag, to be caught up afterwards. */
 const MAX_CREDIT = 12
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
-
-/**
- * Where a member is in the match. `waiting`: they joined while a match was on and have not entered
- * it: no body, no hits, no seat on a team for scoring, until their enter intent (or the Muster).
- * `inMatch`: one of the match's players, on the map whenever the match puts them there.
- */
-export type Place = "waiting" | "inMatch"
 
 export interface Member {
   readonly id: string
@@ -142,11 +137,6 @@ export class Room {
     return !this.training && this.world.phase.tag !== "Muster"
   }
 
-  /** A member who joined a match already on and has not entered it. False for anybody else, and for a stranger. */
-  hasNotEntered(id: string): boolean {
-    return this.members.get(id)?.place === "waiting"
-  }
-
   private get seated() {
     return [...this.members.values()].filter((m) => m.place === "inMatch").length
   }
@@ -236,6 +226,8 @@ export class Room {
     this.stationBots.delete(id)
     if (!this.arriving.delete(id) && m.place === "inMatch") this.sim.leave(id)
     if (this.hostId === id) {
+      // No countdown runs without the host who started it: the next one starts their own.
+      this.cancelCountdown()
       const next = this.humans[0]
       if (next) {
         this.hostId = next.id
@@ -246,23 +238,26 @@ export class Room {
     this.goIfAllReady()
   }
 
+  /**
+   * A member changes team. In the Muster (and in a training) it is always taken, with no bot moved:
+   * the host balances the teams with the bot tools before starting. While a match is on, for a
+   * member on the map and one who has not entered alike, the balance rule of `teamSwitch` holds.
+   */
   setTeam(id: string, team: Team) {
     const m = this.members.get(id)
     if (!m || m.team === team) return
-    // Not on a team for scoring yet: the side they will enter on, with nobody to swap.
-    if (m.place === "waiting") {
-      m.team = team
-      return
-    }
-    // Don't unbalance the teams: if the other one is larger, a bot swaps.
-    if (this.teamCount(team) >= this.teamCount(m.team)) {
-      const swap = [...this.members.values()].find((o) => o.bot && o.team === team)
-      if (!swap) return
-      swap.team = m.team
-      this.sim.team(swap.id, m.team)
+    if (this.matchOn) {
+      const rule = teamSwitch([...this.members.values()], m.team, team)
+      if (rule.tag === "refused") return
+      if (rule.tag === "swap") {
+        const bot = this.members.get(rule.bot)!
+        bot.team = m.team
+        this.sim.team(bot.id, m.team)
+      }
     }
     m.team = team
-    this.sim.team(id, team)
+    // Not on a team for scoring yet: the side they will enter on.
+    if (m.place === "inMatch") this.sim.team(id, team)
   }
 
   /** The primary a member enters a match with: the room's single weapon when it is on, else their own. */
@@ -571,7 +566,7 @@ export class Room {
       minutes: this.settings.minutes,
       level: this.level,
       ff: this.settings.ff,
-      roster: [...this.members.values()].map((m) => ({ id: m.id, name: m.name, team: m.team, primary: this.primaryOf(m), ready: m.ready, bot: m.bot, away: false, onMap: m.place === "inMatch" }))
+      roster: [...this.members.values()].map((m) => ({ id: m.id, name: m.name, team: m.team, primary: this.primaryOf(m), ready: m.ready, bot: m.bot, away: false, place: m.place }))
     }
   }
 

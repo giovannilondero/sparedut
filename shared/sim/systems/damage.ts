@@ -6,8 +6,8 @@
 import { STREAK_AT } from "../../folklore.ts"
 import { foesStandDown, killsScore, spared, SPARED_HP } from "../../training/spared.ts"
 import type { KillCause } from "../events.ts"
-import { absorb, ASSIST_WINDOW_TICKS, currentStation, fromTheFront, hostile, maxHp, RESPAWN_TICKS } from "../rules.ts"
-import { Arsenal, Attackers, Damage, Game, Heal, Life, Match, Motion, Out, Panels, Player, Rules, Score, Stats, TeamOf, Tick, Training, type PanelState } from "../schema.ts"
+import { absorb, ASSIST_WINDOW_TICKS, currentStation, fromTheFront, hostile, maxHp, RESPAWN_TICKS, turretOf } from "../rules.ts"
+import { Arsenal, Attackers, Damage, Game, Heal, Life, Match, Motion, Out, Panels, Player, Rules, Score, Stats, TeamOf, Tick, Training, Turrets, type PanelState } from "../schema.ts"
 
 /** Causes that can also hit whoever launched them (the others, on oneself, count as a fall). */
 const SELF_HARM: ReadonlySet<KillCause> = new Set(["sgnape", "lanciafrico", "mine", "tampieste"])
@@ -34,7 +34,8 @@ export const ApplyDamage = Game.System(
       tick: Game.System.readResource(Tick),
       rules: Game.System.readResource(Rules),
       score: Game.System.writeResource(Score),
-      panels: Game.System.writeResource(Panels)
+      panels: Game.System.writeResource(Panels),
+      turrets: Game.System.readResource(Turrets)
     },
     events: {
       damage: Game.System.thisTick(Game.System.readEvent(Damage)),
@@ -91,8 +92,10 @@ export const ApplyDamage = Game.System(
       if (harmless && attacker && data.player.get(attacker).bot && !data.player.get(victim).bot) continue
       if (life.shield > 0 && hit.weapon !== "fall") continue
 
-      // The panel in hand takes what comes from the front, and breaks at zero.
-      const shield = data.arsenal.get(victim).current === "panel" ? panels.findIndex((p) => p._tag === "carried" && p.by === hit.victim) : -1
+      // The panel in hand takes what comes from the front, and breaks at zero. Seated at a turret
+      // the weapon in hand is the mitraie: the panel blocks nothing.
+      const inHand = data.arsenal.get(victim).current === "panel" && turretOf(resources.turrets.get(), hit.victim) < 0
+      const shield = inHand ? panels.findIndex((p) => p._tag === "carried" && p.by === hit.victim) : -1
       const carried = shield < 0 ? null : panels[shield]
       if (carried?._tag === "carried" && fromTheFront(data.motion.get(victim).body, data.motion.get(victim).yaw, hit.from)) {
         const hp = carried.hp - hit.amount

@@ -3,8 +3,9 @@
  * when one opens, and what the Muster shows. The game draws the menus; this decides the order
  * between them and their content.
  */
-import type { Team } from "../shared/map.ts"
-import type { Reach, RoomInfo } from "../shared/protocol.ts"
+import { TEAMS, type Team } from "../shared/map.ts"
+import type { ClientMessage, Reach, RoomInfo } from "../shared/protocol.ts"
+import { everyoneAlone } from "../shared/sim/rules.ts"
 import { TICK_RATE } from "../shared/movement.ts"
 import type { PhaseView } from "../shared/sim/view.ts"
 import { isTraining } from "../shared/training/index.ts"
@@ -61,13 +62,6 @@ export interface MusterMember {
   readonly host: boolean
 }
 
-/** The Muster's two teams, from the room's roster: who is in each, in the roster's order, with their primary. */
-export function musterTeams(room: Pick<RoomInfo, "hostId" | "roster">): Record<Team, MusterMember[]> {
-  const teams: Record<Team, MusterMember[]> = { benandanti: [], malandanti: [] }
-  for (const r of room.roster) teams[r.team].push({ id: r.id, name: r.name, primary: r.primary, ready: r.ready, bot: r.bot, host: r.id === room.hostId })
-  return teams
-}
-
 /**
  * The primary picker of the Muster and the match's armoury: free, on the player's own primary, or
  * locked on the host's choice under single weapon, when nothing picked there is sent or remembered.
@@ -103,7 +97,7 @@ export type MusterScreen = { readonly tag: "closed" } | { readonly tag: "muster"
 
 export function musterScreen(room: Pick<RoomInfo, "roster" | "mode">, me: string, phase: RoomInfo["phase"]): MusterScreen {
   if (phase === "Muster") return { tag: "muster" }
-  if (phase === "Live" && room.roster.find((r) => r.id === me)?.onMap === false) return { tag: "joining", nextMatch: room.mode === "tampieste" }
+  if (phase === "Live" && room.roster.find((r) => r.id === me)?.place === "waiting") return { tag: "joining", nextMatch: room.mode === "tampieste" }
   return { tag: "closed" }
 }
 
@@ -153,4 +147,32 @@ export function nextFocus(from: Box, boxes: readonly Box[], dir: PadDirection): 
     }
   })
   return best
+}
+
+/** A host's bot button: one bot more or less, on a team, or on no team named in a mode with none. */
+export interface BotButton {
+  readonly delta: 1 | -1
+  readonly team: Team | null
+}
+
+/** The host's bot buttons, in the Muster and in the match menu: a + and a − for each team, or one of each in a mode with no teams. */
+export const botButtons = (room: Pick<RoomInfo, "mode">): readonly BotButton[] =>
+  everyoneAlone(room)
+    ? [
+        { delta: 1, team: null },
+        { delta: -1, team: null }
+      ]
+    : TEAMS.flatMap((team) => [
+        { delta: 1, team },
+        { delta: -1, team }
+      ])
+
+/**
+ * What a bot button sends. With no team named, the room still seats each bot on a team: a bot is
+ * added to the side with fewer members, and the last bot added is the one removed.
+ */
+export function botMessage(room: Pick<RoomInfo, "roster">, button: BotButton): ClientMessage {
+  const count = (team: Team) => room.roster.filter((r) => r.team === team).length
+  const team = button.team ?? (button.delta > 0 ? (count("benandanti") <= count("malandanti") ? "benandanti" : "malandanti") : (room.roster.findLast((r) => r.bot)?.team ?? "benandanti"))
+  return { t: "bot", team, delta: button.delta }
 }

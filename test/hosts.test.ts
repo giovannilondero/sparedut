@@ -96,6 +96,23 @@ for (const host of HOSTS) {
       expect(entered!.you?.arsenal.primary).toBe("doplete")
     })
 
+    test("in the Muster a member's team switch is always taken, and no bot changes team for it", () => {
+      const { connect } = harness(host.make)
+      const me = connect()
+      // One a side: the creator and a Malandant bot.
+      me.say({ ...create, bots: 1 })
+      const { you } = me.last("joined")!
+      const roster = () => me.last("room")!.room.roster
+      const bots = () => roster().filter((r) => r.bot).map((r) => [r.id, r.team])
+      const before = bots()
+      me.say({ t: "team", team: "malandanti" })
+      expect(roster().find((r) => r.id === you)?.team).toBe("malandanti")
+      expect(bots()).toEqual(before)
+      me.say({ t: "team", team: "benandanti" })
+      expect(roster().find((r) => r.id === you)?.team).toBe("benandanti")
+      expect(bots()).toEqual(before)
+    })
+
     test("ready is a member's own mark, set and taken back in the Muster, and shown in the roster", () => {
       const { connect } = harness(host.make)
       const me = connect()
@@ -208,7 +225,7 @@ for (const host of HOSTS) {
       play(10)
       expect(me.last("snap")!.players).toHaveLength(before)
       expect(me.last("snap")!.you?.alive).toBe(true)
-      expect(me.last("room")!.room.roster.find((r) => r.id === you)?.onMap).toBe(true)
+      expect(me.last("room")!.room.roster.find((r) => r.id === you)?.place).toBe("inMatch")
     })
 
     test("the host's restart during a live match ends it and returns the room to the Muster", () => {
@@ -451,6 +468,16 @@ describe("the Muster on the game server", () => {
     expect(other.last("snap")!.phase.tag).toBe("Live")
   })
 
+  test("in the Muster two friends at one a side can swap sides, one after the other", () => {
+    const { host, other, otherId } = twoHumans({ ...HOSTS_CREATE.online, bots: 0 })
+    const hostId = host.last("joined")!.you
+    const teams = () => host.last("room")!.room.roster.map((r) => [r.id, r.team])
+    expect(teams()).toEqual([[hostId, "benandanti"], [otherId, "malandanti"]])
+    host.say({ t: "team", team: "malandanti" })
+    other.say({ t: "team", team: "benandanti" })
+    expect(teams()).toEqual([[hostId, "malandanti"], [otherId, "benandanti"]])
+  })
+
   test("a member who joins sees everybody's team and primary in the roster", () => {
     const { connect } = harness(HOSTS[0].make)
     const host = connect()
@@ -479,6 +506,22 @@ describe("the Muster on the game server", () => {
     play(10)
     expect(other.last("snap")!.phase.tag).toBe("Live")
     expect(other.last("snap")!.you?.alive).toBe(true)
+  })
+
+  test("the host leaving during the countdown cancels it: the room stays in the Muster under the new host until they start", () => {
+    const { play, host, other, otherId } = twoHumans()
+    host.say({ t: "start" })
+    play(60)
+    host.say({ t: "leave" })
+    expect(other.last("room")!.room.hostId).toBe(otherId)
+    play(2)
+    expect(other.last("snap")!.phase).toEqual({ tag: "Muster", starts: null })
+    play(COUNTDOWN_TICKS * 2)
+    expect(other.last("snap")!.phase).toEqual({ tag: "Muster", starts: null })
+    // The only human left, the new host's own start goes live at once.
+    other.say({ t: "start" })
+    play(2)
+    expect(other.last("snap")!.phase.tag).toBe("Live")
   })
 
   test("the room list shows the Muster as a room's phase, then the match", () => {
@@ -513,10 +556,10 @@ describe("joining a match already on, on the game server", () => {
 
   test("a member who joins a live match is in the roster, not on the map, and absent from the match's players", () => {
     const { host, late, you, entry, play } = live()
-    expect(entry()).toMatchObject({ primary: "miedi", onMap: false })
-    expect(entry(host)?.onMap).toBe(false)
+    expect(entry()).toMatchObject({ primary: "miedi", place: "waiting" })
+    expect(entry(host)?.place).toBe("waiting")
     // The others are on the map.
-    expect(late.last("room")!.room.roster.filter((r) => r.id !== you).every((r) => r.onMap)).toBe(true)
+    expect(late.last("room")!.room.roster.filter((r) => r.id !== you).every((r) => r.place === "inMatch")).toBe(true)
     // No time limit: a long wait, and still nothing of them in the match.
     play(60 * 60)
     const snaps = [...late.got, ...host.got].filter((m) => m.t === "snap")
@@ -532,16 +575,69 @@ describe("joining a match already on, on the game server", () => {
     play(30)
     late.say({ t: "team", team })
     late.say({ t: "primary", p: "mulin" })
-    expect(entry()).toMatchObject({ team, primary: "mulin", onMap: false })
+    expect(entry()).toMatchObject({ team, primary: "mulin", place: "waiting" })
     late.say({ t: "enter" })
-    expect(entry()?.onMap).toBe(true)
-    expect(entry(host)?.onMap).toBe(true)
+    expect(entry()?.place).toBe("inMatch")
+    expect(entry(host)?.place).toBe("inMatch")
     play(120)
     const snap = late.last("snap")!
     expect(snap.you?.alive).toBe(true)
     expect(snap.you?.arsenal.primary).toBe("mulin")
     expect(snap.players.find((p) => p.id === you)?.w).toBe("mulin")
     expect(late.last("board")!.rows.find((r) => r.id === you)?.team).toBe(team)
+  })
+
+  test("members who have not entered cannot unbalance the teams: two joiners asking for the same side leave them even", () => {
+    const h = harness(HOSTS[0].make)
+    const host = h.connect()
+    // Three a side.
+    host.say({ ...HOSTS_CREATE.online, bots: 3 })
+    host.say({ t: "start" })
+    h.play(60)
+    const code = host.last("joined")!.room.code
+    const joiners = [h.connect("10.0.0.1"), h.connect("10.0.0.2")]
+    for (const c of joiners) {
+      c.say(join(code))
+      c.say({ t: "team", team: "malandanti" })
+    }
+    for (const c of joiners) c.say({ t: "enter" })
+    h.play(120)
+    const rows = host.last("board")!.rows
+    const count = (team: string) => rows.filter((r) => r.team === team).length
+    expect(rows).toHaveLength(8)
+    expect(count("benandanti")).toBe(4)
+    expect(count("malandanti")).toBe(4)
+  })
+
+  test("while a match is on, a switch onto the larger team with no bot on it to swap is refused, for a member on the map and one who has not entered", () => {
+    const h = harness(HOSTS[0].make)
+    const host = h.connect()
+    host.say({ ...HOSTS_CREATE.online, bots: 0 })
+    const hostId = host.last("joined")!.you
+    const code = host.last("joined")!.room.code
+    const friend = h.connect("10.0.0.1")
+    friend.say(join(code))
+    host.say({ t: "start" })
+    friend.say({ t: "ready", ready: true })
+    h.play(10)
+    expect(host.last("snap")!.phase.tag).toBe("Live")
+    const team = (id: string) => host.last("room")!.room.roster.find((r) => r.id === id)?.team
+    const first = h.connect("10.0.0.2")
+    first.say(join(code))
+    const firstId = first.last("joined")!.you
+    // Seated on the smaller side, the Benandanti; the Malandanti, smaller after it, take it.
+    expect(team(firstId)).toBe("benandanti")
+    first.say({ t: "team", team: "malandanti" })
+    expect(team(firstId)).toBe("malandanti")
+    const second = h.connect("10.0.0.3")
+    second.say(join(code))
+    const secondId = second.last("joined")!.you
+    expect(team(secondId)).toBe("benandanti")
+    // Two a side counting those who have not entered: neither the second joiner nor the host can make it one against three.
+    second.say({ t: "team", team: "malandanti" })
+    expect(team(secondId)).toBe("benandanti")
+    host.say({ t: "team", team: "malandanti" })
+    expect(team(hostId)).toBe("benandanti")
   })
 
   test("a change of primary by a member who has not entered is accepted, and refused once they are on the map", () => {
@@ -620,7 +716,7 @@ describe("joining a match already on, on the game server", () => {
     // Entering during the results is still entering this match; they wait for the Muster instead.
     for (let s = 0; s < 20 && late.last("snap")?.phase.tag !== "Muster"; s++) play(60)
     expect(late.last("snap")!.phase.tag).toBe("Muster")
-    expect(entry()?.onMap).toBe(true)
+    expect(entry()?.place).toBe("inMatch")
     play(2)
     expect(late.last("snap")!.players.some((p) => p.id === you)).toBe(true)
     // Everybody ready: the host's start goes live at once, with no countdown to wait out.
@@ -636,7 +732,7 @@ describe("joining a match already on, on the game server", () => {
     host.say({ t: "start" })
     play(2)
     expect(late.last("snap")!.phase.tag).toBe("Muster")
-    expect(entry()?.onMap).toBe(true)
+    expect(entry()?.place).toBe("inMatch")
     late.say({ t: "ready", ready: true })
     host.say({ t: "start" })
     play(10)
@@ -646,7 +742,7 @@ describe("joining a match already on, on the game server", () => {
   test("in the Tampieste a member entering after the start does not spawn in that match", () => {
     const { late, you, entry, play } = live({ ...HOSTS_CREATE.online, mode: "tampieste" })
     late.say({ t: "enter" })
-    expect(entry()?.onMap).toBe(true)
+    expect(entry()?.place).toBe("inMatch")
     play(600)
     const snap = late.last("snap")!
     expect(snap.phase.tag).toBe("Live")

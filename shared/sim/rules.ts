@@ -31,7 +31,7 @@ export const FLAG_RETURN_TICKS = 30 * 60
 export const otherTeam = (team: Team): Team => (team === "benandanti" ? "malandanti" : "benandanti")
 
 /** The Tampieste has no teams: free-for-all. */
-export const everyoneAlone = (rules: RulesValue) => rules.mode === "tampieste"
+export const everyoneAlone = (rules: Pick<RulesValue, "mode">) => rules.mode === "tampieste"
 
 /** Teammates: they heal each other (same team, outside the Tampieste). */
 export const allied = (rules: RulesValue, a: Team, b: Team) => !everyoneAlone(rules) && a === b

@@ -295,12 +295,14 @@ function lanciafrico(): WeaponModel {
   return { root, muzzle, parts: { frico }, left: new THREE.Vector3(0, 0.0, -0.2), sightH: 0.165 }
 }
 
+/** The panel's width and height (m). */
+const PANEL_SIZE = { w: 1, h: 1 } as const
+
 /**
  * The casot's panel, torn off its wall: four weathered planks on two battens and a brace, the nails
  * still in, splinters where it gave. Held by its right edge (the grip is the origin), the left
  * hand on the far edge, its face towards -z: a board carried in front like a shield.
  */
-export const PANEL_SIZE = { w: 1, h: 1 } as const
 function panel(): WeaponModel {
   const root = new THREE.Group()
   const { w, h } = PANEL_SIZE

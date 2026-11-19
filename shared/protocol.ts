@@ -148,6 +148,14 @@ export const ClientMessage = z.discriminatedUnion("t", [
 ])
 export type ClientMessage = z.infer<typeof ClientMessage>
 
+/**
+ * Where a member is in the match. `waiting`: they joined while a match was on and have not entered
+ * it: no body, no hits, no seat on a team for scoring, until their enter intent (or the Muster).
+ * `inMatch`: one of the match's players, on the map whenever the match puts them there; in the
+ * Muster everybody is, to enter the map together at the start.
+ */
+export type Place = "waiting" | "inMatch"
+
 export interface RosterEntry {
   readonly id: string
   readonly name: string
@@ -158,11 +166,7 @@ export interface RosterEntry {
   readonly ready: boolean
   readonly bot: boolean
   readonly away: boolean
-  /**
-   * False for a member who joined a match already on and has not entered it: off the map and out
-   * of the match until they do. True for everybody else, in the Muster too, where they enter at the start.
-   */
-  readonly onMap: boolean
+  readonly place: Place
 }
 
 /** A room in the room list. Its access says whether it asks for a password, never the password itself. */

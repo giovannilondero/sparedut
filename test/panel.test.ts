@@ -7,13 +7,14 @@
  */
 import { beforeAll, describe, expect, test } from "bun:test"
 import { BUTTON, IDLE_INPUT, type PlayerInput } from "../shared/input.ts"
-import type { V3 } from "../shared/map.ts"
 import { CASOT, LAND, MARAN } from "../shared/maps/maran.ts"
 import { createPhysicsWorld, initPhysics, type PhysicsWorld } from "../shared/physics.ts"
 import type { GameEvent } from "../shared/sim/events.ts"
 import { createSim, type Sim } from "../shared/sim/index.ts"
 import { SHIELD_TICKS } from "../shared/sim/rules.ts"
 import { PANEL_HP, PANEL_TEAR_TICKS, RAIBL_MINE, WEAPONS, type PrimaryId } from "../shared/weapons.ts"
+import { turretRestSeat, type V3 } from "../shared/map.ts"
+import { nearestNode, navGraph, route } from "../server/nav.ts"
 
 let maran: PhysicsWorld
 beforeAll(async () => {
@@ -421,6 +422,44 @@ describe("the panel as a shield", () => {
       expect(lost.panel).toBe(0)
     })
   }
+})
+
+describe("the panel at a turret", () => {
+  /** The village turret, out on the land: its seat, and a point in front of its gun. */
+  const TURRET_SPOT = MARAN.turrets[1]
+  const SEAT = turretRestSeat(TURRET_SPOT)
+  const AHEAD: V3 = [TURRET_SPOT.at[0] - Math.sin(TURRET_SPOT.yaw) * 4, LAND, TURRET_SPOT.at[2] - Math.cos(TURRET_SPOT.yaw) * 4]
+
+  test("seated at a turret its carrier fires the mitraie, and the panel blocks nothing, even from the front", () => {
+    // "c" cuts the casot's door down from outside; "b" waits in front of the turret's gun.
+    const sim = match([
+      { id: "a", at: inside(), yaw: FACING },
+      { id: "c", primary: "motosee", at: [CASOT.minX - 1, LAND, 27], yaw: -Math.PI / 2 },
+      { id: "b", team: "malandanti", at: AHEAD, yaw: TURRET_SPOT.yaw + Math.PI }
+    ])
+    expect(torn(hold(sim, "a", PANEL_TEAR_TICKS + 5, useHeld), "a")).toBe(true)
+    for (let i = 0; i < 600 && sim.view().doors[0] > 0; i++) all(sim, 1, (id) => (id === "c" ? { yaw: -Math.PI / 2, weapon: "motosee", buttons: BUTTON.fire } : {}))
+    expect(sim.view().doors[0]).toBeLessThanOrEqual(0)
+    // Out of the door and along the bots' paths to the turret's seat.
+    const graph = navGraph(maran)
+    const doorway: V3 = [CASOT.minX - 2, LAND, 27]
+    hold(sim, "a", 120, { to: [CASOT.minX + 1.2, 27] })
+    hold(sim, "a", 120, { to: [doorway[0], doorway[2]] })
+    const from = nearestNode(graph, { x: doorway[0], y: doorway[1], z: doorway[2] })
+    const path = route(graph, from, nearestNode(graph, { x: SEAT[0], y: SEAT[1], z: SEAT[2] }))
+    for (const n of path) hold(sim, "a", 300, { to: [graph.points[n][0], graph.points[n][2]] })
+    hold(sim, "a", 120, { to: [SEAT[0], SEAT[2]] })
+    hold(sim, "a", 1, { buttons: BUTTON.use })
+    expect(sim.view().turrets[1].gunner).toBe("a")
+    expect(me(sim, "a").arsenal.current).toBe("panel")
+    hold(sim, "a", 30, { yaw: TURRET_SPOT.yaw })
+    const hp = me(sim, "a").hp
+    const panelHp = carried(sim)
+    all(sim, 1, (id) => (id === "b" ? { ...aimAt(sim, "b", "a"), buttons: BUTTON.fire } : id === "a" ? { yaw: TURRET_SPOT.yaw } : {}))
+    all(sim, 2, (id) => (id === "b" ? aimAt(sim, "b", "a") : id === "a" ? { yaw: TURRET_SPOT.yaw } : {}))
+    expect(me(sim, "a").hp).toBeLessThan(hp)
+    expect(carried(sim)).toEqual(panelHp)
+  })
 })
 
 describe("the panel breaks", () => {

@@ -41,7 +41,7 @@ import "@ui-sdk/web/dialog"
 import "@ui-sdk/web/select"
 import { takeAwayDeparted } from "./bodies.ts"
 import { alwaysChosen } from "./choice.ts"
-import { afterEscape, endFocus, focusOnOpen, MATCH_MENUS, menuPrimary, musterScreen, nextFocus, primaryPicker, singleValue, SINGLE_OFF, type MatchMenu, type MusterScreen, type PadDirection } from "./match-menus.ts"
+import { afterEscape, botButtons, botMessage, endFocus, focusOnOpen, MATCH_MENUS, menuPrimary, musterScreen, nextFocus, primaryPicker, singleValue, SINGLE_OFF, type BotButton, type MatchMenu, type MusterScreen, type PadDirection } from "./match-menus.ts"
 import { classFigures } from "./menu-model.ts"
 import { MusterModel, type MusterRow, type MusterView, type PrimaryTile } from "./muster-model.ts"
 import { pickerEntries } from "./touch.ts"
@@ -508,7 +508,9 @@ export class Game {
 
     const prev = this.snap
     this.snap = s
-    this.muster.snapshot(s)
+    // The player's last pick, sent again while the room does not have it.
+    const pick = this.muster.snapshot(s)
+    if (pick) this.d.net.send(pick)
     // Broken-down doors no longer stop predicted movement or shots.
     this.physics.setDoors(s.doors.map((hp) => hp > 0))
     // A panel torn off leaves its gap: predicted shots pass through it (bodies still cannot).
@@ -859,7 +861,6 @@ export class Game {
     return this.snap?.you ?? null
   }
 
-  /** The turret I'm using, or -1. */
   /**
    * The panel holding "use" would tear off now, as the simulation decides it (`PlayPanels`): on its
    * wall or being torn by me, faced from inside with slot 3 free. -1 when none.
@@ -873,6 +874,7 @@ export class Game {
     })
   }
 
+  /** The turret I'm using, or -1. */
   private mounted() {
     return this.snap?.turrets.findIndex((t) => t.gunner === this.me) ?? -1
   }
@@ -1103,9 +1105,7 @@ export class Game {
 
   private renderLoadout() {
     const lo = t().loadout
-    const picker = primaryPicker(this.room ?? { single: null }, this.d.settings.primary)
-    const note = picker._tag === "locked" ? t().muster.locked(t().weapons[picker.chosen].name) : lo.note
-    this.drawMenu(MENU_PARTS.loadout[1], lo.title, `<div class="overlay-body"><p class="muted">${esc(note)}</p><div class="weapons" id="loadout-list"></div></div><div class="row overlay-actions"><button id="lo-close" class="primary">${lo.resume}</button></div>`)
+    this.drawMenu(MENU_PARTS.loadout[1], lo.title, `<div class="overlay-body"><p class="muted">${esc(lo.note)}</p><div class="weapons" id="loadout-list"></div></div><div class="row overlay-actions"><button id="lo-close" class="primary">${lo.resume}</button></div>`)
     this.d.menu.buildArmarie($("loadout-list"), (p) => {
       this.d.net.send({ t: "primary", p })
       // If I was holding the old primary, switch to the new one right away.
@@ -1115,7 +1115,7 @@ export class Game {
         this.wanted = p
         this.wantedSeq = this.seq + 1
       }
-    }, picker)
+    })
     $("lo-close").onclick = () => {
       this.openOverlay("none")
       this.controls.lock()
@@ -1188,12 +1188,11 @@ export class Game {
   private botToolsHtml(prefix: "p" | "m", room: RoomInfo) {
     const s = t()
     const p = s.pause
-    const ben = TEAM_INFO.benandanti.short
-    const mal = TEAM_INFO.malandanti.short
-    return `<div class="host-bots">
-          <button data-bot="benandanti:1">${p.addBot(ben)}</button><button data-bot="benandanti:-1">${p.removeBot(ben)}</button>
-          <button data-bot="malandanti:1">${p.addBot(mal)}</button><button data-bot="malandanti:-1">${p.removeBot(mal)}</button>
-        </div>
+    const button = (b: BotButton, i: number) => {
+      const team = b.team && TEAM_INFO[b.team].short
+      return `<button data-bot="${i}">${b.delta > 0 ? p.addBot(team) : p.removeBot(team)}</button>`
+    }
+    return `<div class="host-bots">${botButtons(room).map(button).join("")}</div>
         <ui-select id="${prefix}-level" class="host-level" presentation="auto" default-value="${room.level}">
           <ui-select-label>${p.level}</ui-select-label>
           <ui-select-trigger><button><ui-select-value></ui-select-value></button></ui-select-trigger>
@@ -1204,8 +1203,9 @@ export class Game {
   private bindBotTools(el: HTMLElement, prefix: "p" | "m") {
     for (const b of el.querySelectorAll<HTMLButtonElement>("[data-bot]")) {
       b.onclick = () => {
-        const [team, delta] = b.dataset.bot!.split(":")
-        this.d.net.send({ t: "bot", team: team as Team, delta: Number(delta) as 1 | -1 })
+        const room = this.room
+        const button = room && botButtons(room)[Number(b.dataset.bot)]
+        if (button) this.d.net.send(botMessage(room, button))
       }
     }
     // The room's update sets the value back from code ("imperative"): only the host's own choice is sent.
@@ -1257,8 +1257,8 @@ export class Game {
     }
     const team = document.getElementById("p-team")
     if (team) team.onclick = () => this.d.net.send({ t: "team", team: this.otherTeam() })
-    const loadout = document.getElementById("p-loadout")
-    if (loadout) loadout.onclick = () => this.openOverlay("loadout")
+    const armoury = document.getElementById("p-loadout")
+    if (armoury) armoury.onclick = () => this.openOverlay("loadout")
     $("p-leave").onclick = () => {
       this.d.net.send({ t: "leave" })
       this.d.onLeave()
@@ -1323,11 +1323,11 @@ export class Game {
     const focused = document.activeElement
     for (const team of TEAMS) {
       list(team, sides[team])
-      $(`m-to-${team}`).hidden = team === sides.mine
+      $(`m-to-${team}`).hidden = team === sides.mine || !sides.canSwitch
       $(`m-team-${team}`).classList.toggle("mine", team === sides.mine)
     }
-    // The switch pressed is gone with the move: focus goes to the one that leads back.
-    if (focused instanceof HTMLElement && focused.hidden && focused.classList.contains("mu-switch")) $(`m-to-${TEAMS.find((team) => team !== sides.mine)}`).focus()
+    // The switch pressed is gone with the move: focus goes to the one that leads back, if it is offered.
+    if (focused instanceof HTMLElement && focused.hidden && focused.classList.contains("mu-switch") && sides.canSwitch) $(`m-to-${TEAMS.find((team) => team !== sides.mine)}`).focus()
   }
 
   /** A primary's health and speed: the armoury's figures, each with a bar to compare at a glance. */
@@ -1337,11 +1337,13 @@ export class Game {
     return `<span class="mu-stats">${bar(healthLabel, health, tile.bars.health)}${bar(speedLabel, speed, tile.bars.speed)}</span>`
   }
 
-  /** The primary the player enters with, large: its name, its line and its class. */
+  /** The primary the player enters with, large: its name, its line and its class; and its tile marked. */
   private drawMusterChosen(view: OpenMuster) {
     const chosen = view.picker.chosen
     if (chosen === this.musterChosen) return
     this.musterChosen = chosen
+    const group = document.querySelector<HTMLElementTagNameMap["ui-radio-group"]>("#m-picker ui-radio-group")
+    if (group && group.value !== chosen) group.value = chosen
     const s = t()
     const tile = view.picker.tiles.find((x) => x.primary === chosen)!
     $("m-chosen").innerHTML = `<span class="tag">${s.muster.primary}</span><b>${s.weapons[chosen].name}</b><span class="blurb">${s.weapons[chosen].blurb}</span>${this.classBarsHtml(tile)}`
@@ -1459,7 +1461,7 @@ export class Game {
           <section class="mu-chat" aria-labelledby="m-h-chat"><h3 id="m-h-chat">${m.chat}</h3><div class="mu-chat-log" id="m-chat-log" role="log"></div><input id="m-chat" maxlength="120" placeholder="${m.chatPlaceholder}" aria-label="${m.chat}" /></section>
         </aside>
       </div>
-      <div class="mu-foot">${foot}</div>`, "mu-title")
+      <div class="mu-foot">${foot}</div>`)
     const el = $(MENU_PARTS.muster[1])
     this.bindCopy("m", room)
     this.renderMusterChat()

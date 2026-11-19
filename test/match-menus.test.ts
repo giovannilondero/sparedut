@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
-import { afterEscape, endFocus, focusOnOpen, menuPrimary, musterCountdown, musterFocus, musterScreen, musterTeams, nextFocus, primaryPicker, singleOf, singleValue, startsAtOnce } from "../client/match-menus.ts"
+import { afterEscape, botButtons, botMessage, endFocus, focusOnOpen, menuPrimary, musterCountdown, musterFocus, musterScreen, nextFocus, primaryPicker, singleOf, singleValue, startsAtOnce } from "../client/match-menus.ts"
+import type { RoomInfo } from "../shared/protocol.ts"
 
 test("Esc closes the in-match menus one step at a time", () => {
   expect(afterEscape("pause", "none")).toBe("none")
@@ -28,29 +29,14 @@ test("the end screen starts on another match for the host, on leaving for everyo
   expect(endFocus(false)).toBe("e-leave")
 })
 
-const room = (over: Partial<Parameters<typeof musterTeams>[0]> = {}): Parameters<typeof musterTeams>[0] => ({
+const room = (over: Partial<Pick<RoomInfo, "hostId" | "roster">> = {}): Pick<RoomInfo, "hostId" | "roster"> => ({
   hostId: "p1",
   roster: [
-    { id: "p1", name: "Toni", team: "benandanti", primary: "mulin", ready: false, bot: false, away: false, onMap: true },
-    { id: "bot-1", name: "Bepi", team: "malandanti", primary: "cramar", ready: true, bot: true, away: false, onMap: true },
-    { id: "p2", name: "Mariute", team: "malandanti", primary: "miedi", ready: false, bot: false, away: false, onMap: true }
+    { id: "p1", name: "Toni", team: "benandanti", primary: "mulin", ready: false, bot: false, away: false, place: "inMatch" },
+    { id: "bot-1", name: "Bepi", team: "malandanti", primary: "cramar", ready: true, bot: true, away: false, place: "inMatch" },
+    { id: "p2", name: "Mariute", team: "malandanti", primary: "miedi", ready: false, bot: false, away: false, place: "inMatch" }
   ],
   ...over
-})
-
-test("the Muster shows both teams, each member with their primary, from the room's roster", () => {
-  expect(musterTeams(room())).toEqual({
-    benandanti: [{ id: "p1", name: "Toni", primary: "mulin", ready: false, bot: false, host: true }],
-    malandanti: [
-      { id: "bot-1", name: "Bepi", primary: "cramar", ready: true, bot: true, host: false },
-      { id: "p2", name: "Mariute", primary: "miedi", ready: false, bot: false, host: false }
-    ]
-  })
-})
-
-test("a change of team or primary in the roster shows in the Muster", () => {
-  const moved = room({ roster: room().roster.map((r) => (r.id === "p2" ? { ...r, team: "benandanti", primary: "doplete" } : r)) })
-  expect(musterTeams(moved).benandanti.map((m) => [m.name, m.primary])).toEqual([["Toni", "mulin"], ["Mariute", "doplete"]])
 })
 
 test("an Offline room's Muster opens with start focused: one press begins the match", () => {
@@ -77,7 +63,7 @@ test("the Muster's primary picker is free on the player's own primary, and locke
 })
 
 const waiting = (mode: "bataie" | "tampieste" = "bataie") => ({
-  ...room({ roster: room().roster.map((r) => (r.id === "p2" ? { ...r, onMap: false } : r)) }),
+  ...room({ roster: room().roster.map((r) => (r.id === "p2" ? { ...r, place: "waiting" } : r)) }),
   mode
 })
 
@@ -99,12 +85,6 @@ test("joining a Tampieste already on, the screen says they play from the next ma
 
 test("during the results the end screen shows, for a member who has not entered too", () => {
   expect(musterScreen(waiting(), "p2", "Over")).toEqual({ tag: "closed" })
-})
-
-test("a member's ready mark in the roster shows in the Muster, and so does taking it back", () => {
-  const ready = room({ roster: room().roster.map((r) => (r.id === "p2" ? { ...r, ready: true } : r)) })
-  expect(musterTeams(ready).malandanti.find((m) => m.id === "p2")?.ready).toBe(true)
-  expect(musterTeams(room()).malandanti.find((m) => m.id === "p2")?.ready).toBe(false)
 })
 
 test("the Muster's countdown in whole seconds left, and none while no countdown runs", () => {
@@ -147,4 +127,26 @@ test("the pad's d-pad moves focus to the nearest control in its direction", () =
 test("at the edge of the screen the d-pad leaves focus where it is", () => {
   expect(nextFocus(field[2], field, "right")).toBe(-1)
   expect(nextFocus(field[0], field, "up")).toBe(-1)
+})
+
+test("the host's bot buttons: a + and a − for each team, and in a mode with no teams one of each, naming no team", () => {
+  expect(botButtons({ mode: "bataie" })).toEqual([
+    { delta: 1, team: "benandanti" },
+    { delta: -1, team: "benandanti" },
+    { delta: 1, team: "malandanti" },
+    { delta: -1, team: "malandanti" }
+  ])
+  expect(botButtons({ mode: "tampieste" })).toEqual([
+    { delta: 1, team: null },
+    { delta: -1, team: null }
+  ])
+})
+
+test("a bot button sends its team; one naming no team adds a bot to the side with fewer members and removes the last bot added", () => {
+  expect(botMessage(room(), { delta: 1, team: "malandanti" })).toEqual({ t: "bot", team: "malandanti", delta: 1 })
+  // One Benandant against two Malandants, the bot among them.
+  expect(botMessage(room(), { delta: 1, team: null })).toEqual({ t: "bot", team: "benandanti", delta: 1 })
+  expect(botMessage(room(), { delta: -1, team: null })).toEqual({ t: "bot", team: "malandanti", delta: -1 })
+  const more = room({ roster: [...room().roster, { id: "bot-2", name: "Nart", team: "benandanti", primary: "cramar", ready: true, bot: true, away: false, place: "inMatch" }] })
+  expect(botMessage(more, { delta: -1, team: null })).toEqual({ t: "bot", team: "benandanti", delta: -1 })
 })
