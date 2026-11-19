@@ -6,6 +6,7 @@
  * draws the view and forwards the presses.
  */
 import type { Team } from "../shared/map.ts"
+import { everyoneAlone } from "../shared/sim/rules.ts"
 import { teamSwitch } from "../shared/teams.ts"
 import { FLAG_BIT, type ClientMessage, type RoomInfo, type Snapshot } from "../shared/protocol.ts"
 import { CLASSES, PRIMARIES, type PrimaryId } from "../shared/weapons.ts"
@@ -105,11 +106,8 @@ export type MusterView =
       readonly focus: string | null
     }
 
-/** The modes played each for themselves: no teams to show, none to switch to. */
-const alone = (mode: RoomInfo["mode"]) => mode === "tampieste"
-
 const live = (room: RoomInfo, snap: Snap, left: number): MusterLive =>
-  alone(room.mode)
+  everyoneAlone(room)
     ? { tag: "alone", alive: snap.players.filter((p) => p.f & FLAG_BIT.alive).length, left }
     : { tag: "teams", benandanti: snap.score.benandanti, malandanti: snap.score.malandanti, percent: room.mode === "cjar", left }
 
@@ -171,7 +169,7 @@ export class MusterModel {
   /** The switch under the other team: to that team. Nothing in a mode with no teams, nor where the room would refuse it. */
   switchTeam(): ClientMessage | null {
     const room = this.info
-    if (!room || alone(room.mode)) return null
+    if (!room || everyoneAlone(room)) return null
     const mine = this.mine(room)
     const to = other(mine)
     return this.canSwitch(room, mine, to) ? { t: "team", team: to } : null
@@ -257,7 +255,7 @@ export class MusterModel {
     if (screen.tag === "closed") return screen
     const row = (r: RoomInfo["roster"][number]): MusterRow => ({ id: r.id, name: r.name, primary: r.primary, ready: r.ready, bot: r.bot, host: r.id === room.hostId, me: r.id === this.me })
     const rows = room.roster.map(row)
-    const sides: MusterSides = alone(room.mode)
+    const sides: MusterSides = everyoneAlone(room)
       ? { tag: "alone", members: rows }
       : {
           tag: "teams",

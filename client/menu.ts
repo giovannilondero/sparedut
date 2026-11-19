@@ -24,6 +24,7 @@ import { onLangChange, setLang, t, type Lang } from "./i18n.ts"
 import { chooseLook, LOOK_IDS, LOOKS, type LookId } from "./looks.ts"
 import { classFigures, focusOnScreen, MenuModel, SCREENS, type CreateOptions, type MenuButton, type Outcome, type PasswordRefusal, type PromptProblem, type Refusal, type Screen } from "./menu-model.ts"
 import { oneTapRoom, type Settings } from "./settings.ts"
+import { singleOf, singleValue } from "./match-menus.ts"
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 
@@ -78,9 +79,6 @@ function selectItems(select: Select, values: readonly number[], label: (n: numbe
   select.querySelector("ui-select-content")!.innerHTML = values.map((n) => `<ui-select-item value="${n}">${label(n)}</ui-select-item>`).join("")
   select.value = String(chosen)
 }
-
-/** Single weapon off, as creation's select names its value. */
-const SINGLE_OFF = "off"
 
 /** An access as creation names it: on its card and in the options' summary. */
 const accessLabel = (access: Access): string => (access === "password" ? `🔒 ${t().static.accessPassword}` : t().static.accessOpen)
@@ -495,7 +493,7 @@ export class Menu {
     number("c-minutes", (n) => this.model.chooseMinutes(n))
     number("c-bots", (n) => this.model.chooseBots(n))
     $<Select>("c-single").addEventListener("valuechange", alwaysChosen((value) => {
-      this.model.chooseSingle(value === SINGLE_OFF ? null : (value as PrimaryId))
+      this.model.chooseSingle(singleOf(value))
       this.renderChoices()
     }))
     const ff = $<HTMLInputElement>("c-ff")
@@ -539,9 +537,9 @@ export class Menu {
     selectItems($("c-bots"), options.bots, (n) => (n === 0 ? s.menu.botsNone : String(n)), choices.bots)
     const single = $<Select>("c-single")
     single.querySelector("ui-select-content")!.innerHTML = options.singles
-      .map((p) => `<ui-select-item value="${p ?? SINGLE_OFF}">${p ? s.weapons[p].name : s.menu.singleOff}</ui-select-item>`)
+      .map((p) => `<ui-select-item value="${singleValue(p)}">${p ? s.weapons[p].name : s.menu.singleOff}</ui-select-item>`)
       .join("")
-    single.value = choices.single ?? SINGLE_OFF
+    single.value = singleValue(choices.single)
     this.renderChoices()
   }
 

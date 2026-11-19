@@ -14,7 +14,7 @@ export type WeaponId = "mescul" | "mandi" | "cramar" | "doplete" | "cjampanili" 
  */
 export type FireMode = "melee" | "semi" | "auto" | "projectile" | "beam" | "held"
 
-/** Arm's length: how far the Mescul and the Motosee reach. */
+/** Arm's length: how far the Mescul, the Motosee and the casot's panel reach. */
 const MELEE_REACH = 2.4
 
 export interface WeaponDef {
@@ -261,7 +261,7 @@ export const WEAPONS = {
     reloadTicks: 0,
     magazine: 0,
     reserve: 0,
-    range: 2.4,
+    range: MELEE_REACH,
     falloff: 1,
     aimFov: 75,
     scope: false,
