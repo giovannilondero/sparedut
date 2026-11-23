@@ -1,0 +1,40 @@
+/* Throwaway (issue #93), prototype C: the armoury in every match; "now → next" where the primary already shows. */
+
+/* The menu: the primary in hand, and the next beside it once asked for. */
+.c-pair { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.c-side { display: grid; gap: 3px; flex: 1 1 12rem; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--stone-line); }
+.c-side.next { border: 1px dashed var(--gold); background: color-mix(in oklch, var(--gold) 8%, transparent); }
+.c-side.next .pause-primary-name { color: var(--gold); }
+.c-arrow { font: 700 22px/1 var(--serif); color: var(--gold); }
+.c-pair:not(.on) .c-side { flex: 0 1 auto; border: 0; padding: 0; }
+.c-pair:not(.on) .np-tag { display: none; }
+.c-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.c-note { margin: 0; color: var(--muted); }
+#p-loadout { border-color: color-mix(in oklch, var(--gold) 60%, transparent); }
+
+/* The armoury: the game's cards, in hand and next life marked. */
+.c-card { position: relative; }
+.c-card.c-next { border: 1px dashed var(--gold); background: color-mix(in oklch, var(--gold) 8%, transparent); }
+.c-mark { margin-block-end: -2px; }
+
+/* Alive: the slot or the weapon button names the next primary after the one in hand. */
+.c-to { color: var(--gold); font-weight: 700; }
+#weapon-name .c-to { padding: 0 6px; border: 1px dashed var(--gold); border-radius: 6px; font-size: 14px; }
+
+/* The death screen: the pair, and the two classes' figures from one to the other. */
+.c-death { margin-block-start: 8px; padding-block-start: 8px; border-block-start: 1px solid var(--stone-line); display: grid; gap: 2px; }
+.c-death-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+.c-death-pair { display: flex; justify-content: center; align-items: baseline; gap: 10px; font: 600 18px/1.2 var(--serif); }
+.c-death-pair s { color: var(--muted); text-decoration-thickness: 1px; }
+.c-death-pair span { color: var(--gold); }
+.c-death-pair b { font-size: 24px; color: var(--gold); }
+.c-death-figs { font-size: 12px; color: var(--muted); }
+.c-death-figs b { color: var(--ink); }
+.c-open { margin-block-start: 8px; min-block-size: 40px; padding: 6px 18px; font-size: 14px; text-shadow: none; }
+#hud.touch .c-death-pair b { font-size: 20px; }
+/* A narrow menu: the pair one above the other, the arrow pointing down. */
+@container overlay (inline-size <= 34rem) {
+  .c-pair.on { flex-direction: column; align-items: stretch; gap: 4px; }
+  .c-pair.on .c-side { flex: none; }
+  .c-arrow { align-self: center; rotate: 90deg; line-height: 1; }
+}
