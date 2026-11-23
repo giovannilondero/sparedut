@@ -200,7 +200,13 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 #hitmarker.kill { filter: sepia(1) saturate(8) hue-rotate(-40deg); transform: scale(1.4); }
 @keyframes hit { 0% { opacity: 1; transform: scale(1.3); } 100% { opacity: 0; transform: scale(1); } }
 
-#topbar { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); display: flex; align-items: stretch; gap: 0; }
+/*
+ * The top of the screen: the score centred, the kill feed in the room on its right, never under the
+ * score. Its long lines wrap to the room; when the room is too narrow even for that, the feed goes
+ * under the score, on the right.
+ */
+#hud-top { position: absolute; inset-block-start: 14px; inset-inline: 16px; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); column-gap: 12px; align-items: start; }
+#topbar { grid-column: 2; display: flex; align-items: stretch; gap: 0; }
 #topbar .score { display: flex; align-items: center; gap: 10px; padding: 6px 14px; background: var(--stone); border: 1px solid var(--stone-line); font-family: var(--serif); }
 #topbar .score b { font-size: 30px; min-width: 40px; text-align: center; }
 #topbar .score.ben { border-radius: 10px 0 0 10px; color: var(--ben); }
@@ -213,8 +219,12 @@ button kbd { margin-inline-start: 6px; opacity: 0.7; }
 #objective .hillbar { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.15); margin-top: 3px; overflow: hidden; }
 #objective .hillbar i { display: block; height: 100%; }
 
-#killfeed { position: absolute; top: 14px; right: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 13px; }
-#killfeed .kf { background: rgba(10, 8, 6, 0.72); padding: 4px 10px; border-radius: 6px; animation: rise 0.2s; }
+#killfeed-room { grid-column: 3; align-self: stretch; container-type: inline-size; display: flex; justify-content: flex-end; }
+#killfeed { min-inline-size: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 13px; }
+#killfeed .kf { max-inline-size: 100%; overflow-wrap: anywhere; background: rgba(10, 8, 6, 0.72); padding: 4px 10px; border-radius: 6px; animation: rise 0.2s; }
+@container (inline-size < 260px) {
+  #hud:not(.touch) #killfeed { position: absolute; inset-block-start: calc(100% + 8px); inset-inline-end: 0; inline-size: max-content; max-inline-size: 22rem; }
+}
 #killfeed .kf.me { border: 1px solid var(--gold); }
 #killfeed em { font-style: italic; opacity: 0.85; }
 #killfeed .w { color: var(--gold); font-size: 11px; }
@@ -737,9 +747,11 @@ html.in-match[data-device="touch"] :is(.overlay, input) { user-select: text; -we
  * the area client/touch.ts leaves free of the controls (--free-*, set once per size), the chat and
  * the turret at its foot, the crosshair's middle clear. The vitals are two rings where the layout
  * puts them; the rounds are on the weapon's control, the bombs and mines on their buttons. On a
- * desktop the two wrappers are `display: contents` and nothing here applies.
+ * desktop the two wrappers are `display: contents` and nothing here applies; the top's two
+ * (#hud-top, #killfeed-room) are the other way round, a layout on a desktop and invisible here.
  */
 #hud-free, #hud-status { display: contents; }
+#hud.touch :is(#hud-top, #killfeed-room) { display: contents; }
 #hud.touch #hud-free { position: absolute; inset-inline-start: var(--free-l); inset-block-start: var(--free-t); inline-size: var(--free-w); block-size: var(--free-h);
   display: flex; flex-direction: column; align-items: center; gap: 4px; }
 #hud.touch :is(#turret-prompt, #panel-prompt, #panel-hud, #turret-hud, #topbar, #killfeed, #banner, #chat, #training) { position: static; inset: auto; transform: none; }
