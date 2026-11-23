@@ -7,6 +7,7 @@ import { DurableObject } from "cloudflare:workers"
 import { initPhysics } from "../shared/physics.ts"
 import { Hub, type Peer } from "./hub.ts"
 import { networkOf } from "./network.ts"
+import { GAME_BUILD, versionLabel } from "../shared/version.ts"
 
 /**
  * A phone going to standby doesn't say goodbye: it just stops talking. The client sends a
@@ -46,6 +47,12 @@ export class Partidis extends DurableObject<Env> {
   private readonly hub = new Hub()
   private readonly sockets = new Map<WebSocket, Connection>()
   private loop: ReturnType<typeof setInterval> | null = null
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env)
+    // Which build is answering, in the Worker's logs: a deploy starts the object again.
+    console.log(`Partidis ${versionLabel(GAME_BUILD)}`)
+  }
 
   override async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") return new Response("Expected a WebSocket", { status: 426 })

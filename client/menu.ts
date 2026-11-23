@@ -6,6 +6,7 @@ import type { TrainingStart } from "../shared/training/start.ts"
 import type { MapId } from "../shared/map.ts"
 import type { Access, RoomSummary } from "../shared/protocol.ts"
 import { PRIMARIES, WEAPON_IDS, WEAPONS, type PrimaryId, type WeaponId } from "../shared/weapons.ts"
+import { GAME_BUILD, versionLabel } from "../shared/version.ts"
 // UI SDK's radio group: one tab stop, arrow keys, the radio role. Markup and styling stay the game's.
 import "@ui-sdk/web/radio"
 // UI SDK's dialog, for the password prompt: focus moved in and back, Tab kept inside, Esc and outside presses close it.
@@ -369,6 +370,7 @@ export class Menu {
 
   /** Listeners only once: the room list is redrawn on every refresh and language change. */
   private bindHome() {
+    $("home-version").textContent = versionLabel(GAME_BUILD)
     const code = $<HTMLInputElement>("j-code")
     code.addEventListener("input", () => {
       this.model.typeCode(code.value)
