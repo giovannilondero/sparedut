@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Sparedût — next primary prototypes</title>
+    <link rel="stylesheet" href="../../style.css" />
+    <!-- Throwaway (issue #93): the owner picks one design, then this folder is deleted. -->
+    <style>
+      html, body { overflow: auto; }
+      body { background: radial-gradient(120% 80% at 50% 0%, #2a2118 0%, var(--night) 70%); color: var(--ink); }
+      .ix { max-inline-size: 1040px; margin-inline: auto; padding: clamp(14px, 3vw, 40px); display: grid; gap: 18px; }
+      .ix h1 { margin: 0; font: 700 clamp(30px, 5vw, 48px)/1.1 var(--serif); color: var(--gold); }
+      .ix > p { margin: 0; color: var(--muted); max-inline-size: 70ch; line-height: 1.5; }
+      .ix-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 14px; }
+      .ix-card { display: grid; gap: 10px; align-content: start; padding: 18px; border-radius: 14px; background: var(--stone); border: 1px solid var(--stone-line); }
+      .ix-card h2 { margin: 0; font-family: var(--serif); color: var(--gold); }
+      .ix-card h2 a { color: inherit; text-decoration: none; }
+      .ix-card p { margin: 0; font-size: 14px; line-height: 1.45; }
+      .ix-card dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 13px; }
+      .ix-card dt { color: var(--muted); }
+      .ix-card dd { margin: 0; }
+      .ix-card ul { margin: 0; padding-inline-start: 18px; font-size: 13px; line-height: 1.7; color: var(--muted); }
+      .ix-card a { color: var(--gold); }
+      .ix-open { display: flex; gap: 8px; }
+      .ix-open a { flex: 1; display: grid; place-items: center; min-block-size: 44px; border-radius: 10px; border: 1px solid var(--stone-line); text-decoration: none; font-weight: 600; }
+      .ix-open a:first-child { background: linear-gradient(180deg, #f0c45d, #c68c27); color: #1d1408; border-color: #f7d483; }
+    </style>
+  </head>
+  <body>
+    <main class="ix">
+      <div><div class="muted">Issue #93 · next primary prototypes</div><h1>Prossime vite</h1></div>
+      <p>
+        A player asks for another primary while a match is on; they keep the one in hand until they die, and come back with the new one and its class.
+        Three throwaway designs answer two questions together: where the player chooses, and how they are told that a change is waiting. Each has the
+        same screens: the match menu with nothing asked for, the menu just after asking, the HUD during the life, the death screen, and a single-weapon
+        room. The HUD and the match menu are the game's own, drawn with fixed data over a still of Glemone. The white bar at the top switches variant,
+        screen, single weapon, device and language; it is not part of the design. Look at a phone-sized window, upright and on its side, before the
+        desktop. New texts are in both languages; the Friulian is generated, the owner's to correct.
+      </p>
+      <div class="ix-grid">
+        <section class="ix-card">
+          <h2><a href="./a.html">A · The tiles</a></h2>
+          <p>The Muster's tiles in the match menu: the one in hand marked, another pressed marked "next life", the current one pressed again cancels.</p>
+          <dl><dt>Where</dt><dd>Match menu only</dd><dt>Told</dt><dd>Quietly: a dashed mark beside the weapon, one line on the death screen</dd></dl>
+          <div class="ix-open"><a href="./a.html">Furlan</a><a href="./a.html#lang=it">Italiano</a></div>
+          <ul><li><a href="./a.html#screen=pending">Pending</a> · <a href="./a.html#screen=hud">HUD</a> · <a href="./a.html#screen=death">death</a> · <a href="./a.html#single=1">single weapon</a></li></ul>
+        </section>
+        <section class="ix-card">
+          <h2><a href="./b.html">B · The death screen</a></h2>
+          <p>A strip of the primaries on the death screen, under the timer: number keys on a desktop, a tap on touch. The same strip in the match menu for a change asked for during a life.</p>
+          <dl><dt>Where</dt><dd>Death screen and match menu</dd><dt>Told</dt><dd>Loudly: a gold card on the weapon panel (under the score on touch) for the whole life; the death screen leads with it</dd></dl>
+          <div class="ix-open"><a href="./b.html">Furlan</a><a href="./b.html#lang=it">Italiano</a></div>
+          <ul><li><a href="./b.html#screen=pending">Pending</a> · <a href="./b.html#screen=hud">HUD</a> · <a href="./b.html#screen=death">death</a> · <a href="./b.html#single=1">single weapon</a> · <a href="./b.html#screen=death&single=1">its death screen</a></li></ul>
+        </section>
+        <section class="ix-card">
+          <h2><a href="./c.html">C · The armoury</a></h2>
+          <p>The training's armoury in every match: a button in the match menu, B or a button on the death screen. The menu sets "now → next life" side by side.</p>
+          <dl><dt>Where</dt><dd>Armoury, from the menu and the death screen</dd><dt>Told</dt><dd>As a pair, "Dopiete ▸ Mulin", where the primary already shows: the weapon's name, the touch weapon button, the death screen with both classes' figures</dd></dl>
+          <div class="ix-open"><a href="./c.html">Furlan</a><a href="./c.html#lang=it">Italiano</a></div>
+          <ul><li><a href="./c.html#screen=armoury">Armoury</a> · <a href="./c.html#screen=pending">pending</a> · <a href="./c.html#screen=hud">HUD</a> · <a href="./c.html#screen=death">death</a> · <a href="./c.html#single=1">single weapon</a></li></ul>
+        </section>
+      </div>
+      <p>The screenshots are in <code>shots/</code>, made by <code>bun client/preview/next-primary/shoot.ts</code> with the Vite server running.</p>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,51 @@
+/* Throwaway (issue #93), prototype B: a strip of primaries on the death screen and in the match menu; the next life said loudly. */
+
+/* The strip: one chip per primary, its number on a desktop, what it is under the name. */
+.b-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 6.6rem), 1fr)); gap: 6px; }
+.b-chip { position: relative; display: grid; justify-items: start; gap: 1px; min-block-size: var(--tap); padding: 6px 9px; text-align: start; text-shadow: none; }
+.b-chip b { font: 700 14px/1.15 var(--serif); color: var(--gold); }
+.b-chip small { font-size: 10px; color: var(--muted); white-space: nowrap; letter-spacing: 0.02em; }
+.b-chip kbd { position: absolute; inset-block-start: 4px; inset-inline-end: 6px; font: 600 10px/1 var(--sans); color: var(--muted); }
+.b-chip.now { border-color: var(--stone-line); background: rgba(255, 255, 255, 0.08); }
+.b-chip.now small { text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
+.b-chip.next { border-color: var(--gold); background: var(--gold); }
+.b-chip.next :is(b, small, kbd) { color: #1d1408; }
+.b-chip.next small { text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
+
+/* The menu: in hand and next life side by side, the next one gold. */
+.b-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 8px; }
+.b-now, .b-next { display: grid; gap: 4px; align-content: start; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--stone-line); }
+.b-next { grid-template-columns: minmax(0, 1fr) auto; border: 2px solid var(--gold); background: color-mix(in oklch, var(--gold) 14%, transparent); }
+.b-next > :not(button) { grid-column: 1; }
+.b-next > b { font: 700 20px/1.2 var(--serif); color: var(--gold); }
+.b-next > button { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
+.b-note { margin: 0; color: var(--muted); }
+
+/* The HUD: the next life on the weapon panel (desktop) or under the score (touch), for the whole life. */
+.b-life { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: 2px solid var(--gold); border-radius: 8px; background: rgba(10, 8, 6, 0.82); text-shadow: none; }
+.b-life b { font: 700 15px/1.1 var(--serif); color: var(--gold); }
+.b-life small { font-size: 11px; color: var(--muted); white-space: nowrap; }
+#ammo .b-life { justify-content: flex-end; margin: -2px -8px 8px; }
+#hud.touch .b-life { order: 0; padding: 2px 8px; }
+#hud.touch .b-life .np-tag { font-size: 9px; padding: 2px 4px; }
+
+/* The death screen: the next life first, then the strip to change it while the timer runs. */
+.b-death { display: grid; gap: 8px; margin-block-start: 10px; padding-block-start: 10px; border-block-start: 1px solid var(--stone-line); }
+.b-death-head { font: 600 18px/1.2 var(--sans); }
+.b-death-head b { font: 700 24px/1.1 var(--serif); color: var(--gold); }
+.b-death-ask { font-size: 13px; color: var(--ink); }
+.b-death-ask span { color: var(--muted); }
+.b-death .b-chip { pointer-events: auto; }
+#hud:not(.touch) .b-death .b-strip { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+#hud:not(.touch).b-dead #death { min-inline-size: min(880px, 94vw); top: auto; bottom: 168px; }
+/* On touch the strip takes the place of the death's line, and a chip is a name. */
+#hud.touch.b-dead #death { inline-size: min(100%, var(--free-w)); max-block-size: var(--free-h); overflow: hidden; }
+#hud.touch .b-death { gap: 4px; margin-block-start: 6px; padding-block-start: 6px; }
+#hud.touch .b-death-head { font-size: 14px; }
+#hud.touch .b-death-head b { font-size: 18px; }
+#hud.touch .b-death .b-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+#hud.touch .b-death .b-chip { justify-items: center; align-content: center; padding: 2px 4px; min-block-size: 38px; }
+#hud.touch .b-death .b-chip small { display: none; }
+#hud.touch .b-death .b-chip b { font-size: 13px; }
+/* The gold chip is the next life, the head says so: only the one in hand keeps its word. */
+#hud.touch .b-death .b-chip.now small { display: block; font-size: 9px; }

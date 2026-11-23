@@ -1,0 +1,30 @@
+/* Throwaway (issue #93), prototype A: the tiles in the match menu, quiet marks elsewhere. */
+
+/* The Muster's tiles, a tag over each name: in hand, next life, or a blank that keeps the rows level. */
+.a-tiles { grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr)); }
+.a-tile { align-items: stretch; }
+.a-tile .np-blank { visibility: hidden; }
+/* The next life: the gold edge dashed, for it is not in hand yet. */
+.a-tile.a-next { border: 1px dashed var(--gold); background: color-mix(in oklch, var(--gold) 8%, transparent); }
+.a-tiles:not(.locked) .a-tile[data-checked] { cursor: default; }
+.a-note { margin: 0; font-size: 13px; color: var(--muted); }
+.a-note.on { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; color: var(--ink); }
+.a-note.on b { color: var(--gold); font-weight: 600; }
+
+/* In the match: a small mark after the weapon slots, or over the weapon's control on touch. */
+.a-mark { display: inline-block; padding: 1px 6px; border-radius: 4px; border: 1px dashed var(--gold); color: var(--gold); font-size: 11px; white-space: nowrap; }
+#slots .a-mark { opacity: 0.9; }
+.a-badge { position: absolute; left: var(--wx); top: calc(var(--wy) - 22px); width: var(--ww); display: grid; place-items: center; }
+.a-badge .a-mark { background: rgba(10, 8, 6, 0.72); }
+.a-death { margin-top: 6px; font-size: 14px; color: var(--muted); }
+.a-death b { color: var(--gold); font-weight: 600; }
+
+/* A short screen (a phone on its side): the tiles lose their bars for the two numbers, so the seven fit. */
+.a-nums { display: none; font-size: 11px; color: var(--muted); white-space: nowrap; }
+@media (max-height: 500px) {
+  .a-tiles { grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); }
+  .a-tile { padding: 6px 8px; gap: 2px; }
+  .a-tile > b { font-size: 14px; }
+  .a-tile .mu-stats, .a-tile .np-blank { display: none; }
+  .a-nums { display: block; }
+}
