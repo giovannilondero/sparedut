@@ -13,6 +13,7 @@ import { deployOrigin } from "../scripts/deploy-origin.ts"
 import { STRINGS } from "../client/i18n.ts"
 import { readOpening } from "../client/opening.ts"
 import { readPrecache } from "../scripts/service-worker.ts"
+import { currentBuild } from "../scripts/game-version.ts"
 
 const DIST = join(import.meta.dir, "../dist")
 if (!existsSync(join(DIST, "index.html"))) throw new Error("no production build in dist/: run `pnpm build` first")
@@ -129,4 +130,11 @@ test("the built manifest offers the home screen's button as the icon's shortcut,
   expect(readOpening(target.search, target.hash)).toEqual({ kind: "shortcut" })
   for (const icon of manifest.shortcuts![0]!.icons ?? []) expect(existsSync(fileOf(icon.src))).toBe(true)
   expect(manifest.launch_handler).toEqual({ client_mode: "focus-existing" })
+})
+
+test("the built page carries this version and commit, stamped in place of the build's constants", () => {
+  const build = currentBuild()
+  const code = readdirSync(join(DIST, "assets")).filter((name) => name.endsWith(".js")).map((name) => readFileSync(join(DIST, "assets", name), "utf8"))
+  expect(code.some((js) => js.includes(build.version) && js.includes(build.commit))).toBe(true)
+  expect(code.filter((js) => /__SPAREDUT_(VERSION|COMMIT)__/.test(js))).toEqual([])
 })

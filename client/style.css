@@ -846,7 +846,7 @@ html.in-match[data-device="touch"] #perf { top: var(--free-t); left: var(--free-
    Everything at once. One column on a narrow screen, the list after the actions; where there is
    room, the room list beside them, as tall as they are and scrolling inside. */
 .home { align-self: start; display: grid; gap: clamp(10px, 1.4vw, 16px);
-  grid-template-columns: minmax(0, 1fr); grid-template-areas: "name" "hero" "tiles" "rooms" "tools"; }
+  grid-template-columns: minmax(0, 1fr); grid-template-areas: "name" "hero" "tiles" "rooms" "tools" "version"; }
 .home-name { grid-area: name; }
 .home-name input { min-block-size: 44px; font-size: 17px; }
 .home-name input[aria-invalid="true"]::placeholder { color: #f08a6c; }
@@ -885,6 +885,9 @@ html.in-match[data-device="touch"] #perf { top: var(--free-t); left: var(--free-
   border: 1px dashed var(--stone-line); border-radius: 10px; }
 .install-by-hand::before { content: "📲 "; }
 .home-tools .install[hidden], .install-by-hand[hidden] { display: none; }
+/* The version and commit: small and faint in the corner under everything, readable when looked for. */
+.home-version { grid-area: version; align-self: end; justify-self: end; margin: 0; font: 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--muted); opacity: 0.75; user-select: text; }
 
 /* Join by code: label, letters, button; the letters show in capitals whatever is typed. */
 .code-join { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0; padding: 10px 12px; }
@@ -923,7 +926,7 @@ html.in-match[data-device="touch"] #perf { top: var(--free-t); left: var(--free-
 
 @container menu (inline-size > 46rem) {
   .home { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); grid-template-rows: repeat(4, auto) 1fr;
-    grid-template-areas: "name rooms" "hero rooms" "tiles rooms" "tools rooms" ". rooms"; }
+    grid-template-areas: "name rooms" "hero rooms" "tiles rooms" "tools rooms" "version rooms"; }
   /* The list takes the actions' height, or more on a tall screen, and scrolls inside it rather than making the page taller. */
   .home-rooms { contain: size; min-block-size: 55dvh; }
   #room-list { flex: 1; min-block-size: 0; overflow: auto; overscroll-behavior: contain; padding: 2px; margin: -2px; }

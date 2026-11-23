@@ -10,6 +10,7 @@ import * as Alchemy from "alchemy"
 import * as Cloudflare from "@alchemy.run/cloudflare"
 import * as Effect from "effect/Effect"
 import { rapierWithWasmFile } from "./scripts/rapier-wasm.ts"
+import { buildDefines, currentBuild } from "./scripts/game-version.ts"
 
 export default Alchemy.Stack(
   "Sparedut",
@@ -30,7 +31,13 @@ export default Alchemy.Stack(
         runWorkerFirst: ["/ws"]
       },
       env: { PARTIDIS: Cloudflare.DurableObject("PARTIDIS", { className: "Partidis" }) },
-      build: { input: { resolve: { alias: { "@dimforge/rapier3d-compat": rapierWithWasmFile("module") } } } },
+      // The Worker gets the same version and commit as the client (`shared/version.ts`).
+      build: {
+        input: {
+          resolve: { alias: { "@dimforge/rapier3d-compat": rapierWithWasmFile("module") } },
+          transform: { define: buildDefines(currentBuild()) }
+        }
+      },
       domain: process.env.DEPLOY_DOMAIN || undefined,
       observability: { enabled: true }
     })
